@@ -36,3 +36,15 @@ test('changing search and filters resets student pagination', () => {
   assert.match(view, /setClassFilter\(e\.target\.value\); setShowAllClass\(false\); setPage\(1\)/);
   assert.match(view, /setFeeFilter\(e\.target\.value\); setShowAllClass\(false\); setPage\(1\)/);
 });
+
+
+test('student directory uses active current-year enrollments for class filters and display labels', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.get('/students'");
+  const end = api.indexOf("apiRouter.get('/students/export'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /academic_years', \{ school_id: school\.id, is_current: 'true' \}/);
+  assert.match(route, /'enrollments', \{ school_id: school\.id, academic_year_id: currentYearId, status: 'active' \}/);
+  assert.match(route, /filters\.id = enrolledStudentIds/);
+  assert.match(route, /className: klass \? \[klass\.name, section\].*'Not assigned'/s);
+});

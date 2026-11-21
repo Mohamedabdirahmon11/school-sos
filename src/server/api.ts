@@ -4824,8 +4824,10 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   const feeStatus = canViewFeeStatus && ['paid', 'partial', 'unpaid'].includes(requestedFeeStatus) ? requestedFeeStatus : 'all';
   const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId, gender, status: studentStatus };
   let roleFilter: string | undefined;
+  let teacherAssignedClassIds: string[] = [];
   if (user.role === 'teacher') {
     const assigned = await getTeacherAssignedClassIds(school.id, user.id);
+    teacherAssignedClassIds = assigned;
     if (classId && !assigned.includes(classId)) { res.status(403).json({ error: 'Student access is limited to your assigned classes.' }); return; }
     if (!assigned.length) { res.json([]); return; }
     filters.class_id = classId || assigned;
@@ -4867,16 +4869,61 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
 
+  // Resolve the displayed/filtered class from the active enrollment for the school's current year.
+  // students.class_id is retained for compatibility, but is not authoritative after year rollover.
+  const currentYearPage = await db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id');
+  const currentYearId = String((currentYearPage.items[0] as any)?.id || '');
+  const currentEnrollments = currentYearId
+    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active' }, 'id,student_id,class_id,section_id,roll_number')
+    : [];
+  const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
+  const classRows = await db.getClasses(school.id);
+  const classById = new Map<string, SchoolClass>(classRows.map(klass => [klass.id, klass] as const));
+  const sectionIds = [...new Set(currentEnrollments.map((row: any) => String(row.sectionId || '')).filter(Boolean))];
+  const sectionRows = sectionIds.length
+    ? await queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name')
+    : [];
+  const sectionById = new Map<string, string>(sectionRows.map((row: any) => [String(row.id), String(row.name || '')]));
+  const decorateWithCurrentEnrollment = (rows: any[]) => rows.map(student => {
+    if (!currentYearId) {
+      const legacyClass = classById.get(String(student.classId || ''));
+      const legacySection = legacyClass?.section || student.section || '';
+      return { ...student, className: legacyClass ? [legacyClass.name, legacySection].filter(Boolean).join(' · ') : 'Not assigned' };
+    }
+    const enrollment = enrollmentByStudent.get(String(student.id));
+    const klass = enrollment ? classById.get(String(enrollment.classId)) : undefined;
+    const section = enrollment?.sectionId ? sectionById.get(String(enrollment.sectionId)) || klass?.section || '' : klass?.section || '';
+    return {
+      ...student,
+      classId: enrollment?.classId || '',
+      section,
+      rollNumber: enrollment?.rollNumber || student.rollNumber || '',
+      className: klass ? [klass.name, section].filter(Boolean).join(' · ') : 'Not assigned'
+    };
+  });
+  const enrollmentClassScope = classId ? [classId] : user.role === 'teacher' ? teacherAssignedClassIds : null;
+  if (currentYearId && enrollmentClassScope) {
+    const enrolledStudentIds = [...new Set(currentEnrollments
+      .filter((row: any) => enrollmentClassScope.includes(String(row.classId)))
+      .map((row: any) => String(row.studentId)))];
+    if (!enrolledStudentIds.length) {
+      res.set({ 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': '0', 'X-Total-Pages': '0' });
+      res.json([]); return;
+    }
+    filters.class_id = undefined;
+    filters.id = enrolledStudentIds;
+  }
+
   // One class selected: return the whole class at once (A-Z), so numbering 1, 2, 3 is stable.
-  if (typeof filters.class_id === 'string' && filters.class_id && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
+  if (classId && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
     const classStudents = (await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students))
       .filter((student: any) => !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
       .sort(compareStudentsByName);
     res.set({ 'X-Page': '1', 'X-Page-Size': String(Math.max(classStudents.length, 1)), 'X-Total-Count': String(classStudents.length), 'X-Total-Pages': '1' });
-    if (!canViewFeeStatus) { res.json(sanitizeStudents(classStudents)); return; }
+    if (!canViewFeeStatus) { res.json(sanitizeStudents(decorateWithCurrentEnrollment(classStudents))); return; }
     const classStatusMap = await getStudentFeeStatusMap(school.id, classStudents.map((student: any) => student.id), school.academicYear);
-    res.json(sanitizeStudents(classStudents.map((student: any) => ({ ...student, feeStatus: classStatusMap.get(student.id) || 'unpaid' }))));
+    res.json(sanitizeStudents(decorateWithCurrentEnrollment(classStudents.map((student: any) => ({ ...student, feeStatus: classStatusMap.get(student.id) || 'unpaid' })))));
     return;
   }
 
@@ -4893,7 +4940,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     const items = filtered.slice((page - 1) * pageSize, page * pageSize)
       .map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }));
     res.set({ 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': String(total), 'X-Total-Pages': String(Math.ceil(total / pageSize)) });
-    res.json(sanitizeStudents(items));
+    res.json(sanitizeStudents(decorateWithCurrentEnrollment(items)));
     return;
   }
 
@@ -4901,11 +4948,11 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
   const canDecorateFeeStatus = canViewFeeStatus;
   if (!canDecorateFeeStatus) {
-    res.json(sanitizeStudents(result.items));
+    res.json(sanitizeStudents(decorateWithCurrentEnrollment(result.items)));
     return;
   }
   const statusMap = await getStudentFeeStatusMap(school.id, result.items.map((student: any) => student.id), school.academicYear);
-  res.json(sanitizeStudents(result.items.map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }))));
+  res.json(sanitizeStudents(decorateWithCurrentEnrollment(result.items.map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' })))));
 });
 
 apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
