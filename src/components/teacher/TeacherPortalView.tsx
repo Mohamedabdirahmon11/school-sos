@@ -533,7 +533,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="schoolos-teacher-portal mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
+    <div className="mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
         <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
@@ -822,7 +822,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
 
       {/* SUBJECT-WISE EXAM MARK ENTRY */}
       {activeTab === 'grades' && (
-        <section className="space-y-4">
+        <section className="schoolos-teacher-portal space-y-4">
           <div className="schoolos-mark-entry-toolbar grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
             <label className="text-xs font-semibold text-slate-600">Fasal
               <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
