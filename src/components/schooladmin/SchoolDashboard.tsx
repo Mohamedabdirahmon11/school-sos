@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
-import { CalendarCheck, Wallet, UserPlus, CreditCard, ClipboardCheck, BellRing, ArrowRight, AlertCircle } from 'lucide-react';
+import { CalendarCheck, Wallet, UserPlus, CreditCard, ClipboardCheck, BellRing, ArrowRight, AlertCircle, GraduationCap, Users, School } from 'lucide-react';
 
 interface SchoolDashboardProps {
   onNavigate: (view: string) => void;
@@ -41,11 +41,23 @@ export function normalizeSchoolDashboardData(data: unknown) {
   };
 }
 
-const Metric = ({ label, value, hint, onClick }: { label: string; value: React.ReactNode; hint?: string; onClick?: () => void }) => (
-  <button type="button" onClick={onClick} className="min-w-0 rounded-2xl border border-[#dce7e4] bg-white p-5 text-left shadow-[0_2px_8px_rgba(16,37,34,.025)] transition hover:-translate-y-0.5 hover:shadow-md">
-    <div className="text-sm text-[#627571]">{label}</div>
-    <div className="mt-2 text-3xl font-bold tracking-tight text-[#102522]">{value}</div>
-    {hint && <div className="mt-1 inline-flex rounded-full bg-[#d9f2e9] px-2.5 py-1 text-[11px] font-semibold text-[#08734f]">{hint}</div>}
+const Metric = ({ label, value, hint, onClick, icon: Icon, tone }: {
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+  onClick?: () => void;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  tone: 'blue' | 'green' | 'purple' | 'amber';
+}) => (
+  <button type="button" onClick={onClick} data-tone={tone} className="school-admin-metric min-w-0 text-left">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="metric-label">{label}</div>
+        <div className="metric-value mt-2">{value}</div>
+        {hint && <div className="metric-hint mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold">{hint}</div>}
+      </div>
+      <span className="metric-icon shrink-0"><Icon size={22} /></span>
+    </div>
   </button>
 );
 
@@ -74,10 +86,10 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     </section>
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric label="Students" value={totalStudents.toLocaleString()} onClick={()=>onNavigate('sch_students')}/>
-      <Metric label="Teachers" value={totalTeachers.toLocaleString()} onClick={()=>onNavigate('sch_teachers')}/>
-      <Metric label="Attendance today" value={result.stats.attendanceRecordedToday > 0 ? `${attendanceRate}%` : 'Not recorded'} hint={result.stats.attendanceRecordedToday > 0 ? 'Today' : 'Awaiting register'} onClick={()=>onNavigate('sch_attendance')}/>
-      <Metric label="Classes" value={totalClasses.toLocaleString()} hint="School classes" onClick={()=>onNavigate('sch_classes')}/>
+      <Metric label="Total students" value={totalStudents.toLocaleString()} icon={GraduationCap} tone="blue" onClick={()=>onNavigate('sch_students')}/>
+      <Metric label="Teachers" value={totalTeachers.toLocaleString()} icon={Users} tone="green" onClick={()=>onNavigate('sch_teachers')}/>
+      <Metric label="Attendance today" value={result.stats.attendanceRecordedToday > 0 ? `${attendanceRate}%` : 'Not recorded'} hint={result.stats.attendanceRecordedToday > 0 ? 'Today' : 'Awaiting register'} icon={CalendarCheck} tone="purple" onClick={()=>onNavigate('sch_attendance')}/>
+      <Metric label="Total classes" value={totalClasses.toLocaleString()} hint="School classes" icon={School} tone="amber" onClick={()=>onNavigate('sch_classes')}/>
     </section>
 
     <section className="grid gap-5 xl:grid-cols-[1.45fr_1fr]">
