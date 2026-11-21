@@ -9,6 +9,7 @@ import { formatMoney } from '../../lib/money.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { LoadingState } from '../common/AsyncState.tsx';
 import { 
   Building2, 
   GraduationCap, 
@@ -50,18 +51,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="sa-page p-6 space-y-4">
-        <div className="h-8 bg-slate-200 rounded w-1/4 animate-pulse"></div>
-        <div className="sa-metrics-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-24 bg-white rounded-xl border border-slate-200 p-4 animate-pulse"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingState label="Loading platform dashboard…" className="sa-page max-w-7xl" />;
 
   if (dashboard.error) return <ErrorState error={dashboard.error} onRetry={dashboard.retry} />;
   if (!data) return <ErrorState error={new Error('Super Admin data is unavailable.')} onRetry={dashboard.retry} />;
