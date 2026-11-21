@@ -21,6 +21,11 @@ export const ParentsView: React.FC = () => {
   const { school } = useAuth();
   const [contacts, setContacts] = useState<ParentContact[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const [classFilter, setClassFilter] = useState('');
   const [classes, setClasses] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -49,9 +54,10 @@ export const ParentsView: React.FC = () => {
       return;
     }
     let active = true;
+    const controller = new AbortController();
     setIsLoading(true);
     setLoadError(null);
-    ApiClient.getParentContacts({ page, pageSize: 50, search, classId: classFilter })
+    ApiClient.getParentContacts({ page, pageSize: 50, search: debouncedSearch, classId: classFilter, signal: controller.signal })
       .then((rows: ParentContact[]) => {
         if (!active) return;
         setContacts(Array.isArray(rows) ? rows : []);
@@ -64,8 +70,8 @@ export const ParentsView: React.FC = () => {
         setPageInfo(null);
       })
       .finally(() => { if (active) setIsLoading(false); });
-    return () => { active = false; };
-  }, [school?.id, page, search, classFilter, reloadCount]);
+    return () => { active = false; controller.abort(); };
+  }, [school?.id, page, debouncedSearch, classFilter, reloadCount]);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -111,7 +117,7 @@ export const ParentsView: React.FC = () => {
         </select>
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
-          <input type="search" placeholder="Search parent phone or linked student..." value={search}
+          <input type="search" placeholder="Search parent phone or linked student..." aria-label="Search parent contacts by phone or student" value={search}
             onChange={e => handleSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 text-xs border border-[#CBD5E1] rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
         </div>

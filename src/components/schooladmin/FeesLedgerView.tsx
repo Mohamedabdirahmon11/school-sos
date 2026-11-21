@@ -328,7 +328,7 @@ export const FeesLedgerView: React.FC = () => {
                 No cash payment records found. Click "Record Cash Payment" to record a collection.
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" role="region" aria-label="Fee ledger table. Scroll horizontally to view all columns." tabIndex={0}>
                 <table className="w-full min-w-[780px] text-left text-xs text-[#132A29]">
                   <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                     <tr>
@@ -408,7 +408,7 @@ export const FeesLedgerView: React.FC = () => {
           {arrears.length === 0 ? (
             <div className="p-8 text-center text-sm text-[#71817d]">All students are up to date on fee payments!</div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" role="region" aria-label="Fee ledger table. Scroll horizontally to view all columns." tabIndex={0}>
               <table className="w-full text-left text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                   <tr>
@@ -465,7 +465,7 @@ export const FeesLedgerView: React.FC = () => {
           </div>
 
           <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" role="region" aria-label="Fee ledger table. Scroll horizontally to view all columns." tabIndex={0}>
               <table className="w-full text-left text-xs text-[#132A29]">
                 <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                   <tr>
@@ -511,7 +511,7 @@ export const FeesLedgerView: React.FC = () => {
               Add Structure
             </button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" role="region" aria-label="Fee ledger table. Scroll horizontally to view all columns." tabIndex={0}>
             <table className="w-full text-left text-xs text-[#132A29]">
               <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] text-[11px] uppercase font-semibold text-[#64748B]">
                 <tr>

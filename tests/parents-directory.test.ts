@@ -43,7 +43,9 @@ test('unique contacts are searched, sorted, and paginated after deduplication', 
 test('Parents directory uses the unique contacts endpoint and exposes class All filter', () => {
   assert.match(client, /getParentContacts\(/);
   assert.match(client, /\/parents\/contacts\?/);
-  assert.match(view, /ApiClient\.getParentContacts\(\{ page, pageSize: 50, search, classId: classFilter \}\)/);
+  assert.match(view, /ApiClient\.getParentContacts\(\{ page, pageSize: 50, search: debouncedSearch, classId: classFilter, signal: controller\.signal \}\)/);
+  assert.match(view, /setDebouncedSearch\(search\), 300/);
+  assert.match(view, /controller\.abort\(\)/);
   assert.match(view, /<option value="">All classes<\/option>/);
   assert.match(view, /contact\.students\.map/);
 });

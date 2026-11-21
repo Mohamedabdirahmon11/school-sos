@@ -35,7 +35,7 @@ function writeCache<T>(key: string, data: T) {
   }
 }
 
-export function useApi<T>(load: () => Promise<T>, dependencies: DependencyList = [], enabled = true) {
+export function useApi<T>(load: (signal?: AbortSignal) => Promise<T>, dependencies: DependencyList = [], enabled = true) {
   const key = `${load.toString()}::${JSON.stringify(dependencies)}`;
   const cached = readCache<T>(key);
   const [result, setResult] = useState<{ key: string; data?: T; loading: boolean; error: ApiLoadError | null }>(() => ({ key, data: cached, loading: enabled && cached === undefined, error: null }));
@@ -47,14 +47,18 @@ export function useApi<T>(load: () => Promise<T>, dependencies: DependencyList =
     if (!enabled) { setResult({ key, data: freshCached, loading: false, error: null }); return; }
     if (freshCached !== undefined) { setResult({ key, data: freshCached, loading: false, error: null }); return; }
     let current = true;
+    const controller = new AbortController();
     setResult({ key, loading: true, error: null });
-    void loadOnce(key, load).then(result => {
+    const request = load.length > 0
+      ? Promise.resolve().then(() => load(controller.signal))
+      : loadOnce(key, load);
+    void request.then(result => {
       if (current) { writeCache(key, result); setResult({ key, data: result, loading: false, error: null }); }
     }).catch(reason => {
       if (!current) return;
       setResult({ key, loading: false, error: reason instanceof Error ? reason as ApiLoadError : new Error('Unable to load this screen.') });
     });
-    return () => { current = false; };
+    return () => { current = false; controller.abort(); };
     // Dependencies are caller-defined inputs to the request; attempt triggers Retry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...dependencies, attempt, enabled, key]);

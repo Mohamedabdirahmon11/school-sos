@@ -10,6 +10,7 @@ import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { LoadingState } from '../common/AsyncState.tsx';
 import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download, Pencil } from 'lucide-react';
 
 export const TeachersView: React.FC = () => {
@@ -17,10 +18,15 @@ export const TeachersView: React.FC = () => {
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const [subjectFilter, setSubjectFilter] = useState('');
-  const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20, search, subjectId: subjectFilter }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
-  ]), [school?.id, page, search, subjectFilter], Boolean(school));
+  const teacherLoad = useApi(async signal => Promise.all([
+    ApiClient.getTeachers({ page, pageSize: 20, search: debouncedSearch, subjectId: subjectFilter, signal }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+  ]), [school?.id, page, debouncedSearch, subjectFilter], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
@@ -189,7 +195,7 @@ export const TeachersView: React.FC = () => {
     }
   };
 
-  if (teacherLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading teachers"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
+  if (teacherLoad.loading) return <LoadingState label="Loading teachers…" />;
   if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={teacherLoad.retry} />;
   return (
     <div className="mx-auto max-w-[1680px] space-y-6 p-3 sm:p-5 lg:p-7">

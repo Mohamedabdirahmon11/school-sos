@@ -15,6 +15,7 @@ import { BulkStudentPinResetWizard } from './BulkStudentPinResetWizard.tsx';
 import { getPendingPinSlips } from '../../lib/bulk-pin-results.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { LoadingState } from '../common/AsyncState.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { 
   GraduationCap, 
@@ -44,6 +45,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [page, setPage] = useState(1);
   const [branchFilter, setBranchFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const [classFilter, setClassFilter] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
   const [studentStatusFilter, setStudentStatusFilter] = useState('all');
@@ -88,10 +94,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [motherPhone, setMotherPhone] = useState('');
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const studentLoad = useApi(async () => Promise.all([
-    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, gender: genderFilter, status: studentStatusFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass }),
+  const studentLoad = useApi(async signal => Promise.all([
+    ApiClient.getSchoolStudents({ search: debouncedSearch, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, gender: genderFilter, status: studentStatusFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass, signal }),
     ApiClient.getClasses(), ApiClient.getBranches()
-  ]), [school?.id, search, classFilter, branchFilter, feeFilter, genderFilter, studentStatusFilter, page, showAllClass], Boolean(school));
+  ]), [school?.id, debouncedSearch, classFilter, branchFilter, feeFilter, genderFilter, studentStatusFilter, page, showAllClass], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
   const visibleStudents = students;
@@ -351,7 +357,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
 
   // The PIN wizard stays mounted while the list reloads so one-time PINs are never lost.
   const pinResetWizard = <BulkStudentPinResetWizard open={showBulkPinReset} schoolId={school?.id} onClose={() => setShowBulkPinReset(false)} onComplete={() => { void fetchStudents(); }} />;
-  if (isLoading) return <><div className="p-6 space-y-4" aria-label="Loading students"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-64 animate-pulse rounded-xl bg-white" /></div>{pinResetWizard}</>;
+  if (isLoading) return <><LoadingState label="Loading students…" />{pinResetWizard}</>;
   if (studentLoad.error) return <><ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />{pinResetWizard}</>;
   return (
     <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
@@ -423,6 +429,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           <input
             type="text"
             placeholder="Search by student name, ID, or phone..."
+            aria-label="Search students by name, ID, or phone"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="w-full rounded-xl border border-[#d5e2de] bg-[#f8fbfa] py-3 pl-10 pr-4 text-sm text-[#18312d] outline-none transition placeholder:text-[#91a19c] focus:border-[#0e8078] focus:ring-2 focus:ring-[#0e8078]/10"
@@ -486,7 +493,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 </button>
               ))}
           </div>
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto md:block" role="region" aria-label="Student directory table. Scroll horizontally to view all columns." tabIndex={0}>
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>

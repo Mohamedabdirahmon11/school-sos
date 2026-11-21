@@ -12,9 +12,11 @@ import { LoginView } from './components/auth/LoginView.tsx';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal.tsx';
 import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
+import { LoadingState, ErrorState } from './components/common/AsyncState.tsx';
 import { ApiClient } from './services/api.ts';
 import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
+import { getNavigationRoute, type SchoolOSRole } from './lib/navigation-registry.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
 const SchoolsView = React.lazy(() => import('./components/superadmin/SchoolsView.tsx').then(module => ({ default: module.SchoolsView })));
@@ -87,18 +89,7 @@ const AppContent: React.FC = () => {
     return () => { active = false; };
   }, [currentView, user?.id]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F3F6F6] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#0B2B2A] text-white flex items-center justify-center font-bold text-xl animate-pulse">
-            S
-          </div>
-          <p className="text-xs font-semibold text-[#132A29]">Initializing SchoolOS Platform...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingState label="Initializing SchoolOS Platform…" className="min-h-screen border-0 bg-[#F3F6F6]" />;
 
   // Not logged in -> Show Multi-Role Login Screen
   if (!user) {
@@ -112,16 +103,13 @@ const AppContent: React.FC = () => {
   }
 
   if (apiFailure) {
-    const forbidden = apiFailure.status === 403;
-    return (
-      <div className="min-h-screen bg-[#F3F6F6] flex items-center justify-center p-4">
-        <section role="alert" className="max-w-md w-full rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-[#132A29]">{forbidden ? 'No permission' : 'We could not load this screen'}</h1>
-          <p className="mt-2 text-sm text-[#64748B]">{forbidden ? apiFailure.message : 'The server could not return this data. Check the connection and retry.'}</p>
-          <button onClick={() => window.location.reload()} className="mt-4 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white">Retry</button>
-        </section>
-      </div>
-    );
+    const failure = Object.assign(new Error(apiFailure.message), {
+      status: apiFailure.status,
+      code: apiFailure.code
+    });
+    return <div className="min-h-screen bg-[#F3F6F6] flex items-center justify-center p-4">
+      <ErrorState error={failure} onRetry={() => window.location.reload()} />
+    </div>;
   }
 
   // Determine active default view based on role
@@ -148,7 +136,14 @@ const AppContent: React.FC = () => {
         || requestedView === 'sch_reports' && !hasStaffNavigationPermission(user.permissions, 'reports_export')
       ) ? 'acc_dashboard' : requestedView;
 
+  const activeRoute = getNavigationRoute(activeView);
+
   const handleNavigate = (view: string) => {
+    const route = getNavigationRoute(view);
+    if (!route || !route.roles.includes(user.role as SchoolOSRole)) {
+      console.warn(`[navigation] Ignored unregistered or unauthorized route: ${view}`);
+      return;
+    }
     if (setupRequired && !SCHOOL_SETUP_ALLOWED_VIEWS.has(view)) {
       setCurrentView('sch_setup');
       return;
@@ -162,7 +157,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className={`h-[100dvh] min-h-0 overflow-hidden bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' || inspectedSchool ? 'school-admin-design' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
+    <div data-active-route={activeRoute?.id} data-active-route-label={activeRoute?.label} className={`h-[100dvh] min-h-0 overflow-hidden bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' ? 'school-admin-design school-admin-role' : inspectedSchool ? 'school-admin-design school-admin-inspected' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
       {/* Forced Password Change Modal for First-Time Staff Sign-in */}
       <ForcePasswordChangeModal />
 
@@ -204,7 +199,7 @@ const AppContent: React.FC = () => {
                 </div>
               </div>
             )}
-            <React.Suspense fallback={<div className="p-6 space-y-4" aria-label="Loading screen"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map(item => <div key={item} className="h-24 animate-pulse rounded-xl border border-slate-200 bg-white" />)}</div><div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-white" /></div>}>
+            <React.Suspense fallback={<LoadingState label="Loading screen…" className="mx-4 my-6" />}>
             {activeView === 'sch_setup' && (
               <SchoolSetupWizard onNavigate={handleNavigate} onComplete={handleSetupComplete} />
             )}

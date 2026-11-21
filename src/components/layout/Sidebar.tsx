@@ -4,6 +4,7 @@ import { translations, LanguageCode, TranslationDict } from '../../lib/translati
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { hasStaffNavigationPermission, type StaffPermission } from '../../lib/staff-permissions.ts';
+import { getNavigationRoute } from '../../lib/navigation-registry.ts';
 import {
   LayoutDashboard, Building2, Receipt, Users, BarChart3, Radio, LifeBuoy,
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
@@ -81,6 +82,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     Settings: { so: 'Dejinta', am: 'ቅንብሮች', ar: 'الإعدادات' },
     'Exam Marks': { so: 'Dhibcaha Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'درجات الامتحان' },
     'Exam Results': { so: 'Natiijooyinka Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'نتائج الامتحانات' },
+    'Marks Entry': { so: 'Gelinta Dhibcaha', am: 'ውጤት ማስገባት', ar: 'إدخال الدرجات' },
+    'Marks Approval': { so: 'Ansixinta Dhibcaha', am: 'ውጤት ማጽደቅ', ar: 'اعتماد الدرجات' },
 
 
 
@@ -164,7 +167,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   }, [user?.id, school?.id, unreadState.retry]);
 
   const noticeLabel = unread ? `${menuT('notice_board')} · ${unread > 99 ? '99+' : unread}` : menuT('notice_board');
-  const item = (id: string, label: string, icon: NavItem['icon']): NavItem => ({ id, label: menuText(label), icon });
+  const item = (id: string, _label: string, _icon: NavItem['icon']): NavItem => {
+    const route = getNavigationRoute(id);
+    if (!route) throw new Error(`Navigation route is missing from the shared registry: ${id}`);
+    const label = route.labelKey ? menuT(route.labelKey as keyof TranslationDict) : menuText(route.label);
+    return { id, label, icon: route.icon, permission: route.permission };
+  };
   const groups: NavGroup[] = (() => {
     if (role === 'super_admin' && !inspectedSchool) return [{ title: 'Platform Management', items: [
       item('sa_dashboard', menuT('dashboard'), LayoutDashboard), item('sa_schools', menuT('schools'), Building2),
@@ -239,7 +247,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     ];
   })();
 
-  const visibleGroups = groups.map(group => ({ ...group, items: group.items.filter(entry => `${group.title} ${entry.label}`.toLowerCase().includes(menuSearch.trim().toLowerCase())) })).filter(group => group.items.length > 0);
+  const visibleGroups = groups.map(group => ({ ...group, items: group.items.filter(entry => {
+    const route = getNavigationRoute(entry.id);
+    return Boolean(route && route.roles.includes(role as any)
+      && `${group.title} ${entry.label}`.toLowerCase().includes(menuSearch.trim().toLowerCase()));
+  }) })).filter(group => group.items.length > 0);
 
   const handleNavigate = (id: string) => {
     onNavigate(id);

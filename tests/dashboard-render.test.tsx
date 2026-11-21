@@ -4,6 +4,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { normalizeSchoolDashboardData } from '../src/components/schooladmin/SchoolDashboard.tsx';
 import { ErrorState } from '../src/components/common/ErrorState.tsx';
+import { EmptyState, LoadingState } from '../src/components/common/AsyncState.tsx';
 import { ApiClient } from '../src/services/api.ts';
 import { AuthProvider } from '../src/context/AuthContext.tsx';
 
@@ -44,4 +45,15 @@ test('School Dashboard 403 response is surfaced as an error state instead of a r
   const markup = renderToStaticMarkup(<AuthProvider><ErrorState error={Object.assign(new Error('Forbidden'), { status: 403 })} onRetry={() => undefined} /></AuthProvider>);
   assert.match(markup, /No permission/);
   assert.match(markup, /Retry/);
+});
+
+
+test('shared loading and empty states expose accessible status text', () => {
+  const loading = renderToStaticMarkup(<LoadingState label="Loading school dashboard…" />);
+  assert.match(loading, /role="status"/);
+  assert.match(loading, /Loading school dashboard/);
+  const empty = renderToStaticMarkup(<EmptyState title="No records" description="Add a record to get started." />);
+  assert.match(empty, /No records/);
+  assert.match(empty, /Add a record to get started/);
+  assert.match(empty, /role="status"/);
 });
