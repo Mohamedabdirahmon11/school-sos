@@ -77,77 +77,65 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 /* School Admin visual reference: Scholastic Horizon design.
    These rules are presentation-only; all existing routes, data requests and actions remain unchanged. */
 .school-admin-design {
-  --admin-canvas: #f2f6f5;
-  --admin-ink: #102522;
-  --admin-muted: #627571;
-  --admin-line: #dce7e4;
-  --admin-sidebar: #0b302d;
-  --admin-active: #155b55;
-  --admin-primary: #0e8078;
+  --admin-canvas: #f2f5fa;
+  --admin-ink: #18202c;
+  --admin-muted: #667085;
+  --admin-line: #e0e5ee;
+  --admin-sidebar: #0f2a5c;
+  --admin-active: #2563eb;
+  --admin-primary: #2563eb;
+  --sidebar-width: 250px;
   background: var(--admin-canvas) !important;
   color: var(--admin-ink);
 }
 .school-admin-design main { background: var(--admin-canvas); }
 .school-admin-design aside {
   width: var(--sidebar-width, 260px);
-  background: var(--admin-sidebar) !important;
 }
 .school-admin-design aside .h-14 { min-height: 76px; height: 76px; padding-left: 22px; padding-right: 22px; }
 .school-admin-design aside nav { padding: 16px 16px 20px; }
 .school-admin-design aside nav button {
   min-height: 38px;
   padding: 9px 13px;
-  border-radius: 12px;
+  border-radius: 9px;
   font-size: 13px;
   letter-spacing: .005em;
 }
-.school-admin-design aside nav button[class*="bg-[#0F766E]"] { background: var(--admin-active) !important; }
 .school-admin-design header {
-  background: rgba(255,255,255,.96);
+  background: rgba(255,255,255,.97);
   border-color: var(--admin-line);
 }
 .school-admin-design main > div {
-  max-width: none;
-  padding: 30px 34px 36px;
+  width: 100%;
+  max-width: 1250px;
+  margin-inline: auto;
+  padding: 20px;
 }
-.school-admin-design main .rounded-xl {
-  border-radius: 22px;
-}
-.school-admin-design main .rounded-lg {
-  border-radius: 12px;
-}
+.school-admin-design main .rounded-xl { border-radius: 14px; }
+.school-admin-design main .rounded-lg { border-radius: 9px; }
 .school-admin-design main [class*="border-[#E2E8F0]"],
-.school-admin-design main [class*="border-slate-200"] {
-  border-color: var(--admin-line) !important;
-}
+.school-admin-design main [class*="border-slate-200"] { border-color: var(--admin-line) !important; }
 .school-admin-design main [class*="text-[#132A29]"] { color: var(--admin-ink) !important; }
 .school-admin-design main [class*="text-[#64748B]"] { color: var(--admin-muted) !important; }
 .school-admin-design main [class*="bg-[#0F766E]"] { background-color: var(--admin-primary) !important; }
-.school-admin-design main [class*="hover:bg-[#0D655E]"]:hover { background-color: #0b6f68 !important; }
+.school-admin-design main [class*="hover:bg-[#0D655E]"]:hover { background-color: #1d4ed8 !important; }
 .school-admin-design main input,
 .school-admin-design main select,
 .school-admin-design main textarea {
   min-height: 40px;
-  border-color: #d4e0dd;
-  border-radius: 10px;
+  border-color: #d0d7e2;
+  border-radius: 9px;
 }
-.school-admin-design main table thead { background: #f4f8f7; }
-.school-admin-design main table th {
-  font-size: 11px;
-  letter-spacing: .045em;
-  text-transform: uppercase;
-}
-.school-admin-design main table tbody tr:hover { background: #f5faf8; }
+.school-admin-design main table thead { background: #f8fafc; }
+.school-admin-design main table th { font-size: 12px; letter-spacing: 0; text-transform: none; }
+.school-admin-design main table tbody tr:hover { background: #f2f5fa; }
 .school-admin-design main button { transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease; }
 .school-admin-design main button:focus-visible,
-.school-admin-design aside button:focus-visible {
-  outline: 3px solid rgba(14,128,120,.28);
-  outline-offset: 2px;
-}
+.school-admin-design aside button:focus-visible { outline: 3px solid rgba(37,99,235,.28); outline-offset: 2px; }
 @media (max-width: 767px) {
   .school-admin-design aside { width: min(84vw, 320px); }
-  .school-admin-design main > div { padding: 20px 16px 28px; }
-  .school-admin-design main .rounded-xl { border-radius: 18px; }
+  .school-admin-design main > div { padding: 14px; }
+  .school-admin-design main .rounded-xl { border-radius: 14px; }
 }
 
 
@@ -1478,3 +1466,48 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-design main [class*="text-[#2563eb]"] { color:var(--brand-color)!important; }
 .school-admin-design main [class*="border-[#2563eb]"] { border-color:var(--brand-color)!important; }
 .school-admin-design main [class*="hover:bg-[#1d4ed8]"]:hover { background-color:var(--brand-color-dark)!important; }
+
+
+/* AL-BUSHRA reference KPI cards: white surfaces with a colored leading edge. */
+.school-admin-design .school-admin-metric {
+  min-height: 112px;
+  border: 1px solid var(--admin-line) !important;
+  border-left: 4px solid #2563eb !important;
+  border-radius: 14px !important;
+  padding: 16px !important;
+  background: #fff !important;
+  color: var(--admin-ink) !important;
+  box-shadow: 0 2px 8px rgba(16,24,40,.06) !important;
+}
+.school-admin-design .school-admin-metric[data-tone="green"] { border-left-color: #16a34a !important; }
+.school-admin-design .school-admin-metric[data-tone="purple"] { border-left-color: #7c3aed !important; }
+.school-admin-design .school-admin-metric[data-tone="amber"] { border-left-color: #d97706 !important; }
+.school-admin-design .school-admin-metric:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(16,24,40,.09) !important; }
+.school-admin-design .school-admin-metric .metric-label { color: #667085; font-size: 12px; font-weight: 600; }
+.school-admin-design .school-admin-metric .metric-value { color: #18202c; font-size: 26px; font-weight: 750; letter-spacing: -.02em; }
+.school-admin-design .school-admin-metric .metric-hint { color: #475569; background: #f2f5fa; }
+.school-admin-design .school-admin-metric .metric-icon { color: #2563eb; background: #e8f0ff; }
+.school-admin-design .school-dashboard-panel { border: 1px solid var(--admin-line); border-radius: 14px; background: #fff; box-shadow: 0 2px 8px rgba(16,24,40,.06); }
+@media (max-width: 767px) {
+  .school-admin-design .school-admin-metric { min-height: 104px; padding: 14px !important; }
+  .school-admin-design .school-admin-metric .metric-value { font-size: 24px; }
+}
+
+
+/* Final precedence layer: keep the whole admin workspace faithful to the uploaded HTML. */
+.school-admin-design aside > div:first-child { min-height:76px; height:76px; }
+.school-admin-design aside nav { gap:2px; padding:14px 10px 18px; }
+.school-admin-design aside nav section h2 { margin:12px 10px 4px; font-size:10.5px; letter-spacing:.08em; }
+.school-admin-design aside nav button { min-height:38px; padding:7px 10px; border-radius:9px; font-size:13px; }
+.school-admin-design header { min-height:56px; height:56px; padding:10px 20px; }
+.school-admin-design main { background:var(--admin-canvas); }
+.school-admin-design main > div { width:100%; max-width:1250px; margin-inline:auto; padding:20px; }
+.school-admin-design main :is(.rounded-xl,.rounded-2xl) { border-radius:14px; }
+.school-admin-design main :is(.border,.border-b,.border-t) { border-color:var(--admin-line); }
+.school-admin-design main table thead { background:#f8fafc; }
+.school-admin-design main table thead th { color:#667085; font-size:12px; font-weight:600; letter-spacing:0; text-transform:none; }
+.school-admin-design main table tbody tr:hover { background:#f2f5fa; }
+@media(max-width:767px) {
+  .school-admin-design header { min-height:54px; height:54px; padding:8px 12px; }
+  .school-admin-design main > div { padding:14px; }
+}

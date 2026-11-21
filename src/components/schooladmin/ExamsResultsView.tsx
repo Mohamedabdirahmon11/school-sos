@@ -1086,20 +1086,16 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
-            <FileSpreadsheet className="h-7 w-7 text-[#0e8078]" />
-            Marks
+          <h1 className="text-2xl font-bold tracking-tight text-[#18202c] flex items-center gap-2">
+            <FileSpreadsheet className="h-6 w-6 text-[#2563eb]" />
+            {initialTab === 'approval' ? 'Marks Approval' : 'Marks'}
           </h1>
-          <p className="mt-1 text-sm text-[#71817d]">
-            Enter student marks and review subject submissions for approval.
+          <p className="mt-1 text-sm text-[#667085]">
+            {initialTab === 'approval'
+              ? 'Review each subject submission, approve or return pending marks, and publish approved results.'
+              : 'View student marks by subject, class and semester.'}
             {selectedClass ? ` Current class: ${selectedClass.name} (${selectedClass.section}).` : ''}
           </p>
-        </div>
-
-        {/* Focused marks workspace navigation */}
-        <div className="flex items-center gap-1 rounded-xl border border-[#dce7e4] bg-white p-1">
-          <button type="button" onClick={() => setActiveTab('marks')} className={"rounded-lg px-4 py-2 text-sm font-semibold " + (activeTab === 'marks' ? 'bg-[#0F766E] text-white' : 'text-slate-600 hover:bg-slate-50')}>Marks</button>
-          <button type="button" onClick={() => setActiveTab('approval')} className={"rounded-lg px-4 py-2 text-sm font-semibold " + (activeTab === 'approval' ? 'bg-[#0F766E] text-white' : 'text-slate-600 hover:bg-slate-50')}>Marks Approval</button>
         </div>
       </div>
 

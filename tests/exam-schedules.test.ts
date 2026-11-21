@@ -14,6 +14,7 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const termUi = readFileSync(new URL('../src/components/schooladmin/TermExamSchedulingPanel.tsx', import.meta.url), 'utf8');
 const teacherUi = readFileSync(new URL('../src/components/teacher/TeacherPortalView.tsx', import.meta.url), 'utf8');
 
@@ -137,8 +138,10 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(client.includes('updateExamRoom'));
   assert.ok(client.includes('/exams/schedules'));
   assert.ok(client.includes('updateExamSchedule'));
-  assert.ok(ui.includes("setActiveTab('marks')"));
-  assert.ok(ui.includes("setActiveTab('approval')"));
+  assert.ok(app.includes("activeView === 'sch_marks_approval' ? 'approval' : 'marks'"), 'Marks and Marks Approval have distinct sidebar routes.');
+  assert.ok(ui.includes("initialTab === 'approval' ? 'Marks Approval' : 'Marks'"), 'The selected route displays its own page title.');
+  assert.ok(!ui.includes("setActiveTab('marks')"), 'Marks is no longer switched inside the combined workspace.');
+  assert.ok(!ui.includes("setActiveTab('approval')"), 'Marks Approval is no longer switched inside the combined workspace.');
   assert.ok(!ui.includes("setActiveTab('schedule')"), 'Exam schedule is intentionally hidden from the simplified Marks workspace until it is redesigned separately.');
   assert.ok(ui.includes('Save schedule draft'));
   assert.ok(ui.includes('Publish & assign seats'));
