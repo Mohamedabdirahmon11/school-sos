@@ -2075,3 +2075,64 @@ body { font-family: var(--schoolos-font-body); }
 @media (prefers-reduced-motion: reduce) {
   .school-admin-role * { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+
+/* Timetable workspace: compact toolbar and touch-friendly horizontal schedule canvas. */
+.schoolos-timetable-page {
+  width: 100%;
+  min-width: 0;
+  color: var(--schoolos-ink);
+}
+.schoolos-timetable-page > div:first-child h1 {
+  color: var(--schoolos-ink);
+  font-family: var(--schoolos-font-heading);
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -.035em;
+}
+.schoolos-timetable-page :where(select,input,button) { min-height: 40px; }
+.schoolos-timetable-page select,
+.schoolos-timetable-page input {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+  background-color: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-timetable-page :where(.overflow-x-auto) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.schoolos-timetable-page :where(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.schoolos-timetable-page :where(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f2f7f7;
+  color: #365451;
+  font-weight: 700;
+}
+.dark .schoolos-timetable-page :where(thead th) {
+  background: #172a30;
+  color: #c5dcda;
+}
+.schoolos-timetable-page :where(tbody tr:hover) { background: rgba(14,106,98,.045); }
+.schoolos-timetable-page :where(button.bg-\\[\\#0F766E\\],button.bg-teal-600,button.bg-teal-700) {
+  background-color: var(--schoolos-accent);
+}
+.schoolos-timetable-page :where(button.bg-\\[\\#0F766E\\],button.bg-teal-600,button.bg-teal-700):hover {
+  background-color: var(--schoolos-accent-hover);
+}
+@media (max-width: 767px) {
+  .schoolos-timetable-page { padding: 14px !important; }
+  .schoolos-timetable-page > div:first-child { align-items: stretch; }
+  .schoolos-timetable-page > div:first-child > div:last-child {
+    width: 100%;
+    align-items: stretch;
+  }
+  .schoolos-timetable-page > div:first-child > div:last-child select { flex: 1 1 145px; }
+  .schoolos-timetable-page :where(table) { min-width: 660px; }
+}
