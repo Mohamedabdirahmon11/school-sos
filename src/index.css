@@ -101,7 +101,6 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   font-size: 13px;
   letter-spacing: .005em;
 }
-.school-admin-design aside nav button[aria-current="page"] { background: #2563eb !important; color: #fff !important; }
 .school-admin-design header {
   background: rgba(255,255,255,.97);
   border-color: var(--admin-line);
