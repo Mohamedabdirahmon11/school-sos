@@ -580,6 +580,18 @@ function requireSchoolStaff(req: Request, res: Response, next: () => void) {
   next();
 }
 
+async function canAccessFormTeacherClass(req: Request, res: Response, classId: string): Promise<boolean> {
+  const user = (req as any).user as User;
+  const school = (req as any).school as School;
+  if (normalizeRole(user.role) !== 'teacher') return true;
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass) { res.status(404).json({ error: 'Class not found in this school.' }); return false; }
+  if (klass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Attendance access is limited to your own Form Teacher class.' }); return false;
+  }
+  return true;
+}
+
 async function canAccessTeachingClass(req: Request, res: Response, classId: string): Promise<boolean> {
   const user = (req as any).user as User;
   const school = (req as any).school as School;
@@ -4693,18 +4705,33 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
 // 4. STUDENTS & TEACHERS
 // ==============================================================================
 
-apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (!['school_admin', 'super_admin', 'teacher'].includes(role)) {
+    res.status(403).json({ error: 'Only school administrators and the assigned Form Teacher can view parent contacts.' }); return;
+  }
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
-  const classId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
+  const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
+  const classes = await db.getClasses(school.id);
+  let studentClassFilter: string | string[] | undefined = requestedClassId || undefined;
+  if (role === 'teacher') {
+    const ownClassIds = classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived).map(klass => klass.id);
+    if (!ownClassIds.length) { res.status(403).json({ error: 'You are not assigned as a Form Teacher to a class.' }); return; }
+    if (requestedClassId && !ownClassIds.includes(requestedClassId)) {
+      res.status(403).json({ error: 'Parent contacts are limited to your own Form Teacher class.' }); return;
+    }
+    studentClassFilter = requestedClassId || ownClassIds;
+  }
+  const classId = requestedClassId;
   const search = typeof req.query.search === 'string'
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
     : '';
 
-  const [classes, students, guardianRows, guardianLinks] = await Promise.all([
-    db.getClasses(school.id),
-    queryAllRows('students', { school_id: school.id, status: 'active', ...(classId ? { class_id: classId } : {}) }, LIST_QUERY_COLUMNS.students),
+  const [students, guardianRows, guardianLinks] = await Promise.all([
+    queryAllRows('students', { school_id: school.id, status: 'active', ...(studentClassFilter ? { class_id: studentClassFilter } : {}) }, LIST_QUERY_COLUMNS.students),
     queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
     queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id')
   ]);
@@ -5898,7 +5925,7 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
     return;
   }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view attendance.' }); return; }
-  if (!await canAccessTeachingClass(req, res, classId as string)) return;
+  if (!await canAccessFormTeacherClass(req, res, classId as string)) return;
   res.json(await db.getAttendance(school.id, classId as string, date as string));
 });
 
@@ -5914,7 +5941,7 @@ apiRouter.get('/attendance/month', requireAuth, requireSchoolContext, requireSch
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) {
     res.status(403).json({ error:'Akoonka shaqaalaha ma laha rukhsadda xaadirinta.' }); return;
   }
-  if (!await canAccessTeachingClass(req, res, classId)) return;
+  if (!await canAccessFormTeacherClass(req, res, classId)) return;
   const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
   const endDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0,10);
   const client = documentServiceClient(res);

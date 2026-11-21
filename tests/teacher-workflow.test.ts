@@ -329,3 +329,23 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
 });
+
+
+test('teacher directory separates subject-teaching classes from Form Teacher class and relies on server-side subject filtering', () => {
+  const start = view.indexOf('const filteredTeachers = teachers;');
+  assert.notEqual(start, -1);
+  assert.match(view, /Classes taught/);
+  assert.match(view, /Form Teacher class/);
+  assert.match(view, /const displayedClassIds = Array\.from\(new Set\(t\.assignedClasses \|\| \[\]\)\)/);
+});
+
+test('Form Teachers are restricted to their own parent-contact class and attendance reads', () => {
+  const parentStart = api.indexOf("apiRouter.get('/parents/contacts'");
+  const parentEnd = api.indexOf("apiRouter.get('/students'", parentStart);
+  const parentRoute = api.slice(parentStart, parentEnd);
+  assert.match(parentRoute, /requireAuth, requireSchoolContext/);
+  assert.match(parentRoute, /ownClassIds\.includes\(requestedClassId\)/);
+  assert.match(parentRoute, /studentClassFilter = requestedClassId \|\| ownClassIds/);
+  assert.match(api, /async function canAccessFormTeacherClass/);
+  assert.match(api, /Attendance access is limited to your own Form Teacher class/);
+});
