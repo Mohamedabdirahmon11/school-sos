@@ -46,6 +46,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
+  const [studentStatusFilter, setStudentStatusFilter] = useState('all');
   const [showAllClass, setShowAllClass] = useState(false);
   const [feeFilter, setFeeFilter] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
@@ -93,7 +94,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   ]), [school?.id, search, classFilter, branchFilter, feeFilter, page, showAllClass], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
-  const visibleStudents = students.filter(student => genderFilter === 'all' || String(student.gender || '').toLowerCase() === genderFilter);
+  const visibleStudents = students.filter(student => (genderFilter === 'all' || String(student.gender || '').toLowerCase() === genderFilter) && (studentStatusFilter === 'all' || String(student.status || '').toLowerCase() === studentStatusFilter));
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const branches: SchoolBranch[] = Array.isArray(branchRows) ? branchRows : [];
   const isLoading = studentLoad.loading;
@@ -441,13 +442,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           </select>
 
           <select value={genderFilter} onChange={e => { setGenderFilter(e.target.value); setPage(1); }} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs text-[#334155]"><option value="all">All Genders</option><option value="male">Male</option><option value="female">Female</option></select>
+          <select value={studentStatusFilter} onChange={e => { setStudentStatusFilter(e.target.value); setPage(1); }} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs text-[#334155]"><option value="all">All Student Statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="graduated">Graduated</option><option value="transferred">Transferred</option></select>
           {/* Fee Payment Status Filter */}
           <select
             value={feeFilter}
             onChange={e => { setFeeFilter(e.target.value); setShowAllClass(false); setPage(1); }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
           >
-            <option value="all">All Statuses</option>
+            <option value="all">All Fee Statuses</option>
             <option value="paid">Paid in Full</option>
             <option value="partial">Partial Payment</option>
             <option value="unpaid">Unpaid Fees</option>
@@ -503,8 +505,6 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   visibleStudents.map((s, rowIndex) => {
                     const isSelected = selectedStudent?.id === s.id;
                     // Older/imported rows may omit this derived field; never let one row crash the screen.
-                    const feeStatus = typeof s.feeStatus === 'string' ? s.feeStatus.trim() : '';
-                    const normalizedFeeStatus = feeStatus.toLowerCase();
                     return (
                       <tr
                         key={s.id}
@@ -519,16 +519,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 text-[#334155]">{s.className || '—'}</td>
                         <td className="px-5 py-4 capitalize text-[#334155]">{s.gender || '—'}</td>
                         <td className="px-5 py-4 font-mono text-xs text-[#334155]">{s.fatherPhone || s.motherPhone || '—'}</td>
-                        <td className="px-5 py-4">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                            normalizedFeeStatus === 'paid' ? 'bg-emerald-100 text-emerald-800' :
-                            normalizedFeeStatus === 'partial' ? 'bg-amber-100 text-amber-800' :
-                            normalizedFeeStatus === 'unpaid' ? 'bg-rose-100 text-rose-800' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            {feeStatus ? feeStatus.toUpperCase() : 'NOT SET'}
-                          </span>
-                        </td>
+                        <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                          s.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
+                          s.status === 'inactive' ? 'bg-slate-100 text-slate-600' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>{String(s.status || 'active').toUpperCase()}</span></td>
                         <td className="px-5 py-4">
                           <button type="button" disabled={isReadOnly} onClick={event => {
                             event.stopPropagation();
