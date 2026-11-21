@@ -158,7 +158,7 @@ export const StudentPortalView: React.FC = () => {
             <span>Approved Academic Results</span>
           </h2>
 
-          {marksState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : marksState.error ? <ErrorState error={marksState.error} onRetry={marksState.retry} /> : marks.length === 0 ? <p className="text-[#64748B]">No approved results have been published yet.</p> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{marks.map(mark => {
+          {marksState.loading ? <LoadingState label="Loading published results" className="min-h-20 border-0 bg-transparent" /> : marksState.error ? <ErrorState error={marksState.error} onRetry={marksState.retry} /> : marks.length === 0 ? <p className="text-[#64748B]">No approved results have been published yet.</p> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{marks.map(mark => {
             const band = gradeFor(mark.percentage || 0);
             return <div key={mark.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] flex items-center justify-between gap-3">
               <div>
@@ -183,7 +183,7 @@ export const StudentPortalView: React.FC = () => {
           </h2>
           {assignmentMessage && <p role="status" className="rounded-lg border border-[#CCFBF1] bg-[#F0FDFA] px-3 py-2 text-[#0F766E]">{assignmentMessage}</p>}
 
-          {assignmentsState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : assignments.length === 0 ? <p className="text-[#64748B]">No homework has been assigned yet.</p> : <div className="space-y-3">{assignments.map(assignment => {
+          {assignmentsState.loading ? <LoadingState label="Loading assignments" className="min-h-20 border-0 bg-transparent" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : assignments.length === 0 ? <p className="text-[#64748B]">No homework has been assigned yet.</p> : <div className="space-y-3">{assignments.map(assignment => {
             const submission = assignment.submission;
             const graded = submission?.status === 'graded';
             const draft = submissionDrafts[assignment.id] ?? submission?.content ?? '';
@@ -254,7 +254,7 @@ export const StudentPortalView: React.FC = () => {
             </div>)}
           </div>
 
-          {attendanceState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : attendanceState.error ? <ErrorState error={attendanceState.error} onRetry={attendanceState.retry} /> : attendance.length === 0 ? <p className="text-[#64748B]">No attendance records have been recorded yet.</p> : <div className="divide-y divide-[#F1F5F9]">{attendance.map(record => <div key={record.id} className="py-2 flex items-start justify-between gap-3">
+          {attendanceState.loading ? <LoadingState label="Loading attendance" className="min-h-20 border-0 bg-transparent" /> : attendanceState.error ? <ErrorState error={attendanceState.error} onRetry={attendanceState.retry} /> : attendance.length === 0 ? <p className="text-[#64748B]">No attendance records have been recorded yet.</p> : <div className="divide-y divide-[#F1F5F9]">{attendance.map(record => <div key={record.id} className="py-2 flex items-start justify-between gap-3">
             <div>
               <p className="font-semibold text-[#132A29]">{record.date}</p>
               {record.note && <p className="text-[11px] text-[#64748B]">{record.note}</p>}
@@ -277,7 +277,7 @@ export const StudentPortalView: React.FC = () => {
             {unreadNoticeCount > 0 && <button onClick={markAllNoticesRead} className="text-[11px] font-semibold text-[#0F766E] hover:underline">Mark all read</button>}
           </div>
 
-          {noticesState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : noticesState.error ? <ErrorState error={noticesState.error} onRetry={noticesState.retry} /> : notices.length === 0 ? <p className="text-[#64748B]">No school notices have been published yet.</p> : <div className="space-y-2">{notices.map(notice => <div key={notice.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
+          {noticesState.loading ? <LoadingState label="Loading school notices" className="min-h-20 border-0 bg-transparent" /> : noticesState.error ? <ErrorState error={noticesState.error} onRetry={noticesState.retry} /> : notices.length === 0 ? <p className="text-[#64748B]">No school notices have been published yet.</p> : <div className="space-y-2">{notices.map(notice => <div key={notice.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="font-bold text-[#132A29]">{notice.isPinned ? 'Pinned • ' : ''}{notice.title}</p>
               <span className="text-[10px] font-mono text-[#64748B]">{notice.publishDate}</span>
