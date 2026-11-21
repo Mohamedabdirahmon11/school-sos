@@ -1088,7 +1088,7 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#18202c] flex items-center gap-2">
             <FileSpreadsheet className="h-6 w-6 text-[#2563eb]" />
-            {initialTab === 'approval' ? 'Marks Approval' : 'Gelinta dhibcaha · Marks'}
+            {initialTab === 'approval' ? 'Marks Approval' : 'Marks'}{initialTab !== 'approval' && <span className="ml-2 text-sm font-semibold text-teal-100">· Gelinta dhibcaha</span>}
           </h1>
           <p className="mt-1 text-sm text-[#667085]">
             {initialTab === 'approval'
