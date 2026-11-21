@@ -10616,7 +10616,6 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin.' });
     return;
   }
-ol, user = (req as any).user as User;
   try {
     const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
       client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).order('start_date', { ascending: false }),
