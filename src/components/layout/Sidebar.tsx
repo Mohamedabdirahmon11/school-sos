@@ -81,6 +81,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     Settings: { so: 'Dejinta', am: 'ቅንብሮች', ar: 'الإعدادات' },
     'Exam Marks': { so: 'Dhibcaha Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'درجات الامتحان' },
     'Exam Results': { so: 'Natiijooyinka Imtixaanka', am: 'የፈተና ውጤቶች', ar: 'نتائج الامتحانات' },
+    'Marks Entry': { so: 'Gelinta Dhibcaha', am: 'ውጤት ማስገባት', ar: 'إدخال الدرجات' },
+    'Marks Approval': { so: 'Ansixinta Dhibcaha', am: 'ውጤት ማጽደቅ', ar: 'اعتماد الدرجات' },
 
 
 
@@ -214,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Academic', items: [
         item('sch_classes', 'Classes', Layers), item('sch_subjects', 'Subjects', BookOpen), item('sch_curriculum', 'Class Curriculum', BookOpen), item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
         item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
-        item('sch_marks', 'Marks', FileSpreadsheet), item('sch_marks_approval', 'Marks Approval', ShieldCheck), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'School Documents', FileText),
+        item('sch_marks', 'Marks Entry', FileSpreadsheet), item('sch_marks_approval', 'Marks Approval', ShieldCheck), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'School Documents', FileText),
         item('sch_promotion', 'Student Progression & Alumni', Award)
       ] },
       { title: 'Communication', items: [
