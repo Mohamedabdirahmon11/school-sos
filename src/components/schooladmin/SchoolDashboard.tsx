@@ -89,7 +89,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     <section aria-label="School statistics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Total students" value={totalStudents.toLocaleString()} hint="Enrolled students" icon={GraduationCap} tone="blue" onClick={() => onNavigate('sch_students')} />
       <Metric label="Teachers" value={totalTeachers.toLocaleString()} hint="Teaching staff" icon={Users} tone="green" onClick={() => onNavigate('sch_teachers')} />
-      <Metric label="Attendance today" value={result.stats.attendanceRecordedToday > 0 ? String(attendanceRate) + '%' : '—'} hint={result.stats.attendanceRecordedToday > 0 ? 'Register recorded' : 'Not recorded yet'} icon={CalendarCheck} tone="purple" onClick={() => onNavigate('sch_attendance')} />
+      <Metric label="Attendance today" value={result.stats.attendanceRecordedToday > 0 ? String(attendanceRate) + '%' : 'Not recorded'} hint={result.stats.attendanceRecordedToday > 0 ? 'Register recorded' : 'Not recorded yet'} icon={CalendarCheck} tone="purple" onClick={() => onNavigate('sch_attendance')} />
       <Metric label="Total classes" value={totalClasses.toLocaleString()} hint="School classes" icon={School} tone="amber" onClick={() => onNavigate('sch_classes')} />
     </section>
 
