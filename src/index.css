@@ -90,7 +90,6 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-design main { background: var(--admin-canvas); }
 .school-admin-design aside {
   width: var(--sidebar-width, 260px);
-  background: linear-gradient(180deg, #0f2a5c, #16408f) !important;
 }
 .school-admin-design aside .h-14 { min-height: 76px; height: 76px; padding-left: 22px; padding-right: 22px; }
 .school-admin-design aside nav { padding: 16px 16px 20px; }
