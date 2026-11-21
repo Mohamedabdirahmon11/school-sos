@@ -489,7 +489,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               visibleStudents.map((student:any) => (
                 <button type="button" key={student.id} onClick={()=>void loadStudentDetails(student)} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
                   <div className="flex items-start justify-between gap-2"><span className="font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</span><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
-                  <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{student.className || '—'}</span><span>{student.fatherPhone || '—'}</span></div>
+                  <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{student.className || 'Not assigned'}</span><span>{student.fatherPhone || '—'}</span></div>
                 </button>
               ))}
           </div>
@@ -528,7 +528,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 text-slate-400">{((pageInfo?.page || 1) - 1) * 50 + rowIndex + 1}</td>
                         <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
-                        <td className="px-5 py-4 text-[#334155]">{s.className || '—'}</td>
+                        <td className="px-5 py-4 text-[#334155]">{s.className || 'Not assigned'}</td>
                         <td className="px-5 py-4 capitalize text-[#334155]">{s.gender || '—'}</td>
                         <td className="px-5 py-4 font-mono text-xs text-[#334155]">{s.fatherPhone || s.motherPhone || '—'}</td>
                         <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
