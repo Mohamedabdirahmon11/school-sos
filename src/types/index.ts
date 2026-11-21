@@ -76,7 +76,7 @@ export interface NotificationPreferences {
 }
 
 export interface SchoolSetupData {
-  schoolInformation: { name: string; logoUrl: string; address: string; phone: string; email: string; schoolType: 'primary' | 'secondary' | 'combined' };
+  schoolInformation: { name: string; logoUrl: string; address: string; city: string; phone: string; email: string; whatsappPhone: string; schoolType: 'primary' | 'secondary' | 'combined' };
   academicYear: { name: string; startDate: string; endDate: string; isCurrent: boolean };
   terms: Array<{ name: string; startDate: string; endDate: string }>;
   calendar: { workingDays: string[]; weeklyHolidays: string[]; nationalHolidays: Array<{ name: string; date: string; calendar: 'ethiopian' | 'gregorian' }>; schoolHolidays: Array<{ name: string; startDate: string; endDate: string }>; calendarType: 'ethiopian' | 'gregorian' | 'both' };

@@ -1,7 +1,8 @@
 import type { School } from '../types/index.ts';
+import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
 
 export const SCHOOL_SETUP_DEFAULTS = {
-  schoolInformation: { name: '', logoUrl: '', address: '', phone: '', email: '', schoolType: 'combined' as const },
+  schoolInformation: { name: '', logoUrl: '', address: '', city: '', phone: '', email: '', whatsappPhone: '', schoolType: 'combined' as const },
   academicYear: { name: '', startDate: '', endDate: '', isCurrent: true },
   terms: [] as Array<{ name: string; startDate: string; endDate: string }>,
   calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [] as Array<{ name: string; date: string; calendar: 'ethiopian' | 'gregorian' }>, schoolHolidays: [] as Array<{ name: string; startDate: string; endDate: string }>, calendarType: 'both' as const },
@@ -19,7 +20,8 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'Setup data must be an object.';
   if (step === 1) {
     const s = data.schoolInformation;
-    if (!s || !String(s.name || '').trim() || !String(s.address || '').trim() || !String(s.phone || '').trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s.email || ''))) return 'School name, address, phone and a valid email are required.';
+    if (!s || !String(s.name || '').trim() || !String(s.address || '').trim() || !String(s.city || '').trim() || !String(s.phone || '').trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s.email || ''))) return 'School name, address, city, phone and a valid email are required.';
+    if (!normalizeWhatsAppNumber(s.whatsappPhone)) return 'Enter the administration WhatsApp number in international format, beginning with + or 00.';
     if (!['primary', 'secondary', 'combined'].includes(s.schoolType)) return 'Choose a valid school type.';
     if (s.logoUrl && (String(s.logoUrl).length > 2_000_000 || !/^https:\/\/|^data:image\/(png|jpeg|webp);base64,/i.test(String(s.logoUrl)))) return 'School logo must be a valid HTTPS image URL or PNG, JPEG or WebP image smaller than 1.5 MB.';
   }
@@ -70,8 +72,10 @@ export function buildSchoolSetupSchoolUpdates(
     Object.assign(updates, {
       name: info.name.trim(),
       address: info.address.trim(),
+      city: info.city.trim(),
       phone: info.phone.trim(),
       email: info.email.trim(),
+      whatsappPhone: info.whatsappPhone.trim(),
       schoolType: info.schoolType,
       logoUrl: info.logoUrl || undefined
     });

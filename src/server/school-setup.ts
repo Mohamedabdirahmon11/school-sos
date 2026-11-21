@@ -1,5 +1,6 @@
 import { School, SchoolSetupChecklistItem, SchoolSetupProgress, SchoolSetupProgressUpdate } from '../types/index.ts';
 import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
+import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
 
 export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 6, 8] as const;
 export const OPTIONAL_SCHOOL_SETUP_STEPS = [7, 9] as const;
@@ -23,12 +24,24 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
     ? [...new Set(input.filter((step): step is number => Number.isInteger(step) && Number(step) >= 1 && Number(step) <= 10))]
     : [];
   const skippedSteps = validSteps(source.skippedSteps).filter(step => OPTIONAL_SCHOOL_SETUP_STEPS.includes(step as 7 | 9));
-  const completedSteps = validSteps(source.completedSteps).filter(step => !skippedSteps.includes(step));
-  const rawCurrentStep = Number(source.currentStep);
-  const currentStep = Number.isInteger(rawCurrentStep) ? Math.min(10, Math.max(1, rawCurrentStep)) : 1;
-  const completedAt = typeof source.completedAt === 'string' && source.completedAt.trim()
+  const rawCompletedSteps = validSteps(source.completedSteps).filter(step => !skippedSteps.includes(step));
+  const rawCompletedAt = typeof source.completedAt === 'string' && source.completedAt.trim()
     ? source.completedAt
     : null;
+  const fullyComplete = isSchoolSetupProgressComplete({
+    completedAt: rawCompletedAt,
+    completedSteps: rawCompletedSteps,
+    skippedSteps
+  });
+  // Discard the legacy five-step wizard's premature step-10 marker.
+  const completedSteps = rawCompletedSteps.filter(step => step !== 10 || fullyComplete);
+  const rawCurrentStep = Number(source.currentStep);
+  const currentStep = fullyComplete
+    ? 10
+    : Number.isInteger(rawCurrentStep)
+      ? Math.min(10, Math.max(1, rawCurrentStep === 5 && [1, 2, 3, 4, 5].every(step => completedSteps.includes(step)) ? 6 : rawCurrentStep))
+      : 1;
+  const completedAt = fullyComplete ? rawCompletedAt : null;
   return { currentStep, completedSteps, skippedSteps, completedAt };
 }
 

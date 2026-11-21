@@ -3,8 +3,14 @@ import assert from 'node:assert/strict';
 import { buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from '../src/server/school-setup-data.ts';
 
 test('school profile requires valid contact details and a supported school type', () => {
-  assert.equal(validateSchoolSetupStep(1, { schoolInformation: { name: 'Jijiga School', address: 'Main road', phone: '+251911234567', email: 'office@example.edu', schoolType: 'combined' } }), null);
-  assert.match(validateSchoolSetupStep(1, { schoolInformation: { name: 'School', address: '', phone: '123', email: 'bad', schoolType: 'other' } }) || '', /required/);
+  assert.equal(validateSchoolSetupStep(1, { schoolInformation: { name: 'Jijiga School', address: 'Main road', city: 'Jijiga', phone: '+251911234567', email: 'office@example.edu', whatsappPhone: '+251911234567', schoolType: 'combined' } }), null);
+  assert.match(validateSchoolSetupStep(1, { schoolInformation: { name: 'School', address: '', city: '', phone: '123', email: 'bad', whatsappPhone: '', schoolType: 'other' } }) || '', /required/);
+});
+
+test('school profile requires a dedicated international administration WhatsApp number', () => {
+  const profile = { schoolInformation: { name: 'Jijiga School', address: 'Main road', city: 'Jijiga', phone: '+251911234567', email: 'office@example.edu', whatsappPhone: '0911234567', schoolType: 'combined' } };
+  assert.match(validateSchoolSetupStep(1, profile) || '', /international format/);
+  assert.equal(validateSchoolSetupStep(1, { schoolInformation: { ...profile.schoolInformation, whatsappPhone: '+251911234567' } }), null);
 });
 
 test('academic year requires consecutive years and valid Gregorian dates', () => {
