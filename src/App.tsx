@@ -157,7 +157,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div data-active-route={activeRoute?.id} data-active-route-label={activeRoute?.label} className={`h-[100dvh] min-h-0 overflow-hidden bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' || inspectedSchool ? 'school-admin-design' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
+    <div data-active-route={activeRoute?.id} data-active-route-label={activeRoute?.label} className={`h-[100dvh] min-h-0 overflow-hidden bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' ? 'school-admin-design school-admin-role' : inspectedSchool ? 'school-admin-design school-admin-inspected' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
       {/* Forced Password Change Modal for First-Time Staff Sign-in */}
       <ForcePasswordChangeModal />
 
