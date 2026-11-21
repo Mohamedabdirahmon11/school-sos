@@ -38,6 +38,14 @@ test('auto-generation previews before saving and preserves locked lessons', () =
   assert.match(migrations, /schoolos_guard_locked_timetable_slot/);
 });
 
+test('timetable generation rejects unassigned or inactive teachers and teacher timetable requires an active profile', () => {
+  assert.match(api, /queryAllRows\('teachers', \{ school_id: school\.id \}, 'id,status'\)/);
+  assert.match(api, /inactiveTeacherAssignments/);
+  assert.match(api, /Timetable generation requires an active teacher/);
+  assert.match(api, /Bulk timetable generation requires an active teacher/);
+  assert.match(api, /active teacher profile is required to view a teaching timetable/);
+});
+
 test('generator uses Step 6 teacher assignments and respects full-day unavailability', () => {
   assert.match(api, /teacher_class_subject_assignments/);
   assert.match(api, /item\.periodNumber == null/);
