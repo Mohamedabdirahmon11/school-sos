@@ -730,7 +730,7 @@ export class InMemorySupabase {
         student_id: studentId, first_name: payload.first_name, middle_name: payload.middle_name,
         last_name: payload.last_name, gender: payload.gender, admission_date: payload.admission_date,
         student_phone: payload.student_phone || null, father_phone: phone, father_name: payload.guardian_name,
-        class_id: payload.class_id, section: payload.section || 'A', status: 'active',
+        mother_phone: payload.mother_phone || null, class_id: payload.class_id, section: payload.section || 'A', status: 'active',
         pin_hash: payload.pin_hash, address: payload.address || ''
       };
       this.rows('students').push(student);
