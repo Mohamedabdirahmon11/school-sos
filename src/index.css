@@ -1313,7 +1313,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-design {
   --admin-canvas:#f2f5fa; --admin-ink:#17264a; --admin-muted:#66758c;
   --admin-line:#e1e8f3; --admin-sidebar:#0f2a5c; --admin-active:#1673ee;
-  --admin-primary:#2563eb;
+  --admin-primary:var(--brand-color,#2563eb);
   background:var(--admin-canvas)!important;color:var(--admin-ink);
 }
 .school-admin-design aside {
@@ -1470,3 +1470,10 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
     flex-basis: 72px;
   }
 }
+
+
+/* Keep the AL-BUSHRA primary controls in sync with each school's saved brand color. */
+.school-admin-design main [class*="bg-[#2563eb]"] { background-color:var(--brand-color)!important; }
+.school-admin-design main [class*="text-[#2563eb]"] { color:var(--brand-color)!important; }
+.school-admin-design main [class*="border-[#2563eb]"] { border-color:var(--brand-color)!important; }
+.school-admin-design main [class*="hover:bg-[#1d4ed8]"]:hover { background-color:var(--brand-color-dark)!important; }
