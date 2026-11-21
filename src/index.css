@@ -1466,3 +1466,29 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 .school-admin-design main [class*="text-[#2563eb]"] { color:var(--brand-color)!important; }
 .school-admin-design main [class*="border-[#2563eb]"] { border-color:var(--brand-color)!important; }
 .school-admin-design main [class*="hover:bg-[#1d4ed8]"]:hover { background-color:var(--brand-color-dark)!important; }
+
+
+/* AL-BUSHRA reference KPI cards: white surfaces with a colored leading edge. */
+.school-admin-design .school-admin-metric {
+  min-height: 112px;
+  border: 1px solid var(--admin-line) !important;
+  border-left: 4px solid #2563eb !important;
+  border-radius: 14px !important;
+  padding: 16px !important;
+  background: #fff !important;
+  color: var(--admin-ink) !important;
+  box-shadow: 0 2px 8px rgba(16,24,40,.06) !important;
+}
+.school-admin-design .school-admin-metric[data-tone="green"] { border-left-color: #16a34a !important; }
+.school-admin-design .school-admin-metric[data-tone="purple"] { border-left-color: #7c3aed !important; }
+.school-admin-design .school-admin-metric[data-tone="amber"] { border-left-color: #d97706 !important; }
+.school-admin-design .school-admin-metric:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(16,24,40,.09) !important; }
+.school-admin-design .school-admin-metric .metric-label { color: #667085; font-size: 12px; font-weight: 600; }
+.school-admin-design .school-admin-metric .metric-value { color: #18202c; font-size: 26px; font-weight: 750; letter-spacing: -.02em; }
+.school-admin-design .school-admin-metric .metric-hint { color: #475569; background: #f2f5fa; }
+.school-admin-design .school-admin-metric .metric-icon { color: #2563eb; background: #e8f0ff; }
+.school-admin-design .school-dashboard-panel { border: 1px solid var(--admin-line); border-radius: 14px; background: #fff; box-shadow: 0 2px 8px rgba(16,24,40,.06); }
+@media (max-width: 767px) {
+  .school-admin-design .school-admin-metric { min-height: 104px; padding: 14px !important; }
+  .school-admin-design .school-admin-metric .metric-value { font-size: 24px; }
+}
