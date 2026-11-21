@@ -87,7 +87,7 @@ export const NoticesEventsView: React.FC<{ initialTab?: 'events' | 'notices' }> 
           title: eventTitle,
           description: eventDescription,
           startDate: eventStartDate,
-          endDate: eventEndDate,
+          endDate: eventEndDate || eventStartDate,
           type: eventType
         })
       });
@@ -212,7 +212,7 @@ export const NoticesEventsView: React.FC<{ initialTab?: 'events' | 'notices' }> 
             <thead className="border-b border-[#E2E8F0] bg-[#F8FAFC] text-xs font-semibold uppercase text-[#64748B]"><tr><th className="px-4 py-3">Event</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">End date</th><th className="px-4 py-3">Type</th><th className="px-4 py-3 text-right"></th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {events.filter(ev => (ev.title + ' ' + ev.type + ' ' + ev.startDate + ' ' + (ev.endDate || '')).toLowerCase().includes(eventSearch.trim().toLowerCase())).map(ev => (
-                <tr key={ev.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-semibold text-slate-900">{ev.title}</td><td className="px-4 py-3 tabular-nums">{ev.startDate}</td><td className="px-4 py-3 tabular-nums">{ev.endDate || '—'}</td><td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{ev.type}</span></td><td className="px-4 py-3 text-right">{canManageEvents && <details className="relative inline-block text-left"><summary className="cursor-pointer list-none rounded-md px-3 py-1 font-bold text-slate-600 hover:bg-slate-100" aria-label={'Actions for ' + ev.title}>⋯</summary><div className="absolute right-0 z-20 mt-1 min-w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"><button type="button" onClick={() => handleDeleteEvent(ev.id)} className="w-full rounded px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50">Delete</button></div></details>}</td></tr>
+                <tr key={ev.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-semibold text-slate-900">{ev.title}</td><td className="px-4 py-3 tabular-nums">{ev.startDate}</td><td className="px-4 py-3 tabular-nums">{ev.endDate && ev.endDate !== ev.startDate ? ev.endDate : '—'}</td><td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{ev.type}</span></td><td className="px-4 py-3 text-right">{canManageEvents && <details className="relative inline-block text-left"><summary className="cursor-pointer list-none rounded-md px-3 py-1 font-bold text-slate-600 hover:bg-slate-100" aria-label={'Actions for ' + ev.title}>⋯</summary><div className="absolute right-0 z-20 mt-1 min-w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"><button type="button" onClick={() => handleDeleteEvent(ev.id)} className="w-full rounded px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50">Delete</button></div></details>}</td></tr>
               ))}
               {!events.filter(ev => (ev.title + ' ' + ev.type + ' ' + ev.startDate + ' ' + (ev.endDate || '')).toLowerCase().includes(eventSearch.trim().toLowerCase())).length && <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">{events.length ? 'No matching calendar events.' : 'No calendar events yet. Add your first event.'}</td></tr>}
             </tbody>
