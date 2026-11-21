@@ -421,7 +421,7 @@ test('concurrent attendance submissions converge on one daily row without automa
     fullName: 'Attendance Teacher', email: 'attendance-teacher@example.test',
     passwordHash: '', isBlocked: false
   } as any);
-  memory.rows('teachers').push({ id: 'attendance-teacher-profile', school_id: school.id, user_id: teacherUser.id });
+  memory.rows('teachers').push({ id: 'attendance-teacher-profile', school_id: school.id, user_id: teacherUser.id, status: 'active' });
   memory.rows('class_subjects').push({
     id: 'attendance-teacher-assignment', school_id: school.id,
     teacher_id: 'attendance-teacher-profile', class_id: klass.id,
