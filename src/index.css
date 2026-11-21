@@ -2235,3 +2235,58 @@ body { font-family: var(--schoolos-font-body); }
   .schoolos-timetable-page { padding-inline: 10px !important; }
   .schoolos-marks-page { padding-inline: 10px !important; }
 }
+
+
+/* Teacher portal mark-entry workspace */
+.schoolos-teacher-portal { min-width: 0; color: var(--schoolos-ink); }
+.schoolos-teacher-portal :where(input,select,textarea,button) { min-height: 40px; font-family: var(--schoolos-font-body); }
+.schoolos-teacher-portal :where(input,select,textarea) {
+  border-color: var(--schoolos-line);
+  border-radius: 10px;
+  background-color: var(--schoolos-surface);
+  color: var(--schoolos-ink);
+}
+.schoolos-teacher-portal .schoolos-mark-entry-toolbar {
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  border-color: var(--schoolos-line);
+  background: var(--schoolos-surface);
+}
+.schoolos-teacher-portal .schoolos-mark-entry-summary {
+  border-color: var(--schoolos-line);
+  background: var(--schoolos-surface);
+}
+.schoolos-teacher-portal :where(table) { border-collapse: separate; border-spacing: 0; }
+.schoolos-teacher-portal :where(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f1f6f6;
+  color: #365451;
+  font-size: 10px;
+  font-weight: 700;
+}
+.dark .schoolos-teacher-portal :where(thead th) { background: #172a30; color: #c5dcda; }
+.schoolos-teacher-portal :where(tbody tr:hover) { background: rgba(14,106,98,.045); }
+.schoolos-teacher-portal :where(.overflow-x-auto) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.schoolos-teacher-portal :where(input[type="number"]) {
+  min-width: 58px;
+  min-height: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.schoolos-teacher-portal .schoolos-mark-progress { color: var(--schoolos-ink); }
+@media (max-width: 767px) {
+  .schoolos-teacher-portal { padding: 12px !important; }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar { grid-template-columns: minmax(0,1fr); }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar > div { align-items: stretch; }
+  .schoolos-teacher-portal .schoolos-mark-entry-summary { align-items: stretch; }
+}
+@media (max-width: 390px) {
+  .schoolos-teacher-portal { padding: 10px !important; }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar { padding: 12px; }
+}
