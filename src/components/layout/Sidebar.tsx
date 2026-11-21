@@ -10,7 +10,7 @@ import {
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
   CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
   UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
-  HeartPulse, Award, Wallet, Boxes, ChevronLeft, ChevronRight, MessageCircle, Languages, LogOut, UserCircle2, Search
+  HeartPulse, Award, Wallet, Boxes, ChevronLeft, ChevronRight, MessageCircle, UserCircle2, Search
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,14 +24,9 @@ type NavItem = { id: string; label: string; icon: React.ComponentType<{ classNam
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
-  const { user, school, inspectedSchool, logout } = useAuth();
+  const { user, school, inspectedSchool, language, setLanguage } = useAuth();
   const role = user?.role || 'school_admin';
   const [menuSearch, setMenuSearch] = useState('');
-  const [menuLanguage, setMenuLanguage] = useState<LanguageCode>(() => {
-    if (typeof window === 'undefined') return 'en';
-    const saved = window.localStorage.getItem('schoolos:menu-language:guest');
-    return saved === 'so' || saved === 'am' || saved === 'ar' ? saved : 'en';
-  });
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
     const saved = window.localStorage.getItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`);
@@ -142,13 +137,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     'Help Centre': { so: 'Xarunta Caawinta', am: 'የእገዛ ማዕከል', ar: 'مركز المساعدة' },
     'Log out': { so: 'Ka bax', am: 'ውጣ', ar: 'تسجيل الخروج' }
   };
-  const menuText = (value: string) => menuLanguage === 'en' ? value : menuTranslations[value]?.[menuLanguage] || value;
-  const menuT = (key: keyof TranslationDict) => translations[menuLanguage]?.[key] || translations.en[key] || String(key);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem(`schoolos:menu-language:${user?.id || 'guest'}`);
-    setMenuLanguage(saved === 'so' || saved === 'am' || saved === 'ar' ? saved : 'en');
-  }, [user?.id]);
+  const menuText = (value: string) => language === 'en' ? value : menuTranslations[value]?.[language] || value;
+  const menuT = (key: keyof TranslationDict) => translations[language]?.[key] || translations.en[key] || String(key);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`);
@@ -365,48 +355,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           </div>
         </div>
       </div>}
-
-      <div className="school-admin-sidebar-controls shrink-0 border-t border-white/10 px-3 py-2">
-        <div className={`flex items-center gap-2 ${isCollapsed ? "md:flex-col" : ""}`}>
-          <label
-            aria-label={menuText('Language')}
-            title={menuText('Language')}
-            className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/[.06] px-2.5 transition hover:bg-white/[.10] ${isCollapsed ? "md:w-10 md:flex-none md:justify-center md:px-0" : ""}`}
-            style={{ color: "var(--sidebar-text)" }}
-          >
-            <Languages size={16} className="shrink-0" aria-hidden="true" />
-            <select
-              aria-label="Navigation language"
-              value={menuLanguage}
-              onChange={event => {
-                const next = event.target.value as LanguageCode;
-                setMenuLanguage(next);
-                window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next);
-              }}
-              style={{ color: "var(--sidebar-text)" }}
-              className={`min-w-0 flex-1 cursor-pointer appearance-none bg-transparent text-[11px] font-semibold outline-none ${isCollapsed ? "md:hidden" : ""}`}
-            >
-              <option value="en" className="text-slate-900">English</option>
-              <option value="so" className="text-slate-900">Soomaali</option>
-              <option value="am" className="text-slate-900">አማርኛ</option>
-              <option value="ar" className="text-slate-900">العربية</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            aria-label={menuText("Log out")}
-            title={menuText("Log out")}
-            style={{ color: "var(--sidebar-text)" }}
-            className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[.06] px-3 text-[11px] font-semibold transition hover:border-rose-300/30 hover:bg-rose-500/15 hover:text-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:w-10 md:px-0" : ""}`}
-          >
-            <LogOut size={16} aria-hidden="true" />
-            <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
-          </button>
-        </div>
-      </div>
-
-
 
     </aside>
   </>;
