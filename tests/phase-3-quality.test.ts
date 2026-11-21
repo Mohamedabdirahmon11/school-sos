@@ -5,7 +5,7 @@ import { test } from 'node:test';
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
 test('Phase 3 dashboard migration is additive, school-scoped, and preserves dashboard payload fields', () => {
-  const migration = source('../supabase/migrations/20261121150000_phase3_dashboard_aggregate_indexes.sql');
+  const migration = source('../supabase/migrations/20261121114502_phase3_dashboard_aggregate_indexes.sql');
   assert.match(migration, /CREATE INDEX IF NOT EXISTS idx_students_school_class_status_student/);
   assert.match(migration, /CREATE INDEX IF NOT EXISTS idx_teachers_school_status/);
   assert.match(migration, /CREATE INDEX IF NOT EXISTS idx_attendance_school_date_status_class_student/);
