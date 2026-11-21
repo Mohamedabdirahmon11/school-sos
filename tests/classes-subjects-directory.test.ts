@@ -59,3 +59,10 @@ test('school curriculum exposes editable grade-band templates and applies them t
   assert.match(apiSource, /applyPrimarySubjectTemplate\(school, newClass\)/);
   assert.match(apiSource, /apiRouter\.post\('\/curriculum\/classes\/:classId\/apply-template'/);
 });
+
+
+test('new primary class creation reports a curriculum-template attachment warning when needed', () => {
+  assert.match(apiSource, /subjectTemplateWarning = 'The class was created, but its subject template could not be attached/);
+  assert.match(classesSubjectsSource, /subjectTemplateWarning = String\(\(createdClass as any\)\?\.subjectTemplateWarning/);
+  assert.match(classesSubjectsSource, /setNotice\(subjectTemplateWarning \|\|/);
+});

@@ -3058,7 +3058,7 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   let subjectTemplateWarning: string | undefined;
   if (gradeLevel >= 1 && gradeLevel <= 8) {
     try { subjectTemplateResult = await applyPrimarySubjectTemplate(school, newClass); }
-    catch (error) { subjectTemplateWarning = error instanceof Error ? error.message : 'The primary subject template could not be attached. Apply it from Curriculum.'; }
+    catch (error) { console.error('[classes] Primary subject template attachment failed.', { schoolId: school.id, classId: newClass.id, error }); subjectTemplateWarning = 'The class was created, but its subject template could not be attached. Open Curriculum and apply the template.'; }
   }
   res.status(201).json({ ...newClass, subjectTemplateApplied: subjectTemplateResult.applied, subjectTemplateCount: subjectTemplateResult.count, subjectTemplateWarning });
 });
