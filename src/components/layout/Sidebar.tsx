@@ -366,27 +366,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         </div>
       </div>}
 
-      <div className="school-admin-sidebar-controls shrink-0 border-t border-white/10 px-3 pt-3 pb-2">
-<div className="mt-5 border-t border-white/10 pt-3">
-  <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
-    <Languages size={15} aria-hidden="true" />
-    <span className={isCollapsed ? "md:hidden" : ""}>{menuText('Language')}</span>
-    <select aria-label="Navigation language" value={menuLanguage} onChange={event => { const next = event.target.value as LanguageCode; setMenuLanguage(next); window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next); }}
-      style={{ color: 'var(--sidebar-text)' }} className={`min-w-0 flex-1 bg-transparent text-[11px] outline-none ${isCollapsed ? "md:hidden" : ""}`}>
-      <option value="en" className="text-slate-900">English</option>
-      <option value="so" className="text-slate-900">Soomaali</option>
-      <option value="am" className="text-slate-900">አማርኛ</option>
-      <option value="ar" className="text-slate-900">العربية</option>
-    </select>
-  </label>
-  <button type="button" onClick={() => void logout()} aria-label={menuText("Log out")} title={isCollapsed ? menuText("Log out") : undefined}
-    style={{ color: "var(--sidebar-text)" }}
-    className={`mt-1 mb-2 flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2 text-xs font-semibold transition hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:justify-center" : ""}`}>
-    <LogOut size={15} aria-hidden="true" />
-    <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
-  </button>
-
-</div>
+      <div className="school-admin-sidebar-controls shrink-0 border-t border-white/10 px-3 py-2">
+        <div className={`flex items-center gap-2 ${isCollapsed ? "md:flex-col" : ""}`}>
+          <label
+            aria-label={menuText('Language')}
+            title={menuText('Language')}
+            className={`flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/[.06] px-2.5 transition hover:bg-white/[.10] ${isCollapsed ? "md:w-10 md:flex-none md:justify-center md:px-0" : ""}`}
+            style={{ color: "var(--sidebar-text)" }}
+          >
+            <Languages size={16} className="shrink-0" aria-hidden="true" />
+            <select
+              aria-label="Navigation language"
+              value={menuLanguage}
+              onChange={event => {
+                const next = event.target.value as LanguageCode;
+                setMenuLanguage(next);
+                window.localStorage.setItem(`schoolos:menu-language:${user?.id || "guest"}`, next);
+              }}
+              style={{ color: "var(--sidebar-text)" }}
+              className={`min-w-0 flex-1 cursor-pointer appearance-none bg-transparent text-[11px] font-semibold outline-none ${isCollapsed ? "md:hidden" : ""}`}
+            >
+              <option value="en" className="text-slate-900">English</option>
+              <option value="so" className="text-slate-900">Soomaali</option>
+              <option value="am" className="text-slate-900">አማርኛ</option>
+              <option value="ar" className="text-slate-900">العربية</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            aria-label={menuText("Log out")}
+            title={menuText("Log out")}
+            style={{ color: "var(--sidebar-text)" }}
+            className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[.06] px-3 text-[11px] font-semibold transition hover:border-rose-300/30 hover:bg-rose-500/15 hover:text-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300 ${isCollapsed ? "md:w-10 md:px-0" : ""}`}
+          >
+            <LogOut size={16} aria-hidden="true" />
+            <span className={isCollapsed ? "md:hidden" : ""}>{menuText("Log out")}</span>
+          </button>
+        </div>
       </div>
 
 

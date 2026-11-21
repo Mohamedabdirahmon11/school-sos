@@ -1782,3 +1782,75 @@ button:disabled, [aria-disabled="true"] {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Refined sidebar footer: language and sign-out share one compact utility rail. */
+.school-admin-sidebar .school-admin-sidebar-controls {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: 9px 12px max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255,255,255,.10);
+  background: var(--sidebar-background, #0f2a5c);
+}
+.school-admin-sidebar .school-admin-sidebar-controls > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.school-admin-sidebar .school-admin-sidebar-controls label,
+.school-admin-sidebar .school-admin-sidebar-controls button {
+  min-height: 36px;
+  border-radius: 10px;
+}
+.school-admin-sidebar .school-admin-sidebar-controls label {
+  min-width: 0;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.055);
+}
+.school-admin-sidebar .school-admin-sidebar-controls select {
+  min-height: 30px;
+  color: inherit;
+}
+.school-admin-sidebar .school-admin-sidebar-controls select option {
+  color: #172033;
+  background: #fff;
+}
+.school-admin-sidebar .school-admin-sidebar-controls button {
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.055);
+}
+.school-admin-sidebar .school-admin-sidebar-controls button:hover {
+  border-color: rgba(251,113,133,.38);
+  background: rgba(244,63,94,.14);
+}
+.school-admin-sidebar > nav {
+  scrollbar-gutter: stable;
+}
+.school-admin-sidebar > nav section {
+  padding: 0 1px;
+}
+.school-admin-sidebar > nav section button {
+  letter-spacing: -.01em;
+}
+.school-admin-sidebar > div:nth-last-child(2) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.school-admin-sidebar > div:nth-last-child(2) > div {
+  min-height: 38px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+@media (min-width: 768px) {
+  .school-admin-sidebar.school-admin-sidebar-collapsed .school-admin-sidebar-controls > div {
+    flex-direction: column;
+  }
+}
+@media (max-width: 767px) {
+  .school-admin-sidebar .school-admin-sidebar-controls {
+    padding-inline: 12px;
+  }
+}
