@@ -51,3 +51,11 @@ test('class creation accepts a correctly formatted academic year in the API vali
   assert.doesNotMatch(createClassRoute, /!\/\^\\\\d\{4\}-\\\\d\{4\}\$\/.test\(academicYear\)/);
   assert.match(classesSource, /pattern="\[0-9\]\{4\}-\[0-9\]\{4\}"/);
 });
+
+
+test('school curriculum exposes editable grade-band templates and applies them to new primary classes', () => {
+  assert.match(apiSource, /apiRouter\.get\('\/subjects\/templates'/);
+  assert.match(apiSource, /apiRouter\.put\('\/subjects\/templates\/:gradeBand'/);
+  assert.match(apiSource, /applyPrimarySubjectTemplate\(school, newClass\)/);
+  assert.match(apiSource, /apiRouter\.post\('\/curriculum\/classes\/:classId\/apply-template'/);
+});

@@ -82,6 +82,7 @@ export interface SchoolSetupData {
   calendar: { workingDays: string[]; weeklyHolidays: string[]; nationalHolidays: Array<{ name: string; date: string; calendar: 'ethiopian' | 'gregorian' }>; schoolHolidays: Array<{ name: string; startDate: string; endDate: string }>; calendarType: 'ethiopian' | 'gregorian' | 'both' };
   workingHours: { openingTime: string; classStartTime: string; closingTime: string; breakStartTime: string; breakEndTime: string; periodsPerDay: number };
   completedSteps: number[];
+  subjectTemplates?: Record<'1-4' | '5-6' | '7-8', string[]>;
   updatedAt?: string;
 }
 

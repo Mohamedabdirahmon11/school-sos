@@ -38,7 +38,7 @@ import {
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
-import { DEFAULT_SUBJECT_NAMES, normalizeSubjectCode, normalizeSubjectName, subjectNameExists } from './subject-validation.ts';
+import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
@@ -3038,7 +3038,14 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
     classTeacherId: req.body?.classTeacherId || null,
     monthlyFee: Number(req.body?.monthlyFee || 0), shift: requestedShift as 1 | 2
   });
-  res.status(201).json(newClass);
+  await db.flush();
+  let subjectTemplateResult: { applied: boolean; count: number; gradeBand: string | null; added: number } = { applied: false, count: 0, gradeBand: null, added: 0 };
+  let subjectTemplateWarning: string | undefined;
+  if (gradeLevel >= 1 && gradeLevel <= 8) {
+    try { subjectTemplateResult = await applyPrimarySubjectTemplate(school, newClass); }
+    catch (error) { subjectTemplateWarning = error instanceof Error ? error.message : 'The primary subject template could not be attached. Apply it from Curriculum.'; }
+  }
+  res.status(201).json({ ...newClass, subjectTemplateApplied: subjectTemplateResult.applied, subjectTemplateCount: subjectTemplateResult.count, subjectTemplateWarning });
 });
 
 apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res) => {
@@ -3190,6 +3197,47 @@ async function findCurriculumDependency(schoolId: string, classId: string, subje
   }
   return null;
 }
+function primarySubjectBandForGrade(gradeLevel: number): PrimarySubjectGradeBand | null {
+  if (gradeLevel >= 1 && gradeLevel <= 4) return '1-4';
+  if (gradeLevel >= 5 && gradeLevel <= 6) return '5-6';
+  if (gradeLevel >= 7 && gradeLevel <= 8) return '7-8';
+  return null;
+}
+
+function getPrimarySubjectTemplates(school: School): PrimarySubjectTemplates {
+  const saved = school.setupData?.subjectTemplates;
+  return {
+    '1-4': Array.isArray(saved?.['1-4']) && saved['1-4'].length ? saved['1-4'] : [...PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['1-4']],
+    '5-6': Array.isArray(saved?.['5-6']) && saved['5-6'].length ? saved['5-6'] : [...PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['5-6']],
+    '7-8': Array.isArray(saved?.['7-8']) && saved['7-8'].length ? saved['7-8'] : [...PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['7-8']]
+  };
+}
+
+async function applyPrimarySubjectTemplate(school: School, klass: SchoolClass) {
+  const band = primarySubjectBandForGrade(Number(klass.gradeLevel || 0));
+  if (!band) return { applied: false, count: 0, gradeBand: null, added: 0 };
+  const names = getPrimarySubjectTemplates(school)[band];
+  const existingSubjects = await db.getSubjects(school.id);
+  for (const name of names) {
+    if (subjectNameExists(existingSubjects, name)) continue;
+    existingSubjects.push(db.createSubject({ schoolId: school.id, name, code: '', description: `Ethiopian primary curriculum template: Grades ${band}.`, creditUnits: 0, department: '', assignedTeacherIds: [] }));
+  }
+  await db.flush();
+  const subjects = await db.getSubjects(school.id);
+  const subjectByName = new Map(subjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
+  const existingRows = await readClassCurriculumRows(school.id, klass.id);
+  const existingSubjectIds = new Set(existingRows.map((row: any) => String(row.subject_id)));
+  const capacity = await getClassCurriculumCapacity(school.id);
+  const periodsPerWeek = Math.max(1, Math.min(2, Math.floor(Math.max(names.length, capacity.weeklyCapacity) / Math.max(1, names.length))));
+  const selectedSubjects = names.map(name => subjectByName.get(name.trim().toLocaleLowerCase())).filter(Boolean) as Array<{ id: string }>;
+  const payload = selectedSubjects.filter(subject => !existingSubjectIds.has(subject.id))
+    .map(subject => ({ id: randomUUID(), school_id: school.id, class_id: klass.id, subject_id: subject.id, periods_per_week: periodsPerWeek, teacher_id: null, small_exam_enabled: false, big_exam_enabled: false, is_active: true }));
+  if (payload.length) {
+    const { error } = await classGroupsClient().from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
+    if (error) throw error;
+  }
+  return { applied: true, count: names.length, gradeBand: band, added: payload.length };
+}
 async function readClassCurriculumRows(schoolId: string, classId: string) {
   const { data, error } = await classGroupsClient().from('class_subjects')
     .select('id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at')
@@ -3303,6 +3351,20 @@ apiRouter.delete('/curriculum/classes/:classId/subjects/:subjectId', requireAuth
   }
 });
 
+apiRouter.post('/curriculum/classes/:classId/apply-template', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can apply curriculum templates.' }); return; }
+  const klass = await db.getClassById(String(req.params.classId || ''), school.id);
+  if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
+  try {
+    const result = await applyPrimarySubjectTemplate(school, klass);
+    if (!result.applied) { res.status(400).json({ error: 'Primary subject templates are available for Grades 1–8 only.' }); return; }
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(503).json({ error: error instanceof Error ? error.message : 'The subject template could not be applied.' });
+  }
+});
 apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
@@ -3593,6 +3655,32 @@ apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContex
   res.json({ success: true, comment: { id: data.id, studentId: data.student_id, semester: data.semester, comment: data.comment, teacherUserId: data.teacher_user_id, updatedAt: data.updated_at } });
 });
 
+apiRouter.get('/subjects/templates', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view subject templates.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json(getPrimarySubjectTemplates(school));
+});
+
+apiRouter.put('/subjects/templates/:gradeBand', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can edit subject templates.' }); return; }
+  const band = String(req.params.gradeBand || '') as PrimarySubjectGradeBand;
+  if (!['1-4', '5-6', '7-8'].includes(band)) { res.status(400).json({ error: 'Choose grade band 1-4, 5-6, or 7-8.' }); return; }
+  if (!Array.isArray(req.body?.subjects) || req.body.subjects.length < 1 || req.body.subjects.length > 30) { res.status(400).json({ error: 'A grade template must contain 1 to 30 subjects.' }); return; }
+  const subjects = req.body.subjects.map((value: unknown) => normalizeSubjectName(value));
+  if (subjects.some(name => !name || name.length > 150) || new Set(subjects.map(name => name.toLocaleLowerCase())).size !== subjects.length) { res.status(400).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return; }
+  const templates = { ...getPrimarySubjectTemplates(school), [band]: subjects } as PrimarySubjectTemplates;
+  const setupData = { ...(school.setupData || {}), subjectTemplates: templates } as NonNullable<School['setupData']>;
+  const updated = db.updateSchool(school.id, { setupData });
+  if (!updated) { res.status(404).json({ error: 'School not found.' }); return; }
+  await db.flush();
+  db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATE_UPDATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated primary subject template for grades ${band}.`, severity: 'info' });
+  res.json({ gradeBand: band, subjects, templates });
+});
 apiRouter.post('/subjects/defaults', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const role = normalizeRole((req as any).user.role);
