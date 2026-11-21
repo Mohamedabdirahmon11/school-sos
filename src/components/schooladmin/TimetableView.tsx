@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { ErrorState } from '../common/AsyncState.tsx';
 import { TimetableSlot, SchoolClass, Subject, Teacher } from '../../types/index.ts';
 import { getSchoolPeriodsPerDay, getSchoolWorkingDays } from '../../lib/school-calendar.ts';
 import { CalendarDays, AlertTriangle, CheckCircle2, Plus, X, Printer, Settings2, WandSparkles } from 'lucide-react';
@@ -481,9 +482,7 @@ export const TimetableView: React.FC = () => {
             Jadwal fasal kasta gooni ayuu u yahay. Waxaa muuqda maaddada iyo waqtiga oo keliya.
           </p>
         </div>
-        {loadError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 sm:max-w-md">
-          <p>{loadError}</p><button type="button" onClick={() => void fetchData()} className="mt-2 font-bold underline">Retry loading timetable</button>
-        </div>}
+        {loadError && <ErrorState error={loadError} onRetry={() => void fetchData()} />}
 
         <div className="flex w-full flex-wrap items-end gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm self-start sm:self-auto">
           {viewMode === 'class' && sections.length > 0 && <select aria-label="Class section" value={selectedSectionId} onChange={e => setSelectedSectionId(e.target.value)} className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white">
