@@ -3840,8 +3840,10 @@ async function getTeacherTermAssignmentScope(
   const teacher = teacherPage.items[0] as any;
   if (!teacher || String(teacher.status || '').toLowerCase() !== 'active') return null;
 
-  const years = await queryAllRows('academic_years', { school_id: school.id, name: academicYearName }, 'id');
-  const academicYear = years[0] as any;
+  const years = await queryAllRows('academic_years', { school_id: school.id }, 'id,name');
+  const normalizeAcademicYear = (value: unknown) => String(value || '').replace(/[/-]/g, '');
+  const requestedYearKey = normalizeAcademicYear(academicYearName);
+  const academicYear = years.find((item: any) => normalizeAcademicYear(item.name) === requestedYearKey) as any;
   if (!academicYear?.id) return null;
 
   const termNames = semester === 'Semester 1' ? ['Term 1', 'Semester 1'] : ['Term 2', 'Semester 2'];
