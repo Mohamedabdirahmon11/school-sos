@@ -12,7 +12,7 @@ import { LoginView } from './components/auth/LoginView.tsx';
 import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal.tsx';
 import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
-import { LoadingState } from './components/common/AsyncState.tsx';
+import { LoadingState, ErrorState } from './components/common/AsyncState.tsx';
 import { ApiClient } from './services/api.ts';
 import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
@@ -103,16 +103,13 @@ const AppContent: React.FC = () => {
   }
 
   if (apiFailure) {
-    const forbidden = apiFailure.status === 403;
-    return (
-      <div className="min-h-screen bg-[#F3F6F6] flex items-center justify-center p-4">
-        <section role="alert" className="max-w-md w-full rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-[#132A29]">{forbidden ? 'No permission' : 'We could not load this screen'}</h1>
-          <p className="mt-2 text-sm text-[#64748B]">{forbidden ? apiFailure.message : 'The server could not return this data. Check the connection and retry.'}</p>
-          <button onClick={() => window.location.reload()} className="mt-4 rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white">Retry</button>
-        </section>
-      </div>
-    );
+    const failure = Object.assign(new Error(apiFailure.message), {
+      status: apiFailure.status,
+      code: apiFailure.code
+    });
+    return <div className="min-h-screen bg-[#F3F6F6] flex items-center justify-center p-4">
+      <ErrorState error={failure} onRetry={() => window.location.reload()} />
+    </div>;
   }
 
   // Determine active default view based on role
