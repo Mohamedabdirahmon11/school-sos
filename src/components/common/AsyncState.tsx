@@ -56,11 +56,9 @@ export const ErrorState: React.FC<{ error: ApiLoadError; onRetry: () => void }> 
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold text-[#132A29]">{forbidden ? 'No permission' : unauthorized ? 'Session expired' : 'This screen could not load'}</h2>
           <p className="mt-1 text-[#475569]">{error.message || (forbidden ? 'Your account is not allowed to view this information.' : unauthorized ? 'Sign in again to continue.' : 'The server could not return this information.')}</p>
-          {!unauthorized && !forbidden && (
-            <button type="button" onClick={onRetry} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 font-semibold text-white hover:bg-[#0D655E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F766E]">
-              <RefreshCw aria-hidden="true" className="h-4 w-4" /> Isku day mar kale
-            </button>
-          )}
+          <button type="button" onClick={onRetry} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 font-semibold text-white hover:bg-[#0D655E] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F766E]">
+            <RefreshCw aria-hidden="true" className="h-4 w-4" /> Retry · Isku day mar kale
+          </button>
         </div>
       </div>
     </section>
