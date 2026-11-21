@@ -16,7 +16,7 @@ import { LoadingState, ErrorState } from './components/common/AsyncState.tsx';
 import { ApiClient } from './services/api.ts';
 import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
-import { getNavigationRoute } from './lib/navigation-registry.ts';
+import { getNavigationRoute, type SchoolOSRole } from './lib/navigation-registry.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
 const SchoolsView = React.lazy(() => import('./components/superadmin/SchoolsView.tsx').then(module => ({ default: module.SchoolsView })));
@@ -136,9 +136,12 @@ const AppContent: React.FC = () => {
         || requestedView === 'sch_reports' && !hasStaffNavigationPermission(user.permissions, 'reports_export')
       ) ? 'acc_dashboard' : requestedView;
 
+  const activeRoute = getNavigationRoute(activeView);
+
   const handleNavigate = (view: string) => {
-    if (!getNavigationRoute(view)) {
-      console.warn(`[navigation] Ignored unregistered route: ${view}`);
+    const route = getNavigationRoute(view);
+    if (!route || !route.roles.includes(user.role as SchoolOSRole)) {
+      console.warn(`[navigation] Ignored unregistered or unauthorized route: ${view}`);
       return;
     }
     if (setupRequired && !SCHOOL_SETUP_ALLOWED_VIEWS.has(view)) {
@@ -154,7 +157,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className={`h-[100dvh] min-h-0 overflow-hidden bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' || inspectedSchool ? 'school-admin-design' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
+    <div data-active-route={activeRoute?.id} data-active-route-label={activeRoute?.label} className={`h-[100dvh] min-h-0 overflow-hidden bg-[#F3F6F6] flex flex-col antialiased font-sans text-[#132A29] ${user.role === 'accountant' ? 'accountant-design' : user.role === 'school_admin' || inspectedSchool ? 'school-admin-design' : user.role === 'super_admin' ? 'super-admin-design' : ''}`}>
       {/* Forced Password Change Modal for First-Time Staff Sign-in */}
       <ForcePasswordChangeModal />
 
