@@ -1,5 +1,6 @@
 /**
  * Mobile quick navigation generated from the shared role-aware route registry.
+ * Teacher quick tabs are registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
 import { Menu } from 'lucide-react';
