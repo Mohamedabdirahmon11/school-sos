@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
+import { ErrorState, LoadingState } from '../common/AsyncState.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Search, ExternalLink, Phone, MessageSquare, Users } from 'lucide-react';
 
@@ -123,12 +124,9 @@ export const ParentsView: React.FC = () => {
 
       <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
         {isLoading ? (
-          <div className="p-8 text-center text-sm text-slate-500" role="status">Loading parent contacts…</div>
+          <LoadingState label="Loading parent contacts" />
         ) : loadError ? (
-          <div className="p-8 text-center text-sm text-rose-700" role="alert">
-            {loadError}
-            <button type="button" onClick={() => setReloadCount(count => count + 1)} className="ml-3 underline">Retry</button>
-          </div>
+          <ErrorState error={loadError} onRetry={() => setReloadCount(count => count + 1)} />
         ) : (
           <>
             <div className="overflow-x-auto">
