@@ -1565,3 +1565,31 @@ button:disabled, [aria-disabled="true"] {
     max-width: calc(100vw - 28px);
   }
 }
+
+.schoolos-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--schoolos-control-height);
+  padding: var(--schoolos-space-2) var(--schoolos-space-4);
+  border-radius: 0.625rem;
+  font-size: var(--schoolos-font-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.schoolos-button-primary {
+  background: #0f766e;
+  color: #fff;
+}
+.schoolos-button-primary:hover:not(:disabled) {
+  background: #0d655e;
+}
+.schoolos-button-secondary {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+}
+@media (prefers-reduced-motion: reduce) {
+  .schoolos-button { transition: none; }
+}
