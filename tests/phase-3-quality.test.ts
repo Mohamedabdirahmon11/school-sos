@@ -52,3 +52,16 @@ test('shared async states and responsive table behavior expose keyboard focus an
   assert.match(css, /overflow-x: auto/);
   assert.match(students, /hidden overflow-x-auto md:block/);
 });
+
+test('CSV, Excel and PDF exports reuse the active student list filters', () => {
+  const students = source('../src/components/schooladmin/StudentsView.tsx');
+  const teachers = source('../src/components/schooladmin/TeachersView.tsx');
+  assert.match(students, /if \(classFilter\) params\.set\('classId', classFilter\)/);
+  assert.match(students, /if \(branchFilter\) params\.set\('branchId', branchFilter\)/);
+  assert.match(students, /if \(search\.trim\(\)\) params\.set\('search', search\.trim\(\)\)/);
+  assert.match(students, /if \(feeFilter !== 'all'\) params\.set\('feeStatus', feeFilter\)/);
+  assert.match(students, /if \(genderFilter !== 'all'\) params\.set\('gender', genderFilter\)/);
+  assert.match(students, /if \(studentStatusFilter !== 'all'\) params\.set\('status', studentStatusFilter\)/);
+  assert.match(students, /students\/export\.pdf\?' \+ buildStudentExportQuery\(\)/);
+  assert.match(teachers, /subjectId: subjectFilter/);
+});
