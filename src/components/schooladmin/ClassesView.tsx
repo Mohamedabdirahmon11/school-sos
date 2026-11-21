@@ -14,6 +14,7 @@ export const ClassesView: React.FC = () => {
   const [rows,setRows] = useState<ClassGroup[]>([]);
   const [loading,setLoading] = useState(true);
   const [name,setName] = useState('');
+  const [search,setSearch] = useState('');
   const [sections,setSections] = useState('');
   const [sectionDraft,setSectionDraft] = useState<Record<string,string>>({});
   const [editing,setEditing] = useState<string|null>(null);
@@ -28,6 +29,8 @@ export const ClassesView: React.FC = () => {
     finally { setLoading(false); }
   },[language]);
   useEffect(()=>{ void load(); },[load]);
+
+  const visibleRows = rows.filter(row => (row.name + ' ' + (row.class_sections || []).map(section => section.name).join(' ')).toLowerCase().includes(search.trim().toLowerCase()));
 
   const run = async (action:()=>Promise<any>, success:string) => {
     setBusy(true); setNotice(null);
@@ -75,9 +78,9 @@ export const ClassesView: React.FC = () => {
         <button disabled={busy} onClick={()=>void defaults()} className="rounded-xl border border-teal-200 bg-white px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50">{tx('addDefaults')}</button>
       </div>
     </div>}
-    <div className="flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">{tx('classList')}</h2><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{rows.length} {tx('classCount')}</span></div>
-    {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">{tx('loading')}</div> : rows.length===0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">{tx('empty')}</div> :
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{rows.map((row,index)=><article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-lg font-bold text-slate-900">{tx('classList')}</h2><div className="flex flex-wrap items-center gap-2"><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search classes or sections" aria-label="Search classes or sections" className="min-w-[220px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"/><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{visibleRows.length} / {rows.length} {tx('classCount')}</span></div></div>
+    {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">{tx('loading')}</div> : visibleRows.length===0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">{tx('empty')}</div> :
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleRows.map((row,index)=><article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1">{editing===row.id ? <div className="flex gap-2"><input aria-label={tx('className')} value={editName} onChange={e=>setEditName(e.target.value)} maxLength={120} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"/><button disabled={busy||!editName.trim()} onClick={()=>void rename(row.id)} title={tx('save')} className="text-emerald-700 disabled:opacity-40"><Check size={18}/></button><button onClick={()=>setEditing(null)} title={tx('cancel')} className="text-slate-400"><X size={18}/></button></div> : <><div className="text-xs font-semibold text-teal-700">{tx('classLabel')} {index+1}</div><h3 className="mt-1 truncate text-lg font-bold text-slate-900">{row.name}</h3></>}</div>
           {!isReadOnly && editing!==row.id && <div className="flex gap-1"><button onClick={()=>{setEditing(row.id);setEditName(row.name);}} title={tx('rename')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><Pencil size={16}/></button><button onClick={()=>removeClass(row)} title={tx('delete')} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={16}/></button></div>}
         </div>

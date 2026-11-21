@@ -20,6 +20,7 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classId, setClassId] = useState('');
+  const [subjectSearch, setSubjectSearch] = useState('');
   const [detail, setDetail] = useState<CurriculumDetail | null>(null);
   const [included, setIncluded] = useState<string[]>([]);
   const [periods, setPeriods] = useState<Record<string, number>>({});
@@ -78,6 +79,7 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
   const total = useMemo(() => included.reduce((sum, id) => sum + (periods[id] || 1), 0), [included, periods]);
   const overCapacity = total > capacity;
   const classLabel = (row: SchoolClass) => [row.name, row.section, row.academicYear].filter(Boolean).join(' · ');
+  const filteredSubjects = useMemo(() => subjects.filter(subject => (subject.name + ' ' + (subject.code || '')).toLowerCase().includes(subjectSearch.trim().toLowerCase())), [subjects, subjectSearch]);
 
   const toggleSubject = (subjectId: string, checked: boolean) => {
     setIncluded(current => checked ? [...current, subjectId] : current.filter(id => id !== subjectId));
@@ -135,8 +137,12 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
             <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29] dark:text-white"><BookOpen className="h-5 w-5 text-teal-700" /> Maaddooyinka fasalkan</h2>
             <Pill>{included.length} maaddo</Pill>
           </div>
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">Raadi maaddooyinka
+            <input value={subjectSearch} onChange={event => setSubjectSearch(event.target.value)} placeholder="Magaca ama koodhka maaddada" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-teal-600 dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
+          </label>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500"><span>{included.length} maaddo la doortay</span><span>·</span><span>{total} / {capacity} xiisadood toddobaadkii</span></div>
           <div className="space-y-2">
-            {subjects.map(subject => {
+            {filteredSubjects.map(subject => {
               const checked = included.includes(subject.id);
               return <label key={subject.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
                 <input type="checkbox" checked={checked} disabled={isReadOnly || saving} onChange={event => toggleSubject(subject.id, event.target.checked)} className="h-4 w-4 shrink-0 accent-teal-700" />
@@ -144,6 +150,7 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
                 <span className="w-28 shrink-0"><span className="sr-only">Xiisadaha toddobaadkii ee {subject.name}</span><input type="number" min={1} max={12} step={1} disabled={!checked || isReadOnly || saving} value={periods[subject.id] || 1} onChange={event => setPeriods(current => ({ ...current, [subject.id]: Math.min(12, Math.max(1, Number(event.target.value) || 1)) }))} className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-center text-sm text-slate-900 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-800" /></span>
               </label>;
             })}
+            {!filteredSubjects.length && <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">Maaddo ku habboon lama helin.</p>}
           </div>
           <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 ${overCapacity ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200' : 'border-teal-100 bg-teal-50 text-teal-900 dark:border-teal-900 dark:bg-teal-950 dark:text-teal-100'}`}>
             <div className="flex items-center gap-2 text-sm font-bold">{overCapacity && <AlertTriangle className="h-4 w-4" />} Wadarta: {total} / {capacity} xiisad</div>

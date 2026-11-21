@@ -14,13 +14,18 @@ import {
   AlertCircle, 
   CheckCircle, 
   Users,
-  CalendarDays
+  CalendarDays,
+  Download,
+  Printer,
+  Search
 } from 'lucide-react';
 
-export const NoticesEventsView: React.FC = () => {
+export const NoticesEventsView: React.FC<{ initialTab?: 'events' | 'notices' }> = ({ initialTab = 'events' }) => {
   const { school, user, t } = useAuth();
-  const [activeTab, setActiveTab] = useState<'events' | 'notices'>('events');
+  const [activeTab, setActiveTab] = useState<'events' | 'notices'>(initialTab);
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const [events, setEvents] = useState<SchoolEvent[]>([]);
+  const [eventSearch, setEventSearch] = useState('');
   const [notices, setNotices] = useState<SchoolNotice[]>([]);
   const [noticePageInfo, setNoticePageInfo] = useState<PageInfo | null>(null);
   const [noticePage, setNoticePage] = useState(1);
@@ -82,7 +87,7 @@ export const NoticesEventsView: React.FC = () => {
           title: eventTitle,
           description: eventDescription,
           startDate: eventStartDate,
-          endDate: eventEndDate,
+          endDate: eventEndDate || eventStartDate,
           type: eventType
         })
       });
@@ -156,21 +161,20 @@ export const NoticesEventsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Academic Calendar & School Announcements
+            Academic Calendar
           </h1>
           <p className="text-xs text-[#64748B]">
             Academic Calendar is for dated events, terms, exams and holidays. Notice Board is for general announcements and circulars sent to selected school audiences.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {activeTab === 'events' && <>
+            <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-500"><Search className="h-3.5 w-3.5" /><input value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Search events" className="w-36 bg-transparent text-slate-800 outline-none sm:w-48" /></label>
+            <button type="button" onClick={() => { const rows = events.filter(event => (event.title + ' ' + event.type).toLowerCase().includes(eventSearch.toLowerCase())); const csv = ['Event,Date,End date,Type', ...rows.map(event => [event.title,event.startDate,event.endDate || '',event.type].map(value => '"' + String(value || '').replace(/"/g, '""') + '"').join(','))].join('\n'); const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'academic-calendar.csv'; link.click(); URL.revokeObjectURL(url); }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Download className="h-3.5 w-3.5" />Export</button>
+            <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Printer className="h-3.5 w-3.5" />Print</button>
+            <button onClick={() => setShowEventModal(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0D655E]"><Plus className="h-3.5 w-3.5" />Add</button>
+          </>}
           {activeTab === 'notices' && user?.role === 'school_admin' && <button onClick={() => { setEditingNotice(null); setShowNoticeModal(true); }} className="px-3.5 py-2 bg-[#0F766E] text-white text-xs font-semibold rounded-lg"><Plus className="w-3.5 h-3.5 inline mr-1" />{t('add_notice')}</button>}
-          <button
-            onClick={() => setShowEventModal(true)}
-            className="px-3.5 py-2 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg shadow-sm flex items-center gap-1.5 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Event / Holiday</span>
-          </button>
         </div>
       </div>
 
@@ -203,67 +207,16 @@ export const NoticesEventsView: React.FC = () => {
       </div>
 
       {activeTab === 'events' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {error ? null : events.length === 0 ? (
-            <div className="col-span-full bg-white p-12 text-center rounded-xl border border-dashed border-slate-300">
-              <CalendarDays className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <p className="text-xs text-slate-600 font-medium">No calendar events or holidays posted yet.</p>
-              <button
-                onClick={() => setShowEventModal(true)}
-                className="mt-3 px-3 py-1.5 bg-teal-50 text-[#0F766E] rounded-lg text-xs font-semibold"
-              >
-                Schedule First Event
-              </button>
-            </div>
-          ) : (
-            events.map(ev => {
-              const badgeColors: Record<string, string> = {
-                holiday: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                exam: 'bg-red-100 text-red-800 border-red-200',
-                event: 'bg-blue-100 text-blue-800 border-blue-200',
-                meeting: 'bg-purple-100 text-purple-800 border-purple-200'
-              };
-
-              return (
-                <div
-                  key={ev.id}
-                  className="flex flex-col justify-between rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                          badgeColors[ev.type] || 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {ev.type}
-                      </span>
-                      {canManageEvents && <button
-                        onClick={() => handleDeleteEvent(ev.id)}
-                        className="text-slate-400 hover:text-red-600 p-1 rounded"
-                        aria-label={`Delete ${ev.title}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>}
-                    </div>
-                    <h3 className="text-sm font-bold text-slate-800">{ev.title}</h3>
-                    {ev.description && (
-                      <p className="text-xs text-slate-600 line-clamp-3">{ev.description}</p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-mono">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>
-                        {ev.startDate} {ev.endDate && ev.endDate !== ev.startDate ? `to ${ev.endDate}` : ''}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+        <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="border-b border-[#E2E8F0] bg-[#F8FAFC] text-xs font-semibold uppercase text-[#64748B]"><tr><th className="px-4 py-3">Event</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">End date</th><th className="px-4 py-3">Type</th><th className="px-4 py-3 text-right"></th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {events.filter(ev => (ev.title + ' ' + ev.type + ' ' + ev.startDate + ' ' + (ev.endDate || '')).toLowerCase().includes(eventSearch.trim().toLowerCase())).map(ev => (
+                <tr key={ev.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-semibold text-slate-900">{ev.title}</td><td className="px-4 py-3 tabular-nums">{ev.startDate}</td><td className="px-4 py-3 tabular-nums">{ev.endDate && ev.endDate !== ev.startDate ? ev.endDate : '—'}</td><td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{ev.type}</span></td><td className="px-4 py-3 text-right">{canManageEvents && <details className="relative inline-block text-left"><summary className="cursor-pointer list-none rounded-md px-3 py-1 font-bold text-slate-600 hover:bg-slate-100" aria-label={'Actions for ' + ev.title}>⋯</summary><div className="absolute right-0 z-20 mt-1 min-w-28 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"><button type="button" onClick={() => handleDeleteEvent(ev.id)} className="w-full rounded px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50">Delete</button></div></details>}</td></tr>
+              ))}
+              {!events.filter(ev => (ev.title + ' ' + ev.type + ' ' + ev.startDate + ' ' + (ev.endDate || '')).toLowerCase().includes(eventSearch.trim().toLowerCase())).length && <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">{events.length ? 'No matching calendar events.' : 'No calendar events yet. Add your first event.'}</td></tr>}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="space-y-3">
@@ -375,7 +328,6 @@ export const NoticesEventsView: React.FC = () => {
                   <label className="block text-xs font-medium text-slate-700 mb-1">End Date</label>
                   <input
                     type="date"
-                    required
                     value={eventEndDate}
                     onChange={e => setEventEndDate(e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"

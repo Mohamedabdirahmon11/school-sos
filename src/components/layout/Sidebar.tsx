@@ -214,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Academic', items: [
         item('sch_classes', 'Classes', Layers), item('sch_subjects', 'Subjects', BookOpen), item('sch_curriculum', 'Class Curriculum', BookOpen), item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
         item('sch_timetable', menuT('timetable'), CalendarDays), item('sch_attendance', menuT('attendance'), CalendarCheck),
-        item('sch_exams', menuT('exams_results'), FileSpreadsheet), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'School Documents', FileText),
+        item('sch_marks', 'Marks', FileSpreadsheet), item('sch_marks_approval', 'Marks Approval', ShieldCheck), item('sch_report_cards', menuT('report_cards'), FileText), item('sch_documents', 'School Documents', FileText),
         item('sch_promotion', 'Student Progression & Alumni', Award)
       ] },
       { title: 'Communication', items: [
@@ -290,6 +290,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
       </nav>
 
+      {school?.sidebarTheme?.showUserCard !== false && <div className={`shrink-0 border-t border-white/10 bg-black/10 px-3 py-3`}>
+        <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
+          <span style={{ color: "var(--sidebar-text)" }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10"><UserCircle2 size={18} aria-hidden="true" /></span>
+          <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
+            <p style={{ color: "var(--sidebar-text)" }} className="truncate text-xs font-semibold">{user?.fullName || "Signed in"}</p>
+            <p style={{ color: "var(--sidebar-text)", opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, " ")}</p>
+          </div>
+        </div>
+      </div>}
+
       <div className="school-admin-sidebar-controls shrink-0 border-t border-white/10 px-3 pt-3 pb-2">
 <div className="mt-5 border-t border-white/10 pt-3">
   <label style={{ color: "var(--sidebar-text)" }} className={`flex min-h-9 items-center gap-2 rounded-lg px-2 text-[11px] ${isCollapsed ? "md:justify-center" : ""}`}>
@@ -313,15 +323,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 </div>
       </div>
 
-      {school?.sidebarTheme?.showUserCard !== false && <div className={`shrink-0 border-t border-white/10 bg-black/10 px-3 py-3`}>
-        <div style={{ color: "var(--sidebar-text)" }} className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${isCollapsed ? "md:justify-center" : ""}`}>
-          <span style={{ color: "var(--sidebar-text)" }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/10"><UserCircle2 size={18} aria-hidden="true" /></span>
-          <div className={`min-w-0 flex-1 ${isCollapsed ? "md:hidden" : ""}`}>
-            <p style={{ color: "var(--sidebar-text)" }} className="truncate text-xs font-semibold">{user?.fullName || "Signed in"}</p>
-            <p style={{ color: "var(--sidebar-text)", opacity: 0.7 }} className="truncate text-[10px] capitalize">{role.replace(/_/g, " ")}</p>
-          </div>
-        </div>
-      </div>}
+
 
     </aside>
   </>;

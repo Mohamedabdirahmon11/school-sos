@@ -475,7 +475,7 @@ const EXAM_REDESIGN_STYLES = `
 }
 `;
 
-export const ExamsResultsView: React.FC = () => {
+export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> = ({ initialTab = 'marks' }) => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -483,7 +483,8 @@ export const ExamsResultsView: React.FC = () => {
   const [classSubjectRows, setClassSubjectRows] = useState<Array<{ id: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule' | 'marks' | 'approval'>(initialTab);
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
 
   // Exam Config State
@@ -1087,85 +1088,18 @@ export const ExamsResultsView: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
             <FileSpreadsheet className="h-7 w-7 text-[#0e8078]" />
-            {t('exams_results')}
+            Marks
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Review teacher-submitted school results, approve marks, and view semester rankings.
+            Enter student marks and review subject submissions for approval.
             {selectedClass ? ` Current class: ${selectedClass.name} (${selectedClass.section}).` : ''}
           </p>
         </div>
 
-        {/* View Switcher Tabs */}
-        <div className="flex flex-wrap items-center gap-1 bg-[#edf4f1] p-1.5 rounded-2xl text-sm">
-          <button
-            type="button"
-            onClick={() => setActiveTab('overview')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${activeTab === 'overview' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'}`}
-          >
-            Academic Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('results_explorer')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${activeTab === 'results_explorer' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'}`}
-          >
-            Results Explorer
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('analytics')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${activeTab === 'analytics' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'}`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            Performance Analytics
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('entry_approval')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === 'entry_approval' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            Submitted Results & Approval
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('sem1_rankings')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === 'sem1_rankings' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            Semester 1 Rankings
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('sem2_yearly')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              activeTab === 'sem2_yearly' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            Yearly Results (S1 + S2)
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('schedule')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-              activeTab === 'schedule' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            Exam Schedule
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('config')}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 ${
-              activeTab === 'config' ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            Exam Config
-          </button>
+        {/* Focused marks workspace navigation */}
+        <div className="flex items-center gap-1 rounded-xl border border-[#dce7e4] bg-white p-1">
+          <button type="button" onClick={() => setActiveTab('marks')} className={"rounded-lg px-4 py-2 text-sm font-semibold " + (activeTab === 'marks' ? 'bg-[#0F766E] text-white' : 'text-slate-600 hover:bg-slate-50')}>Marks</button>
+          <button type="button" onClick={() => setActiveTab('approval')} className={"rounded-lg px-4 py-2 text-sm font-semibold " + (activeTab === 'approval' ? 'bg-[#0F766E] text-white' : 'text-slate-600 hover:bg-slate-50')}>Marks Approval</button>
         </div>
       </div>
 
@@ -1175,6 +1109,74 @@ export const ExamsResultsView: React.FC = () => {
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
           <span>{notice}</span>
         </div>
+      )}
+
+      {(activeTab === 'marks' || activeTab === 'approval') && (
+        <section className="space-y-4">
+          <div className="grid gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 shadow-sm sm:grid-cols-2">
+            <label className="text-xs font-semibold text-[#475569]">Class
+              <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm">
+                {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? klass.section : ''}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-[#475569]">Semester
+              <select value={selectedSemester} onChange={event => setSelectedSemester(event.target.value as 'Semester 1' | 'Semester 2')} className="mt-1 w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm">
+                <option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option>
+              </select>
+            </label>
+          </div>
+          {activeTab === 'approval' ? (
+            <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+              <table className="w-full min-w-[780px] text-left text-sm">
+                <thead className="bg-[#F8FAFC] text-xs font-semibold uppercase text-[#64748B]"><tr><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Teacher</th><th className="px-4 py-3">Semester</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right"></th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {selectedClassSubjects.map(subject => {
+                    const subjectMarks = marks.filter(mark => mark.subjectId === subject.id);
+                    const pendingIds = subjectMarks.filter(mark => mark.status === 'form_teacher_submitted').map(mark => mark.id);
+                    const approved = subjectMarks.length === students.length && students.length > 0 && subjectMarks.every(mark => mark.status === 'approved');
+                    const pending = pendingIds.length > 0;
+                    const teacher = classSubjectRows.find(row => row.subject && row.subject.id === subject.id)?.teacher;
+                    const status = approved ? 'Approved' : pending ? 'Pending' : 'Not submitted';
+                    return <tr key={subject.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{subject.name}</td>
+                      <td className="px-4 py-3">{selectedClass?.name || '—'}{selectedClass?.section ? ' ' + selectedClass.section : ''}</td>
+                      <td className="px-4 py-3">{teacher?.fullName || '—'}</td>
+                      <td className="px-4 py-3">{selectedSemester}</td>
+                      <td className="px-4 py-3"><span className={"rounded-full px-2.5 py-1 text-xs font-semibold " + (approved ? 'bg-emerald-50 text-emerald-700' : pending ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}>{status}</span></td>
+                      <td className="px-4 py-3 text-right"><details className="relative inline-block text-left"><summary className="cursor-pointer list-none rounded-md px-3 py-1 font-bold text-slate-600 hover:bg-slate-100" aria-label={"Actions for " + subject.name}>⋯</summary>
+                        <div className="absolute right-0 z-20 mt-1 min-w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                          <button type="button" disabled={isReadOnly || !pendingIds.length} onClick={async () => { try { const result = await ApiClient.approveMarks(pendingIds); setNotice('Approved and locked ' + result.approvedCount + ' ' + subject.name + ' mark records.'); await loadClassData(); } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not approve marks.'); } }} className="w-full rounded px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40">Approve subject marks</button>
+                        </div></details></td>
+                    </tr>;
+                  })}
+                  {!selectedClassSubjects.length && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">No subjects are assigned to this class yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm">
+              <table className="w-full min-w-[850px] text-left text-sm">
+                <thead className="bg-[#F8FAFC] text-xs font-semibold uppercase text-[#64748B]"><tr><th className="px-4 py-3">Student</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Tests /50</th><th className="px-4 py-3">Exam /50</th><th className="px-4 py-3">Total</th><th className="px-4 py-3 text-right"></th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {students.flatMap(student => selectedClassSubjects.map(subject => {
+                    const mark = marks.find(item => item.studentId === student.id && item.subjectId === subject.id);
+                    const testRaw = assessmentComponents.filter(component => component.category === 'continuous').reduce((sum, component) => sum + Number(mark?.assessmentScores?.[component.id] || 0), 0);
+                    const examRaw = assessmentComponents.filter(component => component.category === 'final').reduce((sum, component) => sum + Number(mark?.assessmentScores?.[component.id] || 0), 0);
+                    const tests = continuousMax ? Math.round(testRaw / continuousMax * 50) : 0;
+                    const exam = finalMax ? Math.round(examRaw / finalMax * 50) : 0;
+                    const total = tests + exam;
+                    return <tr key={student.id + '-' + subject.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-semibold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</td>
+                      <td className="px-4 py-3">{subject.name}</td><td className="px-4 py-3 tabular-nums">{mark ? tests : '—'}</td><td className="px-4 py-3 tabular-nums">{mark ? exam : '—'}</td><td className="px-4 py-3 font-bold tabular-nums">{mark ? total : '—'}</td>
+                      <td className="px-4 py-3 text-right">{mark ? <details className="relative inline-block text-left"><summary className="cursor-pointer list-none rounded-md px-3 py-1 font-bold text-slate-600 hover:bg-slate-100" aria-label="Mark details">⋯</summary><div className="absolute right-0 z-20 mt-1 min-w-44 rounded-lg border border-slate-200 bg-white p-3 text-left text-xs shadow-lg"><p className="font-semibold text-slate-800">{mark.status === 'approved' ? 'Approved' : mark.status === 'form_teacher_submitted' ? 'Pending approval' : 'Draft'}</p><p className="mt-1 text-slate-500">Original score: {mark.totalMarks}/{maxCombined}</p><p className="text-slate-500">Percentage: {mark.percentage}%</p></div></details> : '—'}</td>
+                    </tr>;
+                  }).filter(Boolean))}
+                  {(!students.length || !selectedClassSubjects.length) && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">No marks available for this class and semester.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       )}
 
       {(activeTab === 'overview' || activeTab === 'results_explorer' || activeTab === 'analytics') && (
