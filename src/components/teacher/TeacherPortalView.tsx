@@ -519,11 +519,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     });
   }, [visibleStudents, gradeSubjects, assessmentComponents, examType, marksInput, classMarks]);
 
+  const enteredMarkCount = classMarks.filter(mark => gradeSubjects.some(subject => subject.id === mark.subjectId)).length;
+  const expectedMarkCount = students.length * gradeSubjects.length;
+  const focusNextMarkInput = (event: React.KeyboardEvent<HTMLInputElement>, componentId: string) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const currentRow = event.currentTarget.closest('tr') || event.currentTarget.closest('article');
+    const nextRow = currentRow?.nextElementSibling;
+    nextRow?.querySelector<HTMLInputElement>('[data-mark-component="' + componentId + '"]')?.focus();
+  };
+
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
+    <div className="schoolos-teacher-portal mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
         <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
@@ -813,22 +823,24 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       {/* SUBJECT-WISE EXAM MARK ENTRY */}
       {activeTab === 'grades' && (
         <section className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
-            <label className="text-xs font-semibold text-slate-600">Class
+          <div className="schoolos-mark-entry-toolbar grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
+            <label className="text-xs font-semibold text-slate-600">Fasal
               <select value={selectedClassId} onChange={event => setSelectedClassId(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
                 {classes.map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ` · ${klass.section}` : ''}</option>)}
               </select>
             </label>
-            <label className="text-xs font-semibold text-slate-600">Semester
+            <label className="text-xs font-semibold text-slate-600">Term
               <select value={semester} onChange={event => setSemester(event.target.value as any)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
-                <option value="Semester 1">Semester 1</option><option value="Semester 2">Semester 2</option>
+                <option value="Semester 1">Term 1</option><option value="Semester 2">Term 2</option>
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Save drafts</button>
-              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Submit marks</button>
+              <button type="button" onClick={() => void handleSaveMarks('draft')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"><Save className="mr-1 inline h-3.5 w-3.5"/>Kaydi qabyo</button>
+              <button type="button" onClick={() => void handleSaveMarks('submitted')} disabled={isReadOnly || isSemesterLocked || isSaving || isLoadingClassData || !editableClassSubjects.length || !students.length} className="flex-1 rounded-xl bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"><Send className="mr-1 inline h-3.5 w-3.5"/>Gudbi dhibcaha</button>
             </div>
           </div>
+
+          <div className="schoolos-mark-progress flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] px-4 py-3 text-xs"><span className="font-semibold text-[var(--schoolos-ink)]">Macallin: {user?.fullName || "—"}</span><span className="rounded-full bg-teal-50 px-3 py-1.5 font-bold text-teal-800">Gelay {enteredMarkCount}/{expectedMarkCount}</span></div>
 
           {isSemesterLocked && <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">This semester is locked by the School Admin. Mark entry and submission are disabled until it is unlocked.</div>}
 
@@ -878,8 +890,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4">
-            <div><p className="text-sm font-bold text-teal-950">Enter marks by subject and exam type</p><p className="mt-1 text-xs text-teal-800">Each subject has its own mark sheet. Small Exam and Big Exam scores are saved together in the student's subject record.</p></div>
+          <div className="schoolos-mark-entry-summary flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal-100 bg-teal-50 p-4">
+            <div><p className="text-sm font-bold text-teal-950">Gelinta dhibcaha — maaddo iyo imtixaan</p><p className="mt-1 text-xs text-teal-800">Maaddo kasta waxay leedahay diiwaan u gaar ah. Dhibcaha imtixaanka iyo qiimaynta waxaa lagu kaydiyaa diiwaanka ardayga.</p></div>
             <div className="flex flex-wrap gap-2">
               <TeacherMarkEntryPrint
                 schoolName={school?.name || 'School'}
@@ -905,14 +917,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <>
               <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div><h2 className="text-sm font-bold text-slate-900">Class examination register</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? 'Small Exam' : 'Big Exam'} · {semester}</p></div>
+                  <div><h2 className="text-sm font-bold text-slate-900">Diiwaanka imtixaanka fasalka</h2><p className="mt-1 text-[10px] text-slate-500">{classes.find(klass => klass.id === selectedClassId)?.name || 'Selected class'} · {examType === 'small' ? 'Small Exam' : 'Big Exam'} · {semester}</p></div>
                   <span className="rounded-full bg-teal-50 px-3 py-1 text-[10px] font-bold text-teal-800">{examRegisterRows.length} students · {gradeSubjects.length} subjects</span>
                 </div>
                 <div className="hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[900px] border-collapse text-xs">
                     <thead className="bg-white text-[10px] font-bold uppercase tracking-wide text-slate-600"><tr>
                       <th className="sticky left-0 z-10 border-b bg-slate-50 px-3 py-3 text-left">#</th>
-                      <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Student name / ID</th>
+                      <th className="sticky left-9 z-10 min-w-[230px] border-b bg-slate-50 px-3 py-3 text-left">Arday / Aqoonsi</th>
                       {gradeSubjects.map(subject => <th key={subject.id} className="min-w-[86px] border-b border-l px-2 py-3 text-center">{subject.name}<span className="mt-1 block text-[9px] font-normal normal-case">/{examRegisterRows[0]?.subjectScores.find(score => score.subjectId === subject.id)?.max ?? 0}</span></th>)}
                       <th className="border-b border-l bg-teal-50 px-3 py-3 text-center text-teal-900">Total</th><th className="border-b bg-slate-50 px-3 py-3 text-center">Rank</th>
                     </tr></thead>
@@ -935,7 +947,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 </div>
                 {examRegisterRows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">No students found in this class.</p>}
               </section>
-              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Enter individual assessment components</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
+              <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-slate-900">Geli qaybaha qiimaynta</h2><span className="text-[10px] text-slate-500">Edit the subject marks below, then save or submit</span></div>
               {gradeSubjects.map(subject => {
             const subjectComponents = assessmentComponents.filter(component => component.category === (examType === 'small' ? 'continuous' : 'final'));
             return (
@@ -958,7 +970,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         return <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <div className="mb-3 flex items-start justify-between gap-2"><div><p className="text-sm font-bold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p><p className="text-[11px] text-slate-500">{student.studentId}</p></div><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-600">{mark?.status || 'Not entered'}</span></div>
                           <div className="grid grid-cols-2 gap-3">
-                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
+                            {subjectComponents.map(component => <label key={component.id} className="text-xs font-semibold text-slate-600">{component.name}<span className="ml-1 text-[10px] font-normal text-slate-400">/ {component.maxMarks}</span>{editable ? <input type="number" inputMode="decimal" data-mark-component={component.id} onKeyDown={event => focusNextMarkInput(event, component.id)} min={0} max={component.maxMarks} step={0.5} value={input.scores[component.id] ?? ''} onChange={event => setMarksInput(previous => { const scores = { ...(previous[key]?.scores || {}) }; if (event.target.value === '') delete scores[component.id]; else scores[component.id] = Math.min(component.maxMarks, Math.max(0, Number(event.target.value) || 0)); return { ...previous, [key]: { ...previous[key], scores } }; })} className="mt-1 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base" aria-label={`${component.name} mark for ${student.firstName} in ${subject.name}`} /> : <span className="mt-1 block rounded-lg bg-white px-3 py-3 text-sm">{mark?.assessmentScores?.[component.id] ?? '—'}</span>}</label>)}
                           </div>
                           <p className="mt-3 text-right text-xs font-bold text-slate-700">Exam total: {examTotal.toFixed(1).replace(/\.0$/, '')}/{subjectComponents.reduce((sum, component) => sum + component.maxMarks, 0)}</p>
                         </article>;
