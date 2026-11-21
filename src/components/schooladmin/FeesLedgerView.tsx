@@ -14,7 +14,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { useApi } from '../../hooks/useApi.ts';
-import { ErrorState } from '../common/ErrorState.tsx';
+import { ErrorState, LoadingState } from '../common/AsyncState.tsx';
 import { formatMoney } from '../../lib/money.ts';
 import { FeePayment, FeeStructureItem, Student, SchoolClass, FeeType } from '../../types/index.ts';
 import { 
@@ -322,7 +322,7 @@ export const FeesLedgerView: React.FC = () => {
           {/* Table */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
             {isLoading ? (
-              <div className="p-8 text-center text-sm text-[#71817d]">Loading payments...</div>
+              <LoadingState label="Loading payments" className="min-h-24 border-0 bg-transparent" />
             ) : filteredPayments.length === 0 ? (
               <div className="p-8 text-center text-sm text-[#71817d]">
                 No cash payment records found. Click "Record Cash Payment" to record a collection.
