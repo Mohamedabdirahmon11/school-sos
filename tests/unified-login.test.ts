@@ -26,7 +26,8 @@ test('shared login sends email passwords and ID-based PINs to the correct creden
   assert.ok(loginView.includes("role: isSuperAdminLogin ? 'super_admin' : activeTab"));
   assert.ok(loginView.includes('pin: isSuperAdminLogin ? undefined : pin'));
   assert.ok(loginView.includes('password: isSuperAdminLogin ? password : undefined'));
-  assert.ok(loginView.includes('Enter your staff ID'));
+  assert.ok(loginView.includes("'School Admin ID'"));
+  assert.ok(loginView.includes('Enter Super Admin email or School Admin ID'));
   assert.ok(loginView.includes('4–6 digit PIN'));
   assert.ok(loginView.includes('Set your School Admin PIN'));
   assert.ok(loginView.includes('handleBootstrapPinChange'));
