@@ -1691,3 +1691,94 @@ button:disabled, [aria-disabled="true"] {
   .school-admin-role main .overflow-x-auto table { min-width: 640px; }
   .school-admin-role header { min-height: 56px; }
 }
+
+
+/* Unified compact sidebar finish — shared by every portal role. */
+.school-admin-sidebar {
+  --sidebar-item-height: 40px;
+  border-right: 1px solid rgba(255,255,255,.09);
+  box-shadow: 8px 0 26px rgba(10, 27, 52, .12);
+}
+.school-admin-sidebar > div:first-child {
+  height: 68px !important;
+  min-height: 68px !important;
+  padding-inline: 16px;
+}
+.school-admin-sidebar > nav {
+  gap: 14px !important;
+  padding: 14px 10px 16px !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(203, 213, 225, .28) transparent;
+}
+.school-admin-sidebar > nav section h2 {
+  margin: 8px 9px 5px !important;
+  font-size: 9px !important;
+  line-height: 1.35;
+  letter-spacing: .13em !important;
+  font-weight: 800;
+  opacity: .58;
+}
+.school-admin-sidebar > nav section > div {
+  display: grid;
+  gap: 3px !important;
+}
+.school-admin-sidebar > nav section button {
+  min-height: var(--sidebar-item-height) !important;
+  padding: 7px 10px !important;
+  border: 1px solid transparent;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+  line-height: 1.25;
+}
+.school-admin-sidebar > nav section button[aria-current="page"] {
+  border-color: rgba(255,255,255,.13);
+  box-shadow: 0 4px 12px rgba(2, 12, 32, .16);
+}
+.school-admin-sidebar > nav section button svg {
+  width: 17px;
+  height: 17px;
+}
+.school-admin-sidebar > nav > label {
+  min-height: 36px;
+  border-radius: 10px;
+}
+.school-admin-sidebar > div:nth-last-child(2) {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.school-admin-sidebar > div:nth-last-child(2) > div {
+  border-radius: 10px;
+}
+.school-admin-sidebar .school-admin-sidebar-controls {
+  padding-top: 8px;
+}
+.school-admin-sidebar .school-admin-sidebar-controls > div {
+  margin-top: 0;
+  padding-top: 8px;
+}
+.school-admin-sidebar .school-admin-sidebar-controls label,
+.school-admin-sidebar .school-admin-sidebar-controls button {
+  min-height: 34px;
+  border-radius: 9px;
+}
+.school-admin-sidebar.school-admin-sidebar-collapsed > nav {
+  padding-inline: 7px !important;
+}
+.school-admin-sidebar.school-admin-sidebar-collapsed > nav section button {
+  padding-inline: 7px !important;
+}
+@media (max-width: 767px) {
+  .school-admin-sidebar > div:first-child {
+    height: 64px !important;
+    min-height: 64px !important;
+  }
+  .school-admin-sidebar > nav {
+    padding: 12px 10px 14px !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-admin-sidebar,
+  .school-admin-sidebar * {
+    transition-duration: .01ms !important;
+  }
+}
