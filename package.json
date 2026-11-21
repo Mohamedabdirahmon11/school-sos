@@ -32,7 +32,8 @@
     "test:schema-conformance": "tsx --test tests/schema-conformance.test.ts",
     "test": "tsx --test --test-concurrency=1 \"tests/*.test.ts\" \"tests/*.test.tsx\"",
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json",
-    "test:ci": "npm test"
+    "test:ci": "npm test",
+    "audit:navigation": "tsx scripts/check-navigation-parity.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
