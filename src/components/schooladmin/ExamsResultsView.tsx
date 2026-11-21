@@ -1088,10 +1088,10 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-[#102522] flex items-center gap-2">
             <FileSpreadsheet className="h-7 w-7 text-[#0e8078]" />
-            {t('exams_results')}
+            Marks
           </h1>
           <p className="mt-1 text-sm text-[#71817d]">
-            Review teacher-submitted school results, approve marks, and view semester rankings.
+            Enter student marks and review subject submissions for approval.
             {selectedClass ? ` Current class: ${selectedClass.name} (${selectedClass.section}).` : ''}
           </p>
         </div>
@@ -1133,7 +1133,7 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
                   {selectedClassSubjects.map(subject => {
                     const subjectMarks = marks.filter(mark => mark.subjectId === subject.id);
                     const pendingIds = subjectMarks.filter(mark => mark.status === 'form_teacher_submitted').map(mark => mark.id);
-                    const approved = subjectMarks.length > 0 && subjectMarks.every(mark => mark.status === 'approved');
+                    const approved = subjectMarks.length === students.length && students.length > 0 && subjectMarks.every(mark => mark.status === 'approved');
                     const pending = pendingIds.length > 0;
                     const teacher = classSubjectRows.find(row => row.subject && row.subject.id === subject.id)?.teacher;
                     const status = approved ? 'Approved' : pending ? 'Pending' : 'Not submitted';
@@ -1160,16 +1160,15 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
                 <tbody className="divide-y divide-slate-100">
                   {students.flatMap(student => selectedClassSubjects.map(subject => {
                     const mark = marks.find(item => item.studentId === student.id && item.subjectId === subject.id);
-                    if (!mark) return null;
-                    const testRaw = assessmentComponents.filter(component => component.category === 'continuous').reduce((sum, component) => sum + Number(mark.assessmentScores?.[component.id] || 0), 0);
-                    const examRaw = assessmentComponents.filter(component => component.category === 'final').reduce((sum, component) => sum + Number(mark.assessmentScores?.[component.id] || 0), 0);
+                    const testRaw = assessmentComponents.filter(component => component.category === 'continuous').reduce((sum, component) => sum + Number(mark?.assessmentScores?.[component.id] || 0), 0);
+                    const examRaw = assessmentComponents.filter(component => component.category === 'final').reduce((sum, component) => sum + Number(mark?.assessmentScores?.[component.id] || 0), 0);
                     const tests = continuousMax ? Math.round(testRaw / continuousMax * 50) : 0;
                     const exam = finalMax ? Math.round(examRaw / finalMax * 50) : 0;
                     const total = tests + exam;
                     return <tr key={student.id + '-' + subject.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-semibold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</td>
-                      <td className="px-4 py-3">{subject.name}</td><td className="px-4 py-3 tabular-nums">{tests}</td><td className="px-4 py-3 tabular-nums">{exam}</td><td className="px-4 py-3 font-bold tabular-nums">{total}</td>
-                      <td className="px-4 py-3 text-right"><details className="relative inline-block text-left"><summary className="cursor-pointer list-none rounded-md px-3 py-1 font-bold text-slate-600 hover:bg-slate-100" aria-label="Mark details">⋯</summary><div className="absolute right-0 z-20 mt-1 min-w-44 rounded-lg border border-slate-200 bg-white p-3 text-left text-xs shadow-lg"><p className="font-semibold text-slate-800">{mark.status === 'approved' ? 'Approved' : mark.status === 'form_teacher_submitted' ? 'Pending approval' : 'Draft'}</p><p className="mt-1 text-slate-500">Original score: {mark.totalMarks}/{maxCombined}</p><p className="text-slate-500">Percentage: {mark.percentage}%</p></div></details></td>
+                      <td className="px-4 py-3">{subject.name}</td><td className="px-4 py-3 tabular-nums">{mark ? tests : '—'}</td><td className="px-4 py-3 tabular-nums">{mark ? exam : '—'}</td><td className="px-4 py-3 font-bold tabular-nums">{mark ? total : '—'}</td>
+                      <td className="px-4 py-3 text-right">{mark ? <details className="relative inline-block text-left"><summary className="cursor-pointer list-none rounded-md px-3 py-1 font-bold text-slate-600 hover:bg-slate-100" aria-label="Mark details">⋯</summary><div className="absolute right-0 z-20 mt-1 min-w-44 rounded-lg border border-slate-200 bg-white p-3 text-left text-xs shadow-lg"><p className="font-semibold text-slate-800">{mark.status === 'approved' ? 'Approved' : mark.status === 'form_teacher_submitted' ? 'Pending approval' : 'Draft'}</p><p className="mt-1 text-slate-500">Original score: {mark.totalMarks}/{maxCombined}</p><p className="text-slate-500">Percentage: {mark.percentage}%</p></div></details> : '—'}</td>
                     </tr>;
                   }).filter(Boolean))}
                   {(!students.length || !selectedClassSubjects.length) && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">No marks available for this class and semester.</td></tr>}
