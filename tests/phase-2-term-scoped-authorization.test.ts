@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const migration = readFileSync(new URL('../supabase/migrations/20261121114449_phase2_term_scoped_authorization.sql', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../supabase/migrations/20261121115111_phase2_term_scoped_authorization.sql', import.meta.url), 'utf8');
 
 test('student marks are tied to a configured term and use normalized teacher assignments', () => {
   assert.match(migration, /student_marks_sync_term/);
