@@ -491,7 +491,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 </button>
               ))}
           </div>
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto md:block" role="region" aria-label="Student directory table. Scroll horizontally to view all columns." tabIndex={0}>
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
