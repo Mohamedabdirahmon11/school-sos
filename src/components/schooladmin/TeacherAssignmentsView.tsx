@@ -211,8 +211,8 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   const workloadByTeacher = new Map(data.workload.map(w => [w.teacherId, w]));
   const replacementSubjectIds = [...new Set(data.assignments.filter(a => a.teacher_id === replaceFrom).map(a => a.subject_id))];
   const qualifiedForReplacement = (teacherId: string) => !replacementSubjectIds.length || replacementSubjectIds.every(subjectId => qualified(subjectId, teacherId));
-  return <main className="mx-auto min-w-0 w-full max-w-[1500px] space-y-5 p-4 md:p-8">
-    <PageHeader title="Qoondeynta Macallimiinta" subtitle="Ku xidh macallin, maaddo iyo fasal/qayb; la soco culayska shaqada toddobaadlaha ah." />
+  return <main className="schoolos-assignment-page mx-auto min-w-0 w-full max-w-[1500px] space-y-5 p-4 md:p-8">
+    <PageHeader title="Qoondaynta macallinka" subtitle="Ku xidh macallin, maaddo iyo fasal; si cad ula soco maaddooyinka bannaan iyo culayska shaqada." />
     <Stepper activeStep={6} labels={['Sannad & Xiisado', 'Fasallo', 'Maaddooyin', 'Manhaj', 'Macallimiin', 'Qoondeyn']} ariaLabel="Tallaabooyinka dejinta waxbarashada" />
     {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"><CheckCircle2 className="mr-2 inline h-4 w-4" />{notice}</div>}
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">{error}</div>}
