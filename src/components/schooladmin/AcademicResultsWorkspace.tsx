@@ -208,7 +208,7 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
       : 'Compare class and subject performance using approved marks only.';
 
   return (
-    <div className="space-y-5">
+    <div className="schoolos-academic-results space-y-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#132A29]">{title}</h2>
