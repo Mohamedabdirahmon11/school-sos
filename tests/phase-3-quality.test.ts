@@ -65,3 +65,11 @@ test('CSV, Excel and PDF exports reuse the active student list filters', () => {
   assert.match(students, /students\/export\.pdf\?' \+ buildStudentExportQuery\(\)/);
   assert.match(teachers, /subjectId: subjectFilter/);
 });
+
+test('tracked Phase 2 hardening migration matches already-applied database restrictions', () => {
+  const migration = source('../supabase/migrations/20261121114448_phase2_security_hardening.sql');
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_audit_component_mark\(\)/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_create_initial_student_enrollment\(\)/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_guard_component_mark\(\)/);
+  assert.match(migration, /SET search_path = ''/);
+});
