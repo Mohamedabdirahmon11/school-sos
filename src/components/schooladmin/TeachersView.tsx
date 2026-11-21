@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
 import { useApi } from '../../hooks/useApi.ts';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download, Pencil } from 'lucide-react';
 
@@ -17,10 +18,12 @@ export const TeachersView: React.FC = () => {
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [subjectFilter, setSubjectFilter] = useState('');
-  const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20, search, subjectId: subjectFilter }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
-  ]), [school?.id, page, search, subjectFilter], Boolean(school));
+  const teacherLoad = useApi((signal) => Promise.all([
+    ApiClient.getTeachers({ page, pageSize: 20, search: debouncedSearch, subjectId: subjectFilter }, signal),
+    ApiClient.getClasses(undefined, signal), ApiClient.getSubjects(school?.id, signal)
+  ]), [school?.id, page, debouncedSearch, subjectFilter], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
