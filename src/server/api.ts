@@ -10590,7 +10590,10 @@ async function removeTeacherAssignment(client: any, school: School, user: User, 
   await teacherAssignmentAudit(client, school.id, user.id, 'deleted', row, null);
 }
 apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school as Scho
+  const school = (req as any).school as School, user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
+  const client = teacherAssignmentClient();
   try {
     // Setup Wizard persists these fields directly on schools; create/update normalized records before loading Step 6.
     const { data: setupRow, error: setupReadError } = await client.from('schools')
@@ -10614,9 +10617,6 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     return;
   }
 ol, user = (req as any).user as User;
-  const role = normalizeRole(user.role);
-  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
-  const client = teacherAssignmentClient();
   try {
     const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
       client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).order('start_date', { ascending: false }),
