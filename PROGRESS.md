@@ -689,7 +689,7 @@ pm run dev and apply migrations 001-014.
 
 
 ## 2026-11-21 — School Admin dashboard and workspace controls
-- IN PROGRESS: refreshed the School Admin Dashboard presentation while preserving the existing Dashboard label, live school-scoped data, role checks, and navigation actions.
-- IN PROGRESS: added a validated school-wide workspace zoom preference (90–100%, default 96%) alongside the existing sidebar width control in School Settings → Appearance.
-- No database migration or school-data changes are required; the preference uses the existing school sidebarTheme settings JSON.
-- Verification: TypeScript check passed on the initial PR run; the run was cancelled after the branch head changed, so full CI is still pending.
+- DONE: refreshed the School Admin Dashboard while preserving its Dashboard label, live school-scoped data, role checks, and navigation actions.
+- DONE: added a validated school-wide workspace zoom preference (90–100%, default 96%) alongside sidebar width in School Settings → Appearance.
+- No database migration or school-data changes were required; the preference uses the existing school sidebarTheme settings JSON.
+- VERIFIED: GitHub Actions run 44924076640 passed TypeScript checks, all 501 tests, route parity, navigation registry, RLS source audit, and production build.
