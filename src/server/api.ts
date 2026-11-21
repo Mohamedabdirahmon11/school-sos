@@ -4849,20 +4849,21 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     const guardianStudentIds: string[] = [];
     if (parentPhones.length) {
       const client = documentServiceClient(res);
-      if (!client) return;
-      const normalizedPhones = [...new Set(parentPhones.map(phone => phone.replace(/[^0-9]/g, '')).filter(Boolean))];
-      if (normalizedPhones.length) {
-        const { data: guardianRows, error: guardianError } = await client.from('guardians').select('id')
-          .eq('school_id', school.id).in('phone_normalized', normalizedPhones);
-        if (guardianError) { res.status(503).json({ error: 'Guardian access could not be checked.' }); return; }
-        const guardianIds = (guardianRows || []).map((guardian: any) => guardian.id);
-        if (guardianIds.length) {
-          const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
-            .eq('school_id', school.id).in('guardian_id', guardianIds);
-          if (linksError) { res.status(503).json({ error: 'Guardian student access could not be loaded.' }); return; }
-          guardianStudentIds.push(...(links || []).map((link: any) => String(link.student_id)));
+      if (client) {
+        const normalizedPhones = [...new Set(parentPhones.map(phone => phone.replace(/[^0-9]/g, '')).filter(Boolean))];
+        if (normalizedPhones.length) {
+          const { data: guardianRows, error: guardianError } = await client.from('guardians').select('id')
+            .eq('school_id', school.id).in('phone_normalized', normalizedPhones);
+          if (guardianError) { res.status(503).json({ error: 'Guardian access could not be checked.' }); return; }
+          const guardianIds = (guardianRows || []).map((guardian: any) => guardian.id);
+          if (guardianIds.length) {
+            const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
+              .eq('school_id', school.id).in('guardian_id', guardianIds);
+            if (linksError) { res.status(503).json({ error: 'Guardian student access could not be loaded.' }); return; }
+            guardianStudentIds.push(...(links || []).map((link: any) => String(link.student_id)));
+          }
         }
-      }
+      } else if (res.headersSent) return;
     }
     const terms = [...(ids.length ? [`id.in.(${ids.join(',')})`] : []), ...parentPhones.flatMap(phone => [`father_phone.eq.${phone}`, `mother_phone.eq.${phone}`]), ...(guardianStudentIds.length ? [`id.in.(${[...new Set(guardianStudentIds)].join(',')})`] : [])];
     if (!terms.length) { res.json([]); return; }
