@@ -64,7 +64,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
     if (role === 'accountant') {
       return [
         { id: 'acc_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck },
+        { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard },
         { id: 'acc_expenses', label: 'Expenses', icon: FileText }
       ];
     }
@@ -73,7 +73,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
       { id: 'sch_dashboard', label: t('dashboard'), icon: LayoutDashboard },
       { id: 'sch_students', label: t('students'), icon: GraduationCap },
       { id: 'sch_classes', label: t('classes'), icon: Layers },
-      { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard }
+      { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck }
     ];
   };
 
