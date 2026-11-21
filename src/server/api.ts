@@ -3686,7 +3686,7 @@ apiRouter.put('/subjects/templates/:gradeBand', requireAuth, requireSchoolContex
   const band = String(req.params.gradeBand || '') as PrimarySubjectGradeBand;
   if (!['1-4', '5-6', '7-8'].includes(band)) { res.status(400).json({ error: 'Choose grade band 1-4, 5-6, or 7-8.' }); return; }
   if (!Array.isArray(req.body?.subjects) || req.body.subjects.length < 1 || req.body.subjects.length > 30) { res.status(400).json({ error: 'A grade template must contain 1 to 30 subjects.' }); return; }
-  const subjects = req.body.subjects.map((value: unknown) => normalizeSubjectName(value));
+  const subjects: string[] = (req.body.subjects as unknown[]).map((value: unknown) => normalizeSubjectName(value));
   if (subjects.some(name => !name || name.length > 150) || new Set(subjects.map(name => name.toLocaleLowerCase())).size !== subjects.length) { res.status(400).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return; }
   const templates = { ...getPrimarySubjectTemplates(school), [band]: subjects } as PrimarySubjectTemplates;
   const setupData = { ...(school.setupData || {}), subjectTemplates: templates } as NonNullable<School['setupData']>;
