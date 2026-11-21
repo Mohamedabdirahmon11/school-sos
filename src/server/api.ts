@@ -8206,8 +8206,67 @@ apiRouter.post('/school/logo', requireAuth, requireSchoolAdminOrSuperAdmin, requ
   }
 );
 
+async function syncWizardAcademicRecords(client: any, schoolId: string, setupData: any) {
+  const configuredYear = setupData?.academicYear;
+  if (!configuredYear || !configuredYear.name || !configuredYear.startDate || !configuredYear.endDate) return;
+  const normalizeYear = (value: unknown) => String(value || '').replace(/[^0-9]/g, '');
+  const { data: yearRows, error: yearReadError } = await client.from('academic_years')
+    .select('id,name,start_date,end_date,is_current').eq('school_id', schoolId);
+  if (yearReadError) throw new Error('Sannadka Setup Wizard laguma waafajin karin qoondeynta macallimiinta.');
+  const yearKey = normalizeYear(configuredYear.name);
+  let year = (yearRows || []).find((row: any) => normalizeYear(row.name) === yearKey);
+  if (configuredYear.isCurrent === true) {
+    const { error } = await client.from('academic_years').update({ is_current: false, updated_at: new Date().toISOString() }).eq('school_id', schoolId);
+    if (error) throw new Error('Sannadka hadda jira lama waafajin karin.');
+  }
+  const yearPayload = {
+    name: String(configuredYear.name).trim(),
+    start_date: configuredYear.startDate,
+    end_date: configuredYear.endDate,
+    is_current: configuredYear.isCurrent === true,
+    updated_at: new Date().toISOString()
+  };
+  if (year) {
+    const { data, error } = await client.from('academic_years').update(yearPayload)
+      .eq('id', year.id).eq('school_id', schoolId).select('id,name,start_date,end_date,is_current').single();
+    if (error || !data) throw new Error('Sannadka Setup Wizard lama cusboonaysiin karin.');
+    year = data;
+  } else {
+    const { data, error } = await client.from('academic_years').insert({ school_id: schoolId, ...yearPayload })
+      .select('id,name,start_date,end_date,is_current').single();
+    if (error || !data) throw new Error('Sannadka Setup Wizard laguma dari karin liiska sannadaha waxbarashada.');
+    year = data;
+  }
+
+  const configuredTerms = Array.isArray(setupData?.terms) ? setupData.terms : [];
+  if (!configuredTerms.length) return;
+  const { data: termRows, error: termReadError } = await client.from('terms')
+    .select('id,name,start_date,end_date,is_current').eq('school_id', schoolId).eq('academic_year_id', year.id);
+  if (termReadError) throw new Error('Xiisadaha Setup Wizard lama akhrin karin.');
+  const today = new Date().toISOString().slice(0, 10);
+  const currentTerm = configuredTerms.find((term: any) => term.startDate <= today && term.endDate >= today);
+  if (currentTerm) {
+    const { error } = await client.from('terms').update({ is_current: false, updated_at: new Date().toISOString() }).eq('school_id', schoolId);
+    if (error) throw new Error('Xiisadda hadda jirta lama waafajin karin.');
+  }
+  for (const term of configuredTerms) {
+    const name = String(term?.name || '').trim();
+    const startDate = String(term?.startDate || '');
+    const endDate = String(term?.endDate || '');
+    if (!name || !startDate || !endDate) continue;
+    const existing = (termRows || []).find((row: any) => String(row.name).trim().toLowerCase() === name.toLowerCase());
+    const payload = { name, start_date: startDate, end_date: endDate, is_current: startDate <= today && endDate >= today, updated_at: new Date().toISOString() };
+    const result = existing
+      ? await client.from('terms').update(payload).eq('id', existing.id).eq('school_id', schoolId).select('id').single()
+      : await client.from('terms').insert({ school_id: schoolId, academic_year_id: year.id, ...payload }).select('id').single();
+    if (result.error || !result.data) throw new Error('Xiisadda "' + name + '" laguma waafajin karin sannad-dugsiyeedka.');
+  }
+}
+
 apiRouter.get('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  try { await syncWizardAcademicRecords(classGroupsClient(), school.id, school.setupData || {}); }
+  catch (error: any) { res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin.' }); return; }
   const current = { ...SCHOOL_SETUP_DEFAULTS, ...(school.setupData || {}), schoolInformation: { ...SCHOOL_SETUP_DEFAULTS.schoolInformation, name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '', ...((school.setupData as any)?.schoolInformation || {}) }, academicYear: { ...SCHOOL_SETUP_DEFAULTS.academicYear, ...((school.setupData as any)?.academicYear || {}) }, calendar: { ...SCHOOL_SETUP_DEFAULTS.calendar, ...((school.setupData as any)?.calendar || {}) }, workingHours: { ...SCHOOL_SETUP_DEFAULTS.workingHours, ...((school.setupData as any)?.workingHours || {}) }, terms: (school.setupData as any)?.terms?.length ? (school.setupData as any).terms : SCHOOL_SETUP_DEFAULTS.terms, completedSteps: (school.setupData as any)?.completedSteps || [] };
   res.json({ data: current, school: { name: school.name, address: school.address, phone: school.phone, email: school.email, schoolType: school.schoolType || 'combined', logoUrl: school.logoUrl || '' }, progress: school.setupProgress || { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null } });
 });
@@ -8229,6 +8288,10 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   const allDone = [1, 2, 3, 4, 5].every(id => nextData.completedSteps.includes(id));
   const progress = { currentStep: allDone ? 5 : Math.min(5, step + 1), completedSteps: allDone ? [1, 2, 3, 4, 5, 10] : nextData.completedSteps, skippedSteps: [], completedAt: allDone ? new Date().toISOString() : null };
   const updates = buildSchoolSetupSchoolUpdates(step, nextData, school, progress);
+  if (step === 2 || step === 3) {
+    try { await syncWizardAcademicRecords(classGroupsClient(), school.id, nextData); }
+    catch (error: any) { res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha lama waafajin karin. Dib u tijaabi kaydinta.' }); return; }
+  }
   let updated: School | null;
   try {
     updated = await db.updateSchoolFromDatabase(school.id, updates);
