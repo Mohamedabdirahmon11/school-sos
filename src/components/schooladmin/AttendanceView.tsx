@@ -10,6 +10,7 @@ import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { ErrorState, LoadingState } from '../common/AsyncState.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
 import { SchoolClass, AttendanceStatus, Student } from '../../types/index.ts';
 import { 
@@ -202,7 +203,7 @@ export const AttendanceView: React.FC = () => {
             <button type="button" onClick={() => void loadSchoolAbsences()} className="rounded-lg bg-[#0e8078] px-4 py-2 text-sm font-semibold text-white">Refresh</button>
           </div>
         </div>
-        {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{loadError}</div>}
+        {loadError && <ErrorState error={loadError} onRetry={() => void loadSchoolAbsences()} />}
         {(calendarStatus.isWeeklyHoliday || calendarStatus.holidayName) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{calendarStatus.isWeeklyHoliday ? 'This date is configured as a weekly school holiday.' : 'School holiday: ' + calendarStatus.holidayName}</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-medium text-rose-700">Absent students</p><p className="mt-1 text-2xl font-bold text-rose-800">{schoolAbsences.length}</p></div>
@@ -249,7 +250,7 @@ export const AttendanceView: React.FC = () => {
         </div>
       </div>
 
-      {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{loadError}</span><button type="button" onClick={() => void (selectedClassId ? loadAttendanceSheet() : loadClasses())} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
+      {loadError && <ErrorState error={loadError} onRetry={() => void (selectedClassId ? loadAttendanceSheet() : loadClasses())} />}
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
@@ -325,10 +326,8 @@ export const AttendanceView: React.FC = () => {
 
       {/* Daily Attendance Student Register Table */}
       <div className="overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-[0_2px_8px_rgba(16,37,34,.025)]">
-        {loadError ? (
-          <div className="p-8 text-center text-xs text-rose-700">Attendance data could not be loaded. Use Retry above.</div>
-        ) : isLoading ? (
-          <div className="p-8 text-center text-xs text-[#64748B]">Loading student attendance register...</div>
+        {isLoading ? (
+          <LoadingState label="Loading student attendance register" />
         ) : filteredStudents.length === 0 ? (
           <div className="p-8 text-center text-xs text-[#64748B]">
             No students found in this class. Add students from the Students view.
