@@ -89,12 +89,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [classId, setClassId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const studentLoad = useApi(async () => Promise.all([
-    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass }),
+    ApiClient.getSchoolStudents({ search, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, gender: genderFilter, status: studentStatusFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass }),
     ApiClient.getClasses(), ApiClient.getBranches()
-  ]), [school?.id, search, classFilter, branchFilter, feeFilter, page, showAllClass], Boolean(school));
+  ]), [school?.id, search, classFilter, branchFilter, feeFilter, genderFilter, studentStatusFilter, page, showAllClass], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
-  const visibleStudents = students.filter(student => (genderFilter === 'all' || String(student.gender || '').toLowerCase() === genderFilter) && (studentStatusFilter === 'all' || String(student.status || '').toLowerCase() === studentStatusFilter));
+  const visibleStudents = students;
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const branches: SchoolBranch[] = Array.isArray(branchRows) ? branchRows : [];
   const isLoading = studentLoad.loading;
@@ -174,6 +174,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
         studentPhone,
         guardianName,
         guardianPhone: fatherPhone,
+        motherPhone,
         address,
         classId
       }, school?.id);
@@ -289,6 +290,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       if (branchFilter) params.set('branchId', branchFilter);
       if (search.trim()) params.set('search', search.trim());
       if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
+      if (genderFilter !== 'all') params.set('gender', genderFilter);
+      if (studentStatusFilter !== 'all') params.set('status', studentStatusFilter);
       const response = await fetch('/api/students/export?' + params.toString(), { credentials: 'include' });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
@@ -314,6 +317,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     if (branchFilter) params.set('branchId', branchFilter);
     if (search.trim()) params.set('search', search.trim());
     if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
+    if (genderFilter !== 'all') params.set('gender', genderFilter);
+    if (studentStatusFilter !== 'all') params.set('status', studentStatusFilter);
     return params.toString();
   };
 

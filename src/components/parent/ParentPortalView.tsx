@@ -26,10 +26,9 @@ export const ParentPortalView: React.FC = () => {
   const [reportCardDownloading, setReportCardDownloading] = useState(false);
   const [reportCardDownloadError, setReportCardDownloadError] = useState('');
   const childrenState = useApi(async () => {
-    const all = await ApiClient.getSchoolStudents({ schoolId: school?.id, page: 1, pageSize: 100 });
-    return (Array.isArray(all) ? all : []).filter(s =>
-      user?.linkedStudentIds?.includes(s.id) || s.fatherPhone === user?.phone || s.motherPhone === user?.phone || s.fatherPhone === user?.parentPhone || s.motherPhone === user?.parentPhone
-    );
+    const all = await ApiClient.getAllStudents();
+    // The API scopes this list to the authenticated parent's linked children.
+    return Array.isArray(all) ? all : [];
   }, [school?.id, user?.id, user?.phone, user?.parentPhone, user?.linkedStudentIds?.join(',')], Boolean(school));
   const children: any[] = childrenState.data ?? [];
   const currentChild = children[selectedChildIndex];

@@ -4,6 +4,14 @@ import { readFileSync } from 'node:fs';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
+test('teacher subject filter is applied by the paginated server query', () => {
+  const admin = read('../src/components/schooladmin/TeachersView.tsx');
+  const api = read('../src/server/api.ts');
+  assert.match(admin, /getTeachers\(\{ page, pageSize: 20, search, subjectId: subjectFilter \}\)/);
+  assert.match(api, /queryAllRows\('teacher_subjects', \{ school_id: school\.id, subject_id: subjectId, is_active: 'true' \}/);
+  assert.match(api, /teacherFilters = \{ \.\.\.teacherFilters, id: teacherIds \}/);
+});
+
 test('class teachers submit attendance while administrators review and contact parents', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   const admin = read('../src/components/schooladmin/AttendanceView.tsx');

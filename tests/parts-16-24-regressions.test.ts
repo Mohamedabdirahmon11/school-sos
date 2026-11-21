@@ -37,12 +37,14 @@ test('year-end promotion uses one database transaction and maps the history sche
   assert.match(migration, /REVOKE ALL ON FUNCTION/);
 });
 
-test('parent portal resolves linked children using either saved guardian phone field', () => {
+test('parent portal loads all children authorized by the server, including linked guardians', () => {
   const portal = read('../src/components/parent/ParentPortalView.tsx');
   const api = read('../src/server/api.ts');
-  assert.match(portal, /user\?\.parentPhone/);
-  assert.match(portal, /pageSize: 100/);
+  const client = read('../src/services/api.ts');
+  assert.match(portal, /ApiClient\.getAllStudents\(\)/);
   assert.match(api, /user\.phone, user\.parentPhone/);
+  assert.match(api, /guardianStudentIds/);
+  assert.match(client, /for \(let page = 2; page <= totalPages; page \+= 1\)/);
 });
 
 test('scheduled notices are editable and hidden from recipients until their publish date', () => {

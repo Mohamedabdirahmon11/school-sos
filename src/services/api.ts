@@ -95,13 +95,14 @@ export class ApiClient {
     return this.request<FeePayment>(`/fees/payments/${encodeURIComponent(paymentId)}/void`, { method: 'POST', body: JSON.stringify({ reason }) });
   }
 
-  private static pageQuery(params?: { page?: number; pageSize?: number; search?: string; status?: string }) {
+  private static pageQuery(params?: { page?: number; pageSize?: number; search?: string; status?: string; subjectId?: string }) {
     if (!params?.page && !params?.pageSize && !params?.search?.trim() && !params?.status) return '';
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
     if (params.search?.trim()) query.set('search', params.search.trim());
     if (params.status) query.set('status', params.status);
+    if (params.subjectId) query.set('subjectId', params.subjectId);
     return `?${query.toString()}`;
   }
   private static getHeaders(): HeadersInit {
@@ -928,7 +929,7 @@ export class ApiClient {
   }
 
   // Students & Teachers
-  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number, search?: string, feeStatus?: string, allClass = false) {
+  public static async getStudents(classId?: string, branchId?: string, page?: number, pageSize?: number, search?: string, feeStatus?: string, allClass = false, filters?: { gender?: string; status?: string }) {
     const params = new URLSearchParams();
     if (classId) params.append('classId', classId);
     if (branchId) params.append('branchId', branchId);
@@ -937,6 +938,8 @@ export class ApiClient {
     if (search?.trim()) params.append('search', search.trim());
     if (feeStatus && feeStatus !== 'all') params.append('feeStatus', feeStatus);
     if (allClass) params.append('allClass', 'true');
+    if (filters?.gender && filters.gender !== 'all') params.append('gender', filters.gender);
+    if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
     return this.request<Student[]>(`/students?${params.toString()}`);
   }
 
@@ -971,7 +974,7 @@ export class ApiClient {
   }
 
   public static async getSchoolStudents(params?: any) {
-    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search, params?.paymentStatus, Boolean(params?.allClass));
+    return this.getStudents(params?.classId, params?.branchId, params?.page, params?.pageSize, params?.search, params?.paymentStatus, Boolean(params?.allClass), { gender: params?.gender, status: params?.status });
   }
 
   public static async getParentContacts(params?: { classId?: string; page?: number; pageSize?: number; search?: string }) {

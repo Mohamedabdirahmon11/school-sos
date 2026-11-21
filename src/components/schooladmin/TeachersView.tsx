@@ -19,8 +19,8 @@ export const TeachersView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('');
   const teacherLoad = useApi(() => Promise.all([
-    ApiClient.getTeachers({ page, pageSize: 20, search }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
-  ]), [school?.id, page, search], Boolean(school));
+    ApiClient.getTeachers({ page, pageSize: 20, search, subjectId: subjectFilter }), ApiClient.getClasses(), ApiClient.getSubjects(school?.id)
+  ]), [school?.id, page, search, subjectFilter], Boolean(school));
   const [teacherRows, classRows, subjectRows] = teacherLoad.data || [[], [], []];
   const teachers: Teacher[] = Array.isArray(teacherRows) ? teacherRows : [];
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
@@ -56,13 +56,14 @@ export const TeachersView: React.FC = () => {
   });
 
   const fetchData = teacherLoad.retry;
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, subjectFilter]);
   useEffect(() => { setPageInfo((teacherRows as any)?.pagination || null); }, [teacherRows]);
 
   const handleExportTeachers = async () => {
     try {
       const params = new URLSearchParams();
       if (search.trim()) params.set('search', search.trim());
+      if (subjectFilter) params.set('subjectId', subjectFilter);
       const response = await fetch('/api/teachers/export?' + params.toString(), { credentials: 'include' });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));

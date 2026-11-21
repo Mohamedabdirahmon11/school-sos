@@ -58,18 +58,18 @@ function adminCookie() {
 
 test('student registration generates IDs server-side and reuses one normalized guardian account', async () => {
   const cookie = adminCookie();
-  const register = (studentName: string, guardianPhone: string, studentId: string) => fetch(`${baseUrl}/students`, {
+  const register = (studentName: string, guardianPhone: string, studentId: string, motherPhone = '') => fetch(`${baseUrl}/students`, {
     method: 'POST',
     headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       firstName: studentName.split(' ')[0], middleName: studentName.split(' ')[1],
       lastName: studentName.split(' ')[2], gender: 'female', admissionDate: '2026-11-14',
       classId: 'student-class-1', section: 'A', guardianName: 'Amina Yusuf',
-      guardianPhone, address: 'Jijiga', studentId
+      guardianPhone, motherPhone, address: 'Jijiga', studentId
     })
   });
 
-  const firstResponse = await register('Hodan Amina Noor', '+251911234567', 'CLIENT-SUPPLIED-001');
+  const firstResponse = await register('Hodan Amina Noor', '+251911234567', 'CLIENT-SUPPLIED-001', '+251912345678');
   assert.equal(firstResponse.status, 201);
   const first = await firstResponse.json() as any;
   assert.match(first.studentId, /^S\d{3,}$/);
@@ -79,6 +79,7 @@ test('student registration generates IDs server-side and reuses one normalized g
   assert.ok(firstStudent);
   assert.equal(firstStudent.address, 'Jijiga');
   assert.equal(firstStudent.father_name, 'Amina Yusuf');
+  assert.equal(firstStudent.mother_phone, '+251912345678');
   assert.equal(verifyPin(first.initialPin, firstStudent.pin_hash), true);
   assert.equal(String(firstStudent.pin_hash).includes(first.initialPin), false);
 

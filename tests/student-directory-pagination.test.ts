@@ -24,6 +24,12 @@ test('School Admin can explicitly show all students in the selected class', () =
   assert.match(view, /!showAllClass && <PaginationControls info=\{pageInfo\} onPage=\{setPage\} \/>/);
 });
 
+test('gender and status filters are sent to the server before pagination', () => {
+  assert.match(view, /gender: genderFilter, status: studentStatusFilter/);
+  assert.match(api, /gender, status: studentStatus/);
+  assert.match(view, /const visibleStudents = students;/);
+});
+
 test('changing search and filters resets student pagination', () => {
   assert.match(view, /setSearch\(e\.target\.value\); setPage\(1\)/);
   assert.match(view, /setBranchFilter\(e\.target\.value\); setPage\(1\)/);

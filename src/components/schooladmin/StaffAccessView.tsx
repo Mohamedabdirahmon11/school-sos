@@ -38,7 +38,7 @@ export const StaffAccessView: React.FC = () => {
 
   // Form State
   const [fullName, setFullName] = useState('');
-  const [roleTitle, setRoleTitle] = useState('Accountant');
+  const [roleTitle, setRoleTitle] = useState('School Accountant');
   const [email, setEmail] = useState('');
   const [staffPin, setStaffPin] = useState('');
   const [staffId, setStaffId] = useState('');
@@ -180,7 +180,7 @@ export const StaffAccessView: React.FC = () => {
             setStaffId('');
             setPhone('');
             setSelectedPermissions(['fees_manage']);
-            setRoleTitle('Accountant');
+            setRoleTitle('School Accountant');
             setCreateLogin(true);
             setShowAddModal(true);
           }}

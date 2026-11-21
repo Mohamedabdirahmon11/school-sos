@@ -952,12 +952,28 @@ apiRouter.post('/auth/login', async (req, res) => {
     if (candidateUsers.length === 0) {
       // Check if student or parent exists in student records
       const students = await db.getStudents(school.id);
-      const matchedStudents = students.filter(student =>
-        role === 'student'
-          ? student.studentPhone === phone || student.fatherPhone === phone
-          : student.fatherPhone === phone || student.motherPhone === phone
-      );
-      const matchStd = matchedStudents[0];
+      let guardianStudentIds: string[] = [];
+      if (role === 'parent') {
+        const client = documentServiceClient(res);
+        if (client) {
+          const normalizedPhone = phone.replace(/[^0-9]/g, '');
+          if (normalizedPhone) {
+            const { data: guardian, error: guardianError } = await client.from('guardians').select('id')
+              .eq('school_id', school.id).eq('phone_normalized', normalizedPhone).maybeSingle();
+            if (guardianError) { res.status(503).json({ error: 'Guardian account could not be checked.' }); return; }
+            if (guardian?.id) {
+              const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
+                .eq('school_id', school.id).eq('guardian_id', guardian.id);
+              if (linksError) { res.status(503).json({ error: 'Guardian student links could not be loaded.' }); return; }
+              guardianStudentIds = (links || []).map((link: any) => String(link.student_id));
+            }
+          }
+        } else if (res.headersSent) return;
+      }
+      const matchedStudents = students.filter(student => role === 'student'
+        ? student.studentPhone === phone || student.fatherPhone === phone
+        : student.fatherPhone === phone || student.motherPhone === phone || guardianStudentIds.includes(student.id));
+      const matchStd = matchedStudents.find(student => verifyPin(pin, student.pinHash || (student as any).pin)) || matchedStudents[0];
 
       if (!matchStd) {
         const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
@@ -4726,13 +4742,11 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
     : '';
 
-  const [classes, students] = await Promise.all([
+  const [classes, students, guardianRows, guardianLinks] = await Promise.all([
     db.getClasses(school.id),
-    queryAllRows('students', {
-      school_id: school.id,
-      status: 'active',
-      ...(classId ? { class_id: classId } : {})
-    }, LIST_QUERY_COLUMNS.students)
+    queryAllRows('students', { school_id: school.id, status: 'active', ...(classId ? { class_id: classId } : {}) }, LIST_QUERY_COLUMNS.students),
+    queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
+    queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary')
   ]);
   const classById = new Map<string, SchoolClass>(classes.map(klass => [klass.id, klass] as const));
   if (classId && !classById.has(classId)) {
@@ -4748,36 +4762,34 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
     relationships: Set<string>;
     students: Array<{ id: string; studentId: string; fullName: string; className: string }>;
   }>();
+  const studentById = new Map<string, any>();
+  const guardianById = new Map<string, any>(guardianRows.map((guardian: any) => [String(guardian.id), guardian]));
+  const addContact = (phoneValue: unknown, nameValue: unknown, relationship: string, child: { id: string; studentId: string; fullName: string; className: string }) => {
+    const phone = String(phoneValue || '').trim();
+    const normalizedPhone = phone.replace(/\D/g, '');
+    if (!normalizedPhone) return;
+    let contact = contacts.get(normalizedPhone);
+    if (!contact) {
+      contact = { id: `${school.id}:${normalizedPhone}`, phone, normalizedPhone, name: String(nameValue || ''), relationships: new Set<string>(), students: [] };
+      contacts.set(normalizedPhone, contact);
+    }
+    if (!contact.name && nameValue) contact.name = String(nameValue);
+    contact.relationships.add(relationship);
+    if (!contact.students.some(item => item.id === child.id)) contact.students.push(child);
+  };
   for (const student of students) {
     const child = {
-      id: student.id,
-      studentId: student.studentId,
-      fullName: studentNameKey(student),
+      id: student.id, studentId: student.studentId, fullName: studentNameKey(student),
       className: [classById.get(student.classId)?.name, classById.get(student.classId)?.section].filter(Boolean).join(' · ') || 'Unassigned'
     };
-    const guardians: Array<{ phone: string; name: string; relationship: string }> = [
-      { phone: String(student.fatherPhone || ''), name: String(student.fatherName || ''), relationship: 'Parent / Guardian' }
-    ];
-    for (const guardian of guardians) {
-      const phone = guardian.phone.trim();
-      const normalizedPhone = phone.replace(/\D/g, '');
-      if (!normalizedPhone) continue;
-      let contact = contacts.get(normalizedPhone);
-      if (!contact) {
-        contact = {
-          id: `${school.id}:${normalizedPhone}`,
-          phone,
-          normalizedPhone,
-          name: guardian.name,
-          relationships: new Set<string>(),
-          students: []
-        };
-        contacts.set(normalizedPhone, contact);
-      }
-      if (!contact.name && guardian.name) contact.name = guardian.name;
-      contact.relationships.add(guardian.relationship);
-      if (!contact.students.some(item => item.id === child.id)) contact.students.push(child);
-    }
+    studentById.set(String(student.id), child);
+    addContact(student.fatherPhone, student.fatherName, 'Father', child);
+    addContact(student.motherPhone, '', 'Mother', child);
+  }
+  for (const link of guardianLinks) {
+    const guardian = guardianById.get(String(link.guardianId));
+    const child = studentById.get(String(link.studentId));
+    if (guardian && child) addContact(guardian.phone, guardian.fullName, 'Guardian', child);
   }
 
   const query = search.toLowerCase();
@@ -4812,13 +4824,15 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   const user = (req as any).user as User;
   const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
+  const gender = typeof req.query.gender === 'string' && ['male', 'female'].includes(req.query.gender) ? req.query.gender : undefined;
+  const studentStatus = typeof req.query.status === 'string' && ['active', 'inactive', 'graduated', 'transferred'].includes(req.query.status) ? req.query.status : undefined;
   const search = typeof req.query.search === 'string'
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80)
     : '';
   const requestedFeeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus.toLowerCase() : 'all';
   const canViewFeeStatus = ['school_admin', 'accountant', 'super_admin'].includes(user.role);
   const feeStatus = canViewFeeStatus && ['paid', 'partial', 'unpaid'].includes(requestedFeeStatus) ? requestedFeeStatus : 'all';
-  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
+  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId, gender, status: studentStatus };
   let roleFilter: string | undefined;
   if (user.role === 'teacher') {
     const assigned = await getTeacherAssignedClassIds(school.id, user.id);
@@ -4832,7 +4846,26 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   } else if (user.role === 'parent') {
     const ids = (user.linkedStudentIds || []).filter(id => /^[A-Za-z0-9_-]+$/.test(id));
     const parentPhones = [...new Set([user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone?.trim())))];
-    const terms = [...(ids.length ? [`id.in.(${ids.join(',')})`] : []), ...parentPhones.flatMap(phone => [`father_phone.eq.${phone}`, `mother_phone.eq.${phone}`])];
+    const guardianStudentIds: string[] = [];
+    if (parentPhones.length) {
+      const client = documentServiceClient(res);
+      if (client) {
+        const normalizedPhones = [...new Set(parentPhones.map(phone => phone.replace(/[^0-9]/g, '')).filter(Boolean))];
+        if (normalizedPhones.length) {
+          const { data: guardianRows, error: guardianError } = await client.from('guardians').select('id')
+            .eq('school_id', school.id).in('phone_normalized', normalizedPhones);
+          if (guardianError) { res.status(503).json({ error: 'Guardian access could not be checked.' }); return; }
+          const guardianIds = (guardianRows || []).map((guardian: any) => guardian.id);
+          if (guardianIds.length) {
+            const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
+              .eq('school_id', school.id).in('guardian_id', guardianIds);
+            if (linksError) { res.status(503).json({ error: 'Guardian student access could not be loaded.' }); return; }
+            guardianStudentIds.push(...(links || []).map((link: any) => String(link.student_id)));
+          }
+        }
+      } else if (res.headersSent) return;
+    }
+    const terms = [...(ids.length ? [`id.in.(${ids.join(',')})`] : []), ...parentPhones.flatMap(phone => [`father_phone.eq.${phone}`, `mother_phone.eq.${phone}`]), ...(guardianStudentIds.length ? [`id.in.(${[...new Set(guardianStudentIds)].join(',')})`] : [])];
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   }
@@ -4891,21 +4924,26 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
   const feeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus : 'all';
+  const gender = typeof req.query.gender === 'string' && ['male', 'female'].includes(req.query.gender) ? req.query.gender : undefined;
+  const studentStatus = typeof req.query.status === 'string' && ['active', 'inactive', 'graduated', 'transferred'].includes(req.query.status) ? req.query.status : undefined;
   const filters: Record<string, string | string[] | undefined> = {
     school_id: school.id,
     class_id: classId,
-    branch_id: branchId
+    branch_id: branchId,
+    gender,
+    status: studentStatus
   };
   const [allStudents, classes] = await Promise.all([
     queryAllRows('students', filters, '*'),
     db.getClasses(school.id)
   ]);
+  const feeStatusMap = await getStudentFeeStatusMap(school.id, allStudents.map((student: any) => student.id), school.academicYear);
   const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const filtered = allStudents.filter((student: any) => {
     const studentClass = classNames.get(student.classId) || student.className || '';
     const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, studentClass]
       .some(value => String(value || '').toLowerCase().includes(search));
-    const matchesFee = feeStatus === 'all' || String(student.feeStatus || '').toLowerCase() === feeStatus.toLowerCase();
+    const matchesFee = feeStatus === 'all' || (feeStatusMap.get(student.id) || 'unpaid') === feeStatus.toLowerCase();
     return (!search || searchable) && matchesFee;
   });
   const cell = (value: unknown) => {
@@ -4918,7 +4956,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     ...filtered.map((student: any) => [
       student.studentId, student.firstName, student.middleName, student.lastName, student.gender,
       classNames.get(student.classId) || student.className, student.admissionDate,
-      student.studentPhone, student.fatherPhone, student.motherPhone, student.status, student.feeStatus
+      student.studentPhone, student.fatherPhone, student.motherPhone, student.status, feeStatusMap.get(student.id) || 'unpaid'
     ])
   ];
   const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
@@ -4934,16 +4972,19 @@ apiRouter.get('/students/export.pdf', requireAuth, requireSchoolAdminOrSuperAdmi
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : undefined;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
   const feeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus : 'all';
-  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId };
+  const gender = typeof req.query.gender === 'string' && ['male', 'female'].includes(req.query.gender) ? req.query.gender : undefined;
+  const studentStatus = typeof req.query.status === 'string' && ['active', 'inactive', 'graduated', 'transferred'].includes(req.query.status) ? req.query.status : undefined;
+  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId, gender, status: studentStatus };
   const [allStudents, classes] = await Promise.all([
     queryAllRows('students', filters, '*'), db.getClasses(school.id)
   ]);
+  const feeStatusMap = feeStatus === 'all' ? new Map<string, string>() : await getStudentFeeStatusMap(school.id, allStudents.map((student: any) => student.id), school.academicYear);
   const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const filtered = allStudents.filter((student: any) => {
     const klass = classNames.get(student.classId) || student.className || '';
     const searchable = [student.studentId, student.firstName, student.middleName, student.lastName, student.fatherPhone, student.motherPhone, klass]
       .some(value => String(value || '').toLowerCase().includes(search));
-    return (!search || searchable) && (feeStatus === 'all' || String(student.feeStatus || '').toLowerCase() === feeStatus.toLowerCase());
+    return (!search || searchable) && (feeStatus === 'all' || (feeStatusMap.get(student.id) || 'unpaid') === feeStatus.toLowerCase());
   });
   const lines = [
     `${school.name} — STUDENT REGISTER`,
@@ -5103,7 +5144,8 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
 
   const guardianPhone = String(body.guardianPhone).trim();
   const studentPhone = body.studentPhone === undefined || body.studentPhone === null ? '' : body.studentPhone;
-  if (!validImportPhone(guardianPhone) || typeof studentPhone !== 'string' || studentPhone.length > 30 || (studentPhone.trim() && !validImportPhone(studentPhone.trim()))) {
+  const motherPhone = body.motherPhone === undefined || body.motherPhone === null ? '' : body.motherPhone;
+  if (!validImportPhone(guardianPhone) || typeof studentPhone !== 'string' || studentPhone.length > 30 || (studentPhone.trim() && !validImportPhone(studentPhone.trim())) || typeof motherPhone !== 'string' || motherPhone.length > 30 || (motherPhone.trim() && !validImportPhone(motherPhone.trim()))) {
     res.status(400).json({ error: 'Guardian and student phone numbers must be valid international numbers.' }); return;
   }
   if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{4}$/.test(body.pin))) {
@@ -5129,6 +5171,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     student_phone: studentPhone.trim(),
     guardian_name: body.guardianName.trim(),
     guardian_phone: guardianPhone,
+    mother_phone: motherPhone.trim() || null,
     class_id: klass.id,
     section: typeof body.section === 'string' && body.section.trim() ? body.section.trim() : klass.section,
     address: typeof body.address === 'string' ? body.address.trim() : '',
@@ -5408,16 +5451,24 @@ apiRouter.delete('/students/:id', requireAuth, requireSchoolContext, requireScho
 apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+  const subjectId = typeof req.query.subjectId === 'string' ? req.query.subjectId.trim() : '';
   const [teachers, classes, subjects] = await Promise.all([
     queryAllRows('teachers', { school_id: school.id }, '*'),
     queryAllRows('classes', { school_id: school.id }, 'id,name,section'),
     queryAllRows('subjects', { school_id: school.id }, 'id,name')
   ]);
+  let subjectTeacherIds: Set<string> | null = null;
+  if (subjectId) {
+    if (!subjects.some((subject: any) => subject.id === subjectId)) { res.status(400).json({ error: 'Subject does not belong to this school.' }); return; }
+    const links = await queryAllRows('teacher_subjects', { school_id: school.id, subject_id: subjectId, is_active: 'true' }, 'teacher_id');
+    subjectTeacherIds = new Set(links.map((link: any) => String(link.teacherId)));
+  }
   const classNames = new Map(classes.map((item: any) => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const subjectNames = new Map(subjects.map((item: any) => [item.id, item.name]));
   const filtered = teachers.filter((teacher: any) =>
-    !search || [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification, teacher.status]
-      .some(value => String(value || '').toLowerCase().includes(search))
+    (!subjectTeacherIds || subjectTeacherIds.has(String(teacher.id))) &&
+    (!search || [teacher.fullName, teacher.staffId, teacher.phone, teacher.department, teacher.qualification, teacher.status]
+      .some(value => String(value || '').toLowerCase().includes(search)))
   );
   const cell = (value: unknown) => {
     const raw = String(value ?? '');
@@ -5438,23 +5489,32 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   }).send('\uFEFF' + csv);
 });
 
-apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/teachers', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const canViewSalary = ['school_admin', 'super_admin', 'accountant'].includes(user.role);
   const search = typeof req.query.search === 'string'
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80)
     : '';
+  const subjectId = typeof req.query.subjectId === 'string' ? req.query.subjectId.trim() : '';
   const searchFilter = search
     ? ['full_name', 'staff_id', 'phone', 'department', 'qualification', 'status']
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
-  void sendDatabasePage(
-    req,
-    res,
-    'teachers',
-    { school_id: school.id },
-    searchFilter,
+  let teacherFilters: Record<string, string | string[] | undefined> = { school_id: school.id };
+  if (subjectId) {
+    const subject = await db.queryPage('subjects', { school_id: school.id, id: subjectId }, 1, 1, undefined, 'id');
+    if (!subject.items.length) { res.status(400).json({ error: 'Subject does not belong to this school.' }); return; }
+    const links = await queryAllRows('teacher_subjects', { school_id: school.id, subject_id: subjectId, is_active: 'true' }, 'teacher_id');
+    const teacherIds = [...new Set(links.map((link: any) => String(link.teacherId)).filter(Boolean))];
+    if (!teacherIds.length) {
+      res.set({ 'X-Page': '1', 'X-Page-Size': String(Math.min(100, Math.max(1, Number(req.query.pageSize) || 20))), 'X-Total-Count': '0', 'X-Total-Pages': '0' });
+      res.json([]);
+      return;
+    }
+    teacherFilters = { ...teacherFilters, id: teacherIds };
+  }
+  void sendDatabasePage(req, res, 'teachers', teacherFilters, searchFilter,
     items => canViewSalary ? items : items.map(({ monthlySalary: _salary, ...teacher }) => teacher)
   );
 });
