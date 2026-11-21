@@ -64,7 +64,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
     if (role === 'accountant') {
       return [
         { id: 'acc_dashboard', label: t('dashboard'), icon: LayoutDashboard },
-        { id: 'sch_fees', label: t('fees_payments'), icon: CreditCard },
+        { id: 'sch_attendance', label: t('attendance'), icon: CalendarCheck },
         { id: 'acc_expenses', label: 'Expenses', icon: FileText }
       ];
     }
@@ -95,6 +95,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
           <button
             key={tab.id}
             onClick={() => onNavigate(tab.id)}
+            aria-current={isActive ? 'page' : undefined}
             className={`
               flex flex-col items-center justify-center min-w-[54px] min-h-[44px] px-2 rounded-md
               transition-colors
