@@ -24,11 +24,11 @@ test('Subjects remain editable with class-specific teacher, periods and exam ass
 });
 
 test('Teacher directory separates classes taught from the Form Teacher class', () => {
-  assert.match(teachersSource, /Classes taught/);
-  assert.match(teachersSource, /Form Teacher class/);
-  assert.match(teachersSource, /const displayedClassIds = Array\\.from\\(new Set\\(t\\.assignedClasses \\|\\| \\[\\]\\)\\)/);
-  assert.match(teachersSource, /const formTeacherClass = classes\\.find/);
-  assert.doesNotMatch(teachersSource, /\\(Form Teacher\\)/);
+  assert.ok(teachersSource.includes('Classes taught'));
+  assert.ok(teachersSource.includes('Form Teacher class'));
+  assert.ok(teachersSource.includes('const displayedClassIds = Array.from(new Set(t.assignedClasses || []))'));
+  assert.ok(teachersSource.includes('const formTeacherClass = classes.find'));
+  assert.ok(!teachersSource.includes('(Form Teacher)'));
 });
 
 
