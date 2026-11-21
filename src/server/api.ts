@@ -5443,16 +5443,41 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
   }
 });
 
-apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  const school = (req as any).school;
+apiRouter.put('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  const studentId = String(req.params.id || '');
+  if (role === 'teacher') {
+    const currentClassId = await getStudentCurrentClassId(school.id, studentId);
+    const ownFormTeacherClasses = await getTeacherFormTeacherClassIds(school.id, user.id);
+    if (!currentClassId || !ownFormTeacherClasses.includes(currentClassId) || !await canAccessStudentRecord(user, studentId)) {
+      res.status(403).json({ error: 'You can only manage student profiles in your own Form Teacher class.' }); return;
+    }
+    const requestedClassId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+    if (requestedClassId && requestedClassId !== currentClassId) {
+      res.status(403).json({ error: 'Form Teachers cannot move a student to another class.' }); return;
+    }
+    const restrictedFields = ['status', 'branchId', 'rollNumber', 'documents', 'busRouteId'];
+    if (restrictedFields.some(field => Object.prototype.hasOwnProperty.call(req.body || {}, field))) {
+      res.status(403).json({ error: 'Only school administrators can change student enrollment, status, documents, or transport assignments.' }); return;
+    }
+  } else if (role !== 'school_admin' && role !== 'super_admin') {
+    res.status(403).json({ error: 'Only school administrators and the assigned Form Teacher can update student records.' }); return;
+  }
   // Never accept identity, tenant, credential, or audit fields from the client.
   // Only the editable student profile fields may be changed through this route.
-  const editableFields = [
+  const adminEditableFields = [
     'firstName', 'middleName', 'lastName', 'gender', 'admissionDate',
     'dateOfBirth', 'studentPhone', 'fatherPhone', 'fatherName', 'address', 'motherPhone',
     'classId', 'section', 'status', 'branchId', 'bloodGroup', 'rollNumber',
     'allergies', 'busRouteId', 'documents', 'notes'
   ] as const;
+  const formTeacherEditableFields = [
+    'firstName', 'middleName', 'lastName', 'gender', 'studentPhone', 'fatherPhone', 'fatherName',
+    'motherPhone', 'address', 'bloodGroup', 'allergies', 'notes'
+  ] as const;
+  const editableFields: readonly string[] = role === 'teacher' ? formTeacherEditableFields : adminEditableFields;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const payload = Object.fromEntries(editableFields
     .filter(field => Object.prototype.hasOwnProperty.call(body, field))

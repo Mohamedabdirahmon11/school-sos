@@ -359,3 +359,15 @@ test('Form Teacher student list and direct student reads are limited to current-
   assert.match(api, /if \(formTeacherClassIds\.length\) return formTeacherClassIds\.includes\(currentClassId\)/);
   assert.match(api, /getStudentCurrentClassId\(student\.schoolId, student\.id, student\.classId\)/);
 });
+
+
+test('Form Teachers may update profiles only inside their current Form Teacher class', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.put('/students/:id'");
+  const end = api.indexOf("apiRouter.delete('/students/:id'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /ownFormTeacherClasses\.includes\(currentClassId\)/);
+  assert.match(route, /Form Teachers cannot move a student to another class/);
+  assert.match(route, /formTeacherEditableFields/);
+  assert.match(route, /Only school administrators can change student enrollment/);
+});
