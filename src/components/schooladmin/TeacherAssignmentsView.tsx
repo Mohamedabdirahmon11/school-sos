@@ -18,6 +18,8 @@ const errorText = (e: unknown) => e instanceof Error ? e.message : 'Qoondeynta l
 export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { school, isReadOnly } = useAuth();
   const [data, setData] = useState<Data | null>(null);
+  const [formTeacherClasses, setFormTeacherClasses] = useState<any[]>([]);
+  const [teacherUserIds, setTeacherUserIds] = useState<Record<string, string>>({});
   const [yearId, setYearId] = useState('');
   const [termId, setTermId] = useState('');
   const [view, setView] = useState<'matrix' | 'teacher'>('matrix');
@@ -60,6 +62,32 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   }, [school?.id, yearId, termId]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    if (!school?.id) return;
+    Promise.all([ApiClient.getClasses(), ApiClient.getTeachers({ page: 1, pageSize: 200 })])
+      .then(([classRows, teacherRows]) => {
+        if (!active) return;
+        setFormTeacherClasses(Array.isArray(classRows) ? classRows : []);
+        setTeacherUserIds(Object.fromEntries((Array.isArray(teacherRows) ? teacherRows : []).map((teacher: any) => [teacher.id, teacher.userId || ''])));
+      })
+      .catch(() => { if (active) { setFormTeacherClasses([]); setTeacherUserIds({}); } });
+    return () => { active = false; };
+  }, [school?.id]);
+
+  const saveFormTeacherClass = async (teacherId: string, classId: string) => {
+    if (isReadOnly || saving) return;
+    setSaving(true); setError(''); setNotice('');
+    try {
+      await ApiClient.updateTeacher(teacherId, { formTeacherClassId: classId } as any);
+      const [classRows, teacherRows] = await Promise.all([ApiClient.getClasses(), ApiClient.getTeachers({ page: 1, pageSize: 200 })]);
+      setFormTeacherClasses(Array.isArray(classRows) ? classRows : []);
+      setTeacherUserIds(Object.fromEntries((Array.isArray(teacherRows) ? teacherRows : []).map((teacher: any) => [teacher.id, teacher.userId || ''])));
+      setNotice(classId ? 'Fasalka Form Teacher waa la qoondeeyey.' : 'Qoondeynta Form Teacher waa laga qaaday.');
+    } catch (e) { setError(errorText(e)); }
+    finally { setSaving(false); }
+  };
 
   const assignmentFor = (classId: string, subjectId: string) => {
     if (!data) return undefined;
@@ -254,7 +282,7 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
         return <Card key={t.id} className="schoolos-teacher-row grid min-w-0 grid-cols-1 gap-4 p-4 md:grid-cols-[minmax(170px,.8fr)_minmax(280px,1.8fr)_minmax(150px,.7fr)]">
           <div className="min-w-0"><h3 className="font-semibold text-[var(--schoolos-ink)]">{t.full_name}</h3><p className="mt-1 text-xs text-[var(--schoolos-muted)]">Koodh: {t.teacher_code || t.staff_id || '—'}</p><p className="mt-3 text-[11px] text-[var(--schoolos-muted)]">Culayska: {w?.periodsPerWeek || 0} / {w?.maxPeriodsPerWeek ?? '—'} xiisadood</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className={'h-full rounded-full ' + tone} style={{ width: (w?.maxPeriodsPerWeek ? pct : 0) + '%' }} /></div>{w?.overloaded && <p className="mt-1 text-xs text-rose-700">Culayska shaqadu wuu ka badan yahay xadka.</p>}</div>
           <div className="min-w-0"><div className="flex flex-wrap gap-2">{rows.map(a => <label key={a.id} className="schoolos-assignment-chip inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1.5 text-xs" style={{ borderColor: "hsl(" + ((Math.max(0, data.subjects.findIndex(subject => subject.id === a.subject_id)) * 53) % 360) + " 42% 78%)", backgroundColor: "hsl(" + ((Math.max(0, data.subjects.findIndex(subject => subject.id === a.subject_id)) * 53) % 360) + " 60% 96%)", color: "hsl(" + ((Math.max(0, data.subjects.findIndex(subject => subject.id === a.subject_id)) * 53) % 360) + " 48% 28%)" }}><input aria-label={'Dooro qoondeynta ' + className(a.class_id) + ' ' + subjectName(a.subject_id)} type="checkbox" checked={selectedAssignmentIds.includes(a.id)} onChange={e => setSelectedAssignmentIds(old => e.target.checked ? [...old, a.id] : old.filter(id => id !== a.id))} /><span>{className(a.class_id)} · {subjectName(a.subject_id)}</span><button type="button" aria-label={'Ka saar ' + subjectName(a.subject_id) + ' ee ' + className(a.class_id)} title="Ka saar qoondaynta" disabled={saving || isReadOnly} onClick={() => { const curriculumRow = data.curriculum.find(r => r.class_id === a.class_id && r.subject_id === a.subject_id); if (curriculumRow) void saveCell(curriculumRow, ''); }} className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-40">×</button></label>)}</div><div className="mt-3 flex items-end gap-2"><label className="min-w-0 flex-1 text-[11px] text-[var(--schoolos-muted)]">Xadka xiisadaha / toddobaad<input aria-label={'Xadka xiisadaha ' + t.full_name} type="number" min="1" max="60" value={workloadLimits[t.id] ?? ''} onChange={e => setWorkloadLimits(old => ({ ...old, [t.id]: e.target.value }))} placeholder="Aan xad lahayn" className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm" /></label><Button disabled={saving || isReadOnly} onClick={async () => { setSaving(true); setError(''); try { await ApiClient.request('/teacher-assignments/teachers/' + t.id + '/workload-limit', { method: 'PUT', body: JSON.stringify({ maxPeriodsPerWeek: workloadLimits[t.id] === '' ? null : Number(workloadLimits[t.id]) }) }); setNotice('Xadka culayska waa la kaydiyey.'); await load(); } catch (e) { setError(errorText(e)); } finally { setSaving(false); } }}>Kaydi xadka</Button></div></div>
-          <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-[var(--schoolos-muted)] md:hidden">Form Teacher</p><div className="flex min-h-10 items-center rounded-lg border border-dashed border-[var(--schoolos-line)] px-3 text-xs text-[var(--schoolos-muted)]">— Lama dejin (ma jiro xulasho API ah)</div></div>
+          <div className="min-w-0"><p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-[var(--schoolos-muted)] md:hidden">Form Teacher</p><select aria-label={'Form Teacher class for ' + t.full_name} value={formTeacherClasses.find(klass => klass.classTeacherId && klass.classTeacherId === teacherUserIds[t.id])?.id || ''} disabled={saving || isReadOnly || !teacherUserIds[t.id]} onChange={event => void saveFormTeacherClass(t.id, event.target.value)} className="w-full rounded-lg border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] px-3 py-2 text-xs text-[var(--schoolos-ink)]"><option value="">— Ma aha Form Teacher —</option>{formTeacherClasses.filter(klass => !klass.isArchived && (!klass.classTeacherId || klass.classTeacherId === teacherUserIds[t.id])).map(klass => <option key={klass.id} value={klass.id}>{klass.name}{klass.section ? ' · ' + klass.section : ''}</option>)}</select></div>
         </Card>;
       })}
     </section>}
