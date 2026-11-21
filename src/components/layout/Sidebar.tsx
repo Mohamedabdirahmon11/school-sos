@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { translations, LanguageCode, TranslationDict } from '../../lib/translations.ts';
+import { translations, TranslationDict } from '../../lib/translations.ts';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { hasStaffNavigationPermission, type StaffPermission } from '../../lib/staff-permissions.ts';
@@ -24,7 +24,7 @@ type NavItem = { id: string; label: string; icon: React.ComponentType<{ classNam
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
-  const { user, school, inspectedSchool, language, setLanguage } = useAuth();
+  const { user, school, inspectedSchool, language } = useAuth();
   const role = user?.role || 'school_admin';
   const [menuSearch, setMenuSearch] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(() => {
