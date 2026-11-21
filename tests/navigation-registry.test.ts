@@ -20,8 +20,8 @@ test('Sidebar and MobileBottomNav only reference registered routes', () => {
   const sidebar = read('../src/components/layout/Sidebar.tsx');
   const mobile = read('../src/components/layout/MobileBottomNav.tsx');
   const used = [
-    ...routeIds(sidebar, /item\\('([^']+)'/g),
-    ...routeIds(mobile, /quickTab\\('([^']+)'/g)
+    ...routeIds(sidebar, /item\('([^']+)'/g),
+    ...routeIds(mobile, /quickTab\('([^']+)'/g)
   ];
   for (const route of new Set(used)) {
     assert.ok(getNavigationRoute(route), `navigation route ${route} is missing from the shared registry`);
