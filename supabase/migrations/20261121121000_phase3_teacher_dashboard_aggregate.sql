@@ -17,11 +17,16 @@ AS $function$
     WHERE id = p_school_id
   ),
   teacher_classes AS (
-    SELECT DISTINCT class_id
-    FROM public.class_subjects
-    WHERE school_id = p_school_id
-      AND teacher_id = p_teacher_id
-      AND is_active = TRUE
+    SELECT DISTINCT assigned.class_id
+    FROM (
+      SELECT id, class_id
+      FROM public.class_subjects
+      WHERE school_id = p_school_id
+        AND teacher_id = p_teacher_id
+        AND is_active = TRUE
+      ORDER BY id
+      LIMIT 100
+    ) AS assigned
   ),
   active_students AS (
     SELECT student.id, student.student_id, student.first_name,
@@ -94,15 +99,20 @@ AS $function$
       FROM (
         SELECT id, title, content, audience, class_id, is_pinned,
                publish_date, author_name, author_role
-        FROM public.school_notices
-        WHERE school_id = p_school_id
-          AND is_active = TRUE
-          AND publish_date <= (
-            now() AT TIME ZONE COALESCE((SELECT timezone FROM school_context), 'Africa/Addis_Ababa')
-          )::date
+        FROM (
+          SELECT id, title, content, audience, class_id, is_pinned,
+                 publish_date, author_name, author_role
+          FROM public.school_notices
+          WHERE school_id = p_school_id AND is_active = TRUE
+          ORDER BY id
+          LIMIT 100
+        ) AS first_page
+        WHERE first_page.publish_date <= (
+          now() AT TIME ZONE COALESCE((SELECT timezone FROM school_context), 'Africa/Addis_Ababa')
+        )::date
           AND (
-            class_id IS NULL
-            OR EXISTS (SELECT 1 FROM teacher_classes WHERE teacher_classes.class_id = school_notices.class_id)
+            first_page.class_id IS NULL
+            OR EXISTS (SELECT 1 FROM teacher_classes WHERE teacher_classes.class_id = first_page.class_id)
           )
         ORDER BY id
         LIMIT 3
