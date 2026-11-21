@@ -288,14 +288,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
 
   const handleExportCSV = async () => {
     try {
-      const params = new URLSearchParams();
-      if (classFilter) params.set('classId', classFilter);
-      if (branchFilter) params.set('branchId', branchFilter);
-      if (search.trim()) params.set('search', search.trim());
-      if (feeFilter !== 'all') params.set('feeStatus', feeFilter);
-      if (genderFilter !== 'all') params.set('gender', genderFilter);
-      if (studentStatusFilter !== 'all') params.set('status', studentStatusFilter);
-      const response = await fetch('/api/students/export?' + params.toString(), { credentials: 'include' });
+      const response = await fetch('/api/students/export?' + buildStudentExportQuery(), { credentials: 'include' });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || 'Student export failed.');
