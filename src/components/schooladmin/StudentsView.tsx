@@ -45,6 +45,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [branchFilter, setBranchFilter] = useState('');
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  const [genderFilter, setGenderFilter] = useState('all');
   const [showAllClass, setShowAllClass] = useState(false);
   const [feeFilter, setFeeFilter] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
@@ -92,6 +93,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   ]), [school?.id, search, classFilter, branchFilter, feeFilter, page, showAllClass], Boolean(school));
   const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
+  const visibleStudents = students.filter(student => genderFilter === 'all' || String(student.gender || '').toLowerCase() === genderFilter);
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const branches: SchoolBranch[] = Array.isArray(branchRows) ? branchRows : [];
   const isLoading = studentLoad.loading;
@@ -438,13 +440,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             ))}
           </select>
 
+          <select value={genderFilter} onChange={e => { setGenderFilter(e.target.value); setPage(1); }} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-xs text-[#334155]"><option value="all">All Genders</option><option value="male">Male</option><option value="female">Female</option></select>
           {/* Fee Payment Status Filter */}
           <select
             value={feeFilter}
             onChange={e => { setFeeFilter(e.target.value); setShowAllClass(false); setPage(1); }}
             className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]"
           >
-            <option value="all">All Fee Statuses</option>
+            <option value="all">All Statuses</option>
             <option value="paid">Paid in Full</option>
             <option value="partial">Partial Payment</option>
             <option value="unpaid">Unpaid Fees</option>
@@ -465,11 +468,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
         <div className={`overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-[0_2px_8px_rgba(16,37,34,.025)] ${selectedStudent ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <div className="flex items-center justify-between border-b border-[#e6efec] px-5 py-4">
             <div><h2 className="font-bold text-[#102522]">Student directory</h2><p className="mt-1 text-xs text-[#71817d]">Select a student to open their full profile</p></div>
-            <span className="rounded-full bg-[#e8f4f1] px-3 py-1 text-xs font-semibold text-[#0e8078]">{students.length} shown</span>
+            <span className="rounded-full bg-[#e8f4f1] px-3 py-1 text-xs font-semibold text-[#0e8078]">{visibleStudents.length} shown</span>
           </div>
           <div className="grid gap-2 p-3 md:hidden">
-            {students.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No students found.</p> :
-              students.map((student:any) => (
+            {visibleStudents.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No students found.</p> :
+              visibleStudents.map((student:any) => (
                 <button type="button" key={student.id} onClick={()=>void loadStudentDetails(student)} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
                   <div className="flex items-start justify-between gap-2"><span className="font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</span><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
                   <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{student.className || '—'}</span><span>{student.fatherPhone || '—'}</span></div>
@@ -484,20 +487,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   <th className="px-5 py-4">Student ID</th>
                   <th className="px-5 py-4">Name</th>
                   <th className="px-5 py-4">Class</th>
-                  <th className="px-5 py-4">Guardian</th>
-                  <th className="px-5 py-4">Fees</th>
+                  <th className="px-5 py-4">Gender</th><th className="px-5 py-4">Parent phone</th>
+                  <th className="px-5 py-4">Status</th>
                   <th className="px-5 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {students.length === 0 ? (
+                {visibleStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={8} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
                 ) : (
-                  students.map((s, rowIndex) => {
+                  visibleStudents.map((s, rowIndex) => {
                     const isSelected = selectedStudent?.id === s.id;
                     // Older/imported rows may omit this derived field; never let one row crash the screen.
                     const feeStatus = typeof s.feeStatus === 'string' ? s.feeStatus.trim() : '';
