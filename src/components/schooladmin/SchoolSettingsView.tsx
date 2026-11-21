@@ -549,9 +549,9 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   };
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-5 p-3 md:p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="space-y-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <Sliders className="w-6 h-6 text-[#0F766E]" />
@@ -561,57 +561,62 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
             {t('settings_page_description')}
           </p>
         </div>
+      </div>
 
+      <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[248px_minmax(0,1fr)]">
+        <aside className="min-w-0 rounded-2xl border border-[#DCE7E4] bg-white p-3 shadow-sm lg:sticky lg:top-4">
+          <div className="mb-3 px-2"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#64748B]">School configuration</p><p className="mt-1 text-xs text-[#64748B]">Choose a section to manage</p></div>
         {/* Organized settings navigation: grouped by purpose, with stable tab IDs. */}
-        <div className="grid w-full grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
-          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
-            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_school')}</h2>
-            <div className="grid grid-cols-1 gap-2">
-              <button type="button" onClick={() => setActiveTab('identity')} aria-current={activeTab === 'identity' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'identity' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+        <div className="flex w-full flex-col gap-4 text-xs">
+          <section className="space-y-2">
+            <h2 className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#64748B]">{t('settings_group_school')}</h2>
+            <div className="flex flex-col gap-1">
+              <button type="button" onClick={() => setActiveTab('identity')} aria-current={activeTab === 'identity' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'identity' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                 <Building2 className="h-4 w-4 shrink-0" /><span>{t('settings_identity')}</span>
               </button>
-              <button type="button" onClick={() => setActiveTab('branches')} aria-current={activeTab === 'branches' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'branches' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+              <button type="button" onClick={() => setActiveTab('branches')} aria-current={activeTab === 'branches' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'branches' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                 <GitBranch className="h-4 w-4 shrink-0" /><span>{t('settings_branches')}</span><span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px]">{branches.length}</span>
               </button>
             </div>
           </section>
-          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
-            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_academics')}</h2>
-            <div className="grid grid-cols-1 gap-2">
-              <button type="button" onClick={() => setActiveTab('academics')} aria-current={activeTab === 'academics' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'academics' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+          <section className="space-y-2">
+            <h2 className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#64748B]">{t('settings_group_academics')}</h2>
+            <div className="flex flex-col gap-1">
+              <button type="button" onClick={() => setActiveTab('academics')} aria-current={activeTab === 'academics' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'academics' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                 <CalendarDays className="h-4 w-4 shrink-0" /><span>{t('settings_academics')}</span>
               </button>
-              <button type="button" onClick={() => setActiveTab('shifts')} aria-current={activeTab === 'shifts' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'shifts' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+              <button type="button" onClick={() => setActiveTab('shifts')} aria-current={activeTab === 'shifts' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'shifts' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                 <Clock className="h-4 w-4 shrink-0" /><span>{t('settings_timetable')}</span>
               </button>
             </div>
           </section>
-          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
-            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_communication')}</h2>
-            <div className="grid grid-cols-1 gap-2">
-              <button type="button" onClick={() => setActiveTab('documents')} aria-current={activeTab === 'documents' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'documents' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+          <section className="space-y-2">
+            <h2 className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#64748B]">{t('settings_group_communication')}</h2>
+            <div className="flex flex-col gap-1">
+              <button type="button" onClick={() => setActiveTab('documents')} aria-current={activeTab === 'documents' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'documents' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                 <Bell className="h-4 w-4 shrink-0" /><span>{t('settings_documents')}</span>
               </button>
-              <button type="button" onClick={() => setActiveTab('designer')} aria-current={activeTab === 'designer' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'designer' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+              <button type="button" onClick={() => setActiveTab('designer')} aria-current={activeTab === 'designer' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'designer' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                 <FileText className="h-4 w-4 shrink-0" /><span>{t('settings_report_design')}</span>
               </button>
             </div>
           </section>
-          <section className="rounded-xl border border-[#DCE7E4] bg-[#F8FAF9] p-3">
-            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[#64748B]">{t('settings_group_appearance_data')}</h2>
-            <div className="grid grid-cols-1 gap-2">
+          <section className="space-y-2">
+            <h2 className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#64748B]">{t('settings_group_appearance_data')}</h2>
+            <div className="flex flex-col gap-1">
               {user?.role === 'school_admin' && (
-                <button type="button" onClick={() => setActiveTab('appearance')} aria-current={activeTab === 'appearance' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'appearance' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+                <button type="button" onClick={() => setActiveTab('appearance')} aria-current={activeTab === 'appearance' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'appearance' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                   <Palette className="h-4 w-4 shrink-0" /><span>{t('settings_menu_appearance')}</span>
                 </button>
               )}
-              <button type="button" onClick={() => setActiveTab('backup')} aria-current={activeTab === 'backup' ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'backup' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
+              <button type="button" onClick={() => setActiveTab('backup')} aria-current={activeTab === 'backup' ? 'page' : undefined} className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left font-semibold transition-colors ${activeTab === 'backup' ? 'border-teal-600 bg-white text-[#0F766E] shadow-sm' : 'border-transparent bg-white text-[#475569] hover:border-slate-200'}`}>
                 <Database className="h-4 w-4 shrink-0" /><span>{t('settings_backup_export')}</span>
               </button>
             </div>
           </section>
         </div>
-      </div>
+        </aside>
+        <main className="min-w-0 space-y-5">
 
       {notice && (
         <div className="p-3 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg text-xs flex items-center gap-2">
@@ -1637,6 +1642,8 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           </div>
         </div>
       )}
+        </main>
+      </div>
     </div>
   );
 };
