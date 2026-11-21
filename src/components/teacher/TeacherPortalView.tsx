@@ -13,7 +13,7 @@ import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopia
 import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
-import { ErrorState } from '../common/ErrorState.tsx';
+import { ErrorState, LoadingState } from '../common/AsyncState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { TeacherMarkEntryPrint } from './TeacherMarkEntryPrint.tsx';
 import { 
@@ -519,7 +519,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     });
   }, [visibleStudents, gradeSubjects, assessmentComponents, examType, marksInput, classMarks]);
 
-  if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
+  if (initialData.loading) return <LoadingState label="Loading teacher dashboard" />;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
@@ -598,7 +598,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <span aria-label={`${visibleTimetable.length} periods shown`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} lessons</span>
             </div>
           </div>
-          {(schoolTimetableLoading && timetableScope === 'school') ? <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Loading school timetable…</div> : schoolTimetableError && timetableScope === 'school' ? <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{schoolTimetableError}</div> : visibleTimetable.length === 0 ? (
+          {(schoolTimetableLoading && timetableScope === 'school') ? <LoadingState label="Loading school timetable" className="min-h-24 border-0 bg-transparent" /> : schoolTimetableError && timetableScope === 'school' ? <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{schoolTimetableError}</div> : visibleTimetable.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-[#64748B]">
               {timetableDay !== 'all'
                 ? `No lessons scheduled for ${timetableDay} in this view. Choose another day or All days.`
@@ -646,7 +646,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <div><h2 className="text-sm font-bold text-slate-900">Students in this class</h2><p className="mt-1 text-[11px] text-slate-500">Students in classes where you teach a subject or serve as Form Teacher are shown.</p></div>
               <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{students.length} students</span>
             </div>
-            {isLoadingClassData ? <p className="p-8 text-center text-sm text-slate-500">Loading assigned students...</p> : students.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{classes.length ? 'No students found in this assigned class.' : 'No teaching classes have been assigned to your teacher profile yet. Ask the School Admin to check your class and subject assignments.'}</p> : (
+            {isLoadingClassData ? <LoadingState label="Loading assigned students" className="min-h-24 border-0 bg-transparent" /> : students.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">{classes.length ? 'No students found in this assigned class.' : 'No teaching classes have been assigned to your teacher profile yet. Ask the School Admin to check your class and subject assignments.'}</p> : (
               <>
               <div className="space-y-2 p-3 md:hidden">
                 {visibleStudents.map((student, index) => <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -666,12 +666,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           </div>
         <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-[#132A29]">Published Exam Timetable</h2><button type="button" onClick={printExamTimetable} className="rounded-lg border border-[#CBD5E1] px-3 py-1.5 text-[11px] font-semibold text-[#334155]">Print timetable</button></div>
-          {publishedExamSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={[...new Set(publishedExamSchedules.map((exam: any) => exam.className).filter(Boolean))].join(" / ") || school?.examTimetableClassGroup} />}
+          {publishedExamSchedulesState.loading ? <LoadingState label="Loading published exam schedule" className="min-h-20 border-0 bg-transparent" /> : publishedExamSchedulesState.error ? <ErrorState error={publishedExamSchedulesState.error} onRetry={publishedExamSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={[...new Set(publishedExamSchedules.map((exam: any) => exam.className).filter(Boolean))].join(" / ") || school?.examTimetableClassGroup} />}
         </section>
 
         <section className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm space-y-3">
           <div><h2 className="text-sm font-bold text-[#132A29]">My Exam Invigilation Duties</h2><p className="mt-1 text-xs text-[#64748B]">Published term-exam sessions where you are assigned as an invigilator.</p></div>
-          {examInvigilationState.loading ? <div className="h-14 animate-pulse rounded-lg bg-slate-100" /> : examInvigilationState.error ? <ErrorState error={examInvigilationState.error} onRetry={examInvigilationState.retry} /> : examInvigilationRows.length ? <div className="divide-y divide-[#E2E8F0]">
+          {examInvigilationState.loading ? <LoadingState label="Loading exam invigilation" className="min-h-20 border-0 bg-transparent" /> : examInvigilationState.error ? <ErrorState error={examInvigilationState.error} onRetry={examInvigilationState.retry} /> : examInvigilationRows.length ? <div className="divide-y divide-[#E2E8F0]">
             {examInvigilationRows.map((item: any, index: number) => <div key={item.examDate + ':' + item.sessionName + ':' + item.roomName + ':' + index} className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs">
               <div><strong className="text-[#132A29]">{item.periodName}</strong><p className="mt-1 text-[#64748B]">{item.examDate} · {item.sessionName} · {String(item.startTime).slice(0,5)}–{String(item.endTime).slice(0,5)}</p></div>
               <div className="text-right"><span className="font-semibold text-[#0F766E]">{item.roomName}</span><p className="mt-1 text-[10px] text-[#64748B]">{item.shiftTag === 'morning' ? 'Morning' : item.shiftTag === 'afternoon' ? 'Afternoon' : 'All-day'}</p></div>
