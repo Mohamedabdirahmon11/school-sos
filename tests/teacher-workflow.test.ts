@@ -58,7 +58,7 @@ test('Form Teachers review all homeroom subjects but can edit only assigned subj
   assert.match(api, /isFormTeacherClass: true/);
   assert.match(api, /isFormTeacher: true/);
   assert.match(api, /canEditMarks: true/);
-  assert.match(api, /You may enter marks only for a subject explicitly assigned to your teacher profile/);
+  assert.match(api, /You may submit marks only for a subject and section assigned to your active teacher profile in this academic term/);
 });
 
 test('teacher notices load independently and cannot block core teaching workflows', () => {
