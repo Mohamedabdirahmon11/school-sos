@@ -4936,7 +4936,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     queryAllRows('students', filters, '*'),
     db.getClasses(school.id)
   ]);
-  const feeStatusMap = feeStatus === 'all' ? new Map<string, string>() : await getStudentFeeStatusMap(school.id, allStudents.map((student: any) => student.id), school.academicYear);
+  const feeStatusMap = await getStudentFeeStatusMap(school.id, allStudents.map((student: any) => student.id), school.academicYear);
   const classNames = new Map(classes.map(item => [item.id, `${item.name}${item.section ? ` - ${item.section}` : ''}`]));
   const filtered = allStudents.filter((student: any) => {
     const studentClass = classNames.get(student.classId) || student.className || '';
@@ -4955,7 +4955,7 @@ apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
     ...filtered.map((student: any) => [
       student.studentId, student.firstName, student.middleName, student.lastName, student.gender,
       classNames.get(student.classId) || student.className, student.admissionDate,
-      student.studentPhone, student.fatherPhone, student.motherPhone, student.status, student.feeStatus
+      student.studentPhone, student.fatherPhone, student.motherPhone, student.status, feeStatusMap.get(student.id) || 'unpaid'
     ])
   ];
   const csv = rows.map(row => row.map(cell).join(',')).join('\r\n');
@@ -5488,7 +5488,7 @@ apiRouter.get('/teachers/export', requireAuth, requireSchoolAdminOrSuperAdmin, r
   }).send('\uFEFF' + csv);
 });
 
-apiRouter.get('/teachers', requireAuth, requireSchoolContext, (req, res) => {
+apiRouter.get('/teachers', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const canViewSalary = ['school_admin', 'super_admin', 'accountant'].includes(user.role);
