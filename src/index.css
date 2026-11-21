@@ -1317,7 +1317,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   background:var(--admin-canvas)!important;color:var(--admin-ink);
 }
 .school-admin-design aside {
-  background:linear-gradient(180deg,color-mix(in srgb,var(--sidebar-background,#102d63) 92%,#fff),var(--sidebar-background,#0b214c))!important;
+  background:var(--sidebar-background,linear-gradient(180deg,#102d63 0%,#0b214c 100%))!important;
   border-right:1px solid rgba(255,255,255,.08);
   box-shadow:8px 0 28px rgba(15,42,92,.10);
 }
