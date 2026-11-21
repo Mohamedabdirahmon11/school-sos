@@ -89,7 +89,7 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
 }
 .school-admin-design main { background: var(--admin-canvas); }
 .school-admin-design aside {
-  width: 268px;
+  width: var(--sidebar-width, 260px);
   background: var(--admin-sidebar) !important;
 }
 .school-admin-design aside .h-14 { min-height: 76px; height: 76px; padding-left: 22px; padding-right: 22px; }
@@ -195,10 +195,10 @@ button[class~="bg-teal-700"], button[class~="bg-teal-600"], a[class~="bg-teal-70
   overflow: hidden;
 }
 .school-admin-design aside {
-  width: 250px;
+  width: var(--sidebar-width, 260px);
   height: 100%;
   max-height: 100%;
-  flex: 0 0 250px;
+  flex: 0 0 var(--sidebar-width, 260px);
   background: linear-gradient(180deg, color-mix(in srgb, var(--sidebar-background, #0b302d) 92%, white), var(--sidebar-background, #082522)) !important;
   box-shadow: 8px 0 28px rgba(6, 29, 26, .10);
 }
