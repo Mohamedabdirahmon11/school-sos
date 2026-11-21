@@ -15,6 +15,7 @@ import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
 import { ApiClient } from './services/api.ts';
 import { SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
+import { getNavigationRoute } from './lib/navigation-registry.ts';
 
 const SuperAdminDashboard = React.lazy(() => import('./components/superadmin/SuperAdminDashboard.tsx').then(module => ({ default: module.SuperAdminDashboard })));
 const SchoolsView = React.lazy(() => import('./components/superadmin/SchoolsView.tsx').then(module => ({ default: module.SchoolsView })));
@@ -149,6 +150,10 @@ const AppContent: React.FC = () => {
       ) ? 'acc_dashboard' : requestedView;
 
   const handleNavigate = (view: string) => {
+    if (!getNavigationRoute(view)) {
+      console.warn(`[navigation] Ignored unregistered route: ${view}`);
+      return;
+    }
     if (setupRequired && !SCHOOL_SETUP_ALLOWED_VIEWS.has(view)) {
       setCurrentView('sch_setup');
       return;
