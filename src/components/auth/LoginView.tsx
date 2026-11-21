@@ -53,13 +53,14 @@ export const LoginView: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const isSuperAdminLogin = activeTab === 'school_admin' && email.trim().includes('@');
       const result = await login({
-        role: activeTab,
-        email,
+        role: isSuperAdminLogin ? 'super_admin' : activeTab,
+        email: email.trim(),
         phone,
         schoolCode,
-        pin,
-        password: activeTab === 'super_admin' ? password : undefined
+        pin: isSuperAdminLogin ? undefined : pin,
+        password: isSuperAdminLogin ? password : undefined
       });
       if (result.requirePinChange && result.challengeToken) {
         setBootstrapToken(result.challengeToken);
@@ -170,82 +171,58 @@ export const LoginView: React.FC = () => {
           )}
 
           {!parentStudentMode && (
-            <div className="mb-4 flex items-center justify-center gap-3 text-xs">
-              <button type="button" onClick={() => { setActiveTab('school_admin'); setEmail(''); setPin(''); setPassword(''); setError(null); }} className={activeTab !== 'super_admin' ? 'font-semibold text-[#0F766E] underline' : 'text-[#64748B]'}>Staff ID + PIN</button>
-              <span className="text-slate-300">|</span>
-              <button type="button" onClick={() => { setActiveTab('super_admin'); setEmail(''); setPin(''); setPassword(''); setError(null); }} className={activeTab === 'super_admin' ? 'font-semibold text-[#0F766E] underline' : 'text-[#64748B]'}>Super Admin</button>
-            </div>
-          )}
-          {!parentStudentMode && (
             <p className="mb-4 text-center text-xs text-[#64748B]">
-              School Admin, Accountant, and Teacher sign in with their school-issued ID and PIN. Super Admin uses email and password.
+              Super Admin and School Admin use this same login. Enter your Super Admin email or your School Admin ID; the correct account type is detected automatically.
             </p>
           )}
 
           {/* Form */}
           <form className="space-y-4" onSubmit={handleSubmit}>
             
-            {/* SUPER ADMIN FORM */}
-            {activeTab === 'super_admin' && (
+            {/* ONE SHARED ADMIN LOGIN: Super Admin email/password or School Admin ID/PIN */}
+            {activeTab === 'school_admin' && !parentStudentMode && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Super Admin Email</label>
-                  <div className="mt-1 relative">
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-[#334155]">Master Password</label>
-                  <div className="mt-1 relative">
-                    <PasswordInput
-                      label="password"
-                      required
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
-                </div>
-
-              </>
-            )}
-
-            {/* STAFF FORM: School Admin, Accountant and Teacher use ID + PIN */}
-            {(activeTab === 'school_admin' || activeTab === 'teacher' || activeTab === 'accountant') && (
-              <>
-                <div>
-                  <label className="block text-xs font-medium text-[#334155]">School Admin ID / Accountant ID / Teacher ID</label>
+                  <label className="block text-xs font-medium text-[#334155]">
+                    {email.trim().includes('@') ? 'Super Admin Email' : 'School Admin ID'}
+                  </label>
                   <input
                     type="text"
                     required
                     autoComplete="username"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="Enter your staff ID"
+                    onChange={e => { setEmail(e.target.value); setPin(''); setPassword(''); setError(null); }}
+                    placeholder="Enter Super Admin email or School Admin ID"
                     className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#334155]">4–6 digit PIN</label>
-                  <PasswordInput
-                    label="PIN"
-                    required
-                    value={pin}
-                    onChange={e => setPin(e.target.value.replace(/\\D/g, '').slice(0, 6))}
-                    placeholder="Enter your PIN"
-                    autoComplete="current-password"
-                    className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg"
-                  />
-                </div>
+                {email.trim().includes('@') ? (
+                  <div>
+                    <label className="block text-xs font-medium text-[#334155]">Super Admin Password</label>
+                    <PasswordInput
+                      label="Super Admin password"
+                      required
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      autoComplete="current-password"
+                      className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-medium text-[#334155]">School Admin PIN (4–6 digits)</label>
+                    <PasswordInput
+                      label="School Admin PIN"
+                      required
+                      value={pin}
+                      onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter your PIN"
+                      autoComplete="current-password"
+                      className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg"
+                    />
+                  </div>
+                )}
               </>
             )}
 
