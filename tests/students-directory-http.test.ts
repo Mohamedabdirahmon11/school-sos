@@ -72,6 +72,12 @@ const noGuardian = storage.db.createStudent({
   gender: 'male', admissionDate: today, fatherPhone: '',
   motherPhone: '', classId: otherClass.id, section: 'B', status: 'active'
 } as any);
+const formTeacherStudent = storage.db.createStudent({
+  schoolId: school.id, studentId: 'STROW-FORM',
+  firstName: 'Form', middleName: '', lastName: 'Student',
+  gender: 'male', admissionDate: today, fatherPhone: '',
+  motherPhone: '', classId: ownClass.id, section: 'A', status: 'active'
+} as any);
 const otherTenantStudent = storage.db.createStudent({
   schoolId: otherSchool.id, studentId: 'STROW-OTHER',
   firstName: 'Other', middleName: '', lastName: 'Tenant',
@@ -168,7 +174,7 @@ test('students without a guardian remain readable and another school stays isola
 test('Form Teacher reads only the homeroom class and receives 403 for another class', async () => {
   memory.rows('enrollments').push({
     id: 'student-row-teacher-own-enrollment', school_id: school.id,
-    student_id: noGuardian.id, academic_year_id: 'student-row-current-year',
+    student_id: formTeacherStudent.id, academic_year_id: 'student-row-current-year',
     class_id: ownClass.id, status: 'active', enrolled_at: new Date().toISOString()
   });
   const own = await fetch(`${baseUrl}/students`, { headers: teacherHeaders });
