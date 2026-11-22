@@ -10,7 +10,8 @@ CREATE OR REPLACE FUNCTION public.upsert_teacher_assignment_atomic(
   p_subject_id varchar,
   p_teacher_id varchar,
   p_qualification_override boolean,
-  p_changed_by varchar
+  p_changed_by varchar,
+  p_clear_dependent_slots boolean DEFAULT false
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -47,7 +48,27 @@ BEGIN
       AND class_id = p_class_id AND subject_id = p_subject_id
     FOR UPDATE;
   END IF;
-  IF old_row.id IS NOT NULL THEN old_json := to_jsonb(old_row); END IF;
+  IF old_row.id IS NOT NULL THEN
+    old_json := to_jsonb(old_row);
+    IF (old_row.teacher_id IS DISTINCT FROM p_teacher_id
+        OR old_row.class_id IS DISTINCT FROM p_class_id
+        OR old_row.subject_id IS DISTINCT FROM p_subject_id
+        OR old_row.section_id IS DISTINCT FROM p_section_id) THEN
+      IF EXISTS (
+        SELECT 1 FROM public.timetable_slots
+        WHERE school_id = p_school_id AND class_id = old_row.class_id
+          AND subject_id = old_row.subject_id
+      ) AND NOT p_clear_dependent_slots THEN
+        RAISE EXCEPTION 'Dependent timetable slots require explicit confirmation before assignment changes.'
+          USING ERRCODE = '23514';
+      END IF;
+      IF p_clear_dependent_slots THEN
+        DELETE FROM public.timetable_slots
+        WHERE school_id = p_school_id AND class_id = old_row.class_id
+          AND subject_id = old_row.subject_id;
+      END IF;
+    END IF;
+  END IF;
 
   SELECT COALESCE(max_periods_per_week, 30) INTO teacher_limit
   FROM public.teachers
@@ -146,5 +167,5 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar) TO service_role;
+REVOKE ALL ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar, boolean) TO service_role;
