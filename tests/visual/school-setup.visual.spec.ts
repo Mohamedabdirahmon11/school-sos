@@ -33,7 +33,7 @@ for (const width of widths) {
   }
 }
 
-test('write School Setup responsive screenshot matrix index', async () => {
+test('School Setup Wizard screenshot matrix index', async () => {
   const folder = path.join(root, 'artifacts', 'school-setup');
   fs.mkdirSync(folder, { recursive: true });
   const links = themes.flatMap(theme => widths.map(width => `<li><a href="${theme}/${width}/">${width}px · ${theme}</a></li>`)).join('');
