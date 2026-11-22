@@ -329,7 +329,7 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
   assert.match(mobile, /id: 't_timetable'/);
   assert.match(mobile, /id: 't_attendance'/);
   assert.match(mobile, /id: 't_grades'/);
-  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.doesNotMatch(sidebar, /item\('t_exam_results'/);
   assert.match(sidebar, /item\('t_assignments'/);
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
