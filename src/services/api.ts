@@ -1081,7 +1081,8 @@ export class ApiClient {
   }
 
   public static async getStudentProfile() {
-    return this.request<any>('/student/me');
+    const response = await this.request<any>('/student/me');
+    return response?.data ?? response;
   }
 
   public static async getStudentMarks(studentId: string) {
