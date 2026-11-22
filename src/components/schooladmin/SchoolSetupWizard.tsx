@@ -211,7 +211,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   if (loading) return <div className="mx-auto max-w-4xl p-8 text-sm text-slate-500">Loading school setup…</div>;
 
   if (showChecklist) {
-    const wizardSteps = [
+    const wizardSteps: Array<{ id: string; title: string; required: boolean; evidence: number; needs: string[]; target?: 'profile' | 'year'; view?: string }> = [
       { id: 'profile', title: 'Macluumaadka dugsiga', required: true, evidence: 2, needs: [], target: 'profile' },
       { id: 'year', title: 'Sanad dugsiyeed & Terms', required: true, evidence: 1, needs: ['profile'], target: 'year' },
       { id: 'classes', title: 'Fasallada', required: true, evidence: 3, needs: ['year'], view: 'sch_classes' },
@@ -221,7 +221,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       { id: 'students', title: 'Ardayda', required: true, evidence: 6, needs: ['assign'], view: 'sch_students' },
       { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['assign'], view: 'sch_timetable' },
       { id: 'finish', title: 'Dhammee & Fur Dashboard', required: true, evidence: -1, needs: ['profile', 'year', 'classes', 'subjects', 'teachers', 'assign', 'students'] }
-    ] as const;
+    ];
     const readyFor = (id: string) => {
       const item = wizardSteps.find(candidate => candidate.id === id);
       if (!item || !setupState) return false;
