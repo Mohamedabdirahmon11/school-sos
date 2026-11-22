@@ -3521,8 +3521,11 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
   const targetSet = new Set(targetIds);
   const targets = allClasses.filter(klass => targetSet.has(klass.id) && !klass.isArchived);
   if (targets.length !== targetIds.length) { res.status(403).json({ error: 'Mid ama ka badan fasallada la doortay kama tirsana dugsigan.' }); return; }
-  if (targets.some(target => Number(target.gradeLevel) !== Number(source.gradeLevel))) {
-    res.status(422).json({ error: 'Curriculum can only be copied to sections in the same grade.' }); return;
+  if (targets.some(target =>
+    Number(target.gradeLevel) !== Number(source.gradeLevel) ||
+    String(target.academicYear || '') !== String(source.academicYear || '')
+  )) {
+    res.status(422).json({ error: 'Curriculum can only be copied to sections in the same grade and academic year.' }); return;
   }
   try {
     const [capacity, sourceRows] = await Promise.all([

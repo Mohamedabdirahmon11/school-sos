@@ -658,7 +658,7 @@ export class ApiClient {
   }
 
   public static async applyPrimarySubjectTemplate(classId: string) {
-    return this.request<{ success: boolean; count: number; gradeBand: string; added: number }>(`/curriculum/classes/${encodeURIComponent(classId)}/apply-template`, { method: 'POST' });
+    return this.request<{ success: boolean; applied: boolean; gradeBand: string; updatedClasses: number; added: number; subjectsRemoved: number; weeklyCapacity: number }>(`/curriculum/classes/${encodeURIComponent(classId)}/apply-template`, { method: 'POST' });
   }
   public static async getSubjects(params?: any) {
     return this.request<Subject[]>('/subjects');
