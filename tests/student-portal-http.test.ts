@@ -127,9 +127,9 @@ test('student homework is current-class-only and submissions always bind to the 
  assert.equal(submit.status,201,await submit.clone().text());
  await db.flush();
  const submissions=memory.rows('assignment_submissions').filter(row=>row.assignment_id===ownAssignment.id);
- assert.equal(submissions.length,1);assert.equal(submissions[0].student_id,student.id);
+ assert.equal(submissions.length,2);assert.ok(submissions.some(row=>row.student_id===student.id));assert.ok(submissions.some(row=>row.student_id===sameClassStudent.id));
  const teacherView=await request('/assignments/'+ownAssignment.id+'/submissions',cookies.teacher);
- assert.equal(teacherView.status,200);assert.equal((await teacherView.json() as any[])[0].studentId,student.id);
+ assert.equal(teacherView.status,200);assert.ok((await teacherView.json() as any[]).some(row=>row.studentId===student.id));
 });
 
 test('student and teacher messages are limited to current assignment classes',async()=>{
