@@ -38,10 +38,12 @@ interface ReportCardMark {
 
 interface ReportCardSubjectResult {
   subject: { id: string; name: string; code?: string };
+  isActive?: boolean;
   sem1Marks?: ReportCardMark | null;
   sem2Marks?: ReportCardMark | null;
   sem1Percentage: number | null;
   sem2Percentage: number | null;
+  yearlyMarks: number | null;
   yearlyPercentage: number | null;
   maxMarks: { small: number; big: number; total: number };
 }
@@ -52,6 +54,10 @@ interface ReportCardResult {
   subjectResults: ReportCardSubjectResult[];
   annualComplete: boolean;
   annualPublished: boolean;
+  semester1Rank: number;
+  semester2Rank: number;
+  yearlyTotal: number;
+  formTeacherComments?: Array<{ semester: string; comment: string }>;
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
@@ -73,6 +79,14 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
   const template = design.templateId || 'modern';
   const background = design.ownDesignImageUrl;
   const logoPosition = design.logoPosition || 'center';
+  const activeRows = result.subjectResults.filter(row => row.isActive !== false);
+  const term1Total = activeRows.reduce((sum, row) => sum + (row.sem1Marks?.totalMarks || 0), 0);
+  const term2Total = activeRows.reduce((sum, row) => sum + (row.sem2Marks?.totalMarks || 0), 0);
+  const finalTotal = activeRows.reduce((sum, row) => sum + (row.yearlyMarks || 0), 0);
+  const term1Average = activeRows.length ? term1Total / activeRows.length : 0;
+  const term2Average = activeRows.length ? term2Total / activeRows.length : 0;
+  const term1Comments = activeRows.filter(row => row.sem1Marks?.teacherRemarks?.trim()).map(row => `${row.subject.name}: ${row.sem1Marks?.teacherRemarks}`);
+  const term2Comments = activeRows.filter(row => row.sem2Marks?.teacherRemarks?.trim()).map(row => `${row.subject.name}: ${row.sem2Marks?.teacherRemarks}`);
 
   const shellClass = template === 'classic'
     ? 'border-4 border-double rounded-sm font-serif'
@@ -139,12 +153,11 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
             <p className="text-[11px] text-[#64748B]">Class & Section</p>
             <p className="font-bold text-[#132A29]">{className || 'Class'}</p>
           </div>
-          {blocks.rank && (
-            <div>
-              <p className="text-[11px] text-[#64748B]">Official Class Rank</p>
-              <p className="font-mono font-bold" style={{ color: primaryColor }}>{result.annualComplete ? `#${result.yearlyRank} of ${totalStudents}` : 'Pending'}</p>
-            </div>
-          )}
+          {blocks.rank && <>
+            <div><p className="text-[11px] text-[#64748B]">Term 1 Rank</p><p className="font-mono font-bold" style={{ color: primaryColor }}>{result.semester1Rank > 0 ? `#${result.semester1Rank} of ${totalStudents}` : 'Pending'}</p></div>
+            <div><p className="text-[11px] text-[#64748B]">Term 2 Rank</p><p className="font-mono font-bold" style={{ color: primaryColor }}>{result.semester2Rank > 0 ? `#${result.semester2Rank} of ${totalStudents}` : 'Pending'}</p></div>
+            <div><p className="text-[11px] text-[#64748B]">Final Rank</p><p className="font-mono font-bold" style={{ color: primaryColor }}>{result.yearlyRank > 0 ? `#${result.yearlyRank} of ${totalStudents}` : 'Pending'}</p></div>
+          </>}
         </div>
 
         {result.attendanceSummary && (
@@ -182,14 +195,14 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                 <th className="py-2.5 px-3 text-center">Semester 1 %</th>
                 <th className="py-2.5 px-3 text-center">Semester 2 Marks</th>
                 <th className="py-2.5 px-3 text-center">Semester 2 %</th>
-                <th className="py-2.5 px-3 text-right font-bold">Yearly Result (%)</th>
+                <th className="py-2.5 px-3 text-center">Final Marks</th><th className="py-2.5 px-3 text-right font-bold">Final Average (%)</th>
                 <th className="py-2.5 px-3 text-center">Grade</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1F5F9]">
               {result.subjectResults.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
+                  <td colSpan={8} className="py-6 text-center text-[#64748B]">No examination marks entered yet for this student.</td>
                 </tr>
               ) : result.subjectResults.map(row => (
                 <tr key={row.subject.id} className="hover:bg-[#F8FAFC]">
@@ -198,6 +211,7 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{row.sem1Percentage !== null ? `${row.sem1Percentage}%` : '-'}</td>
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{formatReportCardMark(row.sem2Marks, row.maxMarks)}</td>
                   <td className="py-2.5 px-3 text-center font-mono text-[#475569]">{row.sem2Percentage !== null ? `${row.sem2Percentage}%` : '-'}</td>
+                  <td className="py-2.5 px-3 text-center font-mono">{row.yearlyMarks !== null ? row.yearlyMarks.toFixed(1).replace(/\.0$/, '') : '-'}</td>
                   <td className="py-2.5 px-3 text-right font-mono font-bold" style={{ color: primaryColor }}>{row.yearlyPercentage !== null ? `${row.yearlyPercentage}%` : '-'}</td>
                   <td className="py-2.5 px-3 text-center font-bold text-[#475569]">{gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)}</td>
                 </tr>
@@ -205,32 +219,34 @@ const ReportCardDocument: React.FC<ReportCardDocumentProps> = ({ school, design,
             </tbody>
             <tfoot className="bg-[#F8FAFC] border-t-2 font-bold" style={{ borderColor: '#CBD5E1' }}>
               <tr>
-                <td className="py-2.5 px-3 uppercase text-[11px] text-[#475569]">Combined Yearly Academic Average</td>
-                <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] text-[#64748B]">Exam maximums shown per subject</td>
-                <td className="py-2.5 px-3 text-right font-mono text-sm" style={{ color: primaryColor }}>{result.annualComplete ? `${result.yearlyPercentage}%` : 'Pending both semesters'}</td>
+                <td className="py-2.5 px-3 uppercase text-[11px] text-[#475569]">Total / Average</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term1Total.toFixed(1).replace(/\.0$/, '')}</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term1Average.toFixed(1).replace(/\.0$/, '')}%</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term2Total.toFixed(1).replace(/\.0$/, '')}</td>
+                <td className="py-2.5 px-3 text-center font-mono">{term2Average.toFixed(1).replace(/\.0$/, '')}%</td>
+                <td className="py-2.5 px-3 text-center font-mono">{finalTotal.toFixed(1).replace(/\.0$/, '')}</td>
+                <td className="py-2.5 px-3 text-right font-mono text-sm" style={{ color: primaryColor }}>{result.yearlyPercentage}%</td>
                 <td className="py-2.5 px-3 text-center">{result.annualComplete ? gradeLabelForPercentage(result.yearlyPercentage, school.gradingScale) : '-'}</td>
               </tr>
             </tfoot>
           </table>
         </div>
 
+        {blocks.teacherRemarks && (result.formTeacherComments || []).some(item => item.comment?.trim()) && (
+          <div className="rounded-lg border p-3" style={{ borderColor: '#CBD5E1' }}>
+            <p className="font-semibold text-[#475569] mb-2">Form Teacher Comments:</p>
+            <ul className="space-y-1 text-[#334155]">{(result.formTeacherComments || []).filter(item => item.comment?.trim()).map((item, index) => <li key={`${item.semester}-${index}`}><strong>{item.semester}:</strong> {item.comment}</li>)}</ul>
+          </div>
+        )}
         {result.annualComplete && (blocks.teacherRemarks || blocks.adminRemarks) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {blocks.teacherRemarks && (
               <div className="p-3 border rounded-lg" style={{ borderColor: '#CBD5E1' }}>
                 <p className="font-semibold text-[#475569] mb-1">Teacher Remarks:</p>
-                {result.subjectResults.some(row => row.sem1Marks?.teacherRemarks?.trim() || row.sem2Marks?.teacherRemarks?.trim()) ? (
-                  <ul className="space-y-1 text-[#334155]">
-                    {result.subjectResults.flatMap(row => [
-                      row.sem1Marks?.teacherRemarks?.trim() ? { key: `${row.subject.id}-s1`, label: `${row.subject.name} · Semester 1`, comment: row.sem1Marks.teacherRemarks.trim() } : null,
-                      row.sem2Marks?.teacherRemarks?.trim() ? { key: `${row.subject.id}-s2`, label: `${row.subject.name} · Semester 2`, comment: row.sem2Marks.teacherRemarks.trim() } : null
-                    ].filter((item): item is { key: string; label: string; comment: string } => Boolean(item))).map(item => (
-                      <li key={item.key}><span className="font-semibold">{item.label}:</span> {item.comment}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="italic text-[#334155]">{teacherRemark(result.yearlyPercentage)}</p>
-                )}
+                <p className="font-semibold text-[#475569] mb-1">Term 1 Teacher Comments:</p>
+                <p className="italic text-[#334155]">{term1Comments.join(' · ') || teacherRemark(result.yearlyPercentage)}</p>
+                <p className="mt-3 font-semibold text-[#475569] mb-1">Term 2 Teacher Comments:</p>
+                <p className="italic text-[#334155]">{term2Comments.join(' · ') || teacherRemark(result.yearlyPercentage)}</p>
               </div>
             )}
             {blocks.adminRemarks && (
