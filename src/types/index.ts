@@ -83,6 +83,7 @@ export interface SchoolSetupData {
   workingHours: { openingTime: string; classStartTime: string; closingTime: string; breakStartTime: string; breakEndTime: string; periodsPerDay: number };
   completedSteps: number[];
   subjectTemplates?: Record<'1-4' | '5-6' | '7-8', string[]>;
+  subjectTemplatePeriods?: Record<string, number>;
   updatedAt?: string;
 }
 

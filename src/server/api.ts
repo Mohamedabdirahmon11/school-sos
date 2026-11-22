@@ -39,7 +39,7 @@ import {
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
 import { hasActiveClassIdentityConflict, hasActiveFormTeacherConflict } from './class-setup-validation.ts';
-import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
+import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, PRIMARY_SUBJECT_TEMPLATE_PERIODS, getDefaultSubjectPeriods, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
@@ -3222,8 +3222,7 @@ async function findCurriculumDependency(schoolId: string, classId: string, subje
   const dependencies: Array<{ table: string; label: string }> = [
     { table: 'timetable_slots', label: 'jadwalka fasalka' },
     { table: 'assignments', label: 'layliyada/shaqooyinka' },
-    { table: 'exam_schedules', label: 'jadwalka imtixaannada' },
-    { table: 'student_marks', label: 'dhibcaha ardayda' }
+    { table: 'exam_schedules', label: 'jadwalka imtixaannada' }
   ];
   for (const dependency of dependencies) {
     const { count, error } = await client.from(dependency.table).select('id', { count: 'exact', head: true })
@@ -3233,6 +3232,95 @@ async function findCurriculumDependency(schoolId: string, classId: string, subje
   }
   return null;
 }
+async function syncPrimarySubjectTemplates(
+  school: School,
+  templates: PrimarySubjectTemplates,
+  periods: Record<string, number>,
+  bands: PrimarySubjectGradeBand[] = ['1-4', '5-6', '7-8']
+) {
+  const allClasses = (await db.getClasses(school.id)).filter(klass => !klass.isArchived);
+  const existingSubjects = await db.getSubjects(school.id);
+  const subjectByNameBefore = new Map(existingSubjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
+  const capacity = await getClassCurriculumCapacity(school.id);
+  const plans: Array<{ klass: SchoolClass; rows: any[]; removed: any[]; names: string[] }> = [];
+
+  for (const band of bands) {
+    const names = templates[band].map(normalizeSubjectName);
+    const classRows = allClasses.filter(klass => primarySubjectBandForGrade(Number(klass.gradeLevel || 0)) === band);
+    for (const klass of classRows) {
+      const rows = await readClassCurriculumRows(school.id, klass.id);
+      const rowBySubject = new Map(rows.map((row: any) => [String(row.subject_id), row]));
+      const total = names.reduce((sum, name) => sum + getDefaultSubjectPeriods(name, periods), 0);
+      if (total > capacity.weeklyCapacity) {
+        const error = new Error(`Grades ${band} template has ${total} weekly periods; the school limit is ${capacity.weeklyCapacity}. Reduce periods before saving.`) as Error & { status: number };
+        error.status = 422;
+        throw error;
+      }
+      const selectedIds = new Set(names.map(name => subjectByNameBefore.get(name.toLocaleLowerCase())?.id).filter(Boolean));
+      const removed = rows.filter((row: any) => row.is_active !== false && !selectedIds.has(String(row.subject_id)));
+      for (const row of removed) {
+        const dependency = await findCurriculumDependency(school.id, klass.id, String(row.subject_id));
+        if (dependency) {
+          const error = new Error(`Cannot remove a curriculum subject while it is linked to ${dependency}. Clear that dependency first.`) as Error & { status: number };
+          error.status = 409;
+          throw error;
+        }
+      }
+      plans.push({ klass, rows, removed, names });
+    }
+  }
+
+  let subjectsAdded = 0;
+  for (const band of bands) {
+    for (const name of templates[band].map(normalizeSubjectName)) {
+      if (!name || subjectNameExists(existingSubjects, name)) continue;
+      existingSubjects.push(db.createSubject({
+        schoolId: school.id, name, code: '',
+        description: 'Ethiopian primary curriculum template.',
+        creditUnits: 0, department: '', assignedTeacherIds: []
+      }));
+      subjectsAdded += 1;
+    }
+  }
+  if (subjectsAdded) await db.flush();
+  const subjects = await db.getSubjects(school.id);
+  const subjectByName = new Map(subjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
+  const client = classGroupsClient();
+  let subjectsRemoved = 0;
+
+  for (const plan of plans) {
+    const existingBySubject = new Map(plan.rows.map((row: any) => [String(row.subject_id), row]));
+    const payload = plan.names.map(name => {
+      const subject = subjectByName.get(name.toLocaleLowerCase());
+      if (!subject) throw new Error(`Subject ${name} could not be resolved in this school.`);
+      const previous: any = existingBySubject.get(subject.id);
+      return {
+        id: previous?.id || randomUUID(), school_id: school.id, class_id: plan.klass.id,
+        subject_id: subject.id, periods_per_week: getDefaultSubjectPeriods(name, periods),
+        teacher_id: previous?.teacher_id || null,
+        small_exam_enabled: previous?.small_exam_enabled ?? false,
+        big_exam_enabled: previous?.big_exam_enabled ?? false, is_active: true
+      };
+    });
+    if (payload.length) {
+      const { error } = await client.from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
+      if (error) throw error;
+    }
+    if (plan.removed.length) {
+      const removedIds = plan.removed.map((row: any) => String(row.subject_id));
+      const { error: assignmentError } = await client.from('teacher_class_subject_assignments')
+        .delete().eq('school_id', school.id).eq('class_id', plan.klass.id).in('subject_id', removedIds);
+      if (assignmentError) throw assignmentError;
+      const { error: deactivateError } = await client.from('class_subjects')
+        .update({ is_active: false, teacher_id: null })
+        .eq('school_id', school.id).eq('class_id', plan.klass.id).in('id', plan.removed.map((row: any) => row.id));
+      if (deactivateError) throw deactivateError;
+      subjectsRemoved += plan.removed.length;
+    }
+  }
+  return { updatedClasses: plans.length, subjectsAdded, subjectsRemoved, weeklyCapacity: capacity.weeklyCapacity };
+}
+
 function primarySubjectBandForGrade(gradeLevel: number): PrimarySubjectGradeBand | null {
   if (gradeLevel >= 1 && gradeLevel <= 4) return '1-4';
   if (gradeLevel >= 5 && gradeLevel <= 6) return '5-6';
@@ -3264,10 +3352,10 @@ async function applyPrimarySubjectTemplate(school: School, klass: SchoolClass) {
   const existingRows = await readClassCurriculumRows(school.id, klass.id);
   const existingSubjectIds = new Set(existingRows.map((row: any) => String(row.subject_id)));
   const capacity = await getClassCurriculumCapacity(school.id);
-  const periodsPerWeek = Math.max(1, Math.min(2, Math.floor(Math.max(names.length, capacity.weeklyCapacity) / Math.max(1, names.length))));
-  const selectedSubjects = names.map(name => subjectByName.get(name.trim().toLocaleLowerCase())).filter(Boolean) as Array<{ id: string }>;
+  const periods = school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS;
+  const selectedSubjects = names.map(name => subjectByName.get(name.trim().toLocaleLowerCase())).filter(Boolean) as Array<{ id: string; name: string }>;
   const payload = selectedSubjects.filter(subject => !existingSubjectIds.has(subject.id))
-    .map(subject => ({ id: randomUUID(), school_id: school.id, class_id: klass.id, subject_id: subject.id, periods_per_week: periodsPerWeek, teacher_id: null, small_exam_enabled: false, big_exam_enabled: false, is_active: true }));
+    .map(subject => ({ id: randomUUID(), school_id: school.id, class_id: klass.id, subject_id: subject.id, periods_per_week: getDefaultSubjectPeriods(subject.name, periods), teacher_id: null, small_exam_enabled: false, big_exam_enabled: false, is_active: true }));
   if (payload.length) {
     const { error } = await classGroupsClient().from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
     if (error) throw error;
@@ -3711,6 +3799,81 @@ apiRouter.get('/subjects/templates', requireAuth, requireSchoolContext, async (r
   res.json(getPrimarySubjectTemplates(school));
 });
 
+apiRouter.get('/subjects/template-periods', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view subject periods.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json(school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS);
+});
+
+apiRouter.put('/subjects/template-periods', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can edit subject periods.' }); return; }
+  const input = req.body?.periods;
+  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length > 100) {
+    res.status(422).json({ error: 'Subject periods must be a map of subject names to weekly period counts.' }); return;
+  }
+  const periods: Record<string, number> = {};
+  for (const [rawName, rawValue] of Object.entries(input)) {
+    const name = normalizeSubjectName(rawName), value = Number(rawValue);
+    if (!name || !Number.isInteger(value) || value < 1 || value > 10) {
+      res.status(422).json({ error: 'Each subject must have between 1 and 10 periods per week.' }); return;
+    }
+    periods[name] = value;
+  }
+  const templates = getPrimarySubjectTemplates(school);
+  try {
+    const sync = await syncPrimarySubjectTemplates(school, templates, periods);
+    const setupData = { ...(school.setupData || {}), subjectTemplatePeriods: periods } as NonNullable<School['setupData']>;
+    if (!db.updateSchool(school.id, { setupData })) { res.status(404).json({ error: 'School not found.' }); return; }
+    await db.flush();
+    res.json({ success: true, periods, ...sync });
+  } catch (error: any) {
+    res.status(Number(error?.status) || 503).json({ error: error?.message || 'Subject periods could not be saved.' });
+  }
+});
+
+apiRouter.put('/subjects/templates', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can edit subject templates.' }); return; }
+  const input = req.body?.templates;
+  const bands: PrimarySubjectGradeBand[] = ['1-4', '5-6', '7-8'];
+  if (!input || typeof input !== 'object' || bands.some(band => !Array.isArray(input[band]) || input[band].length > 30)) {
+    res.status(422).json({ error: 'Each grade band must contain a list of up to 30 subjects.' }); return;
+  }
+  const templates = {} as PrimarySubjectTemplates;
+  for (const band of bands) {
+    const names = (input[band] as unknown[]).map(normalizeSubjectName);
+    if (names.some(name => !name || name.length > 150) || new Set(names.map(name => name.toLocaleLowerCase())).size !== names.length) {
+      res.status(422).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return;
+    }
+    templates[band] = names;
+  }
+  const periodInput = req.body?.periods || school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS;
+  const periods: Record<string, number> = {};
+  if (!periodInput || typeof periodInput !== 'object' || Array.isArray(periodInput)) { res.status(422).json({ error: 'Invalid subject period map.' }); return; }
+  for (const [rawName, rawValue] of Object.entries(periodInput)) {
+    const name = normalizeSubjectName(rawName), value = Number(rawValue);
+    if (!name || !Number.isInteger(value) || value < 1 || value > 10) { res.status(422).json({ error: 'Each subject must have between 1 and 10 periods per week.' }); return; }
+    periods[name] = value;
+  }
+  try {
+    const sync = await syncPrimarySubjectTemplates(school, templates, periods);
+    const setupData = { ...(school.setupData || {}), subjectTemplates: templates, subjectTemplatePeriods: periods } as NonNullable<School['setupData']>;
+    if (!db.updateSchool(school.id, { setupData })) { res.status(404).json({ error: 'School not found.' }); return; }
+    await db.flush();
+    db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATES_SYNCED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Updated Ethiopia primary subjects and synchronized active class curricula.', severity: 'info' });
+    res.json({ success: true, templates, periods, ...sync });
+  } catch (error: any) {
+    res.status(Number(error?.status) || 503).json({ error: error?.message || 'Subject templates could not be synchronized.' });
+  }
+});
+
 apiRouter.put('/subjects/templates/:gradeBand', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
@@ -3722,12 +3885,17 @@ apiRouter.put('/subjects/templates/:gradeBand', requireAuth, requireSchoolContex
   const subjects: string[] = (req.body.subjects as unknown[]).map((value: unknown) => normalizeSubjectName(value));
   if (subjects.some(name => !name || name.length > 150) || new Set(subjects.map(name => name.toLocaleLowerCase())).size !== subjects.length) { res.status(400).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return; }
   const templates = { ...getPrimarySubjectTemplates(school), [band]: subjects } as PrimarySubjectTemplates;
-  const setupData = { ...(school.setupData || {}), subjectTemplates: templates } as NonNullable<School['setupData']>;
-  const updated = db.updateSchool(school.id, { setupData });
-  if (!updated) { res.status(404).json({ error: 'School not found.' }); return; }
-  await db.flush();
-  db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATE_UPDATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated primary subject template for grades ${band}.`, severity: 'info' });
-  res.json({ gradeBand: band, subjects, templates });
+  try {
+    const sync = await syncPrimarySubjectTemplates(school, templates, school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS, [band]);
+    const setupData = { ...(school.setupData || {}), subjectTemplates: templates } as NonNullable<School['setupData']>;
+    const updated = db.updateSchool(school.id, { setupData });
+    if (!updated) { res.status(404).json({ error: 'School not found.' }); return; }
+    await db.flush();
+    db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATE_UPDATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated and synchronized primary subject template for grades ${band}.`, severity: 'info' });
+    res.json({ gradeBand: band, subjects, templates, ...sync });
+  } catch (error: any) {
+    res.status(Number(error?.status) || 503).json({ error: error?.message || 'Subject template could not be synchronized.' });
+  }
 });
 apiRouter.post('/subjects/defaults', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
