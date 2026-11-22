@@ -1497,8 +1497,7 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   if (user.role !== 'school_admin' || !user.mustChangePassword) {
-    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });
-    return;
+    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });    return;
   }
   const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
   if (!/^\d{4,6}$/.test(newPin)) {
@@ -2997,8 +2996,7 @@ apiRouter.get('/school/reports/finance/export', requireAuth, requireSchoolContex
     const payments = (await queryAllRows('fee_payments', { school_id: school.id },
       'receipt_number,reference_number,student_id,academic_year,month,fee_type,amount_due,amount_paid,remaining_amount,payment_method,status,date,voided_at'))
       .filter((payment: any) => !payment.voidedAt);
-    const cell = (value: unknown) => {
-      const raw = String(value ?? '');
+    const cell = (value: unknown) => {      const raw = String(value ?? '');
       const safe = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
       return `"${safe.replace(/"/g, '""')}"`;
     };
@@ -4497,8 +4495,7 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
   if (settings.shiftCount === 1) {
     const shiftTwoClasses = await db.queryPage('classes', { school_id: school.id, shift: '2' }, 1, 1, undefined, 'id');
     if (shiftTwoClasses.total > 0) {
-      res.status(409).json({ error: 'Move all classes assigned to Shift 2 back to Shift 1 before disabling the second shift.' });
-      return;
+      res.status(409).json({ error: 'Move all classes assigned to Shift 2 back to Shift 1 before disabling the second shift.' });      return;
     }
   }
   if (settings.shiftCount === 2) {
@@ -5997,8 +5994,7 @@ apiRouter.put('/teachers/:id/subjects', requireAuth, requireSchoolContext, requi
   const teacher = (await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).items[0];
   if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
   const ids = [...new Set(subjectIds.map((id: string) => id.trim()))];
-  const valid = ids.length ? await queryAllRows('subjects', { school_id: school.id, id: ids }, 'id') : [];
-  if (valid.length !== ids.length) { res.status(400).json({ error: 'Maaddooyinka la doortay dhammaantood waa inay ka tirsan yihiin dugsigan.' }); return; }
+  const valid = ids.length ? await queryAllRows('subjects', { school_id: school.id, id: ids }, 'id') : [];  if (valid.length !== ids.length) { res.status(400).json({ error: 'Maaddooyinka la doortay dhammaantood waa inay ka tirsan yihiin dugsigan.' }); return; }
   await db.saveTeacherSubjects(school.id, teacherId, ids);
   res.json({ success: true, subjectIds: ids });
 });
@@ -7497,8 +7493,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
         !['draft', 'submitted'].includes(mark.status) ||
         (typeof mark.teacherRemarks === 'string' && mark.teacherRemarks.length > 1000)) {
       res.status(400).json({ error: 'Every mark row must include a student, numeric marks, a valid status, and remarks of at most 1,000 characters.' });
-      return;
-    }
+      return;    }
     if (seenStudentIds.has(mark.studentId)) {
       res.status(400).json({ error: 'Duplicate students are not allowed in one marks submission.' });
       return;
@@ -8997,8 +8992,7 @@ apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) =>
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const filters: Record<string, any> = { school_id: school.id, is_active: true };
-  if (!['school_admin', 'super_admin', 'accountant'].includes(user.role)) {
-    const audience = user.role === 'teacher' ? 'teachers' : user.role === 'parent' ? 'parents' : 'students';
+  if (!['school_admin', 'super_admin', 'accountant'].includes(user.role)) {    const audience = user.role === 'teacher' ? 'teachers' : user.role === 'parent' ? 'parents' : 'students';
     const classIds = await getNoticeClassIds(school.id, user);
     const terms = ['audience.eq.all', 'audience.eq.school', `audience.eq.${audience}`];
     if (classIds.length) terms.push(`and(audience.eq.class,class_id.in.(${[...new Set(classIds)].join(',')}))`);
@@ -9810,15 +9804,19 @@ async function getSchoolSetupState(school: School) {
     classes,
     subjects,
     teachers,
+    classSubjects,
+    allSubjects,
     students,
     guardianStudents,
     timetable,
     examConfigs,
     feeStructures
   ] = await Promise.all([
-    queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived'),
+    queryAllRows('classes', { school_id: school.id }, 'id,name,section,class_teacher_id,is_archived'),
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
     queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,staff_id,user_id'),
+    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,class_id,subject_id,teacher_id,periods_per_week'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,name'),
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
@@ -9830,8 +9828,37 @@ async function getSchoolSetupState(school: School) {
     ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
     : [];
   const accountsById = new Map<string, any>(teacherAccounts.map((account: any) => [String(account.id), account] as [string, any]));
+  const activeClasses = classes.filter((item: any) => item.isArchived !== true);
+  const teacherById = new Map<string, any>(teachers.map((teacher: any) => [String(teacher.id), teacher]));
+  const teacherByUserId = new Map<string, any>(teachers.filter((teacher: any) => teacher.userId).map((teacher: any) => [String(teacher.userId), teacher]));
+  const classById = new Map<string, any>(activeClasses.map((klass: any) => [String(klass.id), klass]));
+  const subjectById = new Map<string, any>(allSubjects.map((subject: any) => [String(subject.id), subject]));
+  const teacherAssignmentIssues: string[] = [];
+  if (!activeClasses.length) teacherAssignmentIssues.push('Marka hore ku dar Classes');
+  for (const klass of activeClasses) {
+    const formTeacher = klass.classTeacherId ? teacherByUserId.get(String(klass.classTeacherId)) : null;
+    if (!formTeacher) teacherAssignmentIssues.push(`${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}: Form Teacher la'aan`);
+  }
+  const periodsByTeacher = new Map<string, number>();
+  for (const assignment of classSubjects) {
+    const klass = classById.get(String(assignment.classId));
+    if (!klass) continue;
+    const subjectName = String(subjectById.get(String(assignment.subjectId))?.name || 'Maaddo');
+    const teacher = assignment.teacherId ? teacherById.get(String(assignment.teacherId)) : null;
+    const classLabel = `${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}`;
+    if (!teacher) teacherAssignmentIssues.push(`${classLabel}: ${subjectName} macallin la'aan`);
+    else periodsByTeacher.set(String(teacher.id), (periodsByTeacher.get(String(teacher.id)) || 0) + Number(assignment.periodsPerWeek || 0));
+  }
+  for (const [teacherId, periods] of periodsByTeacher) {
+    if (periods > 30) {
+      const teacher = teacherById.get(teacherId);
+      teacherAssignmentIssues.push(`${teacher?.fullName || 'Macallin'}: ${periods}/30 xiisadood toddobaadkii`);
+    }
+  }
   const checklist = buildSchoolSetupChecklist(school, {
-    classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
+    classNames: activeClasses.map((item: any) => String(item.name || '')),
+    teacherAssignmentReady: teacherAssignmentIssues.length === 0 && activeClasses.length > 0,
+    teacherAssignmentIssues,
     subjectCount: subjects.total,
     teachers: teachers.map((teacher: any) => {
       const account = accountsById.get(String(teacher.userId || '')) as any;
@@ -10497,7 +10524,6 @@ apiRouter.post('/documents/:id/restore', requireAuth, requireSchoolContext, requ
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama soo celin karin.' }); return; }
   res.json(documentClientRow(data,true));
 });
-
 apiRouter.post('/documents/:id/duplicate', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
@@ -11775,12 +11801,3 @@ apiRouter.get('/term-marks/report-cards/classes/:classId/pdf', requireAuth, requ
   if (error || !cards?.length) { res.status(404).json({ error: 'Report cards fasalkan lama helin.' }); return; }
   if (cards.some((card:any)=>card.is_stale)) { res.status(409).json({ error: 'Report Cards-ka fasalkan waa duugoobeen; dib u samee ka hor PDF.' }); return; }
   const students = await Promise.all(cards.map((card: any) => db.getStudentById(card.student_id,school.id)));
-  const klass = await db.getClassById(req.params.classId,school.id);
-  const pages = cards.flatMap((card: any,index: number) => students[index] ? [termReportCardPdfPage(school,card,students[index],`${klass?.name || ''} ${klass?.section || ''}`.trim())] : []);
-  if (!pages.length) { res.status(404).json({ error: 'Arday lama helin.' }); return; }
-  sendPdf(res,`term-report-cards-${klass?.name || 'class'}`,pages);
-});
-
-
-
-forwardAsyncErrors(apiRouter);
