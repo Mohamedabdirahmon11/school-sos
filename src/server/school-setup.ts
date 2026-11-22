@@ -140,7 +140,7 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     1: step(yearReady && datesReady, false, 'Set a valid academic year and complete start/end dates for both semesters.'),
     2: step(profileReady, false, 'Complete the school name, address, city, email, and an international administration WhatsApp number.'),
     3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
-    4: step(evidence.subjectCount > 0 && evidence.curriculumClassCoverageReady !== false, false, (evidence.curriculumClassCoverageIssues || []).join(' · ') || 'Add subjects to the active class curriculum; every class needs at least one subject.'),
+    4: step(evidence.subjectCount > 0 && evidence.curriculumClassCoverageReady !== false, false, evidence.subjectCount === 0 ? 'Add at least one school subject.' : (evidence.curriculumClassCoverageIssues || []).join(' · ') || 'Add subjects to the active class curriculum; every class needs at least one subject.'),
     5: step(teachersReady, false, 'Add at least one teacher; every teacher needs a school-specific ID and a linked teacher login with a password/PIN hash.'),
     0: step(Boolean(evidence.teacherAssignmentReady), false, (evidence.teacherAssignmentIssues || []).length ? 'Marka hore qoondee macallimiinta: ' + (evidence.teacherAssignmentIssues || []).join(' · ') : 'Qoondee Form Teacher fasal kasta iyo macallin maaddo kasta; culayska macallin kasta waa inuu ahaadaa 30 xiisadood ama ka yar toddobaadkii.'),
     6: step(evidence.studentCount > 0 && evidence.guardianContactCount > 0, false, 'Add students and at least one parent/guardian contact number.'),
