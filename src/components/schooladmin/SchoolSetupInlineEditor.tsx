@@ -128,7 +128,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
           ? <select required={field.required} value={form[field.name] || ''} onChange={event => setForm(value => ({ ...value, [field.name]: event.target.value }))} className="w-full rounded-lg border px-3 py-2 bg-transparent">
               <option value="">Dooro…</option>{selectOptions(field).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
-          : <input required={field.required} type={field.type || 'text'} min={field.type === 'number' ? 1 : undefined} value={form[field.name] || ''} onChange={event => setForm(value => ({ ...value, [field.name]: event.target.value }))} className="w-full rounded-lg border px-3 py-2 bg-transparent" />}
+          : <input required={field.required} type={field.type || 'text'} min={field.type === 'number' ? (field.name === 'gradeLevel' ? 0 : 1) : undefined} value={form[field.name] || ''} onChange={event => setForm(value => ({ ...value, [field.name]: event.target.value }))} className="w-full rounded-lg border px-3 py-2 bg-transparent" />}
       </label>)}
       <div className="sm:col-span-2"><button className="sw-btn" type="submit" disabled={saving || loading}>{saving ? 'Kaydinaya…' : 'Ku dar'}</button></div>
     </form>
