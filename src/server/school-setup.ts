@@ -3,7 +3,7 @@ import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
 import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
 
 // Step 0 is a new stable ID reserved for Teacher Assignment. Existing IDs 1–9 remain unchanged.
-export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 0, 6, 8] as const;
+export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 0, 6] as const;
 export const OPTIONAL_SCHOOL_SETUP_STEPS = [7, 9] as const;
 
 export interface TeacherAssignmentReadiness {
