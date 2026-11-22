@@ -46,7 +46,7 @@ import {
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
-  initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices';
+  initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices' | 'profile';
 }
 
 const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolClass[]] = [[], null, [], []];
@@ -1278,6 +1278,39 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       )}
 
       {/* TAB 4: CIRCULARS & NOTICES */}
+      {activeTab === 'profile' && (
+        <section className="space-y-4" aria-labelledby="teacher-profile-heading">
+          <div>
+            <h2 id="teacher-profile-heading" className="text-lg font-semibold">My Profile</h2>
+            <p className="mt-1 text-sm text-slate-500">Xogta macallinka iyo fasallada iyo maaddooyinka laguu qoondeeyay.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <article className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-semibold">Xogtaada</h3>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <dt className="text-slate-500">Magac</dt><dd className="text-right font-medium">{user?.fullName || '—'}</dd>
+                <dt className="text-slate-500">Teacher ID</dt><dd className="text-right font-medium">{(user as any)?.teacherCode || user?.staffId || '—'}</dd>
+                <dt className="text-slate-500">Dugsi</dt><dd className="text-right font-medium">{school?.name || '—'}</dd>
+                <dt className="text-slate-500">Form Teacher</dt><dd className="text-right font-medium">{formTeacherClasses.length ? formTeacherClasses.map(klass => `${klass.name}${klass.section ? ` · ${klass.section}` : ''}`).join(', ') : '—'}</dd>
+              </dl>
+            </article>
+            <article className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-semibold">Maaddooyinka laguu qoondeeyay</h3>
+              {teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).length ? (
+                <ul className="space-y-2 text-sm">
+                  {teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => (
+                    <li key={`${assignment.classId}:${assignment.subject.id}`} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 last:border-0">
+                      <span className="font-medium">{assignment.subject.name}</span>
+                      <span className="text-right text-xs text-slate-500">{assignment.class?.name || '—'}{assignment.class?.section ? ` · ${assignment.class.section}` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-sm text-slate-500" role="status">Weli ma jiro maaddo laguu qoondeeyay. Weydii maamulka dugsiga.</p>}
+            </article>
+          </div>
+        </section>
+      )}
+
       {activeTab === 'notices' && (
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-3">
