@@ -151,6 +151,7 @@ test('student and teacher messages are limited to current assignment classes',as
  assert.equal(history.status,200);assert.ok((await history.json() as any[]).some(row=>row.content==='Question for my teacher'));
  const newTeacherContacts=await request('/messages/contacts',cookies.otherTeacher);
  assert.ok((await newTeacherContacts.json() as any[]).some(row=>row.id===studentUser.id));
+ await memory.from('class_subjects').update({teacher_id:subjectTeacher.id,'teachers.user_id':subjectUser.id}).eq('id','sp-cs-math');await db.flush();
 });
 
 test('teacher attendance is visible in the student attendance endpoint and other student IDs are forbidden',async()=>{
