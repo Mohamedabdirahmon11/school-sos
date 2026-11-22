@@ -12125,6 +12125,12 @@ apiRouter.get('/term-marks/report-cards', requireAuth, requireSchoolContext, req
   if (user.role === 'parent' || user.role === 'student') {
     if (!studentId || !await canAccessStudentRecord(user, studentId)) { res.status(403).json({ error: 'Ma lihid oggolaansho aad u aragto report card-kan.' }); return; }
     query = query.eq('student_id', studentId).not('published_at','is',null).eq('is_stale',false);
+    if (user.role === 'student') {
+      const ownStudent = await db.getStudentById(studentId, school.id);
+      const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
+      if (!currentClassId) { res.json([]); return; }
+      query = query.eq('class_id', currentClassId);
+    }
   } else if (['school_admin','super_admin'].includes(user.role)) {
     if (classId) query = query.eq('class_id', classId);
     if (academicYearId) query = query.eq('academic_year_id', academicYearId);
@@ -12193,6 +12199,11 @@ apiRouter.get('/term-marks/report-cards/:studentId/pdf', requireAuth, requireSch
   const client = termMarksServiceClient(res); if (!client) return;
   let query = client.from('report_cards').select('*').eq('school_id',school.id).eq('student_id',student.id);
   if (user.role === 'parent' || user.role === 'student') query = query.not('published_at','is',null).eq('is_stale',false);
+  if (user.role === 'student') {
+    const currentClassId = await getStudentCurrentClassId(school.id, student.id, student.classId);
+    if (!currentClassId) { res.status(404).json({ error: 'Report card lama helin fasalka hadda.' }); return; }
+    query = query.eq('class_id', currentClassId);
+  }
   const { data: card, error } = await query.order('created_at',{ascending:false}).limit(1).maybeSingle();
   if (error || !card) { res.status(404).json({ error: 'Report Card lama helin ama wali lama daabicin.' }); return; }
   if (card.is_stale) { res.status(409).json({ error: 'Report Card-kan wuu duugoobay; dugsigu waa inuu dib u sameeyo.' }); return; }
