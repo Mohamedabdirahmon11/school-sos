@@ -34,7 +34,13 @@ export function apiErrorHandler(error: unknown, req: Request, res: Response, nex
     next(error);
     return;
   }
+  const requestId = String((req as any).requestId || 'unassigned');
   const message = error instanceof Error ? error.message : 'Unknown server error';
-  console.error(`[api-error] ${req.method} ${req.originalUrl || req.path}: ${message}`);
-  res.status(500).json({ error: 'An unexpected server error occurred. Please try again.' });
+  const schoolId = (req as any).user?.schoolId || (req as any).user?.school_id || (req as any).schoolId || 'unresolved';
+  console.error(`[api-error] request_id=${requestId} route=${req.method} ${req.originalUrl || req.path} status=500 school_id=${schoolId} error=${message}`);
+  res.status(500).json({
+    error: 'An unexpected server error occurred. Please try again.',
+    code: 'INTERNAL_SERVER_ERROR',
+    requestId
+  });
 }
