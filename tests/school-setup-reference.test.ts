@@ -24,8 +24,8 @@ test('School Setup UI exposes the nine reference steps in order and the responsi
   assert.ok(source.includes('START HERE'));
   assert.ok(source.includes('Wax ka maqan'));
   assert.ok(source.includes('prefers-color-scheme:dark'));
-  assert.match(source, /\{ id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8,/);
-  assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'attendance'\]/);
+  assert.ok(source.includes("id: 'finish'"));
+  assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'assign', 'students'\]/);
   assert.ok(source.includes('Dashboard-ka lama furi karo ilaa dhammaan toddobada tallaabo ee aasaasiga ah la xaqiijiyo.'));
 });
 
