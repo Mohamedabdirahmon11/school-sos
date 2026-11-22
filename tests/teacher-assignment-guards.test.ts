@@ -61,4 +61,34 @@ test('Teacher Assignment uses the shared Academic Setup header and theme stylesh
   assert.match(style, /schoolos-assignment-page/);
   assert.doesNotMatch(style, /\\\\n/);
 });
+test('Unassigned teachers receive HTTP 403 when submitting marks for a class subject', () => {
+  const route = api.slice(api.indexOf("apiRouter.post('/exams/marks'"), api.indexOf("apiRouter.post('/exams/forward-class'"));
+  assert.match(route, /class_subjects'[\s\S]*?teacher_id: teacherRecord\.id/);
+  assert.match(route, /if \(!assignment\.total\)[\s\S]*?res\.status\(403\)/);
+});
+
+test('Only the Form Teacher can submit class attendance; other teachers receive HTTP 403', () => {
+  const start = api.indexOf("apiRouter.post('/attendance'");
+  const end = api.indexOf("\napiRouter.", start + 1);
+  const route = api.slice(start, end);
+  assert.match(route, /attendanceClass\.classTeacherId !== user\.id/);
+  assert.match(route, /res\.status\(403\)/);
+});
+
+test('Teacher assignment reads and writes are explicitly isolated by school_id', () => {
+  const fn = api.slice(api.indexOf('async function checkTeacherAssignment'), api.indexOf('async function upsertTeacherAssignment'));
+  assert.match(fn, /academic_years'[\s\S]*?\.eq\('school_id', school\.id\)/);
+  assert.match(fn, /classes'[\s\S]*?\.eq\('school_id', school\.id\)/);
+  assert.match(fn, /subjects'[\s\S]*?\.eq\('school_id', school\.id\)/);
+  assert.match(fn, /teachers'[\s\S]*?\.eq\('school_id', school\.id\)/);
+  assert.match(fn, /teacher_class_subject_assignments'[\s\S]*?\.eq\('school_id', school\.id\)/);
+  assert.match(fn, /class_subjects'[\s\S]*?\.eq\('school_id', school\.id\)/);
+});
+
+test('Removing a subject from a curriculum detaches assignments without deleting historical marks', () => {
+  const sync = api.slice(api.indexOf('async function syncPrimarySubjectTemplates'), api.indexOf('function primarySubjectBandForGrade'));
+  assert.match(sync, /teacher_class_subject_assignments'[\s\S]*?\.delete\(\)/);
+  assert.match(sync, /class_subjects'[\s\S]*?\.update\(\{ is_active: false, teacher_id: null \}\)/);
+  assert.doesNotMatch(sync, /student_marks'[\s\S]*?\.delete\(\)/);
+});
 
