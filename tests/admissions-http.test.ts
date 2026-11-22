@@ -404,7 +404,7 @@ test('student profile updates validate phones and keep parent/student login link
   assert.ok(newFather?.pin && verifyPin(first.initialPin, newFather.pin));
 });
 
-test('concurrent attendance submissions converge on one daily row without automatic parent SMS', async () => {
+test('teacher attendance is blocked until all school assignments are ready without automatic parent SMS', async () => {
   const created = await fetch(`${baseUrl}/students`, {
     method: 'POST', headers,
     body: JSON.stringify({
@@ -456,38 +456,22 @@ test('concurrent attendance submissions converge on one daily row without automa
   assert.ok(assignedClassRow, 'class fixture must exist in the database adapter');
   assignedClassRow.class_teacher_id = teacherUser.id;
   assignedClassRow.classTeacherId = teacherUser.id;
-  // This endpoint now requires school-wide setup readiness. Complete the fixture's
-  // active classes and curriculum assignments so the test can focus on attendance writes.
-  const schoolClasses = await storage.db.getClasses(school.id);
-  const schoolClassIds = new Set(schoolClasses.map(item => item.id));
-  for (const activeClass of schoolClasses) {
-    await storage.db.updateClass(activeClass.id, { classTeacherId: teacherUser.id }, school.id);
-  }
-  for (const row of memory.rows('classes').filter(row => schoolClassIds.has(row.id))) {
-    row.class_teacher_id = teacherUser.id;
-    row.classTeacherId = teacherUser.id;
-  }
-  for (const row of memory.rows('class_subjects').filter(row => schoolClassIds.has(row.class_id || row.classId))) {
-    row.teacher_id = 'attendance-teacher-profile';
-    row.teacherId = 'attendance-teacher-profile';
-    row.periods_per_week = 1;
-    row.periodsPerWeek = 1;
-  }
   const invalidNote = await fetch(`${baseUrl}/attendance`, {
     method: 'POST', headers: teacherHeaders,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
   });
   assert.equal(invalidNote.status, 400);
   const [first, retry] = await Promise.all([submit(), submit()]);
-  assert.equal(first.status, 200, await first.clone().text());
-  assert.equal(retry.status, 200, await retry.clone().text());
+  assert.equal(first.status, 423, await first.clone().text());
+  assert.equal(retry.status, 423, await retry.clone().text());
+  const firstBody = await first.json();
+  assert.equal(firstBody.code, 'TEACHER_ASSIGNMENT_REQUIRED');
 
   const rows = memory.rows('attendance_records').filter(row =>
     row.school_id === school.id && row.class_id === klass.id &&
     row.student_id === student.id && row.date === date
   );
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].status, 'absent');
+  assert.equal(rows.length, 0);
 
   const examHistory = {
     id: 'attendance-class-exam-history', school_id: school.id, class_id: klass.id,
