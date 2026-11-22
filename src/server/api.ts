@@ -2935,7 +2935,7 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
   res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: visibleTimetable, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } });
 });
 
-apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
   if (!['school_admin', 'accountant', 'super_admin', 'teacher'].includes(role || '')) {
@@ -3721,14 +3721,14 @@ apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) =
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
 });
 
-apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
   const classes = await db.getClasses(school.id);
   res.json(classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived));
 });
-apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
@@ -3782,7 +3782,7 @@ apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, a
   }
 });
 
-apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
@@ -3846,7 +3846,7 @@ apiRouter.get('/teacher/subject-assignments', requireAuth, requireSchoolContext,
   res.json(result);
 });
 
-apiRouter.get('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const classId = typeof req.query.classId === 'string' ? req.query.classId : '';
@@ -3864,7 +3864,7 @@ apiRouter.get('/teacher/form-teacher-comments', requireAuth, requireSchoolContex
   res.json((data || []).map((row: any) => ({ id: row.id, studentId: row.student_id, semester: row.semester, comment: row.comment, teacherUserId: row.teacher_user_id, updatedAt: row.updated_at })));
 });
 
-apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const { classId, studentId, semester } = req.body || {};
