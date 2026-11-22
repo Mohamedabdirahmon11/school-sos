@@ -119,3 +119,21 @@ test('bulk document generation resolves up to 100 student identifiers with two s
   assert.match(route, /db\.getStudentsByIdentifiers\(identifiers, school\.id\)/);
   assert.doesNotMatch(route, /for \(const rawId of body\.studentIds\)[\s\S]*?await db\.getStudentById/);
 });
+
+
+test('bulk document generation batches class, marks, and form-teacher lookups for selected students', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const classMethod = storage.slice(storage.indexOf('public async getClassesByIds('), storage.indexOf('public async getClassById(', storage.indexOf('public async getClassesByIds(')));
+  assert.match(classMethod, /id: uniqueIds, school_id: schoolId/);
+  const marksMethod = storage.slice(storage.indexOf('public async getMarksForStudents('), storage.indexOf('public async getMarks(', storage.indexOf('public async getMarksForStudents(')));
+  assert.match(marksMethod, /student_id: uniqueStudentIds, class_id: uniqueClassIds/);
+  const routeStart = api.indexOf("apiRouter.post('/documents/generate'");
+  const routeEnd = api.indexOf("apiRouter.", routeStart + 30);
+  const route = api.slice(routeStart, routeEnd < 0 ? api.length : routeEnd);
+  assert.match(route, /db\.getClassesByIds\(requestedClassIds,school\.id\)/);
+  assert.match(route, /db\.getMarksForStudents\(school\.id,studentIds,classRows\.map/);
+  assert.match(route, /id:teacherIds/);
+  assert.doesNotMatch(route, /for \(const klass of classesById\.values\(\)\)[\s\S]*?await db\.getMarks/);
+  assert.doesNotMatch(route, /for \(const klass of classesById\.values\(\)\)[\s\S]*?db\.queryPage<any>\('teachers'/);
+});
