@@ -1999,7 +1999,7 @@ class StorageEngine {
       p_form_teacher_class_id: payload.formTeacherClassId
     });
     this.recordQuery('rpc:schoolos_create_teacher', 'call', startedAt);
-    if (error) throw new Error(error.message || 'Teacher creation transaction failed.');
+    if (error) { const failure = new Error(error.message || 'Teacher creation transaction failed.') as Error & { code?: string }; failure.code = error.code; throw failure; }
     this.invalidateAuthContextsForSchool(payload.schoolId);
   }
 
