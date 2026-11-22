@@ -2148,6 +2148,12 @@ class StorageEngine {
     return this.queryRows<SchoolClass>('classes', { school_id: schoolId, branch_id: branchId });
   }
 
+  public async getClassesByIds(ids: string[], schoolId: string): Promise<SchoolClass[]> {
+    const uniqueIds = [...new Set(ids.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueIds.length) return [];
+    return this.queryRows<SchoolClass>('classes', { id: uniqueIds, school_id: schoolId });
+  }
+
   public async getClassById(id: string, schoolId?: string): Promise<SchoolClass | null> {
     return (await this.queryRows<SchoolClass>('classes', { id, school_id: schoolId }))[0] || null;
   }
@@ -2805,6 +2811,15 @@ class StorageEngine {
         className: student ? (classNames.get(student.classId) || student.classId || '—') + (student.section ? ' · ' + student.section : '') : '—'
       };
     }).sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
+  }
+
+  public async getMarksForStudents(schoolId: string, studentIds: string[], classIds: string[], semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
+    const uniqueStudentIds = [...new Set(studentIds.filter(id => typeof id === 'string' && id.length > 0))];
+    const uniqueClassIds = [...new Set(classIds.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueStudentIds.length || !uniqueClassIds.length) return [];
+    return this.queryRows<StudentMark>('student_marks', {
+      school_id: schoolId, student_id: uniqueStudentIds, class_id: uniqueClassIds, semester
+    });
   }
 
   public async getMarks(schoolId: string, classId: string, subjectId?: string, semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
