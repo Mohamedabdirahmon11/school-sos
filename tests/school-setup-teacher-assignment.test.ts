@@ -99,12 +99,20 @@ test('completion is rejected while Teacher Assignment is not ready', () => {
   ), /Teacher assignments missing/);
 });
 
-test('Timetable and teacher attendance/marks are gated after the existing authorization checks', () => {
+test('Timetable and marks remain readiness-gated while Form Teacher attendance is class-scoped', () => {
   const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   assert.match(api, /apiRouter\.get\('\/timetable', requireAuth, requireSchoolContext, requireTeacherAssignmentsReady,/);
   assert.match(api, /apiRouter\.post\('\/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady,/);
-  assert.match(api, /apiRouter\.post\('\/attendance', requireAuth, requireSchoolContext, requireSchoolStaff,/);
-  assert.match(api, /if \(user\.role === 'teacher' && !await ensureTeacherAssignmentReadyForTeacher\(school, res\)\) return;/);
+  assert.match(api, /apiRouter\.get\('\/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, requireSchoolSetupReady,/);
+  assert.match(api, /apiRouter\.get\('\/attendance\/month', requireAuth, requireSchoolContext, requireSchoolStaff, requireSchoolSetupReady,/);
+  assert.match(api, /apiRouter\.post\('\/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, requireSchoolSetupReady,/);
+  const attendanceRead = api.slice(api.indexOf("apiRouter.get('/attendance'"), api.indexOf("apiRouter.get('/attendance/month'"));
+  const attendanceMonth = api.slice(api.indexOf("apiRouter.get('/attendance/month'"), api.indexOf("apiRouter.get('/attendance/school/absences'"));
+  const attendanceWrite = api.slice(api.indexOf("apiRouter.post('/attendance'"), api.indexOf("apiRouter.put('/attendance'"));
+  assert.match(attendanceRead, /canAccessFormTeacherClass/);
+  assert.match(attendanceMonth, /canAccessFormTeacherClass/);
+  assert.match(attendanceWrite, /attendanceClass\.classTeacherId !== user\.id/);
+  assert.doesNotMatch(attendanceRead + attendanceMonth + attendanceWrite, /ensureTeacherAssignmentReadyForTeacher/);
   assert.match(api, /apiRouter\.post\('\/exams\/marks', requireAuth, requireSchoolContext, requireSchoolStaff,/);
   assert.match(api, /apiRouter\.post\('\/term-marks\/entry', requireAuth, requireSchoolContext, requireSchoolStaff,/);
   assert.match(api, /if \(!await ensureTeacherAssignmentReadyForTeacher\(school, res\)\) return;/);
