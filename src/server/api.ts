@@ -9868,9 +9868,12 @@ async function getSchoolSetupState(school: School) {
   });
   let progress = normalizeSchoolSetupProgress(school.setupProgress);
   if (progress.completedAt && !progress.completedSteps.includes(0)) {
-    progress = assignmentReadiness.ready
-      ? { ...progress, completedSteps: [...progress.completedSteps, 0].sort((a, b) => a - b) }
-      : { ...progress, currentStep: 0, completedSteps: progress.completedSteps.filter(step => step !== 10), completedAt: null };
+    progress = {
+      ...progress,
+      currentStep: assignmentReadiness.ready ? 10 : 0,
+      completedSteps: [...progress.completedSteps.filter(step => step !== 10), ...(assignmentReadiness.ready ? [0] : [])].sort((a, b) => a - b),
+      completedAt: null
+    };
   }
   return { progress, checklist, canFinish: canFinishSchoolSetup(progress, checklist) };
 }
