@@ -38,6 +38,7 @@ import {
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
+import { hasActiveClassIdentityConflict, hasActiveFormTeacherConflict } from './class-setup-validation.ts';
 import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
@@ -3039,6 +3040,9 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const gradeMismatch = classGradeMismatchError(name, gradeLevel);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   const existingClasses = await db.getClasses(school.id);
+  if (hasActiveClassIdentityConflict(existingClasses, { academicYear, gradeLevel, section })) {
+    res.status(409).json({ error: `Grade ${gradeLevel} · Section ${section || '—'} already exists for academic year ${academicYear}.` }); return;
+  }
   if (existingClasses.some(item => String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
     res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return;
   }
@@ -3046,6 +3050,9 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   if (req.body?.classTeacherId) {
     const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
     if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
+    if (hasActiveFormTeacherConflict(existingClasses, String(req.body.classTeacherId))) {
+      res.status(409).json({ error: 'This Form Teacher is already responsible for another active class.' }); return;
+    }
   }
   const newClass = db.createClass({
     schoolId: school.id, branchId: req.body?.branchId || undefined, name, classCode, academicYear, gradeLevel, section,
@@ -3076,6 +3083,13 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     res.status(400).json({ error: 'Class code and a valid consecutive academic year are required.' }); return;
   }
   const allClasses = await db.getClasses(school.id);
+  if (hasActiveClassIdentityConflict(allClasses, {
+    academicYear,
+    gradeLevel: Number(req.body?.gradeLevel ?? existing.gradeLevel),
+    section: String(req.body?.section ?? existing.section ?? '')
+  }, existing.id)) {
+    res.status(409).json({ error: 'Another active class already uses this school/year/grade/section.' }); return;
+  }
   if (allClasses.some(item => item.id !== existing.id && String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
     res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return;
   }
@@ -3109,6 +3123,9 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     if (req.body.classTeacherId) {
       const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
       if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
+      if (hasActiveFormTeacherConflict(allClasses, String(req.body.classTeacherId), existing.id)) {
+        res.status(409).json({ error: 'This Form Teacher is already responsible for another active class.' }); return;
+      }
     }
     updates.classTeacherId = req.body.classTeacherId || null;
   }
@@ -3150,6 +3167,10 @@ apiRouter.delete('/classes/:id', requireAuth, requireSchoolContext, async (req, 
   if (!klass) { res.status(404).json({ error: 'Class was not found.' }); return; }
   const students = await db.queryPage('students', { school_id: school.id, class_id: klass.id }, 1, 1, undefined, 'id');
   if (students.total) { res.status(409).json({ error: 'Class has students. Move the students before archiving it.' }); return; }
+  const dependency = await findClassDependency(classGroupsClient(), school.id, klass.id);
+  if (dependency) {
+    res.status(409).json({ error: `Class has linked ${dependency}. Move or safely detach those records before archiving it.` }); return;
+  }
   const archived = await db.updateClass(klass.id, { isArchived: true }, school.id);
   db.logAudit({ action: 'CLASS_ARCHIVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Archived empty class ${klass.name} (${klass.id}).`, severity: 'warning' });
   res.json({ success: Boolean(archived), class: archived });
