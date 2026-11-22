@@ -104,7 +104,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // also covers a teacher who keeps the portal open while the admin is working.
   useEffect(() => {
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') initialData.retry();
+      if (document.visibilityState === 'visible') {
+        initialData.retry();
+        timetableState.retry();
+      }
     };
     window.addEventListener('focus', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
@@ -114,7 +117,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.clearInterval(refreshInterval);
     };
-  }, [initialData.retry]);
+  }, [initialData.retry, timetableState.retry]);
   const [assignmentsData, examConfigData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
   // Notices are independent from core teacher data: a notices API outage must
   // not prevent teachers from opening lessons, attendance, marks or homework.
