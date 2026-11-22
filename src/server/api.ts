@@ -86,6 +86,31 @@ const LIST_CACHE_TABLE_KEYS: Record<string, string> = {
   teachers: 'teachers'
 };
 const LIST_CACHE_TTL_MS = 60_000;
+
+// The current academic year is read by student rosters and teacher-facing
+// class views. Cache only its ID briefly to avoid repeating the same lookup
+// across rapid page requests; year changes invalidate this entry immediately.
+const CURRENT_ACADEMIC_YEAR_CACHE_TTL_MS = 15_000;
+const currentAcademicYearCache = new Map<string, { promise: Promise<string>; expiresAt: number }>();
+
+async function getCurrentAcademicYearId(schoolId: string): Promise<string> {
+  const cached = currentAcademicYearCache.get(schoolId);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+
+  let promise: Promise<string>;
+  promise = db.queryPage('academic_years', { school_id: schoolId, is_current: 'true' }, 1, 1, undefined, 'id')
+    .then(page => String((page.items[0] as any)?.id || ''))
+    .catch(error => {
+      if (currentAcademicYearCache.get(schoolId)?.promise === promise) currentAcademicYearCache.delete(schoolId);
+      throw error;
+    });
+  currentAcademicYearCache.set(schoolId, { promise, expiresAt: Date.now() + CURRENT_ACADEMIC_YEAR_CACHE_TTL_MS });
+  return promise;
+}
+
+function invalidateCurrentAcademicYearCache(schoolId: string): void {
+  currentAcademicYearCache.delete(schoolId);
+}
 const serverListCache = new Map<string, {
   table: string;
   body: any[];
@@ -380,8 +405,7 @@ async function getTeacherFormTeacherClassIds(schoolId: string, userId: string): 
 }
 
 async function getStudentCurrentClassId(schoolId: string, studentId: string, fallbackClassId = ''): Promise<string> {
-  const year = await db.queryPage('academic_years', { school_id: schoolId, is_current: 'true' }, 1, 1, undefined, 'id');
-  const academicYearId = String((year.items[0] as any)?.id || '');
+  const academicYearId = await getCurrentAcademicYearId(schoolId);
   if (!academicYearId) return fallbackClassId;
   const enrollment = await db.queryPage('enrollments', { school_id: schoolId, academic_year_id: academicYearId, student_id: studentId, status: 'active' }, 1, 1, undefined, 'class_id');
   return String((enrollment.items[0] as any)?.classId || '');
@@ -5127,8 +5151,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
     : '';
 
-  const currentYearPage = await db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id');
-  const currentYearId = String((currentYearPage.items[0] as any)?.id || '');
+  const currentYearId = await getCurrentAcademicYearId(school.id);
   const currentEnrollments = currentYearId
     ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active' }, 'student_id,class_id,section_id')
     : [];
@@ -5301,8 +5324,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   // When a class or teacher scope is known, constrain enrollment reads at the database
   // instead of loading every active enrollment in the school for a single-class roster.
   const enrollmentClassScope = classId ? [classId] : user.role === 'teacher' ? teacherAssignedClassIds : undefined;
-  const currentYearPage = await db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id');
-  const currentYearId = String((currentYearPage.items[0] as any)?.id || '');
+  const currentYearId = await getCurrentAcademicYearId(school.id);
   const currentEnrollments = currentYearId
     ? await queryAllRows('enrollments', {
       school_id: school.id,
@@ -10098,6 +10120,7 @@ async function syncWizardAcademicRecords(client: any, schoolId: string, setupDat
     year = data;
   }
 
+  invalidateCurrentAcademicYearCache(schoolId);
   const configuredTerms = Array.isArray(setupData?.terms) ? setupData.terms : [];
   if (!configuredTerms.length) return;
   const { data: termRows, error: termReadError } = await client.from('terms')
