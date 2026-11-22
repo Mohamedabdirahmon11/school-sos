@@ -50,16 +50,19 @@ export const OPTIONAL_SCHOOL_SUBJECTS = [
   'Islamic Studies/Quraan'
 ] as const;
 
-/** Generic starter list used by the legacy "add default subjects" action. */
+/**
+ * Legacy generic defaults are retained unchanged for the existing manual
+ * "add default subjects" action. Grade-specific class creation uses the
+ * Ethiopia templates above instead.
+ */
 export const DEFAULT_SUBJECT_NAMES = [
-  'Af-Hooyo (Af-Soomaali)',
-  'English',
-  'Mathematics',
-  'Amharic',
-  'Environmental Science',
-  'Civics and Ethical Education',
-  'Arts',
-  'Physical Education'
+  'Soomaali',
+  'Carabi',
+  'Ingiriis',
+  'Xisaab',
+  'Science',
+  'Tarbiyada Islaamka',
+  'Bulsho'
 ] as const;
 
 export function primarySubjectBandForGrade(gradeLevel: number): PrimarySubjectGradeBand | null {
