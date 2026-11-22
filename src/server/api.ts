@@ -6246,38 +6246,34 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   if (validSubjects.length !== assignedSubjects.length) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
 
-  const account = db.createUser({
-    schoolId: school.id, role: 'teacher', staffId, fullName, phone,
-    passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin),
-    mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0,
-    assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects
-  });
-  const teacher = db.createTeacher({
-    schoolId: school.id,
-    branchId,
-    userId: account.id,
-    staffId,
-    fullName,
-    email: '',
-    phone,
-    address,
-    gender,
-    qualification: qualification.trim(),
-    department: department.trim(),
-    assignedClasses,
-    assignedSubjects,
-    status: 'active',
-    joinedDate,
-    monthlySalary
-  });
-  if (assignedSubjects.length) {
-    try { await db.saveTeacherSubjects(school.id, teacher.id, assignedSubjects); }
-    catch (error: any) { res.status(400).json({ error: error?.message || 'Maaddooyinka macallinka lama kaydin.' }); return; }
+  const userId = `usr-${randomUUID()}`;
+  const teacherId = `tch-${randomUUID()}`;
+  const userRow = {
+    id: userId, school_id: school.id, role: 'teacher', full_name: fullName, phone, staff_id: staffId,
+    password_hash: hashPassword(randomBytes(32).toString('base64url')), pin_hash: hashPin(initialPin),
+    must_change_password: false, is_blocked: false, failed_login_attempts: 0,
+    assigned_class_ids: assignedClasses, assigned_subject_ids: assignedSubjects
+  };
+  const teacherRow = {
+    id: teacherId, school_id: school.id, branch_id: branchId || null, user_id: userId, staff_id: staffId,
+    full_name: fullName, email: '', phone, address, gender, qualification: qualification.trim(),
+    department: department.trim(), assigned_classes: assignedClasses, assigned_subjects: assignedSubjects,
+    status: 'active', joined_date: joinedDate, monthly_salary: monthlySalary
+  };
+  try {
+    await db.createTeacherAtomically({
+      schoolId: school.id, user: userRow, teacher: teacherRow,
+      subjectIds: assignedSubjects, formTeacherClassId: formTeacherClassId || null
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Macallinka iyo xogtiisa lama wada kaydin karin.' });
+    return;
   }
-  if (formTeacherClassId) {
-    await db.getClasses(school.id);
-    await db.updateClass(formTeacherClassId, { classTeacherId: account.id }, school.id);
-  }
+  const teacher = {
+    id: teacherId, schoolId: school.id, branchId, userId, staffId, fullName, email: '', phone, address, gender,
+    qualification: qualification.trim(), department: department.trim(), assignedClasses, assignedSubjects,
+    status: 'active', joinedDate, monthlySalary
+  };
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
   await db.flush();
   res.status(201).json({ ...teacher, initialPin });
