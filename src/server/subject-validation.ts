@@ -63,10 +63,13 @@ export const OPTIONAL_SCHOOL_SUBJECTS = [
  * Ethiopia templates above instead.
  */
 export const DEFAULT_SUBJECT_NAMES = [
-  'Af-Hooyo (Af-Soomaali)', 'English', 'Xisaab', 'Environmental Science',
-  'Arts', 'Physical Education', 'Amharic', 'Moral Education',
-  'Civics & Ethical Education', 'Biology', 'Chemistry', 'Physics',
-  'Cilmi Bulsho', 'ICT'
+  'Soomaali',
+  'Carabi',
+  'Ingiriis',
+  'Xisaab',
+  'Science',
+  'Tarbiyada Islaamka',
+  'Bulsho'
 ] as const;
 
 export function primarySubjectBandForGrade(gradeLevel: number): PrimarySubjectGradeBand | null {

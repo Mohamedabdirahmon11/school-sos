@@ -30,17 +30,16 @@ test('legacy generic defaults remain backward compatible', () => {
 test('Ethiopian primary templates use the specified grade-band subjects', () => {
   assert.deepEqual(Object.keys(PRIMARY_SUBJECT_TEMPLATE_DEFAULTS), ['1-4', '5-6', '7-8']);
   assert.deepEqual(PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['1-4'], [
-    'Af-Hooyo (Af-Soomaali)', 'English', 'Mathematics', 'Environmental Science',
-    'Arts & Physical Education', 'Amharic', 'Moral Education'
+    'Af-Hooyo (Af-Soomaali)', 'English', 'Xisaab', 'Environmental Science',
+    'Arts', 'Physical Education', 'Amharic', 'Moral Education'
   ]);
   assert.deepEqual(PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['5-6'], [
-    'Af-Hooyo (Af-Soomaali)', 'English', 'Amharic', 'Mathematics',
-    'Environmental Science (Science + Social)', 'Civics and Ethical Education',
-    'Arts', 'Physical Education'
+    'Af-Hooyo (Af-Soomaali)', 'English', 'Xisaab', 'Environmental Science',
+    'Arts', 'Physical Education', 'Amharic', 'Civics & Ethical Education'
   ]);
   assert.deepEqual(PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['7-8'], [
-    'Af-Hooyo (Af-Soomaali)', 'English', 'Amharic', 'Mathematics', 'Biology',
-    'Chemistry', 'Physics', 'Social Studies (History + Geography)',
-    'Civics and Ethical Education', 'Arts', 'Physical Education', 'ICT'
+    'Af-Hooyo (Af-Soomaali)', 'English', 'Xisaab', 'Arts', 'Physical Education',
+    'Amharic', 'Civics & Ethical Education', 'Biology', 'Chemistry', 'Physics',
+    'Cilmi Bulsho', 'ICT'
   ]);
 });
