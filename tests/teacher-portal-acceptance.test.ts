@@ -140,6 +140,7 @@ test('15.8 parents cannot see submitted marks until the admin publishes them', a
   assert.equal((await hidden.json() as any[]).some(row => row.id === saved.id), false);
   await db.forwardClassMarks(school.id, klass.id, 'Semester 1', formTeacherUser.id, formTeacherUser.fullName);
   await db.approveMarks(school.id, [saved.id], schoolAdmin.id, schoolAdmin.fullName, schoolAdmin.role);
+  await db.flush();
   await db.publishClassSemesterResults(school.id, klass.id, 'Semester 1', schoolAdmin.id, schoolAdmin.fullName, schoolAdmin.role);
   await db.flush();
   const published = await request(`/exams/marks?studentId=${encodeURIComponent(student.id)}`, cookies.parent);
