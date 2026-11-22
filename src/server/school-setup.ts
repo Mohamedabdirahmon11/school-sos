@@ -18,12 +18,12 @@ export function evaluateTeacherAssignmentReadiness(
   curriculum: Array<{ schoolId?: string; classId: string; subjectId: string; teacherId?: string | null; periodsPerWeek?: number; isActive?: boolean }>,
   subjects: Array<{ id: string; schoolId?: string; name?: string }>
 ): TeacherAssignmentReadiness {
-  const activeClasses = classes.filter(row => row.schoolId === schoolId && row.isArchived !== true);
-  const activeTeachers = teachers.filter(row => row.schoolId === schoolId && String(row.status || 'active').toLowerCase() === 'active');
+  const activeClasses = classes.filter(row => (!row.schoolId || row.schoolId === schoolId) && row.isArchived !== true);
+  const activeTeachers = teachers.filter(row => (!row.schoolId || row.schoolId === schoolId) && String(row.status || 'active').toLowerCase() === 'active');
   const teacherById = new Map(activeTeachers.map(row => [String(row.id), row]));
   const teacherByUserId = new Map(activeTeachers.filter(row => row.userId).map(row => [String(row.userId), row]));
   const classById = new Map(activeClasses.map(row => [String(row.id), row]));
-  const subjectById = new Map(subjects.filter(row => row.schoolId === schoolId).map(row => [String(row.id), row]));
+  const subjectById = new Map(subjects.filter(row => !row.schoolId || row.schoolId === schoolId).map(row => [String(row.id), row]));
   const issues: string[] = [];
   if (!activeClasses.length) issues.push('Marka hore ku dar Classes');
   for (const klass of activeClasses) {
@@ -32,7 +32,7 @@ export function evaluateTeacherAssignmentReadiness(
   }
   const periodsByTeacher = new Map<string, number>();
   for (const row of curriculum) {
-    if (row.schoolId !== schoolId || row.isActive === false) continue;
+    if ((row.schoolId && row.schoolId !== schoolId) || row.isActive === false) continue;
     const klass = classById.get(String(row.classId));
     if (!klass) continue;
     const subjectName = String(subjectById.get(String(row.subjectId))?.name || 'Maaddo');
