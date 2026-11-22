@@ -130,16 +130,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     `${a.firstName} ${a.middleName || ''} ${a.lastName}`.localeCompare(`${b.firstName} ${b.middleName || ''} ${b.lastName}`) ||
     (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true })
   );
-  const [assignedClassStudentCounts, setAssignedClassStudentCounts] = useState<Record<string, number>>({});
   const [assignedClassStudentTotal, setAssignedClassStudentTotal] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    if (activeTab !== 'dashboard' || !classes.length) { setAssignedClassStudentCounts({}); setAssignedClassStudentTotal(0); return; }
-    Promise.all(classes.map(async klass => ({ id: klass.id, count: (await ApiClient.getAllStudents(klass.id)).length })))
-      .then(rows => { if (!cancelled) { setAssignedClassStudentCounts(Object.fromEntries(rows.map(row => [row.id, row.count]))); setAssignedClassStudentTotal(rows.reduce((sum, row) => sum + row.count, 0)); } })
-      .catch(() => { if (!cancelled) { setAssignedClassStudentCounts({}); setAssignedClassStudentTotal(0); } });
+    if (activeTab !== 'dashboard' || !classes.length) { setAssignedClassStudentTotal(0); return; }
+    // The teacher dashboard endpoint returns SQL-side, school-scoped aggregates.
+    // Do not download every student row merely to calculate dashboard counts.
+    ApiClient.getSchoolDashboard()
+      .then(summary => { if (!cancelled) setAssignedClassStudentTotal(Number(summary?.stats?.totalStudents || 0)); })
+      .catch(() => { if (!cancelled) setAssignedClassStudentTotal(0); });
     return () => { cancelled = true; };
-  }, [activeTab, classes, school?.id]);
+  }, [activeTab, classes.length, school?.id]);
   const notices: SchoolNotice[] = Array.isArray(noticesState.data) ? noticesState.data : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
@@ -670,7 +671,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <section className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-5">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Form Teacher responsibility</p>
               <h2 className="mt-1 text-base font-bold text-slate-900">Your assigned class</h2>
-              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}<span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-[11px] text-teal-800">{assignedClassStudentCounts[klass.id] ?? '…'} arday</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
+              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}<span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-[11px] text-teal-800">Form Teacher</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
             </section>
             <section className="rounded-2xl border border-slate-200 bg-white p-5">
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Teaching assignments</p>
