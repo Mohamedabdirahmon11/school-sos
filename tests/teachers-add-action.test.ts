@@ -29,12 +29,10 @@ test('teacher creation uses one transactional database operation', () => {
   assert.ok(schema.includes('INSERT INTO public.teacher_subjects'));
 });
 
-test('teacher ID allocation no longer scans all user and teacher rows', () => {
-  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
-  const helperStart = api.indexOf('async function nextSchoolTeacherId');
-  const helperEnd = api.indexOf('const timetableMinutes', helperStart);
-  assert.ok(helperStart >= 0 && helperEnd > helperStart);
-  const helper = api.slice(helperStart, helperEnd);
-  assert.ok(helper.includes('randomUUID'));
-  assert.ok(!helper.includes('queryAllRows'));
+test('teacher IDs retain the T001 format and are allocated by a database sequence', () => {
+  const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../supabase/migrations/20261122165821_atomic_teacher_creation.sql', import.meta.url), 'utf8');
+  assert.ok(schema.includes('CREATE SEQUENCE IF NOT EXISTS public.teacher_staff_id_seq'));
+  assert.ok(migration.includes("nextval('public.teacher_staff_id_seq'::regclass)"));
+  assert.ok(schema.includes("WHEN v_staff_number < 1000 THEN lpad(v_staff_number::TEXT, 3, '0')"));
 });
