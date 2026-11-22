@@ -49,6 +49,7 @@ test('student marks are published-only at the server and again filtered in the p
   const end = api.indexOf("apiRouter.post('/exams/marks'", start);
   const route = api.slice(start, end);
   assert.match(route, /marks = marks\.filter\(mark => Boolean\(mark\.publishedAt\)\)/);
+  assert.match(route, /grade: getGradeLabel\(mark\.percentage, school\.gradingScale\)/);
   assert.match(portal, /marksState\.data\)\?marksState\.data\.filter\(\(m:any\)=>Boolean\(m\.publishedAt\)\)/);
   assert.match(portal, /Weli lama daabicin natiijooyinkaaga/);
   assert.match(portal, /ExamTimetablePrint schedules=\{publishedExamSchedules\}/);
