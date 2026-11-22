@@ -129,6 +129,7 @@ const authSessionValidationCache = new Map<string, {
   session: UserSession;
   expiresAt: number;
 }>();
+const authContextLoadPromises = new Map<string, Promise<{ session: UserSession; user: User; school?: School | null } | null>>();
 
 export function shouldReuseCachedAuthSession(
   cacheExpiresAt: number,
@@ -1620,6 +1621,20 @@ class StorageEngine {
   }
 
   public async getSessionAndUserById(sessionId: string, userId: string, schoolId?: string): Promise<{ session: UserSession; user: User; school?: School | null } | null> {
+    if (this.testClient) return this.loadSessionAndUserById(sessionId, userId, schoolId);
+    const key = JSON.stringify([sessionId, userId, schoolId || null]);
+    const pending = authContextLoadPromises.get(key);
+    if (pending) return pending;
+    const load = this.loadSessionAndUserById(sessionId, userId, schoolId);
+    authContextLoadPromises.set(key, load);
+    try {
+      return await load;
+    } finally {
+      if (authContextLoadPromises.get(key) === load) authContextLoadPromises.delete(key);
+    }
+  }
+
+  private async loadSessionAndUserById(sessionId: string, userId: string, schoolId?: string): Promise<{ session: UserSession; user: User; school?: School | null } | null> {
     const client = this.testClient || supabase;
     if (!client) return null;
     if (this.testClient?.supportsSeparateAuthQueries === true) {
