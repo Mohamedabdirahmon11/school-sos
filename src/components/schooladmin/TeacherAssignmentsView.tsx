@@ -165,13 +165,6 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   }), [data, classFilter, subjectFilter, unassignedOnly, teacherFilter, search, yearId, termId]);
   const visibleRowKeys = new Set(filteredRows.map(row => row.class_id + ':' + row.subject_id));
   const assignedPercent = data?.totalClassSubjects ? Math.round((data.assignedCount / data.totalClassSubjects) * 100) : 0;
-  const classViewClassId = data.classes.some(row => row.id === assignmentClassId) ? assignmentClassId : (data.classes[0]?.id || '');
-  const classViewClass = data.classes.find(row => row.id === classViewClassId);
-  const classViewRows = data.curriculum.filter(row => row.class_id === classViewClassId);
-  const formTeacherClass = formTeacherClasses.find(row => row.id === classViewClassId);
-  const formTeacherUserId = formTeacherClass?.classTeacherId || '';
-  const formTeacherName = data.teachers.find(row => teacherUserIds[row.id] === formTeacherUserId)?.full_name || 'lama dooran';
-  const classViewUnassigned = classViewRows.filter(row => !assignmentFor(row.class_id, row.subject_id)).length;
 
   const doBulk = async () => {
     if (!data || !bulkTeacher || !bulkSubject || !bulkClasses.length) return;
@@ -236,6 +229,13 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   if (loading && !data) return <div className="academic-setup"><div className="wrap"><AcademicSetupHeader active="sch_teacher_assignments" onNavigate={onNavigate} /><div className="loading">Loading teacher assignments…</div></div></div>;
   if (error && !data) return <div className="academic-setup"><div className="wrap"><AcademicSetupHeader active="sch_teacher_assignments" onNavigate={onNavigate} /><section className="card"><EmptyState><p className="font-semibold">{error}</p><Button onClick={() => void load()}>Mar kale isku day</Button></EmptyState></section></div></div>;
   if (!data) return null;
+  const classViewClassId = data.classes.some(row => row.id === assignmentClassId) ? assignmentClassId : (data.classes[0]?.id || '');
+  const classViewClass = data.classes.find(row => row.id === classViewClassId);
+  const classViewRows = data.curriculum.filter(row => row.class_id === classViewClassId);
+  const formTeacherClass = formTeacherClasses.find(row => row.id === classViewClassId);
+  const formTeacherUserId = formTeacherClass?.classTeacherId || '';
+  const formTeacherName = data.teachers.find(row => teacherUserIds[row.id] === formTeacherUserId)?.full_name || 'lama dooran';
+  const classViewUnassigned = classViewRows.filter(row => !assignmentFor(row.class_id, row.subject_id)).length;
 
   const missingSetup = !data.academicYears.length
     ? { title: 'Sannad-dugsiyeed lama samayn', detail: 'Marka hore dhammee Tallaabada 1.', view: 'sch_setup_academics' }
