@@ -2651,3 +2651,121 @@ body { font-family: var(--schoolos-font-body); }
   .schoolos-teacher-portal .schoolos-mark-entry-toolbar > div:last-child button { min-width: 0; }
   .schoolos-teacher-portal .schoolos-mark-entry-summary { align-items: flex-start; }
 }
+
+
+/* SchoolOS directory and dashboard finish — visual-only; all workflows remain intact. */
+.school-dashboard-page,
+.school-students-page,
+.school-teachers-page {
+  color: #172b2a;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.school-dashboard-page h1,
+.school-dashboard-page h2,
+.school-students-page h1,
+.school-students-page h2,
+.school-teachers-page h1,
+.school-teachers-page h2 {
+  font-family: "Space Grotesk", Inter, sans-serif;
+  letter-spacing: -.035em;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-hero {
+  border: 1px solid #dce8e5;
+  border-radius: 18px;
+  background: radial-gradient(circle at 92% 8%, rgba(14,128,120,.10), transparent 31%), linear-gradient(115deg,#fff 0%,#f7fbfa 100%);
+  box-shadow: 0 8px 26px rgba(18,55,50,.055);
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel {
+  border: 1px solid #dce8e5;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 5px 20px rgba(18,55,50,.045);
+}
+.school-admin-role .school-dashboard-page .school-admin-metric {
+  min-height: 112px;
+  border: 1px solid rgba(255,255,255,.16)!important;
+  border-radius: 16px!important;
+  box-shadow: 0 8px 22px rgba(18,55,50,.10)!important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="blue"] { background:linear-gradient(130deg,#176f79,#0e5963)!important; }
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="green"] { background:linear-gradient(130deg,#16856f,#086b59)!important; }
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="purple"] { background:linear-gradient(130deg,#547d86,#345e69)!important; }
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="amber"] { background:linear-gradient(130deg,#b78337,#956523)!important; }
+.school-admin-role .school-dashboard-page .school-admin-metric:hover { transform:translateY(-2px); box-shadow:0 12px 26px rgba(18,55,50,.15)!important; }
+.school-students-page > :first-child,
+.school-teachers-page > header {
+  border-radius: 18px;
+}
+.school-students-page > :first-child h1,
+.school-teachers-page > header h1 {
+  font-size: clamp(1.65rem,2.4vw,2.15rem);
+  line-height: 1.15;
+  font-weight: 750;
+}
+.school-students-page > :first-child {
+  padding: 18px 20px;
+  border: 1px solid #dce8e5;
+  background: linear-gradient(115deg,#fff,#f6faf9);
+  box-shadow: 0 5px 20px rgba(18,55,50,.04);
+}
+.school-teachers-page > header {
+  background: radial-gradient(circle at 90% 5%,rgba(255,255,255,.12),transparent 27%),linear-gradient(120deg,#103c38,#0d6259 70%,#128477)!important;
+  box-shadow: 0 10px 26px rgba(11,76,68,.14)!important;
+}
+.school-students-page :is(.rounded-2xl.border,.rounded-xl.border,.bg-white.rounded-xl),
+.school-teachers-page :is(.rounded-2xl.border,.rounded-xl.border,.bg-white.rounded-xl) {
+  border-color: #dce7e5!important;
+  border-radius: 15px!important;
+  box-shadow: 0 4px 18px rgba(18,55,50,.045);
+}
+.school-students-page input,
+.school-students-page select,
+.school-students-page textarea,
+.school-teachers-page input,
+.school-teachers-page select,
+.school-teachers-page textarea {
+  min-height: 40px;
+  border-radius: 10px;
+  border-color: #d2dfdc;
+}
+.school-students-page :is(button.bg-\\[\\#0e8078\\],button.bg-\\[\\#0F766E\\]),
+.school-teachers-page :is(button.bg-\\[\\#0e8078\\],button.bg-\\[\\#0F766E\\]) {
+  background: var(--brand-color,#0e6a62);
+}
+.school-students-page table,
+.school-teachers-page table { border-collapse:separate;border-spacing:0; }
+.school-students-page table thead,
+.school-teachers-page table thead { background:#f3f8f7; }
+.school-students-page table th,
+.school-teachers-page table th {
+  color:#58706c;
+  font-size:11px;
+  font-weight:750;
+  letter-spacing:.035em;
+  padding-top:14px;
+  padding-bottom:14px;
+}
+.school-students-page table tbody tr,
+.school-teachers-page table tbody tr { transition:background .15s ease; }
+.school-students-page table tbody tr:hover,
+.school-teachers-page table tbody tr:hover { background:#f3f9f7; }
+.school-students-page table td,
+.school-teachers-page table td { border-color:#edf2f1; }
+.school-students-page button:focus-visible,
+.school-teachers-page button:focus-visible,
+.school-dashboard-page button:focus-visible {
+  outline:3px solid rgba(14,106,98,.24);
+  outline-offset:2px;
+}
+@media(max-width:767px) {
+  .school-dashboard-page,
+  .school-students-page,
+  .school-teachers-page { padding:12px!important; }
+  .school-students-page > :first-child { padding:15px!important; }
+  .school-students-page > :first-child > div:last-child { width:100%; }
+  .school-students-page > :first-child > div:last-child button { flex:1 1 auto;justify-content:center; }
+  .school-teachers-page > header { padding:18px!important; }
+  .school-teachers-page > header > div { gap:14px; }
+  .school-students-page table,
+  .school-teachers-page table { min-width:700px; }
+}
