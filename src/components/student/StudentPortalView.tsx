@@ -1,301 +1,135 @@
-/**
- * Student Portal View
- * Enforces Super Admin student access switch, timetable, homework assignments, results, and attendance
- */
-
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
-import {
-  CalendarDays,
-  FileSpreadsheet,
-  FileCheck2,
-  CalendarCheck,
-  BellRing,
-  ShieldAlert,
-  Send,
-  CheckCircle2
-} from 'lucide-react';
+import { Home, CalendarDays, CalendarCheck, ChartNoAxesColumn, BookOpen, Bell, MessageCircle, UserRound, Menu, Sun, Moon, Send, CheckCircle2, CircleAlert, ChevronRight, RefreshCw } from 'lucide-react';
+import './student-portal-design.css';
 
-type PortalTab = 'schedule' | 'grades' | 'assignments' | 'attendance' | 'notices';
+type StudentView = 'home' | 'tt' | 'att' | 'marks' | 'hw' | 'news' | 'msg' | 'me';
+const NAV: Array<{id:StudentView;label:string;icon:React.ElementType}> = [
+ {id:'home',label:'Hoyga',icon:Home},{id:'tt',label:'Jadwal',icon:CalendarDays},{id:'att',label:'Imaanshaha',icon:CalendarCheck},{id:'marks',label:'Natiijo',icon:ChartNoAxesColumn},
+ {id:'hw',label:'Hawlo',icon:BookOpen},{id:'news',label:'Ogeysiis',icon:Bell},{id:'msg',label:'Fariimo',icon:MessageCircle},{id:'me',label:'Profile',icon:UserRound}
+];
+const todayLocal = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Addis_Ababa'}).format(new Date());
+const dateLabel = (v:string) => v ? new Intl.DateTimeFormat('so',{day:'numeric',month:'short',year:'numeric'}).format(new Date(v.slice(0,10)+'T12:00:00')) : '';
+const percentage = (v:number) => Math.round(v)+'%';
 
-export const StudentPortalView: React.FC = () => {
-  const { user, school, t } = useAuth();
-  const [activeTab, setActiveTab] = useState<PortalTab>('schedule');
-  const [submissionDrafts, setSubmissionDrafts] = useState<Record<string, string>>({});
-  const [submittingAssignmentId, setSubmittingAssignmentId] = useState<string | null>(null);
-  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
-  const studentsState = useApi(() => ApiClient.getStudents(), [school?.id, user?.id], Boolean(school && user));
-  const studentRecord = Array.isArray(studentsState.data)
-    ? studentsState.data.find(student => student.studentId === user?.studentId)
-    : undefined;
-  const scheduleState = useApi(() => ApiClient.getTimetable(), [school?.id, user?.id], Boolean(school && user));
-  const examSchedulesState = useApi(() => studentRecord?.classId ? ApiClient.getPublishedExamSchedules(studentRecord.classId) : Promise.resolve([]), [studentRecord?.classId, school?.id], Boolean(studentRecord));
-  const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
-  const marksState = useApi(() => studentRecord ? ApiClient.getStudentMarks(studentRecord.id) : Promise.resolve([]), [studentRecord?.id], Boolean(studentRecord));
-  const termReportCardsState = useApi(() => studentRecord ? ApiClient.request<any[]>(`/term-marks/report-cards?studentId=${encodeURIComponent(studentRecord.id)}`) : Promise.resolve([]), [studentRecord?.id, school?.id], Boolean(studentRecord));
-  const termReportCards: any[] = Array.isArray(termReportCardsState.data) ? termReportCardsState.data : [];
-  const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
-  const attendanceState = useApi(() => studentRecord ? ApiClient.getStudentAttendance(studentRecord.id) : Promise.resolve([]), [studentRecord?.id], Boolean(studentRecord));
-  const noticesState = useApi(() => ApiClient.getNotices({ pageSize: 50 }), [school?.id, user?.id], Boolean(school && user));
-  const unreadNoticesState = useApi(() => ApiClient.getNoticeUnreadCount(), [school?.id, user?.id], Boolean(school && user));
+function PortalError({error,retry}:{error:any;retry:()=>void}) {
+ const status=Number(error?.status||error?.statusCode||0);
+ if(status===423) return <div className="sp-state sp-warning" role="alert"><CircleAlert/><div><b>Dejinta dugsiga weli ma dhammaystirna</b><p>{error?.message||'Maamulka dugsiga waa inuu dhammaystiraa dejinta ka hor inta aan xogtan la heli karin.'}</p>{Array.isArray(error?.missing||error?.data?.missing)&&(error?.missing||error?.data?.missing).length>0&&<ul>{(error?.missing||error?.data?.missing).map((item:string,index:number)=><li key={index}>{item}</li>)}</ul>}</div><button onClick={retry}>Dib u tijaabi</button></div>;
+ return <ErrorState error={error} onRetry={retry}/>;
+}
 
-  const timetable = Array.isArray(scheduleState.data) ? scheduleState.data : [];
-  const marks = Array.isArray(marksState.data) ? marksState.data : [];
-  const assignments = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
-  const notices = Array.isArray(noticesState.data) ? noticesState.data : [];
-  const unreadNoticeCount = unreadNoticesState.data?.count || 0;
-  const attendance = Array.isArray(attendanceState.data)
-    ? [...attendanceState.data].sort((a, b) => b.date.localeCompare(a.date))
-    : [];
-  const gradingScale = school?.gradingScale?.length
-    ? [...school.gradingScale].sort((a, b) => b.minPercentage - a.minPercentage)
-    : [{ minPercentage: 90, label: 'A', remark: 'Excellent' }, { minPercentage: 80, label: 'B', remark: 'Very good' }, { minPercentage: 70, label: 'C', remark: 'Good' }, { minPercentage: 60, label: 'D', remark: 'Pass' }, { minPercentage: 0, label: 'F', remark: 'Needs support' }];
-  const gradeFor = (percentage: number) => gradingScale.find(band => percentage >= band.minPercentage) || gradingScale[gradingScale.length - 1];
-  const today = new Date().toISOString().slice(0, 10);
-  const attendanceSummary = attendance.reduce((summary, record) => {
-    if (record.status === 'present' || record.status === 'late' || record.status === 'excused' || record.status === 'absent') summary[record.status] += 1;
-    return summary;
-  }, { present: 0, absent: 0, late: 0, excused: 0 });
-  const markAllNoticesRead = async () => {
-    await ApiClient.markNoticesRead(notices.map(notice => notice.id));
-    noticesState.retry();
-    unreadNoticesState.retry();
-  };
-  const submitHomework = async (assignmentId: string) => {
-    const content = (submissionDrafts[assignmentId] || '').trim();
-    if (!content) {
-      setAssignmentMessage('Write your answer before submitting.');
-      return;
-    }
-    setSubmittingAssignmentId(assignmentId);
-    setAssignmentMessage(null);
-    try {
-      const submission = await ApiClient.submitAssignment(assignmentId, content);
-      setAssignmentMessage(submission.status === 'graded' ? 'Homework graded.' : 'Homework submitted.');
-      setSubmissionDrafts(current => ({ ...current, [assignmentId]: submission.content }));
-      assignmentsState.retry();
-    } catch (error) {
-      setAssignmentMessage(error instanceof Error ? error.message : 'Homework could not be submitted.');
-    } finally {
-      setSubmittingAssignmentId(null);
-    }
-  };
+export const StudentPortalView:React.FC=()=>{
+ const {user,school,t}=useAuth();
+ const [view,setView]=useState<StudentView>('home');
+ const [moreOpen,setMoreOpen]=useState(false);
+ const [theme,setTheme]=useState<'auto'|'light'|'dark'>('auto');
+ const [homeworkFilter,setHomeworkFilter]=useState<'pending'|'submitted'|'all'>('pending');
+ const [noticePage,setNoticePage]=useState(1);
+ const [messagePage,setMessagePage]=useState(1);
+ const [drafts,setDrafts]=useState<Record<string,string>>({});
+ const [submittingId,setSubmittingId]=useState<string|null>(null);
+ const [feedback,setFeedback]=useState('');
+ const [contactId,setContactId]=useState('');
+ const [messageDraft,setMessageDraft]=useState('');
+ const [sending,setSending]=useState(false);
 
-  // Hard verification of Super Admin student access switch
-  if (school && !school.studentAccessEnabled) {
-    return (
-      <div className="p-8 max-w-lg mx-auto text-center space-y-4">
-        <div className="p-4 bg-red-50 rounded-2xl border border-red-200 inline-block text-red-600">
-          <ShieldAlert className="w-12 h-12 mx-auto" />
-        </div>
-        <h2 className="text-lg font-bold text-[#132A29]">Student Portal Disabled</h2>
-        <p className="text-xs text-[#64748B] leading-relaxed">
-          {t('student_access_disabled')}
-        </p>
-      </div>
-    );
-  }
+ const profileState=useApi(()=>ApiClient.getStudentProfile(),[school?.id,user?.id],Boolean(school&&user?.role==='student'));
+ const profile:any=profileState.data;
+ const student=profile?.student;
+ const studentRecord=student&&profile?{...student,classId:profile.classId}:undefined;
+ const active=Boolean(student?.id);
+ const home=view==='home';
+ const timetableState=useApi(()=>ApiClient.getTimetable(profile?.classId?{classId:profile.classId}:undefined),[school?.id,user?.id,profile?.classId],active&&(home||view==='tt'));
+ const examSchedulesState=useApi(()=>studentRecord?.classId?ApiClient.getPublishedExamSchedules(studentRecord.classId):Promise.resolve([]),[studentRecord?.classId,school?.id],active&&Boolean(studentRecord?.classId)&&(home||view==='tt'));
+ const attendanceState=useApi(()=>ApiClient.getStudentAttendance(student.id),[school?.id,student?.id],active&&(home||view==='att'));
+ const marksState=useApi(()=>ApiClient.getStudentMarks(student.id),[school?.id,student?.id],active&&(home||view==='marks'));
+ const homeworkState=useApi(()=>ApiClient.getAssignments(),[school?.id,user?.id],active&&(home||view==='hw'));
+ const noticesState=useApi(()=>ApiClient.getStudentNotices({page:noticePage,pageSize:20}),[school?.id,user?.id,noticePage],active&&(home||view==='news'));
+ const unreadState=useApi(()=>ApiClient.getNoticeUnreadCount(),[school?.id,user?.id],active);
+ const contactsState=useApi(()=>ApiClient.getMessageContacts(),[school?.id,user?.id],active&&view==='msg');
+ const contacts=Array.isArray(contactsState.data)?contactsState.data:[];
+ const contact=contacts.find((item:any)=>item.id===contactId);
+ const messagesState=useApi(()=>contactId?ApiClient.getMessages({page:messagePage,pageSize:50,contactId}):Promise.resolve([]),[school?.id,user?.id,contactId,messagePage],active&&view==='msg'&&Boolean(contactId));
 
-  return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Top Banner */}
-      <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-[11px] font-mono text-[#0F766E] uppercase font-bold">Student Academic Portal</span>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Welcome, {user?.fullName}
-          </h1>
-          <p className="text-xs text-[#64748B]">
-            Student ID: <strong className="font-mono text-[#0F766E]">{user?.studentId}</strong> • {school?.name}
-          </p>
-        </div>
+ useEffect(()=>{if(!contactId&&contacts.length)setContactId(contacts[0].id);else if(contactId&&!contacts.some((item:any)=>item.id===contactId))setContactId(contacts[0]?.id||'');},[contacts,contactId]);
+ useEffect(()=>{setMessagePage(1);},[contactId]);
+ useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId).catch(()=>undefined);},[view,contactId]);
+ useEffect(()=>{const refresh=()=>{if(document.visibilityState!=='visible')return;if(view==='home'){timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();}else if(view==='tt')timetableState.retry();else if(view==='att')attendanceState.retry();else if(view==='marks')marksState.retry();else if(view==='hw')homeworkState.retry();else if(view==='news'){noticesState.retry();unreadState.retry();}else if(view==='msg')contactsState.retry();else profileState.retry();};window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};},[view,student?.id,profile?.classId]);
 
-        {/* Tab Switcher */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#F1F5F9] rounded-lg text-xs self-start sm:self-auto">
-          {[
-            { id: 'schedule', label: 'My Timetable' },
-            { id: 'grades', label: 'Exam Results' },
-            { id: 'assignments', label: 'Homework' },
-            { id: 'attendance', label: 'Attendance' },
-            { id: 'notices', label: `Notices${unreadNoticeCount > 0 ? ` (${unreadNoticeCount})` : ''}` }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as PortalTab)}
-              className={`px-3 py-1.5 font-medium rounded transition-colors ${
-                activeTab === tab.id ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B] hover:text-[#132A29]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+ const timetable=Array.isArray(timetableState.data)?timetableState.data:[];
+ const publishedExamSchedules=Array.isArray(examSchedulesState.data)?examSchedulesState.data:[];
+ const attendance=Array.isArray(attendanceState.data)?attendanceState.data:[];
+ const marks=Array.isArray(marksState.data)?marksState.data.filter((m:any)=>Boolean(m.publishedAt)):[];
+ const homework=Array.isArray(homeworkState.data)?homeworkState.data:[];
+ const notices=Array.isArray(noticesState.data)?noticesState.data:Array.isArray((noticesState.data as any)?.items)?(noticesState.data as any).items:[];
+ const noticePagination=(noticesState.data as any)?.pagination||{page:noticePage,totalPages:1};
+ const messageRows=Array.isArray(messagesState.data)?messagesState.data:[];
+ const messagePagination=(messagesState.data as any)?.pagination||{page:messagePage,totalPages:1};
+ const unread=Number(unreadState.data?.count||0);
+ const pending=homework.filter((h:any)=>!h.submission).length;
+ const submitted=homework.filter((h:any)=>Boolean(h.submission)).length;
+ const today=todayLocal();
+ const month=today.slice(0,7);
+ const monthRows=attendance.filter((r:any)=>String(r.date).startsWith(month));
+ const counts=useMemo(()=>monthRows.reduce((a:any,r:any)=>{if(r.status in a)a[r.status]++;return a;},{present:0,absent:0,late:0,excused:0}),[attendance,month]);
+ const avg=marks.length?marks.reduce((s:number,m:any)=>s+Number(m.percentage||0),0)/marks.length:0;
+ const monthPresent=monthRows.filter((r:any)=>r.status==='present').length;
+ const todayDay=new Intl.DateTimeFormat('en-US',{weekday:'long',timeZone:'Africa/Addis_Ababa'}).format(new Date());
+ const todaySlots=timetable.filter((s:any)=>s.dayOfWeek===todayDay).sort((a:any,b:any)=>a.periodNumber-b.periodNumber);
+ const monthDays=new Date(Number(today.slice(0,4)),Number(today.slice(5,7)),0).getDate();
+ const firstDay=new Date(month+'-01T12:00:00').getDay();
+ const attendanceByDate=new Map(attendance.map((r:any)=>[String(r.date).slice(0,10),r.status]));
+ const visibleHomework=homework.filter((h:any)=>homeworkFilter==='all'||(homeworkFilter==='submitted'?Boolean(h.submission):!h.submission)).sort((a:any,b:any)=>String(a.dueDate).localeCompare(String(b.dueDate)));
 
-      {/* TIMETABLE TAB */}
-      {activeTab === 'schedule' && (
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs text-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-[#0F766E]" />
-            <span>{t('timetable')}</span>
-          </h2>
+ const submitHomework=async(id:string)=>{const content=(drafts[id]||'').trim();if(!content){setFeedback('Fadlan qor jawaabta ka hor gudbinta.');return;}setSubmittingId(id);setFeedback('');try{await ApiClient.submitAssignment(id,content);setFeedback('Hawsha si guul leh ayaa loo gudbiyey.');homeworkState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Hawsha lama gudbin karin.');}finally{setSubmittingId(null);}};
+ const sendMessage=async()=>{const content=messageDraft.trim();if(!content||!contact)return;setSending(true);try{await ApiClient.sendMessage(contact.id,contact.fullName,contact.role,content);setMessageDraft('');setMessagePage(1);messagesState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Fariinta lama diri karin.');}finally{setSending(false);}};
+ const markRead=async(id:string)=>{try{await ApiClient.markNoticeRead(id);noticesState.retry();unreadState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Ogeysiiska lama calaamadin karin.');}};
+ const navButton=(item:typeof NAV[number],mobile=false)=>{const Icon=item.icon;const selected=view===item.id;const badge=item.id==='hw'?pending:item.id==='news'?unread:0;return <button key={item.id} type="button" className={'sp-nav-item '+(selected?'is-active ':'')+(mobile?'is-mobile':'')} onClick={()=>{setView(item.id);setMoreOpen(false);setFeedback('');if(item.id==='home'){timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();}else if(item.id==='tt')timetableState.retry();else if(item.id==='att')attendanceState.retry();else if(item.id==='marks')marksState.retry();else if(item.id==='hw')homeworkState.retry();else if(item.id==='news'){setNoticePage(1);noticesState.retry();unreadState.retry();}else if(item.id==='msg')contactsState.retry();else if(item.id==='me')profileState.retry();}} aria-current={selected?'page':undefined}><Icon size={18}/><span>{item.label}</span>{badge>0&&<i className="sp-badge">{badge>99?'99+':badge}</i>}</button>;};
+ const title=NAV.find(n=>n.id===view)?.label||'Hoyga';
+ if(school&&school.studentAccessEnabled===false)return <div className="sp-disabled"><CircleAlert size={42}/><h2>Student Portal waa xiran yahay</h2><p>{t('student_access_disabled')}</p></div>;
 
-          {scheduleState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : scheduleState.error ? <ErrorState error={scheduleState.error} onRetry={scheduleState.retry} /> : timetable.length === 0 ? <p className="text-[#64748B]">{t('timetable_empty')}</p> : <div className="space-y-2">{[...timetable].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.periodNumber - b.periodNumber).map(slot => <div key={slot.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1] flex items-center justify-between"><div><span className="font-bold text-[#132A29] block">{slot.dayOfWeek} • {slot.startTime} - {slot.endTime}: {slot.subjectName || slot.subjectId}</span><span className="text-[#64748B]">{slot.roomNumber}{slot.teacherName ? ` • ${slot.teacherName}` : ''}</span></div><span className="font-mono text-xs font-bold text-[#0F766E]">Period {slot.periodNumber}</span></div>)}</div>}
-          <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
-            <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-bold text-[#132A29]">Published Exam Schedule</h3><button type="button" onClick={printExamTimetable} className="rounded-lg border border-[#CBD5E1] px-3 py-1.5 text-[11px] font-semibold text-[#334155]">Print timetable</button></div>
-            {examSchedulesState.loading ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={publishedExamSchedules[0]?.className || school?.examTimetableClassGroup} />}
-          </div>
-        </div>
-      )}
+ return <div className={'student-portal-shell '+(theme==='auto'?'':'sp-theme-'+theme)} data-theme={theme}>
+  <aside className="sp-sidebar">
+   <div className="sp-brand"><div className="sp-avatar">{String(user?.fullName||'A').trim().slice(0,1).toUpperCase()}</div><div><b>{user?.fullName}</b><small>{profile?.className||'Fasalka lama qoondeyn'}</small><small>ID: {student?.studentId||user?.studentId||'—'}</small></div></div>
+   <nav aria-label="Qaybaha ardayga" className="sp-side-nav">{NAV.map(n=>navButton(n))}</nav>
+   <div className="sp-sidebar-foot"><span>SchoolOS</span><small>{school?.name}</small></div>
+  </aside>
+  <div className="sp-content"><main className="sp-main">
+   <header className="sp-page-head"><div><span className="sp-eyebrow">STUDENT PORTAL</span><h1>{view==='home'?'Soo dhawoow, '+(user?.fullName||'Arday')+' 👋':title}</h1><p>{view==='home'?new Intl.DateTimeFormat('so',{weekday:'long',day:'numeric',month:'long'}).format(new Date())+' · '+(school?.name||''):((profile?.className||'')+' · '+(profile?.academicYear||school?.academicYear||''))}</p></div><div className="sp-head-actions"><span className="sp-school-mark">{school?.name}</span><button type="button" className="sp-icon-button" onClick={()=>{profileState.retry();timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();contactsState.retry();}} aria-label="Cusboonaysii"><RefreshCw size={17}/></button></div></header>
+   {feedback&&<div className="sp-feedback" role="status">{feedback}</div>}
+   {profileState.loading&&<div className="sp-card sp-empty">Xogta ardayga waa la soo dejinayaa…</div>}
+   {profileState.error&&<PortalError error={profileState.error} retry={profileState.retry}/>}
+   {!profileState.loading&&!profileState.error&&!student&&<div className="sp-state sp-warning"><CircleAlert/><div><b>Koontada ardayga lama xirin</b><p>La xiriir maamulka dugsiga si user-ka loogu xiro diiwaanka ardayga.</p></div></div>}
 
-      {/* GRADES TAB */}
-      {activeTab === 'grades' && (
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs text-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4 text-[#0F766E]" />
-            <span>Approved Academic Results</span>
-          </h2>
+   {active&&view==='home'&&<>
+    <section className="sp-stat-grid">
+     <div className="sp-card"><span className="sp-muted">Imaanshaha bishan</span><strong>{attendanceState.loading||attendanceState.error?'—':percentage(monthRows.length?monthPresent/monthRows.length*100:0)}</strong><div className="sp-progress"><i style={{width:(monthRows.length?monthPresent/monthRows.length*100:0)+'%'}}/></div></div>
+     <div className="sp-card"><span className="sp-muted">Celceliska natiijooyinka</span><strong>{marksState.loading?'—':marks.length?percentage(avg):'—'}</strong><small>{marksState.error?'Natiijooyinka lama soo dejin karin':marks.length?marks.length+' maaddo oo Published ah':'Weli lama daabicin'}</small></div>
+     <div className="sp-card"><span className="sp-muted">Hawlo harsan</span><strong>{homeworkState.loading||homeworkState.error?'—':pending}</strong><button className="sp-text-button" onClick={()=>{setView('hw');homeworkState.retry();}}>Fur hawlaha <ChevronRight size={14}/></button></div>
+    </section>
+    <section className="sp-card"><div className="sp-section-title"><h2>Jadwalka maanta</h2><button className="sp-text-button" onClick={()=>{setView('tt');timetableState.retry();}}>Jadwalka oo dhan <ChevronRight size={14}/></button></div>{timetableState.loading?<div className="sp-empty">Jadwalka waa la soo dejinayaa…</div>:timetableState.error?<PortalError error={timetableState.error} retry={timetableState.retry}/>:todayDay==='Friday'?<div className="sp-empty">Maanta waa Jimce; dugsigu waa fasax.</div>:!todaySlots.length?<div className="sp-empty">Casharro maanta lama qorin.</div>:todaySlots.map((s:any)=><div className="sp-row" key={s.id}><span><b>{s.startTime} – {s.endTime} · {s.subjectName||s.subjectId}</b><small>{s.teacherName||'Macallin'}</small></span><em>Period {s.periodNumber}</em></div>)}</section>
+    <section className="sp-card"><div className="sp-section-title"><h2>Ogeysiisyadii ugu dambeeyey</h2><button className="sp-text-button" onClick={()=>{setView('news');setNoticePage(1);noticesState.retry();unreadState.retry();}}>Dhammaan <ChevronRight size={14}/></button></div>{noticesState.loading?<div className="sp-empty">Ogeysiisyada waa la soo dejinayaa…</div>:noticesState.error?<PortalError error={noticesState.error} retry={noticesState.retry}/>:notices.length?notices.slice(0,2).map((n:any)=><div className="sp-row" key={n.id}><span><b>{n.title}</b><small>{dateLabel(n.publishDate)}</small></span>{!n.isRead&&<em className="sp-new">Cusub</em>}</div>):<div className="sp-empty">Ogeysiis cusub ma jiro.</div>}</section>
+   </>}
 
-          {termReportCardsState.loading ? <div className="h-20 animate-pulse rounded-lg bg-slate-100" /> : termReportCards.length > 0 ? termReportCards.map((card: any) => (
-            <div key={card.id} className="rounded-xl border border-teal-200 bg-teal-50 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-teal-950">Report Card sannadeedka</p><p className="text-[11px] text-teal-800">Celcelis {card.yearly_average}/100 · Grade {card.overall_grade} · Darajo #{card.rank_in_class}</p></div><button type="button" onClick={() => studentRecord && ApiClient.downloadTermReportCardPdf(studentRecord.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white">Download PDF</button></div>
-              <div className="mt-2 space-y-1">{(card.subject_results || []).map((subject: any) => <p key={subject.subject_id} className="text-[11px] text-teal-950">{subject.subject}: T1 {subject.term1} · T2 {subject.term2} · Sanad {subject.yearly} · {subject.grade || ''}</p>)}</div>
-            </div>
-          )) : <p className="text-[#64748B]">Report Card-ka sannadlaha wali lama daabicin.</p>}
+   {active&&view==='tt'&&<section className="sp-card"><div className="sp-section-title"><h2>Jadwalka fasalka</h2><span className="sp-muted">Sabti – Khamiis · Jimce fasax</span></div>{timetableState.loading?<div className="sp-empty">Jadwalka waa la soo dejinayaa…</div>:timetableState.error?<PortalError error={timetableState.error} retry={timetableState.retry}/>:!timetable.length?<div className="sp-empty">Jadwal lama diiwaangelin fasalkaaga.</div>:<div className="sp-table-wrap"><table className="sp-table"><thead><tr><th>Waqti</th>{['Sabti','Axad','Isniin','Talaado','Arbaco','Khamiis'].map(d=><th key={d}>{d}</th>)}</tr></thead><tbody>{Array.from({length:Math.max(1,...timetable.map((s:any)=>Number(s.periodNumber||1)))},(_,i)=>i+1).map(p=><tr key={p}><td>Period {p}</td>{['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'].map(d=>{const s=timetable.find((x:any)=>x.dayOfWeek===d&&Number(x.periodNumber)===p);return <td key={d}>{s?<><b>{s.subjectName||s.subjectId}</b><small>{s.startTime}–{s.endTime}</small><small>{s.teacherName||''}</small></>:'—'}</td>;})}</tr>)}</tbody></table></div>}</section>}
+   {active&&view==='tt'&&<section className="sp-card"><div className="sp-section-title"><h2>Published Exam Schedule · Jadwalka imtixaanka</h2>{publishedExamSchedules.length>0&&<button className="sp-text-button" onClick={()=>printExamTimetable()}>Daabac jadwalka</button>}</div>{examSchedulesState.loading?<div className="sp-empty">Jadwalka imtixaanka waa la soo dejinayaa…</div>:examSchedulesState.error?<PortalError error={examSchedulesState.error} retry={examSchedulesState.retry}/>:publishedExamSchedules.length>0?<ExamTimetablePrint schedules={publishedExamSchedules} school={school}/>:<div className="sp-empty">Weli lama daabicin jadwalka imtixaanka.</div>}</section>}
 
-          {marksState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : marksState.error ? <ErrorState error={marksState.error} onRetry={marksState.retry} /> : marks.length === 0 ? <p className="text-[#64748B]">No approved results have been published yet.</p> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{marks.map(mark => {
-            const band = gradeFor(mark.percentage || 0);
-            return <div key={mark.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] flex items-center justify-between gap-3">
-              <div>
-                <p className="font-bold text-[#132A29]">{mark.subjectName || mark.subjectId}</p>
-                <p className="text-[11px] text-[#64748B]">{mark.semester} • {mark.academicYear}</p>
-              </div>
-              <div className="text-right">
-                <span className="text-lg font-mono font-bold text-emerald-700">{mark.totalMarks} pts</span>
-                <p className="text-[11px] font-semibold text-[#0F766E]">{mark.percentage}% • {band.label}</p>
-              </div>
-            </div>;
-          })}</div>}
-        </div>
-      )}
+   {active&&view==='att'&&<section className="sp-card"><div className="sp-section-title"><h2>Imaanshaha ardayga</h2><span className="sp-muted">{new Intl.DateTimeFormat('so',{month:'long',year:'numeric'}).format(new Date())}</span></div>{attendanceState.loading?<div className="sp-empty">Diiwaanka imaanshaha waa la soo dejinayaa…</div>:attendanceState.error?<PortalError error={attendanceState.error} retry={attendanceState.retry}/>:<><div className="sp-stat-grid sp-att-stats"><div><small>Joogay</small><b>{counts.present}</b></div><div><small>Maqnaa</small><b>{counts.absent}</b></div><div><small>Daahay</small><b>{counts.late}</b></div><div><small>Boqolkiiba</small><b>{percentage(attendance.length?counts.present/attendance.length*100:0)}</b></div></div><div className="sp-calendar">{['Ax','Is','Ta','Ar','Kh','Jim','Sab'].map(d=><b key={d}>{d}</b>)}{Array.from({length:firstDay},(_,i)=><i key={'blank'+i}/>)}{Array.from({length:monthDays},(_,i)=>{const date=month+'-'+String(i+1).padStart(2,'0');const status=attendanceByDate.get(date);return <span key={date} className={'sp-day '+(status==='present'?'is-present':status==='absent'?'is-absent':status==='late'?'is-late':status==='excused'?'is-excused':'')}>{i+1}</span>;})}</div><p className="sp-muted">Cagaar = joogay · Casaan = maqnaa · Huruud = daahay · Buluug = fasax la oggolaaday</p></>}</section>}
 
-      {/* HOMEWORK TAB */}
-      {activeTab === 'assignments' && (
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs text-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <FileCheck2 className="w-4 h-4 text-[#0F766E]" />
-            <span>Active Homework & Assignments</span>
-          </h2>
-          {assignmentMessage && <p role="status" className="rounded-lg border border-[#CCFBF1] bg-[#F0FDFA] px-3 py-2 text-[#0F766E]">{assignmentMessage}</p>}
+   {active&&view==='marks'&&<section className="sp-card"><div className="sp-section-title"><h2>Natiijooyinka la daabacay</h2><span className="sp-muted">Published oo keliya</span></div>{marksState.loading?<div className="sp-empty">Natiijooyinka waa la soo dejinayaa…</div>:marksState.error?<PortalError error={marksState.error} retry={marksState.retry}/>:!marks.length?<div className="sp-empty">Weli lama daabicin natiijooyinkaaga.</div>:<div className="sp-table-wrap"><table className="sp-table"><thead><tr><th>Maaddo</th><th>Semester</th><th>Wadar</th><th>Boqolkiiba</th><th>Darajo</th></tr></thead><tbody>{marks.map((m:any)=><tr key={m.id}><td><b>{m.subjectName||m.subjectId}</b></td><td>{m.semester}</td><td>{m.totalMarks}</td><td>{percentage(Number(m.percentage||0))}</td><td>{m.grade||m.gradeLabel||'—'}</td></tr>)}</tbody></table></div>}</section>}
 
-          {assignmentsState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : assignmentsState.error ? <ErrorState error={assignmentsState.error} onRetry={assignmentsState.retry} /> : assignments.length === 0 ? <p className="text-[#64748B]">No homework has been assigned yet.</p> : <div className="space-y-3">{assignments.map(assignment => {
-            const submission = assignment.submission;
-            const graded = submission?.status === 'graded';
-            const draft = submissionDrafts[assignment.id] ?? submission?.content ?? '';
-            return (
-              <div key={assignment.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1] space-y-2">
-                <div className="flex flex-wrap justify-between gap-2 font-bold text-[#132A29]">
-                  <span>{assignment.title}</span>
-                  <span className={`font-mono text-[11px] ${assignment.dueDate < today ? 'text-rose-700' : 'text-[#0F766E]'}`}>
-                    {assignment.dueDate < today ? `Overdue: ${assignment.dueDate}` : assignment.dueDate === today ? 'Due today' : `Due ${assignment.dueDate}`}
-                  </span>
-                </div>
-                <p className="text-[#475569]">{assignment.description}</p>
-                <p className="text-[11px] text-[#64748B]">{assignment.subjectName || assignment.subjectId} €¢ {assignment.maxPoints} points</p>
-                {submission && (
-                  <div className="rounded-lg border border-[#99F6E4] bg-white p-2 space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2 font-semibold text-[#132A29]">
-                      <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5 text-[#0F766E]" />{graded ? 'Graded' : 'Submitted'}</span>
-                      <span>{graded ? `${submission.grade}/${assignment.maxPoints}` : `Submitted ${submission.submittedAt.slice(0, 10)}`}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap text-[#475569]">{submission.content}</p>
-                    {graded && submission.feedback && <p className="text-[#0F766E]">Teacher feedback: {submission.feedback}</p>}
-                  </div>
-                )}
-                {!graded && (
-                  <div className="space-y-2">
-                    <textarea
-                      value={draft}
-                      onChange={event => setSubmissionDrafts(current => ({ ...current, [assignment.id]: event.target.value }))}
-                      rows={3}
-                      maxLength={5000}
-                      placeholder={submission ? 'Update your answer' : 'Write your answer here'}
-                      className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => submitHomework(assignment.id)}
-                      disabled={submittingAssignmentId === assignment.id || !draft.trim()}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      {submittingAssignmentId === assignment.id ? 'Submitting...' : submission ? 'Update Submission' : 'Submit Homework'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}</div>}
-        </div>
-      )}
+   {active&&view==='hw'&&<div className="sp-homework"><div className="sp-filter-tabs">{(['pending','submitted','all'] as const).map(f=><button key={f} className={homeworkFilter===f?'is-selected':''} onClick={()=>setHomeworkFilter(f)}>{f==='pending'?'Harsan ('+pending+')':f==='submitted'?'La gudbiyey ('+submitted+')':'Dhammaan'}</button>)}</div>{homeworkState.loading?<div className="sp-card sp-empty">Hawlaha waa la soo dejinayaa…</div>:homeworkState.error?<PortalError error={homeworkState.error} retry={homeworkState.retry}/>:!visibleHomework.length?<div className="sp-card sp-empty">Hawl halkan kuma jirto.</div>:visibleHomework.map((h:any)=>{const sub=h.submission;const late=!sub&&h.dueDate<today;const draft=drafts[h.id]??sub?.content??'';return <section className="sp-card sp-homework-card" key={h.id}><div className="sp-section-title"><div><b>{h.subjectName||h.subjectId}</b><h3>{h.title}</h3></div><em className={late?'sp-overdue':sub?'sp-done':'sp-due'}>{late?'Dhaafay':sub?'La gudbiyey':'Dhammaad '+dateLabel(h.dueDate)}</em></div><p>{h.description}</p>{sub?<div className="sp-submission"><b><CheckCircle2 size={15}/> {sub.status==='graded'?'La qiimeeyey':'La gudbiyey'}</b><p>{sub.content}</p>{sub.grade!==undefined&&<small>Darajo: {sub.grade}/{h.maxPoints}</small>}{sub.feedback&&<small>{sub.feedback}</small>}</div>:<><textarea value={draft} onChange={e=>setDrafts(s=>({...s,[h.id]:e.target.value}))} rows={3} maxLength={5000} placeholder="Qor jawaabtaada…"/><button className="sp-primary-button" disabled={submittingId===h.id||!draft.trim()} onClick={()=>submitHomework(h.id)}>{submittingId===h.id?'Waa la dirayaa…':'Gudbi hawsha'}</button></>}</section>;})}</div>}
 
-      {/* ATTENDANCE TAB */}
-      {activeTab === 'attendance' && (
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs text-xs">
-          <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-            <CalendarCheck className="w-4 h-4 text-[#0F766E]" />
-            <span>My Attendance</span>
-          </h2>
+   {active&&view==='news'&&<div className="sp-news-list">{noticesState.loading?<div className="sp-card sp-empty">Ogeysiisyada waa la soo dejinayaa…</div>:noticesState.error?<PortalError error={noticesState.error} retry={noticesState.retry}/>:!notices.length?<div className="sp-card sp-empty">Ogeysiis cusub ma jiro.</div>:<>{notices.map((n:any)=><section className="sp-card" key={n.id}><div className="sp-section-title"><h3>{n.title}</h3><span className="sp-muted">{dateLabel(n.publishDate)}</span></div><p className="sp-notice-body">{n.content}</p><div className="sp-row"><small>{n.authorName||'Maamulka dugsiga'}</small>{n.isRead?<em className="sp-done">La akhriyey</em>:<button className="sp-text-button" onClick={()=>markRead(n.id)}>Calaamadi akhriyey</button>}</div></section>)}{noticePagination.totalPages>1&&<div className="sp-pagination"><button disabled={noticePage<=1} onClick={()=>setNoticePage(page=>Math.max(1,page-1))}>Hore</button><span>{noticePagination.page||noticePage} / {noticePagination.totalPages}</span><button disabled={noticePage>=noticePagination.totalPages} onClick={()=>setNoticePage(page=>Math.min(noticePagination.totalPages,page+1))}>Xiga</button></div>}</>}</div>}
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { label: t('present'), value: attendanceSummary.present, tone: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-              { label: t('absent'), value: attendanceSummary.absent, tone: 'text-rose-700 bg-rose-50 border-rose-100' },
-              { label: t('late'), value: attendanceSummary.late, tone: 'text-amber-700 bg-amber-50 border-amber-100' },
-              { label: t('excused'), value: attendanceSummary.excused, tone: 'text-sky-700 bg-sky-50 border-sky-100' }
-            ].map(item => <div key={item.label} className={`rounded-lg border p-3 ${item.tone}`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide">{item.label}</p>
-              <p className="font-mono text-xl font-bold">{item.value}</p>
-            </div>)}
-          </div>
+   {active&&view==='msg'&&<section className="sp-card sp-messages"><div className="sp-section-title"><h2>Macallimiinta fasalkaaga</h2><span className="sp-muted">Kuwa laguu qoondeeyey oo keliya</span></div>{contactsState.loading?<div className="sp-empty">Macallimiinta waa la soo dejinayaa…</div>:contactsState.error?<PortalError error={contactsState.error} retry={contactsState.retry}/>:!contacts.length?<div className="sp-empty">Weli macallin laguma xirin fasalkaaga.</div>:<div className="sp-message-layout"><nav className="sp-contact-list" aria-label="Macallimiinta">{contacts.map((c:any)=><button key={c.id} className={contactId===c.id?'is-selected':''} onClick={()=>setContactId(c.id)}>{c.fullName}<small>Macallin</small></button>)}</nav><div className="sp-thread"><b>{contact?.fullName||'Macallin'}</b>{messagesState.loading?<div className="sp-empty">Fariimaha waa la soo dejinayaa…</div>:messagesState.error?<PortalError error={messagesState.error} retry={messagesState.retry}/>:<><div className="sp-chat-log">{messageRows.length?messageRows.map((m:any)=><div key={m.id} className={'sp-chat-bubble '+(m.senderId===user?.id?'mine':'')}>{m.content}<small>{dateLabel(String(m.timestamp||'').slice(0,10))}</small></div>):<div className="sp-empty">Wada-hadal ma jiro. Fariintaada koowaad dir.</div>}</div>{messagePagination.totalPages>1&&<div className="sp-pagination"><button disabled={messagePage<=1} onClick={()=>setMessagePage(page=>Math.max(1,page-1))}>Hore</button><span>{messagePagination.page||messagePage} / {messagePagination.totalPages}</span><button disabled={messagePage>=messagePagination.totalPages} onClick={()=>setMessagePage(page=>Math.min(messagePagination.totalPages,page+1))}>Xiga</button></div>}</>}<div className="sp-compose"><input value={messageDraft} onChange={e=>setMessageDraft(e.target.value)} maxLength={5000} placeholder="Qor fariin…"/><button aria-label="Dir fariinta" disabled={!messageDraft.trim()||sending||!contact} onClick={sendMessage}><Send size={17}/></button></div></div></div>}</section>}
 
-          {attendanceState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : attendanceState.error ? <ErrorState error={attendanceState.error} onRetry={attendanceState.retry} /> : attendance.length === 0 ? <p className="text-[#64748B]">No attendance records have been recorded yet.</p> : <div className="divide-y divide-[#F1F5F9]">{attendance.map(record => <div key={record.id} className="py-2 flex items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-[#132A29]">{record.date}</p>
-              {record.note && <p className="text-[11px] text-[#64748B]">{record.note}</p>}
-            </div>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${record.status === 'present' ? 'bg-emerald-50 text-emerald-700' : record.status === 'absent' ? 'bg-rose-50 text-rose-700' : record.status === 'late' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'}`}>
-              {record.status}
-            </span>
-          </div>)}</div>}
-        </div>
-      )}
-
-      {/* NOTICES TAB */}
-      {activeTab === 'notices' && (
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-4 shadow-xs text-xs">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2">
-              <BellRing className="w-4 h-4 text-[#0F766E]" />
-              <span>School Notices</span>
-            </h2>
-            {unreadNoticeCount > 0 && <button onClick={markAllNoticesRead} className="text-[11px] font-semibold text-[#0F766E] hover:underline">Mark all read</button>}
-          </div>
-
-          {noticesState.loading ? <div className="h-28 animate-pulse rounded-lg bg-slate-100" /> : noticesState.error ? <ErrorState error={noticesState.error} onRetry={noticesState.retry} /> : notices.length === 0 ? <p className="text-[#64748B]">No school notices have been published yet.</p> : <div className="space-y-2">{notices.map(notice => <div key={notice.id} className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-bold text-[#132A29]">{notice.isPinned ? 'Pinned • ' : ''}{notice.title}</p>
-              <span className="text-[10px] font-mono text-[#64748B]">{notice.publishDate}</span>
-            </div>
-            <p className="text-[#475569] whitespace-pre-wrap">{notice.content}</p>
-            <p className="text-[11px] text-[#64748B]">{notice.authorName} • {notice.authorRole}</p>
-          </div>)}</div>}
-        </div>
-      )}
-    </div>
-  );
+   {active&&view==='me'&&<div className="sp-profile"><section className="sp-card">{[['Magac',user?.fullName],['Aqoonsiga ardayga',student?.studentId],['Fasal',profile?.className],['Form Teacher',profile?.formTeacherName||'Lama qoondeyn'],['Sanad dugsiyeed',profile?.academicYear||school?.academicYear],['Dugsiga',school?.name]].map(([label,value])=><div className="sp-row" key={String(label)}><span className="sp-muted">{label}</span><b>{value||'—'}</b></div>)}</section><section className="sp-card"><h2>Muuqaalka</h2><div className="sp-theme-options">{(['auto','light','dark'] as const).map(v=><button key={v} className={theme===v?'is-selected':''} onClick={()=>setTheme(v)}>{v==='auto'?'Otomaatig':v==='light'?<><Sun size={16}/> Iftiin</>:<><Moon size={16}/> Mugdi</>}</button>)}</div><p className="sp-muted">Doorashada muuqaalka waxay shaqaynaysaa inta portal-ku furan yahay.</p></section></div>}
+  </main></div>
+  <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','hw','marks'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}<div className="sp-more-wrap"><button type="button" className={'sp-nav-item is-mobile '+(moreOpen||(['tt','att','news','msg','me'] as StudentView[]).includes(view)?'is-active':'')} onClick={()=>setMoreOpen(v=>!v)} aria-expanded={moreOpen}><Menu size={19}/><span>Dheeraad</span>{unread>0&&<i className="sp-badge">{unread}</i>}</button>{moreOpen&&<div className="sp-more-sheet">{(['tt','att','news','msg','me'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}</div>}</div></nav>
+ </div>;
 };

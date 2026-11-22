@@ -179,11 +179,12 @@ export class ApiClient {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
+      const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || `HTTP ${response.status}: ${response.statusText}`;
       const err = new Error(errorMsg);
       (err as any).status = response.status;
-      (err as any).code = data.code;
+      (err as any).code = data.code || data.error?.code;
       (err as any).data = data;
+      (err as any).missing = data.missing || data.error?.missing;
       if (typeof window !== 'undefined' && ['MUST_CHANGE_PASSWORD', 'MUST_CHANGE_PIN'].includes(data.code)) {
         window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
       }
@@ -1080,12 +1081,25 @@ export class ApiClient {
     };
   }
 
+  public static async getStudentNotices(params?: { page?: number; pageSize?: number }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    const response = await this.request<any>('/student/notices?' + query.toString());
+    return response?.data ?? response;
+  }
+
+  public static async getStudentProfile() {
+    const response = await this.request<any>('/student/me');
+    return response?.data ?? response;
+  }
+
   public static async getStudentMarks(studentId: string) {
     return this.request<Array<StudentMark & { subjectName?: string }>>(`/exams/marks?studentId=${encodeURIComponent(studentId)}`);
   }
 
   public static async getStudentAttendance(studentId: string) {
-    return this.request<AttendanceRecord[]>(`/attendance/student?studentId=${encodeURIComponent(studentId)}`);
+    return this.request<AttendanceRecord[]>(`/attendance/student?studentId=${encodeURIComponent(studentId)}&page=1&pageSize=100`);
   }
 
   public static async getAssignments() {

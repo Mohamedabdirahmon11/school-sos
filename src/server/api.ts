@@ -41,6 +41,7 @@ import { classGradeMismatchError } from './class-grade-validation.ts';
 import { hasActiveClassIdentityConflict, hasActiveFormTeacherConflict } from './class-setup-validation.ts';
 import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, PRIMARY_SUBJECT_TEMPLATE_PERIODS, getDefaultSubjectPeriods, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
+import { getGradeLabel } from '../lib/grading.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
 import { isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
@@ -430,11 +431,19 @@ async function getTeacherAssignedClassIds(schoolId: string, userId: string): Pro
 
 async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]> {
   if (user.role === 'teacher') return getTeacherAssignedClassIds(schoolId, user.id);
-  if (!['parent', 'student'].includes(user.role)) return [];
+  if (user.role === 'student') {
+    if (!user.studentId) return [];
+    const own = (await db.queryPage('students', { school_id: schoolId, student_id: user.studentId }, 1, 1, undefined, 'id,class_id')).items[0] as any;
+    if (!own) return [];
+    const currentClassId = await getStudentCurrentClassId(schoolId, String(own.id), String(own.classId || ''));
+    return currentClassId ? [currentClassId] : [];
+  }
+  if (user.role !== 'parent') return [];
   const students = await db.getStudents(schoolId);
-  return students.filter(student => user.role === 'parent'
-    ? user.linkedStudentIds?.includes(student.id) || [user.phone, user.parentPhone].includes(student.fatherPhone || '') || [user.phone, user.parentPhone].includes(student.motherPhone || '')
-    : student.studentId === user.studentId || student.id === user.id.replace(/^usr-student-/, 'std-')
+  return students.filter(student =>
+    user.linkedStudentIds?.includes(student.id) ||
+    [user.phone, user.parentPhone].includes(student.fatherPhone || '') ||
+    [user.phone, user.parentPhone].includes(student.motherPhone || '')
   ).map(student => student.classId);
 }
 
@@ -4369,13 +4378,20 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
     let studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
-      studentIds = own.items.map((item: any) => item.id);
+      if (own.items[0]) {
+        studentIds = [String((own.items[0] as any).id)];
+        const currentClassId = await getStudentCurrentClassId(school.id, String((own.items[0] as any).id), String((own.items[0] as any).classId || ''));
+        if (classId && currentClassId && classId !== currentClassId) { res.status(403).json({ error: 'Timetable access is limited to your current class.' }); return; }
+        classId = currentClassId;
+      } else studentIds = [];
     } else if (role === 'parent' && user.phone) {
       const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id');
       studentIds = [...new Set([...studentIds, ...phoneChildren.items.map((item: any) => item.id)])];
     }
-    const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
-    const classIds = [...new Set(children.items.map((item: any) => item.classId))];
+    const children = role === 'student'
+      ? { items: [] as any[] }
+      : studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
+    const classIds = role === 'student' ? (classId ? [classId] : []) : [...new Set(children.items.map((item: any) => item.classId))];
     if (classId && !classIds.includes(classId)) { res.status(403).json({ error: 'Timetable access is limited to your own class.' }); return; }
     if (!classIds.length) { res.json([]); return; }
     let slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, term_id: termId || undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
@@ -4410,6 +4426,7 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
   const role = normalizeRole(user.role);
   let classIds: string[] | null = null;
   let studentIds: string[] | null = null;
+  let studentCurrentClassIds: string[] | null = null;
 
   let teacherSubjectPairs: Set<string> | null = null;
   if (role === 'teacher') {
@@ -4422,12 +4439,19 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
       studentIds = own.items.map((item: any) => item.id);
+      const ownRow = own.items[0] as any;
+      const currentClassId = ownRow ? await getStudentCurrentClassId(school.id, String(ownRow.id), String(ownRow.classId || '')) : '';
+      studentCurrentClassIds = currentClassId ? [currentClassId] : [];
     } else if (user.phone) {
       const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id,class_id');
       studentIds = [...new Set([...studentIds, ...phoneChildren.items.map((item: any) => item.id)])];
     }
-    const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
-    classIds = [...new Set(children.items.map((item: any) => item.classId))];
+    if (role === 'student') {
+      classIds = studentCurrentClassIds || [];
+    } else {
+      const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
+      classIds = [...new Set(children.items.map((item: any) => item.classId))];
+    }
   }
 
   if (classIds && !classIds.length) { res.json([]); return; }
@@ -4508,7 +4532,8 @@ apiRouter.post('/assignments/:id/submissions', requireAuth, requireSchoolContext
   if (!assignment) { res.status(404).json({ error: 'Homework was not found.' }); return; }
   const student = (await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,school_id,student_id,first_name,middle_name,last_name,class_id')).items[0];
   if (!student) { res.status(403).json({ error: 'Your student record is not linked to this school.' }); return; }
-  if (student.classId !== assignment.classId) { res.status(403).json({ error: 'You can only submit homework assigned to your class.' }); return; }
+  const currentClassId = await getStudentCurrentClassId(school.id, String(student.id), String(student.classId || ''));
+  if (!currentClassId || currentClassId !== assignment.classId) { res.status(403).json({ error: 'You can only submit homework assigned to your current class.' }); return; }
   const existing = await db.queryPage('assignment_submissions', { school_id: school.id, assignment_id: assignment.id, student_id: student.id }, 1, 1, undefined, '*');
   if (existing.items[0]?.status === 'graded') { res.status(409).json({ error: 'This submission has already been graded and cannot be changed.' }); return; }
   const studentName = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
@@ -5262,6 +5287,53 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
     'X-Total-Pages': String(Math.ceil(total / pageSize))
   });
   res.json(items);
+});
+
+apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'student') {
+    res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_ONLY', message: 'Student accounts only.' } });
+    return;
+  }
+  if (!user.studentId) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_NOT_LINKED', message: 'Your account is not linked to a student record.' } });
+    return;
+  }
+  const student = (await db.queryPage('students', {
+    school_id: school.id, student_id: user.studentId
+  }, 1, 1, undefined, 'id,school_id,student_id,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,mother_phone,address,class_id,section,status,roll_number,created_at')).items[0] as any;
+  if (!student) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_NOT_LINKED', message: 'Your account is not linked to a student record in this school.' } });
+    return;
+  }
+  const academicYearId = await getCurrentAcademicYearId(school.id);
+  const classId = await getStudentCurrentClassId(school.id, String(student.id), String(student.classId || ''));
+  const [klass, year] = await Promise.all([
+    classId ? db.getClassById(classId, school.id) : Promise.resolve(null),
+    academicYearId ? db.queryPage('academic_years', { school_id: school.id, id: academicYearId }, 1, 1, undefined, 'id,name') : Promise.resolve({ items: [] as any[] })
+  ]);
+  const formTeacher = klass?.classTeacherId ? await db.getUserById(klass.classTeacherId, school.id) : null;
+  const safeStudent = {
+    id: student.id, schoolId: student.schoolId, studentId: student.studentId,
+    firstName: student.firstName, middleName: student.middleName, lastName: student.lastName,
+    gender: student.gender, admissionDate: student.admissionDate, dateOfBirth: student.dateOfBirth,
+    studentPhone: student.studentPhone, fatherPhone: student.fatherPhone, motherPhone: student.motherPhone,
+    address: student.address, classId, section: student.section, rollNumber: student.rollNumber, status: student.status
+  };
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  res.json({
+    ok: true,
+    data: {
+      student: safeStudent,
+      classId,
+      className: klass ? [klass.name, klass.section].filter(Boolean).join(' · ') : 'Not assigned',
+      formTeacherName: formTeacher?.fullName || '',
+      academicYear: (year.items[0] as any)?.name || school.academicYear || '',
+      academicYearId: academicYearId || undefined
+    },
+    error: null
+  });
 });
 
 apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) => {
@@ -6548,7 +6620,14 @@ apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (r
     res.status(403).json({ error: 'You do not have access to this student attendance record.' });
     return;
   }
-  await sendDatabasePage(req, res, 'attendance_records', { school_id: school.id, student_id: studentId });
+  const filters: Record<string, string | string[]> = { school_id: school.id, student_id: studentId };
+  if (normalizeRole(user.role) === 'student') {
+    const ownStudent = await db.getStudentById(studentId, school.id);
+    const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
+    if (!currentClassId) { res.json([]); return; }
+    filters.class_id = currentClassId;
+  }
+  await sendDatabasePage(req, res, 'attendance_records', filters);
 });
 
 apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, requireSchoolSetupReady, async (req, res) => {
@@ -7504,6 +7583,11 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     if (['parent', 'student'].includes(normalizeRole(user.role) || '')) {
       marks = marks.filter(mark => Boolean(mark.publishedAt));
     }
+    if (normalizeRole(user.role) === 'student') {
+      const ownStudent = await db.getStudentById(studentId as string, school.id);
+      const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
+      marks = currentClassId ? marks.filter(mark => mark.classId === currentClassId) : [];
+    }
     if (normalizeRole(user.role) === 'teacher') {
       const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
       const teacher = teacherPage.items[0] as any;
@@ -7523,7 +7607,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       ? await db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, 'id,name,code')
       : { items: [] as any[] };
     const subjectNames = new Map(subjects.items.map((item: any) => [item.id, item.name]));
-    res.json(marks.map(mark => ({ ...mark, subjectName: subjectNames.get(mark.subjectId) || mark.subjectId })));
+    res.json(marks.map(mark => ({ ...mark, subjectName: subjectNames.get(mark.subjectId) || mark.subjectId, grade: getGradeLabel(mark.percentage, school.gradingScale) })));
     return;
   }
   if (!classId) { res.status(400).json({ error: 'classId is required' }); return; }
@@ -9115,6 +9199,35 @@ apiRouter.delete('/school/events/:id', requireAuth, requireSchoolContext, requir
   res.status(204).end();
 });
 
+apiRouter.get('/student/notices', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'student') {
+    res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_ONLY', message: 'Student accounts only.' } });
+    return;
+  }
+  if (!user.studentId) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_NOT_LINKED', message: 'Your account is not linked to a student record.' } });
+    return;
+  }
+  const classIds = await getNoticeClassIds(school.id, user);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  const audiences = ['audience.eq.all', 'audience.eq.school', 'audience.eq.students'];
+  if (classIds.length) audiences.push('and(audience.eq.class,class_id.in.(' + classIds.join(',') + '))');
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 20));
+  const result = await db.queryPage('school_notices', { school_id: school.id, is_active: 'true' }, page, pageSize,
+    'and(publish_date.lte.' + today + ',or(' + audiences.join(',') + '))',
+    'id,school_id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role,is_active', 'publish_date', false);
+  const noticeIds = result.items.map((notice: any) => String(notice.id));
+  const reads = noticeIds.length
+    ? await db.queryPage('notice_reads', { school_id: school.id, user_id: user.id, notice_id: noticeIds }, 1, 50, undefined, 'notice_id')
+    : { items: [] as any[] };
+  const readIds = new Set(reads.items.map((row: any) => String(row.noticeId)));
+  res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)), 'Cache-Control': 'private, no-store, max-age=0' });
+  res.json({ ok: true, data: { items: result.items.map((notice: any) => ({ ...notice, isRead: readIds.has(String(notice.id)) })), pagination: { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: Math.ceil(result.total / result.pageSize) } }, error: null });
+});
+
 apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
@@ -9236,34 +9349,66 @@ apiRouter.post('/notices/:id/read', requireAuth, requireSchoolContext, async (re
 apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User;
   const school = (req as any).school;
-  const users = await db.getUsers(school.id);
   const allowedRoles: Record<string, string[]> = {
-    school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent'], parent: ['teacher', 'student'], student: ['parent']
+    school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent', 'student'], parent: ['teacher', 'student'], student: ['teacher']
   };
-  let contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
-  if (user.role === 'teacher') {
-    const students = await db.getStudents(school.id);
-    const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
-    const assignedStudents = students.filter(student => assignedClassIds.includes(student.classId));
-    const assignedStudentIds = new Set(assignedStudents.map(student => student.id));
-    const phones = new Set(assignedStudents.flatMap(student => [student.fatherPhone, student.motherPhone]).filter(Boolean));
-    contacts = contacts.filter(contact => contact.role !== 'parent' || (contact.linkedStudentIds || []).some(id => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone)));
-  }
-  if (user.role === 'parent') {
-    const linkedStudents = (await db.getStudents(school.id)).filter(student => user.linkedStudentIds?.includes(student.id) || [user.phone, user.parentPhone].includes(student.fatherPhone || '') || [user.phone, user.parentPhone].includes(student.motherPhone || ''));
-    const linkedIds = new Set(linkedStudents.flatMap(student => [student.id, student.studentId]));
-    const linkedClasses = new Set(linkedStudents.map(student => student.classId));
-    const teacherClassScopes = new Map<string, string[]>();
-    for (const contact of contacts.filter(item => item.role === 'teacher')) {
-      teacherClassScopes.set(contact.id, await getTeacherAssignedClassIds(school.id, contact.id));
-    }
-    contacts = contacts.filter(contact => contact.role === 'student'
-      ? Boolean(contact.studentId && linkedIds.has(contact.studentId))
-      : contact.role !== 'teacher' || Boolean((teacherClassScopes.get(contact.id) || []).some(classId => linkedClasses.has(classId))));
-  }
+  let contacts: any[] = [];
   if (user.role === 'student') {
-    const student = (await db.getStudents(school.id)).find(item => item.studentId === user.studentId || item.id === user.id.replace(/^usr-student-/, 'std-'));
-    contacts = contacts.filter(contact => contact.role !== 'parent' || Boolean(student && (contact.linkedStudentIds?.includes(student.id) || [contact.phone, contact.parentPhone].includes(student.fatherPhone || '') || [contact.phone, contact.parentPhone].includes(student.motherPhone || ''))));
+    const student = user.studentId
+      ? (await db.queryPage('students', { school_id: school.id, student_id: user.studentId }, 1, 1, undefined, 'id,class_id')).items[0] as any
+      : null;
+    if (student) {
+      const currentClassId = await getStudentCurrentClassId(school.id, String(student.id), String(student.classId || ''));
+      const [klass, classAssignments] = await Promise.all([
+        currentClassId ? db.getClassById(currentClassId, school.id) : Promise.resolve(null),
+        currentClassId ? db.queryPage('class_subjects', { school_id: school.id, class_id: currentClassId, is_active: 'true' }, 1, 100, undefined, 'teacher_id') : Promise.resolve({ items: [] as any[] })
+      ]);
+      const teacherIds = [...new Set(classAssignments.items.map((row: any) => String(row.teacherId || '')).filter(Boolean))];
+      const teachers = teacherIds.length
+        ? await db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 100, undefined, 'id,user_id')
+        : { items: [] as any[] };
+      const eligibleUserIds = [...new Set([
+        ...(klass?.classTeacherId ? [String(klass.classTeacherId)] : []),
+        ...teachers.items.map((teacher: any) => String(teacher.userId || '')).filter(Boolean)
+      ])];
+      contacts = eligibleUserIds.length
+        ? (await db.queryPage('users', { school_id: school.id, id: eligibleUserIds, role: 'teacher' }, 1, 100, undefined, 'id,role,full_name,email,phone')).items as any[]
+        : [];
+    }
+  } else {
+    const users = await db.getUsers(school.id);
+    contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
+    if (user.role === 'teacher') {
+      const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
+      const currentYearId = await getCurrentAcademicYearId(school.id);
+      const activeEnrollments = currentYearId && assignedClassIds.length
+        ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', class_id: assignedClassIds }, 'student_id,class_id')
+        : [];
+      const enrolledStudentIds = [...new Set(activeEnrollments.map((enrollment: any) => String(enrollment.studentId || '')).filter(Boolean))];
+      const assignedStudents = !assignedClassIds.length
+        ? []
+        : currentYearId
+          ? enrolledStudentIds.length ? await queryAllRows('students', { school_id: school.id, id: enrolledStudentIds }, 'id,student_id,class_id,father_phone,mother_phone') : []
+          : await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone');
+      const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
+      const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
+      const phones = new Set(assignedStudents.flatMap((student: any) => [student.fatherPhone, student.motherPhone]).filter(Boolean));
+      contacts = contacts.filter(contact => contact.role === 'parent'
+        ? (contact.linkedStudentIds || []).some((id: string) => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone))
+        : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
+    }
+    if (user.role === 'parent') {
+      const linkedStudents = (await db.getStudents(school.id)).filter(student => user.linkedStudentIds?.includes(student.id) || [user.phone, user.parentPhone].includes(student.fatherPhone || '') || [user.phone, user.parentPhone].includes(student.motherPhone || ''));
+      const linkedIds = new Set(linkedStudents.flatMap(student => [student.id, student.studentId]));
+      const linkedClasses = new Set(linkedStudents.map(student => student.classId));
+      const teacherClassScopes = new Map<string, string[]>();
+      for (const contact of contacts.filter(item => item.role === 'teacher')) {
+        teacherClassScopes.set(contact.id, await getTeacherAssignedClassIds(school.id, contact.id));
+      }
+      contacts = contacts.filter(contact => contact.role === 'student'
+        ? Boolean(contact.studentId && linkedIds.has(contact.studentId))
+        : contact.role !== 'teacher' || Boolean((teacherClassScopes.get(contact.id) || []).some(classId => linkedClasses.has(classId))));
+    }
   }
   res.json(contacts.map(({ id, role, fullName, email, phone }) => ({ id, role, fullName, email, phone })));
 });
@@ -9292,8 +9437,26 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
   if (typeof content !== 'string' || !content.trim() || content.length > 5000 || typeof recipientId !== 'string') return res.status(400).json({ error: 'A recipient and a message of 1–5000 characters are required.' });
   const recipient = await db.getUserById(recipientId, school.id);
   if (!recipient || recipient.id === user.id) return res.status(404).json({ error: 'Message recipient was not found in this school.' });
-  const allowed: Record<string, string[]> = { school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent'], parent: ['teacher', 'student'], student: ['parent'] };
+  const allowed: Record<string, string[]> = { school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent', 'student'], parent: ['teacher', 'student'], student: ['teacher'] };
   if (!(allowed[user.role] || []).includes(recipient.role)) return res.status(403).json({ error: 'This direct-message role pairing is not allowed.' });
+  if (user.role === 'student' && recipient.role === 'teacher') {
+    const ownStudent = user.studentId
+      ? (await db.queryPage('students', { school_id: school.id, student_id: user.studentId }, 1, 1, undefined, 'id,class_id')).items[0] as any
+      : null;
+    if (!ownStudent) return res.status(403).json({ error: 'Your student record is not linked to this school.' });
+    const currentClassId = await getStudentCurrentClassId(school.id, String(ownStudent.id), String(ownStudent.classId || ''));
+    const teacherClassIds = await getTeacherAssignedClassIds(school.id, recipient.id);
+    if (!currentClassId || !teacherClassIds.includes(currentClassId)) return res.status(403).json({ error: 'Students may message only teachers assigned to their current class.' });
+  }
+  if (user.role === 'teacher' && recipient.role === 'student') {
+    const targetStudent = recipient.studentId
+      ? (await db.queryPage('students', { school_id: school.id, student_id: recipient.studentId }, 1, 1, undefined, 'id,class_id')).items[0] as any
+      : null;
+    if (!targetStudent) return res.status(403).json({ error: 'Student recipient is not linked to this school.' });
+    const currentClassId = await getStudentCurrentClassId(school.id, String(targetStudent.id), String(targetStudent.classId || ''));
+    const teacherClassIds = await getTeacherAssignedClassIds(school.id, user.id);
+    if (!currentClassId || !teacherClassIds.includes(currentClassId)) return res.status(403).json({ error: 'Teachers may message only students in their assigned classes.' });
+  }
   if (user.role === 'parent' && recipient.role === 'student') {
     const linkedStudent = (await db.getStudents(school.id)).find(student => student.studentId === recipient.studentId || student.id === recipient.studentId);
     if (!linkedStudent || !(user.linkedStudentIds?.includes(linkedStudent.id) || [user.phone, user.parentPhone].includes(linkedStudent.fatherPhone || '') || [user.phone, user.parentPhone].includes(linkedStudent.motherPhone || ''))) return res.status(403).json({ error: 'Parents may message only their linked students.' });
@@ -10011,7 +10174,8 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   // still enforces the exact class_teacher_id match before returning any records.
   // Writes remain gated by setup readiness.
   if (role === 'teacher' && req.method === 'GET' && req.path === '/attendance' && typeof req.query.classId === 'string' && req.query.classId.trim()) { next(); return; }
-  if (role !== 'school_admin' && role !== 'teacher' && role !== 'super_admin') {
+  const studentReadOnly = role === 'student' && req.method === 'GET' && req.path === '/timetable';
+  if (role !== 'school_admin' && role !== 'teacher' && role !== 'super_admin' && !studentReadOnly) {
     res.status(403).json({ error: 'Your role cannot access school setup operations.' }); return;
   }
   if (req.query?.setupWizard === 'true' && ['school_admin', 'super_admin'].includes(role)
@@ -11962,6 +12126,12 @@ apiRouter.get('/term-marks/report-cards', requireAuth, requireSchoolContext, req
   if (user.role === 'parent' || user.role === 'student') {
     if (!studentId || !await canAccessStudentRecord(user, studentId)) { res.status(403).json({ error: 'Ma lihid oggolaansho aad u aragto report card-kan.' }); return; }
     query = query.eq('student_id', studentId).not('published_at','is',null).eq('is_stale',false);
+    if (user.role === 'student') {
+      const ownStudent = await db.getStudentById(studentId, school.id);
+      const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
+      if (!currentClassId) { res.json([]); return; }
+      query = query.eq('class_id', currentClassId);
+    }
   } else if (['school_admin','super_admin'].includes(user.role)) {
     if (classId) query = query.eq('class_id', classId);
     if (academicYearId) query = query.eq('academic_year_id', academicYearId);
@@ -12030,6 +12200,11 @@ apiRouter.get('/term-marks/report-cards/:studentId/pdf', requireAuth, requireSch
   const client = termMarksServiceClient(res); if (!client) return;
   let query = client.from('report_cards').select('*').eq('school_id',school.id).eq('student_id',student.id);
   if (user.role === 'parent' || user.role === 'student') query = query.not('published_at','is',null).eq('is_stale',false);
+  if (user.role === 'student') {
+    const currentClassId = await getStudentCurrentClassId(school.id, student.id, student.classId);
+    if (!currentClassId) { res.status(404).json({ error: 'Report card lama helin fasalka hadda.' }); return; }
+    query = query.eq('class_id', currentClassId);
+  }
   const { data: card, error } = await query.order('created_at',{ascending:false}).limit(1).maybeSingle();
   if (error || !card) { res.status(404).json({ error: 'Report Card lama helin ama wali lama daabicin.' }); return; }
   if (card.is_stale) { res.status(409).json({ error: 'Report Card-kan wuu duugoobay; dugsigu waa inuu dib u sameeyo.' }); return; }

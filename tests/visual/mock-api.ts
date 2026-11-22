@@ -1,3 +1,4 @@
+const studentMode = new URLSearchParams(window.location.search).get('component') === 'student';
 const klass = { id: 'class-4a', name: 'Grade 4', section: 'A', classTeacherId: 'teacher-visual-001', academicYear: '2026-2027' };
 const math = { id: 'subject-math', name: 'Mathematics', code: 'MATH' };
 const science = { id: 'subject-science', name: 'Environmental Science', code: 'ENV' };
@@ -39,7 +40,43 @@ const setupState = {
   progress: { currentStep: 10, completedSteps: [0, 1, 2, 3, 4, 5, 6, 8], skippedSteps: [7, 9], completedAt: null },
   checklist: setupChecklist, canFinish: true
 };
+const studentProfile = {
+  student: { id: 'student-visual-001', schoolId: 'school-visual-001', studentId: 'ST-0421', firstName: 'Faadumo', middleName: 'Axmed', lastName: 'Cabdi', classId: klass.id, section: 'A', status: 'active', rollNumber: '12' },
+  classId: klass.id, className: 'Grade 4 · A', formTeacherName: 'Amina Teacher', academicYear: '2026/2027', academicYearId: 'year-visual-001'
+};
+const studentAttendance = [
+  { id: 'att-1', date: '2026-11-02', status: 'present' }, { id: 'att-2', date: '2026-11-03', status: 'present' },
+  { id: 'att-3', date: '2026-11-04', status: 'late' }, { id: 'att-4', date: '2026-11-05', status: 'absent' },
+  { id: 'att-5', date: '2026-11-06', status: 'present' }, { id: 'att-6', date: '2026-11-09', status: 'present' }
+];
+const studentMarks = [
+  { id: 'mark-1', subjectId: math.id, subjectName: math.name, semester: 'Semester 1', totalMarks: 82, percentage: 82, status: 'approved', publishedAt: '2026-11-01T10:00:00Z', grade: 'A' },
+  { id: 'mark-2', subjectId: science.id, subjectName: science.name, semester: 'Semester 1', totalMarks: 76, percentage: 76, status: 'approved', publishedAt: '2026-11-01T10:00:00Z', grade: 'B' }
+];
+const studentHomework = [
+  { id: 'hw-1', classId: klass.id, subjectId: math.id, subjectName: math.name, title: 'Layliska 5.2', description: 'Xalli su’aalaha 1 ilaa 12.', dueDate: '2099-11-29', maxPoints: 20 },
+  { id: 'hw-2', classId: klass.id, subjectId: science.id, subjectName: science.name, title: 'Sawir unugga dhirta', description: 'Sawir oo sharax qaybaha unugga.', dueDate: '2099-11-20', maxPoints: 10, submission: { id: 'sub-1', status: 'submitted', content: 'Jawaabtayda waa diyaar.', submittedAt: '2026-11-20T09:00:00Z' } }
+];
+const studentNotices = [
+  { id: 'notice-1', title: 'Imtixaanka dhexe', content: 'Jadwalka imtixaanka dhexe waa la daabacay.', publishDate: '2026-11-21', authorName: 'Maamulka', isRead: false },
+  { id: 'notice-2', title: 'Kulanka waalidiinta', content: 'Kulanku wuxuu dhacayaa Khamiista.', publishDate: '2026-11-19', authorName: 'Maamulka', isRead: true }
+];
+const studentContacts = [{ id: 'teacher-user-visual-001', role: 'teacher', fullName: 'Amina Teacher' }];
+const studentMessages = [{ id: 'msg-1', senderId: 'teacher-user-visual-001', recipientId: 'student-user-visual-001', content: 'Ku soo dhawoow fasalka.', timestamp: '2026-11-20T08:00:00Z' }];
 const values: Record<string, (...args: any[]) => Promise<any>> = {
+  getStudentProfile: async () => studentProfile,
+  getStudentNotices: async () => studentNotices,
+  getNoticeUnreadCount: async () => ({ count: 1 }),
+  getStudentAttendance: async () => studentAttendance,
+  getStudentMarks: async () => studentMarks,
+  getAssignments: async () => studentMode ? studentHomework : [],
+  getMessageContacts: async () => studentMode ? studentContacts : [],
+  getMessages: async () => studentMode ? studentMessages : [],
+  markMessagesRead: async () => ({ success: true }),
+  sendMessage: async () => ({ id: 'msg-new' }),
+  markNoticeRead: async () => ({ success: true }),
+  submitAssignment: async () => ({ id: 'submission-new', status: 'submitted' }),
+
   getTeacherSubjectAssignments: async () => assignments,
   getClasses: async () => [klass],
   getSubjects: async () => [math, science],
@@ -53,13 +90,10 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getPublishedExamSchedules: async () => [],
   getTeacherExamInvigilation: async () => [],
   getSchoolDashboard: async () => ({ stats: { totalStudents: students.length, attendanceRate: 67 }, totalClasses: 1, totalPeriodsPerWeek: timetable.length, openHomeworkCount: 0, attendanceRecordedToday: 2, todayAttendance: 2 }),
-  getAssignments: async () => [],
   getAllStudents: async () => students,
   getDailyAttendance: async () => [],
   getMarks: async () => [],
   getFormTeacherComments: async () => [],
-  getMessages: async () => [],
-  getMessageContacts: async () => [],
   getMyPayslips: async () => [],
   getSchoolSetupData: async () => ({ data: { schoolInformation: { name: 'SchoolOS Test Academy', address: 'Main Street', city: 'Jijiga', phone: '+251911000001', email: 'office@example.test', whatsappPhone: '+251911000001', schoolType: 'combined' }, academicYear: { name: '2026/2027', startDate: '2026-09-01', endDate: '2027-06-30', isCurrent: true }, terms: [{ name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-20' }, { name: 'Semester 2', startDate: '2027-02-01', endDate: '2027-06-30' }], calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' }, workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 }, completedSteps: [1, 2, 3, 4, 5] }, school: { name: 'SchoolOS Test Academy', address: 'Main Street', city: 'Jijiga', phone: '+251911000001', email: 'office@example.test', whatsappPhone: '+251911000001', schoolType: 'combined', logoUrl: '' } }),
   getSchoolSetupProgress: async () => setupState,

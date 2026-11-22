@@ -178,7 +178,7 @@ const AppContent: React.FC = () => {
 
       <div className="min-h-0 flex-1 flex overflow-hidden">
         {/* Keep first-time School Admins in setup until the required checklist is complete. */}
-        {!setupRequired && (
+        {!setupRequired && user.role !== 'student' && (
           <Sidebar
             currentView={activeView}
             onNavigate={handleNavigate}
@@ -189,7 +189,7 @@ const AppContent: React.FC = () => {
 
         {/* Main Viewport Hub */}
         <div className="min-h-0 flex-1 flex flex-col min-w-0 overflow-hidden">
-          {!setupRequired && <Header currentView={activeView} onNavigate={handleNavigate} />}
+          {!setupRequired && user.role !== 'student' && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
           <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6">
             {setupRequired && activeView !== 'sch_setup' && (
@@ -361,7 +361,7 @@ const AppContent: React.FC = () => {
             )}
 
             {/* STUDENT ROUTING */}
-            {activeView === 'st_messages' ? <MessagesView /> : activeView.startsWith('st_') && (
+            {activeView.startsWith('st_') && (
               <StudentPortalView />
             )}
             </React.Suspense>
@@ -370,7 +370,7 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Mobile Touch Bottom Navigation */}
-      {!setupRequired && (
+      {!setupRequired && user.role !== 'student' && (
         <MobileBottomNav
           currentView={activeView}
           onNavigate={handleNavigate}
