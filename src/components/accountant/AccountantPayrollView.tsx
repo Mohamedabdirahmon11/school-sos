@@ -189,12 +189,41 @@ export const AccountantPayrollView: React.FC = () => {
 };
 
 export const StaffPayslipsView: React.FC = () => {
-  const { school, t } = useAuth();
+  const { user, school, t } = useAuth();
+  const isTeacher = user?.role === 'teacher';
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [records, setRecords] = useState<StaffPayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const copyPayslipSummary = async (record: StaffPayrollRecord) => {
+    const currency = isTeacher ? 'ETB' : school?.currency;
+    const allowanceLines = Array.isArray(record.allowances)
+      ? record.allowances.map(item => `${item.label}: ${formatMoney(item.amount, currency)}`)
+      : [`Allowances: ${formatMoney(Number(record.allowances) || record.allowanceTotal, currency)}`];
+    const deductionLines = Array.isArray(record.deductions)
+      ? record.deductions.map(item => `${item.label}: ${formatMoney(item.amount, currency)}`)
+      : [`Deductions: ${formatMoney(Number(record.deductions) || record.deductionTotal, currency)}`];
+    const summary = [
+      `Payslip · ${record.payrollMonth}`,
+      `Basic salary: ${formatMoney(record.baseSalary, currency)}`,
+      ...allowanceLines,
+      `Allowance total: ${formatMoney(record.allowanceTotal, currency)}`,
+      ...deductionLines,
+      `Deduction total: ${formatMoney(record.deductionTotal, currency)}`,
+      `Net pay: ${formatMoney(record.netSalary, currency)}`,
+      `Paid: ${formatMoney(record.paidAmount ?? 0, currency)}`,
+      `Balance: ${formatMoney(record.balanceDue ?? record.netSalary, currency)}`
+    ].join('\\n');
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopiedId(record.id);
+    } catch {
+      setError('Unable to copy the payslip summary on this device.');
+    }
+  };
 
   const downloadPayslip = async (recordId: string) => {
     if (downloadingId) return;
@@ -228,7 +257,7 @@ export const StaffPayslipsView: React.FC = () => {
           <div>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-100">Staff workspace · Payroll</p>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t('payroll_payslip')}</h1>
-            <p className="mt-1 text-sm text-teal-100/90">Your personal monthly pay statements and downloadable records.</p>
+            <p className="mt-1 text-sm text-teal-100/90">{isTeacher ? 'Your personal monthly pay statements. Read-only; managed by the school Accountant.' : 'Your personal monthly pay statements and downloadable records.'}</p>
           </div>
           <span className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">{records.length} statement(s)</span>
         </div>
@@ -258,11 +287,18 @@ export const StaffPayslipsView: React.FC = () => {
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Payroll period</p>
                 <h2 className="mt-2 text-lg font-bold text-slate-900">{record.payrollMonth}</h2>
                 <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Net salary</p>
-                <p className="mt-1 text-2xl font-bold tracking-tight text-teal-800">{formatMoney(record.netSalary, school?.currency)}</p>
-                <p className="mt-2 text-xs text-slate-500">Paid: {formatMoney(record.paidAmount ?? (record.status === 'paid' ? record.netSalary : 0), school?.currency)} · Remaining: {formatMoney(record.balanceDue ?? (record.netSalary - (record.paidAmount || 0)), school?.currency)}</p>
+                <p className="mt-1 text-2xl font-bold tracking-tight text-teal-800">{formatMoney(record.netSalary, isTeacher ? 'ETB' : school?.currency)}</p>
+                <p className="mt-2 text-xs text-slate-500">Paid: {formatMoney(record.paidAmount ?? (record.status === 'paid' ? record.netSalary : 0), isTeacher ? 'ETB' : school?.currency)} · Remaining: {formatMoney(record.balanceDue ?? (record.netSalary - (record.paidAmount || 0)), isTeacher ? 'ETB' : school?.currency)}</p>
                 <p className="mt-1 text-xs font-semibold text-slate-600">Status: {record.status === 'partially_paid' ? 'Partially paid' : record.status}</p>
+                <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs">
+                  <span className="text-slate-500">Basic salary</span><b className="text-right">{formatMoney(record.baseSalary, isTeacher ? 'ETB' : school?.currency)}</b>
+                  <span className="text-slate-500">Allowances</span><b className="text-right">{formatMoney(record.allowanceTotal, isTeacher ? 'ETB' : school?.currency)}</b>
+                  <span className="text-slate-500">Deductions</span><b className="text-right">{formatMoney(record.deductionTotal, isTeacher ? 'ETB' : school?.currency)}</b>
+                </div>
               </div>
-              <button type="button" onClick={() => void downloadPayslip(record.id)} disabled={downloadingId !== null} className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 disabled:cursor-wait disabled:opacity-60">{downloadingId === record.id ? 'Preparing PDF…' : t('payroll_payslip')}</button>
+              {isTeacher
+                ? <button type="button" onClick={() => void copyPayslipSummary(record)} className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100"> {copiedId === record.id ? 'Copied' : 'Copy summary'} </button>
+                : <button type="button" onClick={() => void downloadPayslip(record.id)} disabled={downloadingId !== null} className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 disabled:cursor-wait disabled:opacity-60">{downloadingId === record.id ? 'Preparing PDF…' : t('payroll_payslip')}</button>}
             </article>
           ))}
         </div>

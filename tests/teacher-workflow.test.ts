@@ -404,6 +404,7 @@ test('teacher timetable is a weekday period matrix backed by the authenticated t
   assert.match(teacher, /const timetablePeriods = \[\.\.\.new Map\(timetable\.map/);
   assert.match(teacher, /timetableMatrixDays\.map\(day/);
   assert.match(teacher, /item\.dayOfWeek === day && item\.periodNumber === period\.periodNumber/);
+  assert.match(teacher, /getTeacherSubjectHue\(slot\.subjectId\)/);
   assert.match(teacher, /period\.startTime/);
   assert.match(teacher, /period\.endTime/);
 });
@@ -415,6 +416,15 @@ test('teacher student register includes parent phone and explicit mobile and des
   assert.match(teacher, /Phone not provided/);
   assert.match(teacher, /No students match your search\./);
   assert.match(teacher, /No students found in this assigned class\./);
+});
+
+test('teacher payslips are read-only, show ETB breakdown and offer copy instead of PDF download', () => {
+  const payroll = read('../src/components/accountant/AccountantPayrollView.tsx');
+  assert.match(payroll, /const isTeacher = user\?\.role === 'teacher'/);
+  assert.match(payroll, /copyPayslipSummary/);
+  assert.match(payroll, /isTeacher \? 'ETB'/);
+  assert.match(payroll, /Copy summary/);
+  assert.match(payroll, /: <button type="button" onClick=\{\(\) => void downloadPayslip/);
 });
 
 test('teacher portal refreshes assignments and timetable after administrator changes', () => {

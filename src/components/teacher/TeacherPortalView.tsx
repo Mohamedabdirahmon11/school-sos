@@ -57,6 +57,12 @@ const formatTeacherGuardianPhone = (...values: unknown[]) => {
   return raw || 'Phone not provided';
 };
 
+const getTeacherSubjectHue = (subjectId: string) => {
+  let hash = 0;
+  for (const character of subjectId) hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  return Math.abs(hash) % 360;
+};
+
 interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices' | 'profile';
 }
@@ -801,10 +807,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                         return (
                           <td key={period.periodNumber} className="p-2 align-top">
                             {slot ? (
-                              <div className="min-h-16 rounded-lg border border-teal-200 bg-teal-50 p-2">
-                                <p className="font-semibold text-teal-900">{(slot as any).subjectName || subject?.name || 'Subject'}</p>
-                                <p className="mt-1 text-[10px] text-slate-600">{(slot as any).className || klass?.name || 'Class'}{klass?.section ? ` · ${klass.section}` : ''}</p>
-                                <p className="mt-1 text-[10px] text-slate-500">Room {slot.roomNumber || 'TBA'}</p>
+                              <div className="min-h-16 rounded-lg border border-slate-200 p-2" style={{ backgroundColor: `hsl(${getTeacherSubjectHue(slot.subjectId)} 60% var(--tp-slot-bg, 91%))`, color: `hsl(${getTeacherSubjectHue(slot.subjectId)} 55% var(--tp-slot-fg, 24%))` }}>
+                                <p className="font-semibold">{(slot as any).subjectName || subject?.name || 'Subject'}</p>
+                                <p className="mt-1 text-[10px] opacity-80">{(slot as any).className || klass?.name || 'Class'}{klass?.section ? ` · ${klass.section}` : ''}</p>
+                                <p className="mt-1 text-[10px] opacity-75">Room {slot.roomNumber || 'TBA'}</p>
                               </div>
                             ) : <div className="flex min-h-16 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-400">—</div>}
                           </td>
