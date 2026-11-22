@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teacher Portal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: left menu + one working panel; on phones the menu becomes a scrolling chip row. */
+:root{
+  --bg:#f2f5f8; --surface:#fff; --fg:#13202d; --muted:#5a6878; --line:#dbe2ea;
+  --brand:#0e6a62; --brand-fg:#fff; --soft:#e3f1ef; --bad:#b8302a; --bad-bg:#fde9e7; --ok:#1d7a4a; --ok-bg:#e0f3e8; --warn:#8a5a00; --warn-bg:#fff1d6;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-head:'Space Grotesk','Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#0d141b;--surface:#151e28;--fg:#e5ebf1;--muted:#92a0b1;--line:#263342;--brand:#4cc3b5;--brand-fg:#06201d;--soft:#16332f;--bad:#ff8c82;--bad-bg:#3b1d1b;--ok:#6fd49b;--ok-bg:#16301f;--warn:#f2c14e;--warn-bg:#3a2e12;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#0d141b;--surface:#151e28;--fg:#e5ebf1;--muted:#92a0b1;--line:#263342;--brand:#4cc3b5;--brand-fg:#06201d;--soft:#16332f;--bad:#ff8c82;--bad-bg:#3b1d1b;--ok:#6fd49b;--ok-bg:#16301f;--warn:#f2c14e;--warn-bg:#3a2e12;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;
+  padding-block:0 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1140px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:18px 0 14px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--brand);color:var(--brand-fg);display:grid;place-items:center;font-family:var(--font-head);font-weight:700}
+.top b{font-family:var(--font-head);font-size:18px;display:block;line-height:1.2}
+.top span{color:var(--muted);font-size:12px}
+.sp{flex:1}
+.grid{display:grid;grid-template-columns:210px minmax(0,1fr);gap:20px;align-items:start}
+.menu{position:sticky;top:12px;display:flex;flex-direction:column;gap:2px}
+.menu a{display:flex;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:9px;color:var(--fg);text-decoration:none;font-weight:500}
+.menu a[aria-current="page"]{background:var(--brand);color:var(--brand-fg)}
+.menu .n{font-size:11px;font-weight:600;background:var(--bad);color:#fff;border-radius:999px;padding:0 7px}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+h2{font-family:var(--font-head);font-size:22px;margin:0 0 2px;letter-spacing:-.01em}
+.lead{color:var(--muted);margin:0 0 14px;max-width:70ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card+.card{margin-top:14px}
+.card h3{font-family:var(--font-head);font-size:15px;margin:0 0 10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat small{display:block;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.stat b{font-family:var(--font-head);font-size:26px;font-variant-numeric:tabular-nums}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f label,.lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+select,input[type=text],input[type=number],input[type=date],textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:38px;max-width:100%}
+textarea{width:100%;min-height:80px;resize:vertical}
+option{background:var(--surface);color:var(--fg)}
+button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:8px 14px;min-height:38px;cursor:pointer}
+button.primary{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+button.ghost{border:0;background:transparent;color:var(--bad);min-height:30px;padding:4px 8px}
+.pill{display:inline-flex;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;background:var(--soft);color:var(--brand)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.warn{background:var(--warn-bg);color:var(--warn)}.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.msg{min-height:20px;font-size:13px;margin-bottom:6px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:520px;font-variant-numeric:tabular-nums}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);font-weight:600}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right}
+td input[type=number]{width:74px;text-align:right}
+td input.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px;background:var(--bg)}
+.seg button{border:0;background:transparent;min-height:32px;padding:3px 12px;color:var(--muted)}
+.seg button[aria-pressed="true"].P{background:var(--ok);color:#fff}
+.seg button[aria-pressed="true"].A{background:var(--bad);color:#fff}
+.seg button[aria-pressed="true"].L{background:var(--warn);color:#fff}
+.tt td{padding:4px;border:0}.tt th{padding:2px 4px}
+.slot{border-radius:8px;padding:8px 6px;text-align:center;font-weight:600;font-size:13px;min-height:46px;display:flex;flex-direction:column;justify-content:center}
+.slot small{font-weight:400;font-size:11px;opacity:.85}
+.slot.e{border:1px dashed var(--line);color:var(--muted);font-weight:400}
+.slot.now{outline:2px solid var(--brand);outline-offset:1px}
+.list{display:flex;flex-direction:column}
+.it{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.it:first-child{border-top:0}
+.it .g{flex:1;min-width:200px}
+.mut{color:var(--muted)}
+.lock{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+.chat{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:260px;overflow:auto}
+.b{max-width:80%;padding:8px 12px;border-radius:12px;background:var(--bg)}
+.b.me{align-self:flex-end;background:var(--brand);color:var(--brand-fg)}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px}
+.kv b{text-align:right;font-variant-numeric:tabular-nums}
+.net{font-family:var(--font-head);font-size:28px;color:var(--brand)}
+@media (max-width:860px){.grid{grid-template-columns:1fr}.menu{position:static;flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:4px}
+ .menu a{white-space:nowrap;border:1px solid var(--line);background:var(--surface)}.menu a[aria-current="page"]{border-color:var(--brand)}}
+</style>
+
+<div class="wrap">
+ <div class="top"><div class="av">MM</div><div><b>Mohamed Muuse</b><span>Teacher · T004 · BUS10 · Form Teacher of Grade 4 · A</span></div><span class="sp"></span><span class="pill" id="today"></span></div>
+ <div class="grid"><nav class="menu" id="menu" aria-label="Teacher portal"></nav><main id="view"></main></div>
+</div>
+
+<script>
+/* ---- data ---- */
+const ME={name:'Mohamed Muuse',id:'T004',form:'4A'};
+const CLS={'4A':'Grade 4 · A','5A':'Grade 5 · A','6A':'Grade 6 · A'};
+const SUBJ={ma:['Xisaab',265],es:['Environmental Sci.',125]};
+const ASG=[['4A','ma',5],['4A','es',4],['5A','ma',5],['6A','es',4]]; /* class, subject, periods/week */
+const ST={'4A':['Axmed Cabdi','Ayaan Maxamed','Bilal Yuusuf','Dahabo Cali','Hodan Nuur','Ismaaciil Cumar'],
+ '5A':['Faarax Xasan','Idil Ibraahim','Khaalid Warsame','Maryan Jaamac','Sacdiyo Aadan','Zakariye Diiriye'],
+ '6A':['Abdullaahi Siciid','Fowsiya Axmed','Guuleed Maxamuud','Iftin Cabdulle','Najma Xuseen','Yaasiin Cilmi']};
+const DAYS=['Isniin','Talaado','Arbaco','Khamiis','Jimce'];
+const TIMES=['8:00','8:45','9:30','10:30','11:15','12:00'];
+const PH={'4A':'+251 91 100 0001','5A':'+251 91 100 0002','6A':'+251 91 100 0003'};
+/* timetable: fill periods round-robin, same subject max twice a day */
+const TT=DAYS.map(()=>Array(6).fill(null));
+(function(){const left=ASG.map(a=>({c:a[0],s:a[1],n:a[2]}));
+ for(let d=0;d<5;d++){const used={};for(let p=0;p<6;p++){
+  const used2=TT.map((_,dd)=>dd===d?null:TT[dd][p]).filter(Boolean);
+  const pick=left.filter(x=>x.n>0&&(used[x.c+x.s]||0)<2&&!used2.some(u=>u.c===x.c)).sort((a,b)=>b.n-a.n)[0];
+  if(pick&&Math.random()>-1){TT[d][p]={c:pick.c,s:pick.s};pick.n--;used[pick.c+pick.s]=(used[pick.c+pick.s]||0)+1}}}})();
+
+let S={att:{},marks:{},hw:[
+ {id:1,c:'4A',s:'ma',t:'Isku-jir iyo ka-jir: bog 42',due:'2026-11-25',done:false},
+ {id:2,c:'5A',s:'ma',t:'Jaantuska isku-dhufashada',due:'2026-11-24',done:false},
+ {id:3,c:'6A',s:'es',t:'Qoraal gaaban: Biyaha',due:'2026-11-27',done:true}],
+ notices:[{id:1,t:'Shir macallimiinta',d:'Khamiista, 2:00 PM, qolka shirarka.',pin:true},{id:2,t:'Imtixaanka Semester 1',d:'Dhibcaha waa in la geliyaa ka hor Jimcaha.',pin:false},{id:3,t:'Fasax Jimce',d:'Maalinta Jimcaha waa nus-maalin.',pin:false}],
+ msgs:[{to:'Waalidka Axmed Cabdi',t:'Axmed wuu ka soo hormarayaa Xisaabta.',me:true},{to:'Waalidka Axmed Cabdi',t:'Mahadsanid macallin.',me:false}],
+ theme:'system',mm:'Nov 2026',pay:true};
+try{const r=JSON.parse(localStorage.getItem('teacher-portal')||'null');if(r)S=Object.assign(S,r)}catch(e){}
+const save=()=>{try{localStorage.setItem('teacher-portal',JSON.stringify(S))}catch(e){}};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const opt=(v,t,s)=>`<option value="${esc(v)}"${s?' selected':''}>${esc(t)}</option>`;
+const $=id=>document.getElementById(id);
+const view=$('view');
+const todayISO=new Date().toISOString().slice(0,10);
+$('today').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
+const grade=n=>n>=90?'A':n>=80?'B':n>=70?'C':n>=60?'D':'F';
+const hue=s=>SUBJ[s][1];
+function applyTheme(){const r=document.documentElement;if(S.theme==='system')r.removeAttribute('data-theme');else r.setAttribute('data-theme',S.theme)}
+let msg='',bad=false;const note=(m,b)=>{msg=m;bad=!!b};
+const mh=()=>`<div class="msg" role="status" style="color:${bad?'var(--bad)':'var(--ok)'}">${esc(msg)}</div>`;
+
+/* ---- sections ---- */
+const TABS=[['dashboard','Dashboard'],['timetable','Timetable'],['students','Students'],['attendance','Attendance'],['marks','Exam Marks'],['homework','Homework'],['notices','Notice Board'],['messages','Messages'],['payslip','Payslip'],['profile','My Profile']];
+function menu(cur){const open=S.hw.filter(h=>!h.done).length;
+ $('menu').innerHTML=TABS.map(([k,t])=>`<a href="#${k}"${k===cur?' aria-current="page"':''}>${t}${k==='homework'&&open?`<span class="n">${open}</span>`:''}</a>`).join('')}
+
+function dashboard(){
+  const di=(new Date().getDay()+6)%7,today=di<5?TT[di]:[];
+  const total=ASG.reduce((a,x)=>a+x[2],0),students=new Set(ASG.map(a=>a[0])).size?Object.keys(CLS).reduce((a,c)=>a+ST[c].length,0):0;
+  view.innerHTML=`<h2>Dashboard</h2><p class="lead">Fasalladaada, casharrada maanta iyo shaqooyinka furan.</p>
+  <div class="stats"><div class="stat"><small>Fasallo</small><b>${Object.keys(CLS).length}</b></div><div class="stat"><small>Arday</small><b>${students}</b></div>
+   <div class="stat"><small>Xiisado/toddobaad</small><b>${total}</b></div><div class="stat"><small>Shaqo guri furan</small><b>${S.hw.filter(h=>!h.done).length}</b></div></div>
+  <div class="two"><div class="card"><h3>Casharrada maanta</h3>${today.some(Boolean)?`<div class="list">${today.map((s,p)=>s?`<div class="it"><b style="width:52px">${TIMES[p]}</b><div class="g">${SUBJ[s.s][0]} <span class="mut">· ${CLS[s.c]}</span></div></div>`:'').join('')}</div>`:'<p class="mut">Maanta cashar ma jiro.</p>'}</div>
+  <div class="card"><h3>Waxa la sameeyo</h3><div class="list">
+   <div class="it"><div class="g">Attendance — ${CLS[ME.form]}</div>${S.att[ME.form+todayISO]?'<span class="pill ok">La qaaday</span>':'<span class="pill warn">Weli lama qaadin</span>'}<a href="#attendance"><button>Fur</button></a></div>
+   <div class="it"><div class="g">Gelinta dhibcaha</div><a href="#marks"><button>Fur</button></a></div>
+   <div class="it"><div class="g">Notice cusub</div><span class="pill">${S.notices.length}</span><a href="#notices"><button>Eeg</button></a></div></div></div></div>`}
+
+function timetable(){
+  view.innerHTML=`<h2>Timetable</h2><p class="lead">Jadwalkaaga toddobaadlaha ah (fasallada iyo maaddooyinka lagu qoondeeyay oo keliya).</p>
+  <div class="card"><div class="scroll"><table class="tt"><thead><tr><th></th>${TIMES.map((t,i)=>`<th>Xiisad ${i+1}<br><span class="mut" style="font-weight:400">${t}</span></th>`).join('')}</tr></thead><tbody>
+  ${DAYS.map((d,di)=>`<tr><th style="white-space:nowrap">${d}</th>${TT[di].map(s=>s?`<td><div class="slot" style="background:hsl(${hue(s.s)} 60% var(--tl,90%));color:hsl(${hue(s.s)} 55% var(--tt,24%))">${SUBJ[s.s][0]}<small>${CLS[s.c]}</small></div></td>`:`<td><div class="slot e">—</div></td>`).join('')}</tr>`).join('')}
+  </tbody></table></div></div>
+  <style>:root{--tl:91%;--tt:24%}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--tl:23%;--tt:86%}}:root[data-theme="dark"]{--tl:23%;--tt:86%}</style>`}
+
+let stC='4A';
+function students(){
+  view.innerHTML=`<h2>Students</h2><p class="lead">Ardayda fasalladaada. Telefoonka waalidka waa sidoo kale halkan.</p>
+  <div class="card"><div class="bar"><div class="f"><label for="sc">Fasal</label><select id="sc">${Object.keys(CLS).map(c=>opt(c,CLS[c]+(c===ME.form?' (Form Teacher)':''),c===stC)).join('')}</select></div></div>
+  <div class="scroll"><table><thead><tr><th>#</th><th>Arday</th><th>Telefoon waalid</th><th>Xaalad</th></tr></thead><tbody>${ST[stC].map((n,i)=>`<tr><td>${i+1}</td><td><b>${n}</b></td><td>${PH[stC].slice(0,-1)}${i+1}</td><td><span class="pill ok">Active</span></td></tr>`).join('')}</tbody></table></div></div>`;
+  $('sc').onchange=e=>{stC=e.target.value;students()}}
+
+let atD=todayISO,atC=ME.form;
+function attendance(){
+  const key=atC+atD,rec=S.att[key]||{};
+  const mine=atC===ME.form,cnt={P:0,A:0,L:0};Object.values(rec).forEach(v=>cnt[v]++);
+  view.innerHTML=`<h2>Daily Attendance</h2><p class="lead">Attendance-ka fasalka waxaa qaata Form Teacher-kiisa oo keliya. Fasallada kale waad arki kartaa, laakiin ma qaadi kartid.</p>
+  <div class="card"><div class="bar"><div class="f"><label for="ac">Fasal</label><select id="ac">${Object.keys(CLS).map(c=>opt(c,CLS[c],c===atC)).join('')}</select></div>
+  <div class="f"><label for="ad">Taariikh</label><input id="ad" type="date" value="${atD}" max="${todayISO}"></div><span class="sp"></span>
+  <span class="pill ok">Present ${cnt.P}</span><span class="pill bad">Absent ${cnt.A}</span><span class="pill warn">Late ${cnt.L}</span></div>
+  ${mine?'':`<div class="lock">Ma ihid Form Teacher-ka ${CLS[atC]}. Attendance-ka kaliya waa la arki karaa.</div>`}${mh()}
+  <div class="scroll"><table><thead><tr><th>Arday</th><th>Xaalad</th></tr></thead><tbody>${ST[atC].map((n,i)=>`<tr><td>${n}</td><td><div class="seg" role="group" aria-label="${esc(n)}">${[['P','Present'],['A','Absent'],['L','Late']].map(([k,t])=>`<button type="button" class="${k}" data-i="${i}" data-k="${k}" aria-pressed="${rec[i]===k}"${mine?'':' disabled'}>${t}</button>`).join('')}</div></td></tr>`).join('')}</tbody></table></div>
+  ${mine?`<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><button id="allp">Dhammaan Present</button><button class="primary" id="saveat">Keydi attendance</button></div>`:''}</div>`;
+  $('ac').onchange=e=>{atC=e.target.value;note('');attendance()};$('ad').onchange=e=>{atD=e.target.value||todayISO;note('');attendance()};
+  if(mine){const set=(i,k)=>{S.att[key]=S.att[key]||{};S.att[key][i]=k};
+   view.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{set(b.dataset.i,b.dataset.k);attendance()});
+   $('allp').onclick=()=>{ST[atC].forEach((_,i)=>set(i,'P'));attendance()};
+   $('saveat').onclick=()=>{const r=S.att[key]||{};if(Object.keys(r).length<ST[atC].length){note('Dhammaan ardayda xaalad u dooro ka hor intaadan keydin.',1)}else{save();note('Attendance waa la keydiyey.')}attendance()}}}
+
+let mC='4A',mS='ma',mT=1,mX=50;
+function marks(){
+  const opts=ASG.map(a=>a[0]+'|'+a[1]),key=[mC,mS,mT].join('|');S.marks[key]=S.marks[key]||{};const R=S.marks[key];
+  const valid=ASG.some(a=>a[0]===mC&&a[1]===mS);
+  const subs=ASG.filter(a=>a[0]===mC).map(a=>a[1]);if(!subs.includes(mS)){mS=subs[0]}
+  const tot=ST[mC].map((_,i)=>{const r=R[i]||{};return(r.e!=null&&r.a!=null&&r.e>=0&&r.e<=mX&&r.a>=0&&r.a<=100-mX)?r.e+r.a:null}).filter(v=>v!==null);
+  view.innerHTML=`<h2>Exam Marks</h2><p class="lead">Term kasta waa 100. Waxaad geli kartaa kaliya fasalladaada iyo maaddooyinkaaga.</p>
+  <div class="card"><div class="bar"><div class="f"><label for="mc">Fasal</label><select id="mc">${[...new Set(ASG.map(a=>a[0]))].map(c=>opt(c,CLS[c],c===mC)).join('')}</select></div>
+  <div class="f"><label for="ms">Maaddo</label><select id="ms">${subs.map(s=>opt(s,SUBJ[s][0],s===mS)).join('')}</select></div>
+  <div class="f"><label for="mt">Term</label><select id="mt">${opt(1,'Term 1',mT===1)}${opt(2,'Term 2',mT===2)}</select></div>
+  <div class="f"><label for="mx">Qaybinta</label><select id="mx">${opt(50,'Exam 50 + Assess. 50',mX===50)}${opt(60,'Exam 60 + Assess. 40',mX===60)}</select></div><span class="sp"></span><span class="pill">Gelay ${tot.length}/${ST[mC].length}</span></div>${mh()}
+  <div class="scroll"><table><thead><tr><th>Arday</th><th class="n">Exam /${mX}</th><th class="n">Assessment /${100-mX}</th><th class="n">Total</th><th>Darajo</th></tr></thead><tbody>
+  ${ST[mC].map((n,i)=>{const r=R[i]||{};return `<tr data-i="${i}"><td>${n}</td><td class="n"><input type="number" min="0" max="${mX}" step="0.5" inputmode="decimal" data-f="e" aria-label="Exam ${esc(n)}" value="${r.e??''}"></td><td class="n"><input type="number" min="0" max="${100-mX}" step="0.5" inputmode="decimal" data-f="a" aria-label="Assessment ${esc(n)}" value="${r.a??''}"></td><td class="n t"></td><td class="g"></td></tr>`}).join('')}</tbody>
+  <tfoot><tr><td colspan="3" class="mut">Celcelis fasalka</td><td class="n" id="avg"></td><td></td></tr></tfoot></table></div>
+  <div style="margin-top:12px"><button class="primary" id="sm">Keydi dhibcaha</button></div></div>`;
+  const calc=tr=>{const r=R[tr.dataset.i]||{},e=tr.querySelector('[data-f="e"]'),a=tr.querySelector('[data-f="a"]');
+   e.classList.toggle('bad',r.e!=null&&(r.e<0||r.e>mX));a.classList.toggle('bad',r.a!=null&&(r.a<0||r.a>100-mX));
+   const ok=r.e!=null&&r.a!=null&&r.e>=0&&r.e<=mX&&r.a>=0&&r.a<=100-mX,t=ok?r.e+r.a:null;
+   tr.querySelector('.t').innerHTML=t===null?'<span class="mut">—</span>':`<b>${t}</b>`;
+   tr.querySelector('.g').innerHTML=t===null?'':`<span class="pill ${grade(t)==='F'?'bad':''}">${grade(t)}</span>`;
+   const all=[...view.querySelectorAll('tbody tr')].map(x=>x.querySelector('.t b')).filter(Boolean).map(b=>+b.textContent);
+   $('avg').innerHTML=all.length?`<b>${(all.reduce((p,q)=>p+q,0)/all.length).toFixed(1)}</b>`:'—';
+   view.querySelector('.pill').textContent=`Gelay ${all.length}/${ST[mC].length}`};
+  view.querySelectorAll('tbody tr').forEach(tr=>{calc(tr);tr.querySelectorAll('input').forEach(inp=>{
+   inp.oninput=()=>{const i=tr.dataset.i;R[i]=R[i]||{};R[i][inp.dataset.f]=inp.value===''?null:+inp.value;calc(tr)};
+   inp.onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();const all=[...view.querySelectorAll(`[data-f="${inp.dataset.f}"]`)],n=all[all.indexOf(inp)+1];if(n){n.focus();n.select()}}})});
+  $('mc').onchange=e=>{mC=e.target.value;mS=ASG.find(a=>a[0]===mC)[1];note('');marks()};
+  $('ms').onchange=e=>{mS=e.target.value;note('');marks()};$('mt').onchange=e=>{mT=+e.target.value;note('');marks()};$('mx').onchange=e=>{mX=+e.target.value;note('');marks()};
+  $('sm').onclick=()=>{const badRow=view.querySelector('input.bad');if(badRow){note('Dhibic ka badan xadka waa la diidaa. Saxo qoraalka casaan.',1)}else{save();note('Dhibcaha waa la keydiyey.')}marks()}}
+
+function homework(){
+  view.innerHTML=`<h2>Homework &amp; Assignments</h2><p class="lead">Shaqada guriga fasalladaada.</p>
+  <div class="card"><div class="bar"><div class="f"><label for="hc">Fasal · Maaddo</label><select id="hc">${ASG.map(a=>opt(a[0]+'|'+a[1],CLS[a[0]]+' · '+SUBJ[a[1]][0])).join('')}</select></div>
+  <div class="f" style="flex:1;min-width:200px"><label for="ht">Cinwaan</label><input id="ht" type="text" placeholder="Shaqada guriga"></div>
+  <div class="f"><label for="hd">Waqtiga ugu dambeeya</label><input id="hd" type="date" value="${todayISO}"></div><button class="primary" id="ha">Ku dar</button></div>${mh()}
+  <div class="list">${S.hw.length?S.hw.map(h=>`<div class="it"><div class="g"><b style="${h.done?'text-decoration:line-through;color:var(--muted)':''}">${esc(h.t)}</b><div class="mut">${CLS[h.c]} · ${SUBJ[h.s][0]} · ${h.due}</div></div>
+   <button data-done="${h.id}">${h.done?'Dib u fur':'Dhammaystir'}</button><button class="ghost" data-del="${h.id}">Tirtir</button></div>`).join(''):'<p class="mut">Shaqo guri ma jirto. Ku dar mid.</p>'}</div></div>`;
+  $('ha').onclick=()=>{const t=$('ht').value.trim();if(!t){note('Geli cinwaanka shaqada.',1);homework();return}const [c,s]=$('hc').value.split('|');S.hw.unshift({id:Date.now(),c,s,t,due:$('hd').value,done:false});note('Shaqada waa lagu daray.');save();homework();menu('homework')};
+  view.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{const h=S.hw.find(x=>x.id==b.dataset.done);h.done=!h.done;save();homework();menu('homework')});
+  view.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(b.dataset.a!=='1'){b.dataset.a='1';b.textContent='Hubi?';return}S.hw=S.hw.filter(x=>x.id!=b.dataset.del);save();homework();menu('homework')})}
+
+function notices(){
+  const l=[...S.notices].sort((a,b)=>b.pin-a.pin);
+  view.innerHTML=`<h2>Notice Board</h2><p class="lead">Ogeysiisyada dugsiga.</p><div class="card"><div class="list">${l.map(n=>`<div class="it"><div class="g"><b>${esc(n.t)}</b> ${n.pin?'<span class="pill warn">Muhiim</span>':''}<div class="mut">${esc(n.d)}</div></div></div>`).join('')}</div></div>`}
+
+let toC='Waalidka Axmed Cabdi';
+function messages(){
+  const to=['Waalidka Axmed Cabdi','Waalidka Ayaan Maxamed','Maamulka dugsiga','Macallimiinta'];
+  const thread=S.msgs.filter(m=>m.to===toC);
+  view.innerHTML=`<h2>Direct Messages</h2><p class="lead">Fariimaha waalidka, maamulka iyo macallimiinta.</p><div class="card"><div class="bar"><div class="f"><label for="to">Qofka</label><select id="to">${to.map(t=>opt(t,t,t===toC)).join('')}</select></div></div>
+  <div class="chat">${thread.length?thread.map(m=>`<div class="b${m.me?' me':''}">${esc(m.t)}</div>`).join(''):'<p class="mut">Fariin wali ma jirto. Qor mid.</p>'}</div>
+  <div class="f"><label for="mt2">Fariin</label><textarea id="mt2" placeholder="Qor fariinta..."></textarea></div>
+  <div style="margin-top:10px"><button class="primary" id="send">Dir</button></div></div>`;
+  $('to').onchange=e=>{toC=e.target.value;messages()};
+  $('send').onclick=()=>{const t=$('mt2').value.trim();if(!t){$('mt2').focus();return}S.msgs.push({to:toC,t,me:true});save();messages()}}
+
+const PAY={'Nov 2026':[9500,1200,600,1050,400],'Oct 2026':[9500,1200,600,1050,400],'Sep 2026':[9500,1200,0,1050,400]};
+function payslip(){
+  const m=S.mm in PAY?S.mm:'Nov 2026',[basic,allow,over,tax,pen]=PAY[m],gross=basic+allow+over,ded=tax+pen,net=gross-ded,f=n=>n.toLocaleString('en-US');
+  view.innerHTML=`<h2>Payslip</h2><p class="lead">Mushaharka bishii (ETB). Xogtan waa tusaale; mushaharka runta ah waxaa geliya Accountant-ka.</p>
+  <div class="card"><div class="bar"><div class="f"><label for="pm">Bisha</label><select id="pm">${Object.keys(PAY).map(k=>opt(k,k,k===m)).join('')}</select></div></div>
+  <div class="two"><div><h3>Dakhliga</h3><div class="kv"><span>Mushahar aasaasi</span><b>${f(basic)}</b><span>Allowance</span><b>${f(allow)}</b><span>Overtime</span><b>${f(over)}</b><span><b>Wadar</b></span><b>${f(gross)}</b></div></div>
+  <div><h3>Dhimista</h3><div class="kv"><span>Canshuur</span><b>${f(tax)}</b><span>Pension</span><b>${f(pen)}</b><span><b>Wadar</b></span><b>${f(ded)}</b></div></div></div>
+  <div style="margin-top:16px"><span class="lbl">Net pay</span><div class="net">${f(net)} ETB</div></div>
+  <div style="margin-top:10px"><button id="cp">Koobiyee soo koobid</button> <span class="mut" id="cpm" role="status"></span></div></div>`;
+  $('pm').onchange=e=>{S.mm=e.target.value;payslip()};
+  $('cp').onclick=()=>{const t=`Payslip ${m} · ${ME.name} (${ME.id}) · Net ${f(net)} ETB`;const ok=()=>$('cpm').textContent='La koobiyeeyay.';try{navigator.clipboard.writeText(t).then(ok,()=>$('cpm').textContent=t)}catch(x){$('cpm').textContent=t}}}
+
+function profile(){
+  view.innerHTML=`<h2>My Profile</h2><p class="lead">Xogtaada iyo muuqaalka.</p><div class="two"><div class="card"><h3>Xogta</h3><div class="kv"><span>Magac</span><b>${ME.name}</b><span>Koodh</span><b>${ME.id}</b><span>Dugsi</span><b>BUS10</b><span>Form Teacher</span><b>${CLS[ME.form]}</b><span>Maaddooyin</span><b>Xisaab, Environmental Sci.</b></div></div>
+  <div class="card"><h3>Muuqaalka</h3><div class="f"><label for="th">Theme</label><select id="th">${opt('system','Follow device',S.theme==='system')}${opt('light','Light',S.theme==='light')}${opt('dark','Dark',S.theme==='dark')}</select></div></div></div>`;
+  $('th').onchange=e=>{S.theme=e.target.value;save();applyTheme()}}
+
+const R={dashboard,timetable,students,attendance,marks,homework,notices,messages,payslip,profile};
+function route(){const h=(location.hash||'').slice(1),t=R[h]?h:'dashboard';note('');menu(t);R[t]();window.scrollTo(0,0)}
+window.addEventListener('hashchange',route);applyTheme();route();
+</script>
+</head>
+<body></body>
+</html>
