@@ -26,6 +26,17 @@ const timetable = [
   { id: 'slot-2', classId: klass.id, subjectId: science.id, dayOfWeek: 'Tuesday', periodNumber: 2, startTime: '08:45', endTime: '09:30', roomNumber: 'Room 4', subjectName: science.name, className: 'Grade 4 · A' },
   { id: 'slot-3', classId: klass.id, subjectId: math.id, dayOfWeek: 'Thursday', periodNumber: 3, startTime: '09:30', endTime: '10:15', roomNumber: 'Room 4', subjectName: math.name, className: 'Grade 4 · A' }
 ];
+const setupChecklist: Record<number, any> = {
+  1: { ready: true, optional: false, reason: '' }, 2: { ready: true, optional: false, reason: '' },
+  3: { ready: true, optional: false, reason: '' }, 4: { ready: true, optional: false, reason: '' },
+  5: { ready: true, optional: false, reason: '' }, 0: { ready: true, optional: false, reason: '' },
+  6: { ready: true, optional: false, reason: '' }, 7: { ready: true, optional: true, reason: '' },
+  8: { ready: true, optional: false, reason: '' }, 9: { ready: true, optional: true, reason: '' }
+};
+const setupState = {
+  progress: { currentStep: 10, completedSteps: [0, 1, 2, 3, 4, 5, 6, 8], skippedSteps: [7, 9], completedAt: null },
+  checklist: setupChecklist, canFinish: true
+};
 const values: Record<string, (...args: any[]) => Promise<any>> = {
   getTeacherSubjectAssignments: async () => assignments,
   getExamConfig: async () => examConfig,
@@ -42,7 +53,11 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getFormTeacherComments: async () => [],
   getMessages: async () => [],
   getMessageContacts: async () => [],
-  getMyPayslips: async () => []
+  getMyPayslips: async () => [],
+  getSchoolSetupData: async () => ({ data: { schoolInformation: { name: 'SchoolOS Test Academy', address: 'Main Street', city: 'Jijiga', phone: '+251911000001', email: 'office@example.test', whatsappPhone: '+251911000001', schoolType: 'combined' }, academicYear: { name: '2026/2027', startDate: '2026-09-01', endDate: '2027-06-30', isCurrent: true }, terms: [{ name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-20' }, { name: 'Semester 2', startDate: '2027-02-01', endDate: '2027-06-30' }], calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' }, workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 }, completedSteps: [1, 2, 3, 4, 5] }, school: { name: 'SchoolOS Test Academy', address: 'Main Street', city: 'Jijiga', phone: '+251911000001', email: 'office@example.test', whatsappPhone: '+251911000001', schoolType: 'combined', logoUrl: '' } }),
+  getSchoolSetupProgress: async () => setupState,
+  updateSchoolSetupProgress: async () => setupState,
+  getTimetableSettings: async () => ({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 })
 };
 export const ApiClient: any = new Proxy(values, {
   get(target, property: string) {
