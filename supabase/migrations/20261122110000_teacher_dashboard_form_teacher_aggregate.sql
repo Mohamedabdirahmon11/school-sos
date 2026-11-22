@@ -26,7 +26,7 @@ AS $function$
     SELECT id AS class_id
     FROM public.classes
     WHERE school_id = p_school_id
-      AND class_teacher_id = p_teacher_id
+      AND class_teacher_id = (SELECT user_id FROM public.teachers WHERE id = p_teacher_id AND school_id = p_school_id)
   ),
   active_students AS (
     SELECT student.id, student.student_id, student.first_name,
