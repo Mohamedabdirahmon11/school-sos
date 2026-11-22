@@ -3236,9 +3236,11 @@ async function syncPrimarySubjectTemplates(
   school: School,
   templates: PrimarySubjectTemplates,
   periods: Record<string, number>,
-  bands: PrimarySubjectGradeBand[] = ['1-4', '5-6', '7-8']
+  bands: PrimarySubjectGradeBand[] = ['1-4', '5-6', '7-8'],
+  classIds?: string[]
 ) {
-  const allClasses = (await db.getClasses(school.id)).filter(klass => !klass.isArchived);
+  const classIdSet = classIds ? new Set(classIds) : null;
+  const allClasses = (await db.getClasses(school.id)).filter(klass => !klass.isArchived && (!classIdSet || classIdSet.has(klass.id)));
   const existingSubjects = await db.getSubjects(school.id);
   const subjectByNameBefore = new Map(existingSubjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
   const capacity = await getClassCurriculumCapacity(school.id);
@@ -3287,6 +3289,7 @@ async function syncPrimarySubjectTemplates(
   const subjectByName = new Map(subjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
   const client = classGroupsClient();
   let subjectsRemoved = 0;
+  let curriculumAdded = 0;
 
   for (const plan of plans) {
     const existingBySubject = new Map(plan.rows.map((row: any) => [String(row.subject_id), row]));
@@ -3294,6 +3297,7 @@ async function syncPrimarySubjectTemplates(
       const subject = subjectByName.get(name.toLocaleLowerCase());
       if (!subject) throw new Error(`Subject ${name} could not be resolved in this school.`);
       const previous: any = existingBySubject.get(subject.id);
+      if (!previous || previous.is_active === false) curriculumAdded += 1;
       return {
         id: previous?.id || randomUUID(), school_id: school.id, class_id: plan.klass.id,
         subject_id: subject.id, periods_per_week: getDefaultSubjectPeriods(name, periods),
@@ -3318,7 +3322,7 @@ async function syncPrimarySubjectTemplates(
       subjectsRemoved += plan.removed.length;
     }
   }
-  return { updatedClasses: plans.length, subjectsAdded, subjectsRemoved, weeklyCapacity: capacity.weeklyCapacity };
+  return { updatedClasses: plans.length, subjectsAdded, subjectsRemoved, added: curriculumAdded, weeklyCapacity: capacity.weeklyCapacity };
 }
 
 function primarySubjectBandForGrade(gradeLevel: number): PrimarySubjectGradeBand | null {
@@ -3401,18 +3405,18 @@ apiRouter.put('/curriculum/classes/:classId', requireAuth, requireSchoolContext,
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Fasalkan lagama helin dugsigan.' }); return; }
   const input = req.body?.subjects;
-  if (!Array.isArray(input) || input.length > 500) { res.status(400).json({ error: 'Dooro maaddooyinka fasalka si sax ah.' }); return; }
+  if (!Array.isArray(input) || input.length > 500) { res.status(422).json({ error: 'Dooro maaddooyinka fasalka si sax ah.' }); return; }
   const normalized: CurriculumInput[] = input.map((item: any) => ({
     subjectId: String(item?.subjectId || ''),
     periodsPerWeek: Number(item?.periodsPerWeek)
   }));
   if (new Set(normalized.map(item => item.subjectId)).size !== normalized.length ||
-      normalized.some(item => !item.subjectId || !Number.isInteger(item.periodsPerWeek) || item.periodsPerWeek < 1 || item.periodsPerWeek > 12)) {
-    res.status(400).json({ error: 'Xiisadaha maaddo kasta waa inay ahaadaan tiro dhan oo u dhexeysa 1 ilaa 12.' }); return;
+      normalized.some(item => !item.subjectId || !Number.isInteger(item.periodsPerWeek) || item.periodsPerWeek < 1 || item.periodsPerWeek > 10)) {
+    res.status(422).json({ error: 'Xiisadaha maaddo kasta waa inay ahaadaan tiro dhan oo u dhexeysa 1 ilaa 10.' }); return;
   }
   const subjects = await db.getSubjects(school.id);
   const validSubjectIds = new Set(subjects.map(subject => subject.id));
-  if (normalized.some(item => !validSubjectIds.has(item.subjectId))) { res.status(400).json({ error: 'Maaddo aan dugsigan ka tirsanayn ayaa la doortay.' }); return; }
+  if (normalized.some(item => !validSubjectIds.has(item.subjectId))) { res.status(422).json({ error: 'Maaddo aan dugsigan ka tirsanayn ayaa la doortay.' }); return; }
   try {
     const [capacity, existing] = await Promise.all([
       getClassCurriculumCapacity(school.id),
@@ -3420,7 +3424,7 @@ apiRouter.put('/curriculum/classes/:classId', requireAuth, requireSchoolContext,
     ]);
     const total = normalized.reduce((sum, item) => sum + item.periodsPerWeek, 0);
     if (total > capacity.weeklyCapacity) {
-      res.status(400).json({ error: `Wadarta xiisaduhu waa ${total}, balse awoodda fasalku waa ${capacity.weeklyCapacity} xiisad toddobaadkii. Yaree xiisadaha.` }); return;
+      res.status(422).json({ error: `Wadarta xiisaduhu waa ${total}, balse awoodda fasalku waa ${capacity.weeklyCapacity} xiisad toddobaadkii. Yaree xiisadaha.` }); return;
     }
     const selectedIds = new Set(normalized.map(item => item.subjectId));
     const removed = existing.filter((row: any) => row.is_active !== false && !selectedIds.has(row.subject_id));
@@ -3447,7 +3451,12 @@ apiRouter.put('/curriculum/classes/:classId', requireAuth, requireSchoolContext,
       if (error) throw error;
     }
     if (removed.length) {
-      const { error } = await client.from('class_subjects').delete().eq('school_id', school.id).in('id', removed.map((row: any) => row.id));
+      const removedIds = removed.map((row: any) => String(row.subject_id));
+      const { error: assignmentError } = await client.from('teacher_class_subject_assignments')
+        .delete().eq('school_id', school.id).eq('class_id', classId).in('subject_id', removedIds);
+      if (assignmentError) throw assignmentError;
+      const { error } = await client.from('class_subjects').update({ is_active: false, teacher_id: null })
+        .eq('school_id', school.id).eq('class_id', classId).in('id', removed.map((row: any) => row.id));
       if (error) throw error;
     }
     db.logAudit({ action: 'CLASS_CURRICULUM_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Saved curriculum for class ${klass.name}: ${payload.length} subjects, ${total} weekly periods.`, severity: 'info' });
@@ -3467,7 +3476,10 @@ apiRouter.delete('/curriculum/classes/:classId/subjects/:subjectId', requireAuth
   try {
     const dependency = await findCurriculumDependency(school.id, classId, subjectId);
     if (dependency) { res.status(409).json({ error: `Maaddadan lagama saari karo manhajka: waxaa hore ugu xiran ${dependency}. Marka hore ka saar xiriirkaas.` }); return; }
-    const { error } = await classGroupsClient().from('class_subjects').delete().eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId);
+    const client = classGroupsClient();
+    const { error: assignmentError } = await client.from('teacher_class_subject_assignments').delete().eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId);
+    if (assignmentError) throw assignmentError;
+    const { error } = await client.from('class_subjects').update({ is_active: false, teacher_id: null }).eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId);
     if (error) throw error;
     res.json({ success: true });
   } catch (error: any) {
@@ -3482,9 +3494,14 @@ apiRouter.post('/curriculum/classes/:classId/apply-template', requireAuth, requi
   const klass = await db.getClassById(String(req.params.classId || ''), school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
   try {
-    const result = await applyPrimarySubjectTemplate(school, klass);
-    if (!result.applied) { res.status(400).json({ error: 'Primary subject templates are available for Grades 1–8 only.' }); return; }
-    res.json({ success: true, ...result });
+    const band = primarySubjectBandForGrade(Number(klass.gradeLevel || 0));
+    if (!band) { res.status(422).json({ error: 'Primary subject templates are available for Grades 1–8 only.' }); return; }
+    const result = await syncPrimarySubjectTemplates(
+      school, getPrimarySubjectTemplates(school),
+      school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS,
+      [band], [klass.id]
+    );
+    res.json({ success: true, applied: true, gradeBand: band, ...result });
   } catch (error) {
     res.status(503).json({ error: error instanceof Error ? error.message : 'The subject template could not be applied.' });
   }
@@ -3497,26 +3514,39 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
   const sourceId = String(req.params.classId || '');
   const targetIds = Array.isArray(req.body?.targetClassIds) ? req.body.targetClassIds.map((id: unknown) => String(id || '')).filter(Boolean) : [];
   if (!targetIds.length || targetIds.length > 100 || new Set(targetIds).size !== targetIds.length || targetIds.includes(sourceId)) {
-    res.status(400).json({ error: 'Dooro fasallo kale oo koobi-ga lagu shubayo.' }); return;
+    res.status(422).json({ error: 'Dooro fasallo kale oo koobi-ga lagu shubayo.' }); return;
   }
   const [source, allClasses] = await Promise.all([db.getClassById(sourceId, school.id), db.getClasses(school.id)]);
   if (!source || source.isArchived) { res.status(404).json({ error: 'Fasalka laga koobiyeeynayo lama helin.' }); return; }
   const targetSet = new Set(targetIds);
   const targets = allClasses.filter(klass => targetSet.has(klass.id) && !klass.isArchived);
-  if (targets.length !== targetIds.length) { res.status(400).json({ error: 'Mid ama ka badan fasallada la doortay kama tirsana dugsigan.' }); return; }
+  if (targets.length !== targetIds.length) { res.status(403).json({ error: 'Mid ama ka badan fasallada la doortay kama tirsana dugsigan.' }); return; }
+  if (targets.some(target => Number(target.gradeLevel) !== Number(source.gradeLevel))) {
+    res.status(422).json({ error: 'Curriculum can only be copied to sections in the same grade.' }); return;
+  }
   try {
     const [capacity, sourceRows] = await Promise.all([
       getClassCurriculumCapacity(school.id),
       readClassCurriculumRows(school.id, sourceId)
     ]);
     const activeSource = sourceRows.filter((row: any) => row.is_active !== false);
-    if (!activeSource.length) { res.status(400).json({ error: 'Fasalkaan weli ma laha manhaj la koobiyeeyo.' }); return; }
+    if (!activeSource.length) { res.status(422).json({ error: 'Fasalkaan weli ma laha manhaj la koobiyeeyo.' }); return; }
     const total = activeSource.reduce((sum: number, row: any) => sum + Number(row.periods_per_week || 0), 0);
-    if (total > capacity.weeklyCapacity) { res.status(400).json({ error: `Manhajka asalka ahi wuxuu ka badan yahay awoodda toddobaadlaha ah ee ${capacity.weeklyCapacity} xiisad.` }); return; }
+    if (total > capacity.weeklyCapacity) { res.status(422).json({ error: `Manhajka asalka ahi wuxuu ka badan yahay awoodda toddobaadlaha ah ee ${capacity.weeklyCapacity} xiisad.` }); return; }
     const client = classGroupsClient();
     const { data: existingRows, error: existingError } = await client.from('class_subjects').select('*').eq('school_id', school.id).in('class_id', targetIds);
     if (existingError) throw existingError;
     const existingMap = new Map((existingRows || []).map((row: any) => [`${row.class_id}:${row.subject_id}`, row]));
+    const sourceSubjectIds = new Set(activeSource.map((row: any) => String(row.subject_id)));
+    const removedByClass = new Map<string, any[]>();
+    for (const target of targets) {
+      const removed = (existingRows || []).filter((row: any) => row.class_id === target.id && row.is_active !== false && !sourceSubjectIds.has(String(row.subject_id)));
+      for (const row of removed) {
+        const dependency = await findCurriculumDependency(school.id, target.id, String(row.subject_id));
+        if (dependency) { res.status(409).json({ error: `Cannot replace the curriculum while a target subject is linked to ${dependency}.` }); return; }
+      }
+      removedByClass.set(target.id, removed);
+    }
     const payload = targets.flatMap(target => activeSource.map((row: any) => {
       const previous: any = existingMap.get(`${target.id}:${row.subject_id}`);
       return {
@@ -3529,6 +3559,17 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
     }));
     const { error } = await client.from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
     if (error) throw error;
+    for (const target of targets) {
+      const removed = removedByClass.get(target.id) || [];
+      if (!removed.length) continue;
+      const removedIds = removed.map((row: any) => String(row.subject_id));
+      const { error: assignmentError } = await client.from('teacher_class_subject_assignments')
+        .delete().eq('school_id', school.id).eq('class_id', target.id).in('subject_id', removedIds);
+      if (assignmentError) throw assignmentError;
+      const { error: deactivateError } = await client.from('class_subjects').update({ is_active: false, teacher_id: null })
+        .eq('school_id', school.id).eq('class_id', target.id).in('id', removed.map((row: any) => row.id));
+      if (deactivateError) throw deactivateError;
+    }
     db.logAudit({ action: 'CLASS_CURRICULUM_COPIED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Copied curriculum from ${source.name} to ${targets.length} class(es).`, severity: 'info' });
     res.json({ success: true, copiedClasses: targets.length, subjectsPerClass: activeSource.length });
   } catch (error: any) {
