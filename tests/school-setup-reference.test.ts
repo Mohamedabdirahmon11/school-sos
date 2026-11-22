@@ -138,7 +138,7 @@ test('six setup modules render inside the wizard and use existing database-backe
   for (const method of ['getClasses', 'createClass', 'deleteClass', 'getSubjects', 'createSubject', 'saveClassCurriculum', 'getTeachers', 'createTeacher', 'getStudents', 'createStudent', 'setTimetableSlot']) {
     assert.ok(editor.includes(`ApiClient.${method}`), `inline editor must use ${method}`);
   }
-  assert.match(editor, /request<any>\\('\/teacher-assignments'/);
-  assert.match(editor, /request\\(.*timetable/);
+  assert.match(editor, /request<any>\('\/teacher-assignments'/);
+  assert.match(editor, /request\(.*timetable/);
   assert.doesNotMatch(editor, /localStorage/);
 });
