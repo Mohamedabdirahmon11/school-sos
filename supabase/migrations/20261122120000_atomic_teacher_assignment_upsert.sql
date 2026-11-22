@@ -63,9 +63,10 @@ BEGIN
           USING ERRCODE = '23514';
       END IF;
       IF p_clear_dependent_slots THEN
-        DELETE FROM public.timetable_slots
+        UPDATE public.timetable_slots
+        SET is_active = false
         WHERE school_id = p_school_id AND class_id = old_row.class_id
-          AND subject_id = old_row.subject_id;
+          AND subject_id = old_row.subject_id AND is_active = true;
       END IF;
     END IF;
   END IF;
