@@ -100,5 +100,5 @@ test('School Setup Wizard screenshot matrix index and difference notes', async (
     '- SchoolOS uses the shared SchoolOS API and authorization scope; the reference fixture is static visual sample data.',
     '- Reference copy and SchoolOS copy differ in wording and some labels; layout tokens, 290px sidebar, 860px content width, card surfaces and mobile breakpoint are aligned.',
     '- The Finish panel includes SchoolOS readiness evidence and legacy follow-up indicators that are not present in the reference HTML.'
-  ].join('\\n'));
+  ].join('\n'));
 });
