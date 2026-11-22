@@ -1987,11 +1987,11 @@ class StorageEngine {
     return this.data.teachers[index];
   }
 
-  public async createTeacherAtomically(payload: { schoolId: string; user: Record<string, unknown>; teacher: Record<string, unknown>; subjectIds: string[]; formTeacherClassId: string | null }): Promise<void> {
+  public async createTeacherAtomically(payload: { schoolId: string; user: Record<string, unknown>; teacher: Record<string, unknown>; subjectIds: string[]; formTeacherClassId: string | null }): Promise<string> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Teacher creation storage is unavailable.');
     const startedAt = performance.now();
-    const { error } = await client.rpc('schoolos_create_teacher', {
+    const { data, error } = await client.rpc('schoolos_create_teacher', {
       p_school_id: payload.schoolId,
       p_user: payload.user,
       p_teacher: payload.teacher,
@@ -2000,7 +2000,11 @@ class StorageEngine {
     });
     this.recordQuery('rpc:schoolos_create_teacher', 'call', startedAt);
     if (error) { const failure = new Error(error.message || 'Teacher creation transaction failed.') as Error & { code?: string }; failure.code = error.code; throw failure; }
+    const result = Array.isArray(data) ? data[0] : data;
+    const staffId = result && typeof result.staff_id === 'string' ? result.staff_id : '';
+    if (!staffId) throw new Error('Teacher creation did not return a valid staff ID.');
     this.invalidateAuthContextsForSchool(payload.schoolId);
+    return staffId;
   }
 
   public createTeacher(teacherData: Omit<Teacher, 'id' | 'createdAt'>): Teacher {
