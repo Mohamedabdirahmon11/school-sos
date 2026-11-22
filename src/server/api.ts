@@ -9338,7 +9338,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
   if (user.role === 'teacher') {
     const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
     const assignedStudents = assignedClassIds.length
-      ? await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id')
+      ? await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone')
       : [];
     const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
     const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
