@@ -85,3 +85,44 @@ test('Form Teacher uniqueness is enforced by the existing API guard and additive
   assert.match(migration, /GROUP BY school_id, class_teacher_id/);
   assert.match(migration, /RAISE EXCEPTION 'Duplicate active Form Teacher assignments exist/);
 });
+
+
+test('dedicated setup_completed_at is additive, idempotent, backfilled, and preserves incomplete schools', () => {
+  const migration = read('supabase/migrations/20261122122000_school_setup_completed_at.sql');
+  const storage = read('src/server/storage.ts');
+  const api = read('src/server/api.ts');
+  const types = read('src/types/index.ts');
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS setup_completed_at timestamptz/);
+  assert.match(migration, /setup_progress ->> 'completedAt'/);
+  assert.match(migration, /WHERE setup_completed_at IS NULL/);
+  assert.match(storage, /setup_progress,setup_completed_at,setup_data/);
+  assert.match(api, /setupCompletedAt: progress\.completedAt \|\| loadedSchool\.setupCompletedAt \|\| null/);
+  assert.match(types, /setupCompletedAt\?: string \| null/);
+  assert.doesNotMatch(migration, /DELETE FROM public\.schools/i);
+});
+
+test('teacher assignment slot cleanup is inside the atomic RPC and failure rolls back', () => {
+  const migration = read('supabase/migrations/20261122120000_atomic_teacher_assignment_upsert.sql');
+  const api = read('src/server/api.ts');
+  const sqlTest = read('tests/sql/school-setup-migrations.test.sql');
+  assert.match(migration, /p_clear_dependent_slots boolean DEFAULT false/);
+  assert.match(migration, /DELETE FROM public\.timetable_slots/);
+  assert.match(migration, /p_clear_dependent_slots THEN/);
+  assert.match(api, /p_clear_dependent_slots: clearDependentSlots/);
+  assert.match(sqlTest, /simulated timetable cleanup failure/);
+  assert.match(sqlTest, /assignment update was not rolled back/);
+});
+
+test('PostgreSQL CI integration covers atomic rollback, Form Teacher uniqueness and tenant RLS', () => {
+  const workflow = read('.github/workflows/ci.yml');
+  const sqlTest = read('tests/sql/school-setup-migrations.test.sql');
+  const formTeacherMigration = read('supabase/migrations/20261122121000_one_active_form_teacher_per_school.sql');
+  assert.match(workflow, /school-setup-sql:/);
+  assert.match(workflow, /image: postgres:16/);
+  assert.match(workflow, /tests\/sql\/school-setup-migrations\.test\.sql/);
+  assert.match(sqlTest, /CREATE POLICY classes_school_scope/);
+  assert.match(sqlTest, /duplicate Form Teacher was not rejected/);
+  assert.match(sqlTest, /cross-school RLS isolation failed/);
+  assert.match(formTeacherMigration, /GROUP BY school_id, class_teacher_id/);
+  assert.match(formTeacherMigration, /RAISE EXCEPTION 'Duplicate active Form Teacher assignments exist/);
+});
