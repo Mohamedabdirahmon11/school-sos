@@ -4152,17 +4152,9 @@ async function nextSchoolStaffId(school: School): Promise<string> {
 }
 
 async function nextSchoolTeacherId(_school: School): Promise<string> {
-  // Teacher IDs are also the login identifier and users.staff_id has a
-  // global unique index, so keep the short T001 sequence globally unique.
-  const [users, teachers] = await Promise.all([
-    queryAllRows('users', {}, 'id,staff_id'),
-    queryAllRows('teachers', {}, 'id,staff_id')
-  ]);
-  const used = new Set([...users, ...teachers].map((record: any) => String(record.staffId || '').toUpperCase()).filter(Boolean));
-  let sequence = 1;
-  let id = '';
-  do { id = 'T' + String(sequence++).padStart(3, '0'); } while (used.has(id));
-  return id;
+  // IDs are unique without scanning every user and teacher row on each create.
+  // The database unique indexes remain the final collision guard.
+  return 'T' + randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase();
 }
 
 const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
@@ -6090,8 +6082,8 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   const formTeacherClassId = body.formTeacherClassId === undefined ? undefined : (typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '');
   if (formTeacherClassId && !current.userId) { res.status(400).json({ error: 'This teacher has no sign-in account for Form Teacher access.' }); return; }
   if (formTeacherClassId) {
-    const schoolClasses = await db.getClasses(school.id);
-    if (!schoolClasses.some(klass => klass.id === formTeacherClassId && klass.schoolId === school.id && !klass.isArchived)) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
+    const matchingClass = await queryAllRows('classes', { school_id: school.id, id: formTeacherClassId, is_archived: 'false' }, 'id');
+    if (!matchingClass.length) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
   }
   const updates: Record<string, unknown> = {};
   for (const field of ['fullName', 'phone', 'address', 'qualification', 'department'] as const) {
@@ -6215,13 +6207,8 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const phoneDigits = phone.replace(/\D/g, '');
-  if (phoneDigits) {
-    const existingPhones = await queryAllRows('teachers', { school_id: school.id }, 'id,phone');
-    if (existingPhones.some((item: any) => item.phone && String(item.phone).replace(/\D/g, '') === phoneDigits)) {
-      res.status(409).json({ error: 'Telefoonkan lambarkiisa hore ayaa macallin kale uga diiwaangashan dugsigan.' }); return;
-    }
-  }
+  // Normalized school-scoped unique index on teachers.phone is the authoritative
+  // duplicate check; avoid loading every teacher just to compare phone numbers.
   const staffId = await nextSchoolTeacherId(school);
   const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
   if (branchId && !(await db.getBranches(school.id)).some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
@@ -6266,7 +6253,11 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
       subjectIds: assignedSubjects, formTeacherClassId: formTeacherClassId || null
     });
   } catch (error: any) {
-    res.status(400).json({ error: error?.message || 'Macallinka iyo xogtiisa lama wada kaydin karin.' });
+    res.status(error?.code === '23505' ? 409 : error?.code === '23503' ? 400 : 400).json({
+      error: error?.code === '23505' && /phone/i.test(error?.message || '')
+        ? 'Telefoonkan lambarkiisa hore ayaa macallin kale uga diiwaangashan dugsigan.'
+        : error?.message || 'Macallinka iyo xogtiisa lama wada kaydin karin.'
+    });
     return;
   }
   const teacher = {
