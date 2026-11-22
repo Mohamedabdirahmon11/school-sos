@@ -4386,8 +4386,10 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
       const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id');
       studentIds = [...new Set([...studentIds, ...phoneChildren.items.map((item: any) => item.id)])];
     }
-    const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
-    const classIds = [...new Set(children.items.map((item: any) => item.classId))];
+    const children = role === 'student'
+      ? { items: [] as any[] }
+      : studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
+    const classIds = role === 'student' ? (classId ? [classId] : []) : [...new Set(children.items.map((item: any) => item.classId))];
     if (classId && !classIds.includes(classId)) { res.status(403).json({ error: 'Timetable access is limited to your own class.' }); return; }
     if (!classIds.length) { res.json([]); return; }
     let slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, term_id: termId || undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
