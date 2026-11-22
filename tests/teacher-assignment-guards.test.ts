@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/20261118183000_step6_teacher_class_subject_assignments.sql', import.meta.url), 'utf8');
+const uniqueMigration = readFileSync(new URL('../supabase/migrations/20261122090000_teacher_assignment_unique_class_subject.sql', import.meta.url), 'utf8');
 
 test('Teacher assignment requires an active teacher and an active class-subject curriculum row', () => {
   const fn = api.slice(api.indexOf('async function checkTeacherAssignment'), api.indexOf("apiRouter.get('/teacher-assignments'"));
@@ -44,7 +45,7 @@ test('Teacher assignment update preserves HTTP 409 and 422 validation statuses',
   assert.match(putRoute, /409/);
 });
 test('Assignment uniqueness is per school, year, term, class and subject—not section metadata', () => {
-  const unique = migration.slice(migration.indexOf('CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique'));
+  const unique = uniqueMigration.slice(uniqueMigration.indexOf('CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique'));
   assert.match(unique, /school_id, academic_year_id,[\s\S]*class_id,[\s\S]*subject_id/);
   assert.doesNotMatch(unique.split(';')[0], /section_id/);
   const upsert = api.slice(api.indexOf('async function upsertTeacherAssignment'), api.indexOf("apiRouter.get('/teacher-assignments'"));
