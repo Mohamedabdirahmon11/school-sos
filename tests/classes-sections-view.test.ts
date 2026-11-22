@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+const view = readFileSync(new URL('../src/components/schooladmin/ClassesView.tsx', import.meta.url), 'utf8');
+const header = readFileSync(new URL('../src/components/schooladmin/AcademicSetupHeader.tsx', import.meta.url), 'utf8');
+const css = readFileSync(new URL('../src/components/schooladmin/academic-setup.css', import.meta.url), 'utf8');
+
+test('Classes & Sections uses live school classes and real active teachers', () => {
+  assert.match(view, /ApiClient\.getClasses\(\)/);
+  assert.match(view, /ApiClient\.getTeachers/);
+  assert.match(view, /teacher\.status === 'active'/);
+  assert.doesNotMatch(view, /const TEACH\s*=|localStorage|demo data/i);
+});
+
+test('Grade 1–8 standard creates only missing Section A classes for the configured school year', () => {
+  assert.match(view, /for \(let level = 1; level <= 8; level \+= 1\)/);
+  assert.match(view, /createClass\(level, 'A'/);
+  assert.match(view, /row\.section\.trim\(\)\.toUpperCase\(\) === 'A'/);
+  assert.match(view, /school\.academicYear/);
+});
+
+test('Form Teacher dropdown excludes teachers assigned to another class', () => {
+  assert.match(view, /usedTeacherIds/);
+  assert.match(view, /!usedTeacherIds\.has\(teacher\.userId!\)/);
+  assert.match(view, /ApiClient\.updateClass\(row\.id, updates\)/);
+});
+
+test('Class removal uses safe archive API and shows dependency protection', () => {
+  assert.match(view, /ApiClient\.deleteClass\(row\.id\)/);
+  assert.match(view, /students, marks, attendance and fee records are protected/);
+});
+
+test('Academic setup header preserves the four exact tabs and hash routes', () => {
+  for (const hash of ['#classes', '#subjects', '#curriculum', '#assignment']) assert.ok(header.includes(hash));
+  for (const label of ['Classes & Sections', 'Subjects', 'Class Curriculum', 'Teacher Assignment']) assert.ok(header.includes(label));
+});
+
+test('Academic setup CSS preserves the reference design tokens and responsive table behavior', () => {
+  for (const token of ['#f2f5f8', '#13202d', '#dbe2ea', '#0e6a62', '#0d141b', '#151e28', '#263342', 'Space Grotesk', 'Inter', 'max-width:1080px']) assert.ok(css.includes(token));
+  assert.match(css, /overflow-x:auto/);
+  assert.match(css, /:focus-visible/);
+});

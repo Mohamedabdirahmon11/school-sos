@@ -1,91 +1,240 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { academicText } from '../../lib/academic-translations.ts';
-import { Plus, Pencil, Trash2, X, Check, Layers, RefreshCw, Sparkles } from 'lucide-react';
+import { SchoolClass, Teacher } from '../../types/index.ts';
+import { AcademicSetupHeader } from './AcademicSetupHeader.tsx';
+import './academic-setup.css';
 
-type Section = { id:string; name:string; legacy_class_id:string|null };
-type ClassGroup = { id:string; name:string; sort_order:number; class_sections:Section[] };
+type ShiftSettings = { shiftCount: 1 | 2 };
+type Notice = { kind: 'ok' | 'error'; text: string };
 
-export const ClassesView: React.FC = () => {
-  const { isReadOnly, language } = useAuth();
-  const tx = (key: string, values: Record<string, string | number> = {}) =>
-    Object.entries(values).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), academicText(language, key));
-  const [rows,setRows] = useState<ClassGroup[]>([]);
-  const [loading,setLoading] = useState(true);
-  const [name,setName] = useState('');
-  const [search,setSearch] = useState('');
-  const [sections,setSections] = useState('');
-  const [sectionDraft,setSectionDraft] = useState<Record<string,string>>({});
-  const [editing,setEditing] = useState<string|null>(null);
-  const [editName,setEditName] = useState('');
-  const [busy,setBusy] = useState(false);
-  const [notice,setNotice] = useState<{kind:'ok'|'error';text:string}|null>(null);
+const gradeBand = (grade: number) => grade <= 4 ? 'Grade 1–4' : grade <= 6 ? 'Grade 5–6' : 'Grade 7–8';
+const classLabel = (row: SchoolClass) => `Grade ${row.gradeLevel} · ${row.section || '—'}`;
+const activeClass = (row: SchoolClass) => row.isArchived !== true;
+
+export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
+  const { school, isReadOnly } = useAuth();
+  const [rows, setRows] = useState<SchoolClass[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjectCounts, setSubjectCounts] = useState<Record<string, number>>({});
+  const [shiftSettings, setShiftSettings] = useState<ShiftSettings>({ shiftCount: 1 });
+  const [grade, setGrade] = useState(1);
+  const [section, setSection] = useState('B');
+  const [capacity, setCapacity] = useState(String(school?.defaultClassCapacity || 40));
+  const [shift, setShift] = useState<1 | 2>(1);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [busyClassId, setBusyClassId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const load = useCallback(async () => {
+    if (!school?.id) return;
     setLoading(true);
-    try { setRows(await ApiClient.getClassGroups()); }
-    catch { setNotice({kind:'error',text:tx('loadError')}); }
-    finally { setLoading(false); }
-  },[language]);
-  useEffect(()=>{ void load(); },[load]);
-
-  const visibleRows = rows.filter(row => (row.name + ' ' + (row.class_sections || []).map(section => section.name).join(' ')).toLowerCase().includes(search.trim().toLowerCase()));
-
-  const run = async (action:()=>Promise<any>, success:string) => {
-    setBusy(true); setNotice(null);
-    try { await action(); setNotice({kind:'ok',text:success}); await load(); }
-    catch { setNotice({kind:'error',text:tx('actionError')}); }
-    finally { setBusy(false); }
-  };
-
-  const create = async (e:React.FormEvent) => {
-    e.preventDefault();
-    const parsed = sections.split(',').map(x=>x.trim()).filter(Boolean);
-    await run(async()=>{ await ApiClient.createClassGroup(name.trim(),parsed); setName(''); setSections(''); },tx('savedClass'));
-  };
-  const defaults = async () => {
-    await run(async()=>{const r=await ApiClient.createDefaultClassGroups();setNotice({kind:'ok',text:tx('defaultsResult',{created:r.created,skipped:r.skipped})});},tx('defaultsChecked'));
-  };
-  const rename = async (id:string) => {
-    await run(async()=>{await ApiClient.renameClassGroup(id,editName.trim());setEditing(null);},tx('renamed'));
-  };
-  const removeClass = (row:ClassGroup) => {
-    if(window.confirm(tx('confirmDelete')+' '+row.name)) {
-      void run(()=>ApiClient.deleteClassGroup(row.id),tx('deleted'));
+    try {
+      const [classRows, teacherRows, settings] = await Promise.all([
+        ApiClient.getClasses(),
+        ApiClient.getTeachers({ page: 1, pageSize: 200 }),
+        ApiClient.getTimetableSettings()
+      ]);
+      const safeClasses = (Array.isArray(classRows) ? classRows : []).filter(activeClass)
+        .sort((a, b) => a.gradeLevel - b.gradeLevel || a.section.localeCompare(b.section));
+      setRows(safeClasses);
+      setTeachers((Array.isArray(teacherRows) ? teacherRows : []).filter(teacher => teacher.status === 'active'));
+      setShiftSettings({ shiftCount: settings.shiftCount });
+      const counts = await Promise.all(safeClasses.map(async row => {
+        try {
+          const detail = await ApiClient.getClassCurriculum(row.id);
+          return [row.id, detail.curriculum.filter(item => item.isActive).length] as const;
+        } catch {
+          return [row.id, 0] as const;
+        }
+      }));
+      setSubjectCounts(Object.fromEntries(counts));
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Fasallada lama soo qaadi karin.' });
+    } finally {
+      setLoading(false);
     }
+  }, [school?.id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const sortedRows = useMemo(() => [...rows].sort((a, b) => a.gradeLevel - b.gradeLevel || a.section.localeCompare(b.section)), [rows]);
+  const usedTeacherIds = useMemo(() => new Set(rows.map(row => row.classTeacherId).filter(Boolean) as string[]), [rows]);
+  const freeTeachersFor = (row: SchoolClass) => teachers.filter(teacher =>
+    Boolean(teacher.userId) && (!usedTeacherIds.has(teacher.userId!) || teacher.userId === row.classTeacherId)
+  );
+
+  const createClass = async (gradeLevel: number, sectionName: string, classCapacity: number, classShift: 1 | 2) => {
+    if (!school?.academicYear) throw new Error('School academic year is not configured.');
+    return ApiClient.createClass({
+      name: `Grade ${gradeLevel}`,
+      gradeLevel,
+      section: sectionName,
+      academicYear: school.academicYear,
+      capacity: classCapacity,
+      shift: classShift,
+      classTeacherId: null,
+      roomNumber: ''
+    });
   };
 
-  return <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-7">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-teal-700"><Layers size={17}/> {tx('academics')}</div>
-        <h1 className="mt-1 text-2xl font-bold text-slate-900">{tx('classes')}</h1>
-        <p className="mt-1 text-sm text-slate-500">{tx('subtitle')}</p>
-      </div>
-      <button onClick={()=>void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><RefreshCw size={15}/> {tx('refresh')}</button>
-    </div>
-    {notice && <div role="status" aria-live="polite" className={`rounded-xl border px-4 py-3 text-sm ${notice.kind==='ok'?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-rose-200 bg-rose-50 text-rose-800'}`}>{notice.text}</div>}
-    {!isReadOnly && <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-      <form onSubmit={create} className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-bold text-slate-900">{tx('addClass')}</h2>
-        <label className="block text-sm font-medium text-slate-700">{tx('className')}<input value={name} onChange={e=>setName(e.target.value)} maxLength={120} required placeholder={tx('classExample')} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"/></label>
-        <label className="block text-sm font-medium text-slate-700">{tx('sections')}<input value={sections} onChange={e=>setSections(e.target.value)} placeholder={tx('sectionExample')} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"/><span className="mt-1 block text-xs text-slate-500">{tx('sectionHelp')}</span></label>
-        <button disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50"><Plus size={16}/> {tx('saveClass')}</button>
-      </form>
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-5">
-        <div><div className="flex items-center gap-2 font-bold text-slate-900"><Sparkles size={17} className="text-teal-700"/> {tx('defaults')}</div><p className="mt-2 text-sm leading-6 text-slate-600">{tx('defaultsHelp')}</p></div>
-        <button disabled={busy} onClick={()=>void defaults()} className="rounded-xl border border-teal-200 bg-white px-4 py-2.5 text-sm font-semibold text-teal-800 hover:bg-teal-100 disabled:opacity-50">{tx('addDefaults')}</button>
-      </div>
-    </div>}
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-lg font-bold text-slate-900">{tx('classList')}</h2><div className="flex flex-wrap items-center gap-2"><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search classes or sections" aria-label="Search classes or sections" className="min-w-[220px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-teal-600"/><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{visibleRows.length} / {rows.length} {tx('classCount')}</span></div></div>
-    {loading ? <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">{tx('loading')}</div> : visibleRows.length===0 ? <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">{tx('empty')}</div> :
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleRows.map((row,index)=><article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1">{editing===row.id ? <div className="flex gap-2"><input aria-label={tx('className')} value={editName} onChange={e=>setEditName(e.target.value)} maxLength={120} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"/><button disabled={busy||!editName.trim()} onClick={()=>void rename(row.id)} title={tx('save')} className="text-emerald-700 disabled:opacity-40"><Check size={18}/></button><button onClick={()=>setEditing(null)} title={tx('cancel')} className="text-slate-400"><X size={18}/></button></div> : <><div className="text-xs font-semibold text-teal-700">{tx('classLabel')} {index+1}</div><h3 className="mt-1 truncate text-lg font-bold text-slate-900">{row.name}</h3></>}</div>
-          {!isReadOnly && editing!==row.id && <div className="flex gap-1"><button onClick={()=>{setEditing(row.id);setEditName(row.name);}} title={tx('rename')} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><Pencil size={16}/></button><button onClick={()=>removeClass(row)} title={tx('delete')} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={16}/></button></div>}
+  const add = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const cleanSection = section.trim().toUpperCase();
+    const classCapacity = Number(capacity);
+    if (!cleanSection || cleanSection.length > 2) { setNotice({ kind: 'error', text: 'Section must be 1–2 characters.' }); return; }
+    if (!Number.isInteger(classCapacity) || classCapacity < 1 || classCapacity > 200) { setNotice({ kind: 'error', text: 'Capacity must be between 1 and 200.' }); return; }
+    if (!school?.academicYear) { setNotice({ kind: 'error', text: 'School academic year is not configured.' }); return; }
+    if (rows.some(row => row.gradeLevel === grade && row.section.trim().toUpperCase() === cleanSection && (row.academicYear || school.academicYear) === school.academicYear)) {
+      setNotice({ kind: 'error', text: `Grade ${grade} · ${cleanSection} already exists.` }); return;
+    }
+    setBusy(true); setNotice(null);
+    try {
+      const created = await createClass(grade, cleanSection, classCapacity, shift);
+      setRows(current => [...current, created].sort((a, b) => a.gradeLevel - b.gradeLevel || a.section.localeCompare(b.section)));
+      setSubjectCounts(current => ({ ...current, [created.id]: 0 }));
+      setSection('B');
+      setNotice({ kind: 'ok', text: `${classLabel(created)} waa lagu daray.` });
+      await load();
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Fasalka lama kaydin karin.' });
+    } finally { setBusy(false); }
+  };
+
+  const addStandard = async () => {
+    if (!school?.academicYear) { setNotice({ kind: 'error', text: 'School academic year is not configured.' }); return; }
+    setBusy(true); setNotice(null);
+    let created = 0;
+    let skipped = 0;
+    try {
+      for (let level = 1; level <= 8; level += 1) {
+        const exists = rows.some(row => row.gradeLevel === level && row.section.trim().toUpperCase() === 'A' && (row.academicYear || school.academicYear) === school.academicYear);
+        if (exists) { skipped += 1; continue; }
+        try {
+          await createClass(level, 'A', Number(school.defaultClassCapacity || 40), 1);
+          created += 1;
+        } catch (error) {
+          if (error instanceof Error && /already exists|horay/i.test(error.message)) { skipped += 1; continue; }
+          throw error;
+        }
+      }
+      await load();
+      setNotice({ kind: 'ok', text: created ? `${created} fasal ayaa lagu daray; ${skipped} hore ayay u jireen.` : 'Grade 1–8 Section A oo dhan way jiraan.' });
+    } catch (error) {
+      await load();
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Standard classes could not be created.' });
+    } finally { setBusy(false); }
+  };
+
+  const update = async (row: SchoolClass, updates: Partial<SchoolClass>) => {
+    if (isReadOnly || busyClassId) return;
+    setBusyClassId(row.id); setNotice(null);
+    try {
+      const saved = await ApiClient.updateClass(row.id, updates);
+      setRows(current => current.map(item => item.id === row.id ? saved : item));
+      setNotice({ kind: 'ok', text: 'Fasalka waa la cusboonaysiiyey.' });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Fasalka lama cusboonaysiin karin.' });
+      await load();
+    } finally { setBusyClassId(null); }
+  };
+
+  const remove = async (row: SchoolClass) => {
+    if (!window.confirm(`Delete ${classLabel(row)}? Existing students, marks, attendance and fee records are protected.`)) return;
+    setBusyClassId(row.id); setNotice(null);
+    try {
+      await ApiClient.deleteClass(row.id);
+      setRows(current => current.filter(item => item.id !== row.id));
+      setNotice({ kind: 'ok', text: `${classLabel(row)} waa la archive-gareeyey.` });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Fasalka lama archive-gareyn karin.' });
+    } finally { setBusyClassId(null); }
+  };
+
+  return (
+    <div className="academic-setup">
+      <div className="wrap">
+        <AcademicSetupHeader active="sch_classes" onNavigate={onNavigate} />
+        <h2>Classes &amp; Sections</h2>
+        <p className="lead">Fasal kasta waa Grade iyo Section (tusaale Grade 4 · A). Fasal kasta hal shift ayuu ku jiraa, hal Form Teacherna wuu leeyahay.</p>
+        {notice && <div role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite" className={`msg ${notice.kind === 'error' ? 'bad' : 'ok'}`}>{notice.text}</div>}
+        {!isReadOnly && (
+          <div className="card">
+            <form className="bar" onSubmit={add}>
+              <div className="f">
+                <label htmlFor="ng">Grade</label>
+                <select id="ng" value={grade} onChange={event => setGrade(Number(event.target.value))}>
+                  {[1,2,3,4,5,6,7,8].map(level => <option key={level} value={level}>Grade {level}</option>)}
+                </select>
+              </div>
+              <div className="f">
+                <label htmlFor="ns">Section</label>
+                <input id="ns" type="text" maxLength={2} value={section} onChange={event => setSection(event.target.value)} style={{ width: 80 }} />
+              </div>
+              <div className="f">
+                <label htmlFor="nc">Capacity</label>
+                <input id="nc" type="number" min={1} max={200} value={capacity} onChange={event => setCapacity(event.target.value)} style={{ width: 90 }} />
+              </div>
+              <div className="f">
+                <label htmlFor="nsh">Shift</label>
+                <select id="nsh" value={shift} onChange={event => setShift(Number(event.target.value) as 1 | 2)}>
+                  <option value={1}>Morning</option>
+                  {shiftSettings.shiftCount === 2 && <option value={2}>Afternoon</option>}
+                </select>
+              </div>
+              <button className="primary" type="submit" disabled={busy || loading}>Add class</button>
+              <span className="spacer" />
+              <button type="button" onClick={() => void addStandard()} disabled={busy || loading}>Standard: Grade 1–8</button>
+            </form>
+            <div className="mut">Academic year: {school?.academicYear || '—'}</div>
+          </div>
+        )}
+        <div className="bar" style={{ alignItems: 'center', marginTop: 16 }}>
+          <h2 style={{ fontSize: 16, margin: 0 }}>Class list</h2>
+          <span className="spacer" />
+          <span className="pill">{sortedRows.length} classes</span>
         </div>
-        <div className="mt-4 flex min-h-9 flex-wrap gap-2">{row.class_sections?.length ? row.class_sections.map(sec=><span key={sec.id} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm font-semibold text-slate-700">{sec.name}{!isReadOnly && !sec.legacy_class_id && <button onClick={()=>void run(()=>ApiClient.deleteClassSection(sec.id),tx('sectionDeleted'))} title={tx('removeSection')} aria-label={tx('removeSection')} className="ml-1 text-slate-400 hover:text-rose-600"><X size={13}/></button>}</span>) : <span className="text-sm text-slate-400">{tx('noSections')}</span>}</div>
-        {!isReadOnly && <form className="mt-4 flex gap-2 border-t border-slate-100 pt-3" onSubmit={e=>{e.preventDefault();const value=sectionDraft[row.id]?.trim();if(value)void run(async()=>{await ApiClient.addClassSection(row.id,value);setSectionDraft(v=>({...v,[row.id]:''}));},tx('sectionAdded'));}}><input value={sectionDraft[row.id]||''} onChange={e=>setSectionDraft(v=>({...v,[row.id]:e.target.value}))} placeholder={tx('newSection')} maxLength={80} aria-label={tx('newSection')+' '+row.name} className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"/><button disabled={busy||!sectionDraft[row.id]?.trim()} className="rounded-lg bg-slate-900 px-3 text-white disabled:opacity-40" title={tx('addSection')}><Plus size={17}/></button></form>}
-      </article>)}</div>}
-  </div>;
+        {loading ? <div className="loading">Loading classes…</div> : !sortedRows.length ? (
+          <div className="card empty">Wali fasal lama darin. Riix "Standard: Grade 1–8".</div>
+        ) : (
+          <div className="card">
+            <div className="scroll">
+              <table>
+                <thead><tr><th>Class</th><th>Level</th><th>Shift</th><th className="n">Capacity</th><th>Form Teacher</th><th className="n">Subjects</th><th className="n"> </th></tr></thead>
+                <tbody>
+                  {sortedRows.map(row => {
+                    const free = freeTeachersFor(row);
+                    const selectedTeacher = teachers.find(teacher => teacher.userId === row.classTeacherId);
+                    return (
+                      <tr key={row.id}>
+                        <td><b>{classLabel(row)}</b></td>
+                        <td className="mut">{gradeBand(row.gradeLevel)}</td>
+                        <td>
+                          <select value={row.shift || 1} disabled={isReadOnly || busyClassId === row.id} aria-label={`Shift ${classLabel(row)}`} onChange={event => void update(row, { shift: Number(event.target.value) as 1 | 2 })}>
+                            <option value={1}>Morning</option>
+                            {(shiftSettings.shiftCount === 2 || row.shift === 2) && <option value={2}>Afternoon</option>}
+                          </select>
+                        </td>
+                        <td className="n"><input type="number" min={1} max={200} value={row.capacity} disabled={isReadOnly || busyClassId === row.id} aria-label={`Capacity ${classLabel(row)}`} onChange={event => setRows(current => current.map(item => item.id === row.id ? { ...item, capacity: Number(event.target.value) } : item))} onBlur={event => { const next = Number(event.target.value); if (Number.isInteger(next) && next >= 1 && next <= 200 && next !== row.capacity) void update(row, { capacity: next }); }} /></td>
+                        <td>
+                          <select value={row.classTeacherId || ''} disabled={isReadOnly || busyClassId === row.id} aria-label={`Form teacher ${classLabel(row)}`} onChange={event => void update(row, { classTeacherId: event.target.value || null })}>
+                            <option value="">—</option>
+                            {free.map(teacher => <option key={teacher.id} value={teacher.userId}>{teacher.fullName}</option>)}
+                            {selectedTeacher && !free.some(teacher => teacher.id === selectedTeacher.id) && <option value={selectedTeacher.userId}>{selectedTeacher.fullName}</option>}
+                          </select>
+                        </td>
+                        <td className="n">{subjectCounts[row.id] ?? 0}</td>
+                        <td className="n"><button type="button" className="ghost" disabled={isReadOnly || busyClassId === row.id} aria-label={`Delete ${classLabel(row)}`} onClick={() => void remove(row)}>Delete</button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };

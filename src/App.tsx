@@ -252,7 +252,7 @@ const AppContent: React.FC = () => {
               <ParentsView />
             )}
             {activeView === 'sch_classes' && (
-              <ClassesView />
+              <ClassesView onNavigate={handleNavigate} />
             )}
             {activeView === 'sch_subjects' && (
               <SubjectsView />

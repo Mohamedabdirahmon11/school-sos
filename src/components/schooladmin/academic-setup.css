@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+.academic-setup{
+  --bg:#f2f5f8;--surface:#fff;--fg:#13202d;--muted:#5a6878;--line:#dbe2ea;
+  --brand:var(--brand-color,#0e6a62);--brand-fg:var(--brand-foreground,#fff);--soft:#e3f1ef;
+  --bad:#b8302a;--bad-bg:#fde9e7;--ok:#1d7a4a;--warn:#8a5a00;--warn-bg:#fff1d6;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-head:'Space Grotesk','Inter',system-ui,sans-serif;
+  color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;
+  padding:0 16px 48px;min-width:0;
+}
+.dark .academic-setup,:root[data-theme="dark"] .academic-setup{
+  --bg:#0d141b;--surface:#151e28;--fg:#e5ebf1;--muted:#92a0b1;--line:#263342;
+  --brand:var(--brand-color,#4cc3b5);--brand-fg:var(--brand-foreground,#06201d);--soft:#16332f;
+  --bad:#ff8c82;--bad-bg:#3b1d1b;--ok:#6fd49b;--warn:#f2c14e;--warn-bg:#3a2e12;
+  color-scheme:dark;
+}
+.academic-setup *{box-sizing:border-box}
+.academic-setup .wrap{max-width:1080px;margin:0 auto}
+.academic-setup header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding:20px 0 14px}
+.academic-setup .brand{font-family:var(--font-head);font-weight:700;font-size:20px}
+.academic-setup nav{display:flex;flex-wrap:wrap;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px;max-width:100%}
+.academic-setup nav a{padding:7px 14px;border-radius:7px;color:var(--muted);text-decoration:none;font-weight:600;white-space:nowrap}
+.academic-setup nav a[aria-current="page"]{background:var(--brand);color:var(--brand-fg)}
+.academic-setup :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.academic-setup h2{font-family:var(--font-head);font-size:22px;margin:6px 0 2px;letter-spacing:-.01em}
+.academic-setup .lead{color:var(--muted);margin:0 0 16px;max-width:75ch}
+.academic-setup .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.academic-setup .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
+.academic-setup .f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.academic-setup .f label,.academic-setup .lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.academic-setup select,.academic-setup input[type=text],.academic-setup input[type=number]{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:38px;max-width:100%}
+.academic-setup option{background:var(--surface);color:var(--fg)}
+.academic-setup button{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:8px 14px;min-height:38px;cursor:pointer}
+.academic-setup button.primary{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+.academic-setup button.ghost{border:0;background:transparent;color:var(--bad);min-height:30px;padding:4px 8px}
+.academic-setup button:disabled{opacity:.5;cursor:default}
+.academic-setup .spacer{flex:1}
+.academic-setup .pill{display:inline-flex;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;background:var(--soft);color:var(--brand)}
+.academic-setup .pill.bad{background:var(--bad-bg);color:var(--bad)}
+.academic-setup .pill.warn{background:var(--warn-bg);color:var(--warn)}
+.academic-setup .msg{min-height:20px;font-size:13px;margin:0 0 8px}
+.academic-setup .msg.ok{color:var(--ok)}
+.academic-setup .msg.bad{color:var(--bad)}
+.academic-setup .scroll{overflow-x:auto;max-width:100%}
+.academic-setup table{width:100%;border-collapse:collapse;min-width:620px;font-variant-numeric:tabular-nums}
+.academic-setup th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:2px solid var(--line);font-weight:600}
+.academic-setup td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.academic-setup td.n,.academic-setup th.n{text-align:right}
+.academic-setup td input[type=number]{width:70px;text-align:right}
+.academic-setup td select{min-width:150px}
+.academic-setup .mut{color:var(--muted)}
+.academic-setup .empty{color:var(--muted);text-align:center;padding:28px 12px}
+.academic-setup .loading{color:var(--muted);padding:24px;text-align:center}
+@media(max-width:860px){.academic-setup .gr{grid-template-columns:1fr}}
