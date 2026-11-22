@@ -1080,6 +1080,10 @@ export class ApiClient {
     };
   }
 
+  public static async getStudentProfile() {
+    return this.request<any>('/student/me');
+  }
+
   public static async getStudentMarks(studentId: string) {
     return this.request<Array<StudentMark & { subjectName?: string }>>(`/exams/marks?studentId=${encodeURIComponent(studentId)}`);
   }
