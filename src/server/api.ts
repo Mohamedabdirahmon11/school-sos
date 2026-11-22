@@ -6236,13 +6236,13 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const userId = `usr-${randomUUID()}`;
   const teacherId = `tch-${randomUUID()}`;
   const userRow = {
-    id: userId, school_id: school.id, role: 'teacher', full_name: fullName, phone, staff_id: staffId,
+    id: userId, school_id: school.id, branch_id: branchId || null, role: 'teacher', full_name: fullName, phone, staff_id: staffId,
     password_hash: hashPassword(randomBytes(32).toString('base64url')), pin_hash: hashPin(initialPin),
     must_change_password: false, is_blocked: false, failed_login_attempts: 0,
     assigned_class_ids: assignedClasses, assigned_subject_ids: assignedSubjects
   };
   const teacherRow = {
-    id: teacherId, school_id: school.id, branch_id: branchId || null, user_id: userId, staff_id: staffId,
+    id: teacherId, school_id: school.id, user_id: userId, staff_id: staffId,
     full_name: fullName, email: '', phone, address, gender, qualification: qualification.trim(),
     department: department.trim(), assigned_classes: assignedClasses, assigned_subjects: assignedSubjects,
     status: 'active', joined_date: joinedDate, monthly_salary: monthlySalary
