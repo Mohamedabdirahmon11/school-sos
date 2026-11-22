@@ -4151,20 +4151,6 @@ async function nextSchoolStaffId(school: School): Promise<string> {
   return id;
 }
 
-async function nextSchoolTeacherId(_school: School): Promise<string> {
-  // Teacher IDs are also the login identifier and users.staff_id has a
-  // global unique index, so keep the short T001 sequence globally unique.
-  const [users, teachers] = await Promise.all([
-    queryAllRows('users', {}, 'id,staff_id'),
-    queryAllRows('teachers', {}, 'id,staff_id')
-  ]);
-  const used = new Set([...users, ...teachers].map((record: any) => String(record.staffId || '').toUpperCase()).filter(Boolean));
-  let sequence = 1;
-  let id = '';
-  do { id = 'T' + String(sequence++).padStart(3, '0'); } while (used.has(id));
-  return id;
-}
-
 const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
 const timetableClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], academicYear?: string): Promise<Map<string, 'paid' | 'partial' | 'unpaid'>> {
@@ -6090,8 +6076,8 @@ apiRouter.put('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolA
   const formTeacherClassId = body.formTeacherClassId === undefined ? undefined : (typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '');
   if (formTeacherClassId && !current.userId) { res.status(400).json({ error: 'This teacher has no sign-in account for Form Teacher access.' }); return; }
   if (formTeacherClassId) {
-    const schoolClasses = await db.getClasses(school.id);
-    if (!schoolClasses.some(klass => klass.id === formTeacherClassId && klass.schoolId === school.id && !klass.isArchived)) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
+    const matchingClass = await queryAllRows('classes', { school_id: school.id, id: formTeacherClassId, is_archived: 'false' }, 'id');
+    if (!matchingClass.length) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
   }
   const updates: Record<string, unknown> = {};
   for (const field of ['fullName', 'phone', 'address', 'qualification', 'department'] as const) {
@@ -6215,14 +6201,8 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
   const monthlySalary = body.monthlySalary === undefined || body.monthlySalary === '' ? 0 : Number(body.monthlySalary);
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
-  const phoneDigits = phone.replace(/\D/g, '');
-  if (phoneDigits) {
-    const existingPhones = await queryAllRows('teachers', { school_id: school.id }, 'id,phone');
-    if (existingPhones.some((item: any) => item.phone && String(item.phone).replace(/\D/g, '') === phoneDigits)) {
-      res.status(409).json({ error: 'Telefoonkan lambarkiisa hore ayaa macallin kale uga diiwaangashan dugsigan.' }); return;
-    }
-  }
-  const staffId = await nextSchoolTeacherId(school);
+  // Normalized school-scoped unique index on teachers.phone is the authoritative
+  // duplicate check; avoid loading every teacher just to compare phone numbers.
   const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
   if (branchId && !(await db.getBranches(school.id)).some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (body.assignedClasses !== undefined && (!Array.isArray(body.assignedClasses) || body.assignedClasses.length > 100 || body.assignedClasses.some((id: unknown) => typeof id !== 'string' || !id.trim()))) {
@@ -6241,43 +6221,44 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (body.formTeacherClassId !== undefined && body.formTeacherClassId !== null && typeof body.formTeacherClassId !== 'string') { res.status(400).json({ error: 'Form Teacher class must be a valid class ID.' }); return; }
   const formTeacherClassId = typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '';
   if (formTeacherClassId) {
-    const schoolClasses = await db.getClasses(school.id);
-    if (!schoolClasses.some(klass => klass.id === formTeacherClassId && klass.schoolId === school.id && !klass.isArchived)) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
+    const formTeacherClass = await db.getClassById(formTeacherClassId, school.id);
+    if (!formTeacherClass || formTeacherClass.isArchived) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
   }
   if (validSubjects.length !== assignedSubjects.length) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
 
-  const account = db.createUser({
-    schoolId: school.id, role: 'teacher', staffId, fullName, phone,
-    passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin),
-    mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0,
-    assignedClassIds: assignedClasses, assignedSubjectIds: assignedSubjects
-  });
-  const teacher = db.createTeacher({
-    schoolId: school.id,
-    branchId,
-    userId: account.id,
-    staffId,
-    fullName,
-    email: '',
-    phone,
-    address,
-    gender,
-    qualification: qualification.trim(),
-    department: department.trim(),
-    assignedClasses,
-    assignedSubjects,
-    status: 'active',
-    joinedDate,
-    monthlySalary
-  });
-  if (assignedSubjects.length) {
-    try { await db.saveTeacherSubjects(school.id, teacher.id, assignedSubjects); }
-    catch (error: any) { res.status(400).json({ error: error?.message || 'Maaddooyinka macallinka lama kaydin.' }); return; }
+  const userId = `usr-${randomUUID()}`;
+  const teacherId = `tch-${randomUUID()}`;
+  const userRow = {
+    id: userId, school_id: school.id, branch_id: branchId || null, role: 'teacher', full_name: fullName, phone,
+    password_hash: hashPassword(randomBytes(32).toString('base64url')), pin_hash: hashPin(initialPin),
+    must_change_password: false, is_blocked: false, failed_login_attempts: 0,
+    assigned_class_ids: assignedClasses, assigned_subject_ids: assignedSubjects
+  };
+  const teacherRow = {
+    id: teacherId, school_id: school.id, user_id: userId,
+    full_name: fullName, email: '', phone, address, gender, qualification: qualification.trim(),
+    department: department.trim(), assigned_classes: assignedClasses, assigned_subjects: assignedSubjects,
+    status: 'active', joined_date: joinedDate, monthly_salary: monthlySalary
+  };
+  let staffId = '';
+  try {
+    staffId = await db.createTeacherAtomically({
+      schoolId: school.id, user: userRow, teacher: teacherRow,
+      subjectIds: assignedSubjects, formTeacherClassId: formTeacherClassId || null
+    });
+  } catch (error: any) {
+    res.status(error?.code === '23505' ? 409 : error?.code === '23503' ? 400 : 400).json({
+      error: error?.code === '23505' && /phone/i.test(error?.message || '')
+        ? 'Telefoonkan lambarkiisa hore ayaa macallin kale uga diiwaangashan dugsigan.'
+        : error?.message || 'Macallinka iyo xogtiisa lama wada kaydin karin.'
+    });
+    return;
   }
-  if (formTeacherClassId) {
-    await db.getClasses(school.id);
-    await db.updateClass(formTeacherClassId, { classTeacherId: account.id }, school.id);
-  }
+  const teacher = {
+    id: teacherId, schoolId: school.id, branchId, userId, staffId, fullName, email: '', phone, address, gender,
+    qualification: qualification.trim(), department: department.trim(), assignedClasses, assignedSubjects,
+    status: 'active', joinedDate, monthlySalary
+  };
   db.logAudit({ action: 'TEACHER_SIGN_IN_CREATED', category: 'auth', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: 'Created teacher sign-in for staff ID ' + staffId + '.', severity: 'warning' });
   await db.flush();
   res.status(201).json({ ...teacher, initialPin });
