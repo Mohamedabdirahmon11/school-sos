@@ -1,6 +1,8 @@
 const klass = { id: 'class-4a', name: 'Grade 4', section: 'A', classTeacherId: 'teacher-visual-001', academicYear: '2026-2027' };
 const math = { id: 'subject-math', name: 'Mathematics', code: 'MATH' };
 const science = { id: 'subject-science', name: 'Environmental Science', code: 'ENV' };
+const teacher = { id: 'teacher-visual-001', fullName: 'Amina Teacher', staffId: 'TCH-001', phone: '+251911000001', status: 'active' };
+const term = { id: 'term-visual-001', name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-20', isCurrent: true };
 const students = [
   { id: 'student-001', studentId: 'ST-001', firstName: 'Ayaan', middleName: 'Test', lastName: 'Student', gender: 'female', rollNumber: '1', fatherPhone: '+251911000001', motherPhone: '+251922000001', classId: klass.id, status: 'active' },
   { id: 'student-002', studentId: 'ST-002', firstName: 'Bilal', middleName: '', lastName: 'Student', gender: 'male', rollNumber: '2', fatherPhone: '+251911000002', motherPhone: '', classId: klass.id, status: 'active' },
@@ -39,6 +41,11 @@ const setupState = {
 };
 const values: Record<string, (...args: any[]) => Promise<any>> = {
   getTeacherSubjectAssignments: async () => assignments,
+  getClasses: async () => [klass],
+  getSubjects: async () => [math, science],
+  getTeachers: async () => [teacher],
+  getStudents: async () => students,
+  getTimetableTerms: async () => [term],
   getExamConfig: async () => examConfig,
   getTimetable: async () => timetable,
   getMyFormTeacherClasses: async () => [klass],
@@ -57,7 +64,8 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getSchoolSetupData: async () => ({ data: { schoolInformation: { name: 'SchoolOS Test Academy', address: 'Main Street', city: 'Jijiga', phone: '+251911000001', email: 'office@example.test', whatsappPhone: '+251911000001', schoolType: 'combined' }, academicYear: { name: '2026/2027', startDate: '2026-09-01', endDate: '2027-06-30', isCurrent: true }, terms: [{ name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-20' }, { name: 'Semester 2', startDate: '2027-02-01', endDate: '2027-06-30' }], calendar: { workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], weeklyHolidays: ['Saturday', 'Sunday'], nationalHolidays: [], schoolHolidays: [], calendarType: 'both' }, workingHours: { openingTime: '07:30', classStartTime: '08:00', closingTime: '16:00', breakStartTime: '10:00', breakEndTime: '10:30', periodsPerDay: 8 }, completedSteps: [1, 2, 3, 4, 5] }, school: { name: 'SchoolOS Test Academy', address: 'Main Street', city: 'Jijiga', phone: '+251911000001', email: 'office@example.test', whatsappPhone: '+251911000001', schoolType: 'combined', logoUrl: '' } }),
   getSchoolSetupProgress: async () => setupState,
   updateSchoolSetupProgress: async () => setupState,
-  getTimetableSettings: async () => ({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 })
+  getTimetableSettings: async () => ({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 }),
+  request: async (endpoint: string) => endpoint === '/teacher-assignments' ? { selectedAcademicYearId: 'year-visual-001', selectedTermId: 'term-visual-001', classes: [klass], subjects: [math, science], teachers: [teacher], assignments, unassigned: [] } : []
 };
 export const ApiClient: any = new Proxy(values, {
   get(target, property: string) {
