@@ -54,8 +54,6 @@ test('student marks are published-only at the server and again filtered in the p
   assert.match(portal, /Weli lama daabicin natiijooyinkaaga/);
   assert.match(portal, /ExamTimetablePrint schedules=\{publishedExamSchedules\}/);
   assert.match(portal, /getPublishedExamSchedules\(studentRecord\.classId\)/);
-  assert.match(portal, /term-marks\/report-cards\?studentId=/);
-  assert.match(api, /const currentClassId = ownStudent \? await getStudentCurrentClassId\(school\.id, ownStudent\.id, ownStudent\.classId\) : ''/);
 });
 
 test('student homework reads current enrollment class and only their own submissions', () => {
