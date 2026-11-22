@@ -109,7 +109,7 @@ test('bulk document generation resolves up to 100 student identifiers with two s
   const methodEnd = storage.indexOf('public async getStudentById(', methodStart);
   const method = storage.slice(methodStart, methodEnd);
   assert.match(method, /Promise\.all\(/);
-  assert.match(method, /school_id: schoolId, id: uniqueIdentifiers/);
+  assert.match(method, /\.eq\('school_id', schoolId\)\.in\('id', uniqueIdentifiers\)/);
   assert.match(method, /school_id', schoolId\)[\s\S]*?in\('student_id', uniqueIdentifiers\)/);
   assert.match(method, /select\('\*'\)/);
   assert.doesNotMatch(method, /count:\s*'exact'/);
