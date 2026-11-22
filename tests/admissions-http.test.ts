@@ -458,14 +458,16 @@ test('concurrent attendance submissions converge on one daily row without automa
   assignedClassRow.classTeacherId = teacherUser.id;
   // This endpoint now requires school-wide setup readiness. Complete the fixture's
   // active classes and curriculum assignments so the test can focus on attendance writes.
-  for (const activeClass of await storage.db.getClasses(school.id)) {
+  const schoolClasses = await storage.db.getClasses(school.id);
+  const schoolClassIds = new Set(schoolClasses.map(item => item.id));
+  for (const activeClass of schoolClasses) {
     await storage.db.updateClass(activeClass.id, { classTeacherId: teacherUser.id }, school.id);
   }
-  for (const row of memory.rows('classes').filter(row => (row.school_id ?? row.schoolId) === school.id && row.is_archived !== true && row.isArchived !== true)) {
+  for (const row of memory.rows('classes').filter(row => schoolClassIds.has(row.id))) {
     row.class_teacher_id = teacherUser.id;
     row.classTeacherId = teacherUser.id;
   }
-  for (const row of memory.rows('class_subjects').filter(row => (row.school_id ?? row.schoolId) === school.id && row.is_active !== false && row.is_active !== 'false' && row.isActive !== false)) {
+  for (const row of memory.rows('class_subjects').filter(row => schoolClassIds.has(row.class_id || row.classId))) {
     row.teacher_id = 'attendance-teacher-profile';
     row.teacherId = 'attendance-teacher-profile';
     row.periods_per_week = 1;
