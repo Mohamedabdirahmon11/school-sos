@@ -28,8 +28,16 @@ export function isSchoolSetupProgressComplete(progress: unknown): boolean {
   if (typeof value.completedAt !== 'string' || !value.completedAt.trim()) return false;
   const completed = new Set(Array.isArray(value.completedSteps) ? value.completedSteps.filter(Number.isInteger) as number[] : []);
   const skipped = new Set(Array.isArray(value.skippedSteps) ? value.skippedSteps.filter(Number.isInteger) as number[] : []);
-  const required = [1, 2, 3, 4, 5, 0, 6, 8, 10];
+  const required = [1, 2, 3, 4, 5, 6, 8, 10];
   return required.every(step => completed.has(step))
     && [7, 9].every(step => completed.has(step) || skipped.has(step))
     && [...skipped].every(step => (step === 7 || step === 9) && !completed.has(step));
+}
+
+/** New dashboard gate: preserve the legacy validator while requiring the new assignment step. */
+export function isSchoolSetupProgressCompleteWithTeacherAssignment(progress: unknown): boolean {
+  if (!isSchoolSetupProgressComplete(progress)) return false;
+  const value = progress as Record<string, unknown>;
+  const completed = new Set(Array.isArray(value.completedSteps) ? value.completedSteps.filter(Number.isInteger) as number[] : []);
+  return completed.has(0);
 }
