@@ -7455,7 +7455,7 @@ apiRouter.post('/exams/term-periods/:periodId/publish', requireAuth, requireScho
   }
 });
 
-apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
+apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { classId, subjectId, semester, studentId } = req.query;
