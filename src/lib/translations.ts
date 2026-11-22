@@ -1364,7 +1364,7 @@ export const translations: Record<LanguageCode, TranslationDict> = {
     settings_report_footer: 'تذييل كشف الدرجات',
     settings_save_profile: 'حفظ الملف الشخصي',
     settings_save_academics: 'حفظ القواعد الأكاديمية',
-    settings_save_exam: 'حفظ قواعد الامتحان'
+    settings_save_exam: 'حفظ قواعد الامتحان',
   
     exam_marks: 'الدرجات',
     exam_scheme: 'نظام الدرجات',
