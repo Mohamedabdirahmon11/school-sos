@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, ClipboardList, Users } from 'lucide-react';
-import { TeacherAssignmentsView } from './TeacherAssignmentsView.tsx';
+import { CalendarDays, ClipboardList } from 'lucide-react';
 import { TimetableView } from './TimetableView.tsx';
 import { ExamsResultsView } from './ExamsResultsView.tsx';
 
-type AcademicSection = 'assignments' | 'timetable' | 'marks';
+type AcademicSection = 'timetable' | 'marks';
 
 const SECTIONS: Array<{ id: AcademicSection; title: string; subtitle: string; icon: React.ElementType; view: string }> = [
-  { id: 'assignments', title: 'Teacher Assignments', subtitle: 'Macallimiinta, fasallada iyo maaddooyinka', icon: Users, view: 'sch_teacher_assignments' },
   { id: 'timetable', title: 'Timetable', subtitle: 'Jadwalka fasallada iyo xiisadaha', icon: CalendarDays, view: 'sch_timetable' },
   { id: 'marks', title: 'Marks Entry', subtitle: 'Gelinta iyo hubinta dhibcaha', icon: ClipboardList, view: 'sch_marks' }
 ];
@@ -15,7 +13,7 @@ const SECTIONS: Array<{ id: AcademicSection; title: string; subtitle: string; ic
 function sectionFromView(view: string): AcademicSection {
   if (view === 'sch_timetable') return 'timetable';
   if (view === 'sch_marks' || view === 'sch_exams') return 'marks';
-  return 'assignments';
+  return 'marks';
 }
 
 export const AcademicsWorkspace: React.FC<{ activeView: string; onNavigate: (view: string) => void }> = ({ activeView, onNavigate }) => {
@@ -30,10 +28,10 @@ export const AcademicsWorkspace: React.FC<{ activeView: string; onNavigate: (vie
       <header className="space-y-1">
         <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--schoolos-accent)]">SchoolOS · Academics</p>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Academics</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Maamul saddexda hawlood ee waxbarashada hal meel.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Maamul jadwalka iyo gelinta dhibcaha.</p>
       </header>
 
-      <nav aria-label="Academic sections" className="grid grid-cols-1 gap-2 rounded-2xl border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] p-2 sm:grid-cols-3">
+      <nav aria-label="Academic sections" className="grid grid-cols-1 gap-2 rounded-2xl border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] p-2 sm:grid-cols-2">
         {SECTIONS.map(section => {
           const Icon = section.icon;
           const selected = activeSection === section.id;
@@ -58,7 +56,6 @@ export const AcademicsWorkspace: React.FC<{ activeView: string; onNavigate: (vie
       </nav>
 
       <section className="min-w-0" aria-label={SECTIONS.find(section => section.id === activeSection)?.title}>
-        {activeSection === 'assignments' && <TeacherAssignmentsView onNavigate={onNavigate} />}
         {activeSection === 'timetable' && <TimetableView />}
         {activeSection === 'marks' && <ExamsResultsView initialTab="marks" />}
       </section>

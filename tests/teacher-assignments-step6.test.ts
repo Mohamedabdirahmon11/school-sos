@@ -60,7 +60,9 @@ test('Assignment page includes matrix, teacher workload, filters, and print acti
 test('Assignment page is reachable from the School Admin app and sidebar', () => {
   assert.match(app, /AcademicsWorkspace/);
   assert.match(app, /sch_teacher_assignments/);
-  assert.match(workspace, /TeacherAssignmentsView/);
+  assert.match(app, /const TeacherAssignmentsView = React\.lazy/);
+  assert.match(app, /<TeacherAssignmentsView onNavigate=/);
+  assert.doesNotMatch(workspace, /TeacherAssignmentsView/);
   assert.match(workspace, /activeView/);
   assert.match(sidebar, /sch_teacher_assignments/);
 });

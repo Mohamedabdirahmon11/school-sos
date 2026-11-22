@@ -36,6 +36,7 @@ const ClassesSubjectsView = React.lazy(() => import('./components/schooladmin/Cl
 const SubjectsView = React.lazy(() => import('./components/schooladmin/SubjectsView.tsx').then(module => ({ default: module.SubjectsView })));
 const CurriculumView = React.lazy(() => import('./components/schooladmin/CurriculumView.tsx').then(module => ({ default: module.CurriculumView })));
 const AcademicsWorkspace = React.lazy(() => import('./components/schooladmin/AcademicsWorkspace.tsx').then(module => ({ default: module.AcademicsWorkspace })));
+const TeacherAssignmentsView = React.lazy(() => import('./components/schooladmin/TeacherAssignmentsView.tsx').then(module => ({ default: module.TeacherAssignmentsView })));
 const AttendanceView = React.lazy(() => import('./components/schooladmin/AttendanceView.tsx').then(module => ({ default: module.AttendanceView })));
 const ExamsResultsView = React.lazy(() => import('./components/schooladmin/ExamsResultsView.tsx').then(module => ({ default: module.ExamsResultsView })));
 const FeesLedgerView = React.lazy(() => import('./components/schooladmin/FeesLedgerView.tsx').then(module => ({ default: module.FeesLedgerView })));
@@ -259,7 +260,10 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_curriculum' && (
               <CurriculumView onNavigate={handleNavigate} />
             )}
-            {['sch_teacher_assignments', 'sch_timetable', 'sch_marks', 'sch_exams'].includes(activeView) && (
+            {activeView === 'sch_teacher_assignments' && (
+              <TeacherAssignmentsView onNavigate={handleNavigate} />
+            )}
+            {['sch_timetable', 'sch_marks', 'sch_exams'].includes(activeView) && (
               <AcademicsWorkspace activeView={activeView} onNavigate={handleNavigate} />
             )}
             {activeView === 'sch_attendance' && (
