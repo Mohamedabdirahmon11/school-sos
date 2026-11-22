@@ -38,7 +38,7 @@ after(async () => {
 test('async route rejections become JSON 500 responses instead of hanging', async () => {
   const response = await fetch(`${baseUrl}/async-throws`);
   assert.equal(response.status, 500);
-  assert.deepEqual(await response.json(), { error: 'An unexpected server error occurred. Please try again.' });
+  assert.deepEqual(await response.json(), { error: 'An unexpected server error occurred. Please try again.', code: 'INTERNAL_SERVER_ERROR', requestId: 'unassigned' });
 });
 
 test('synchronous route throws become JSON 500 responses', async () => {
@@ -51,4 +51,12 @@ test('successful routes still respond normally after wrapping', async () => {
   const response = await fetch(`${baseUrl}/ok`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true });
+});
+
+
+test('API error responses include a stable code and request correlation id', async () => {
+  const response = await fetch(`${baseUrl}/async-throws`);
+  const body = await response.json() as { code?: string; requestId?: string };
+  assert.equal(body.code, 'INTERNAL_SERVER_ERROR');
+  assert.equal(body.requestId, 'unassigned');
 });
