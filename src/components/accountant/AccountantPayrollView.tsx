@@ -216,7 +216,7 @@ export const StaffPayslipsView: React.FC = () => {
       `Net pay: ${formatMoney(record.netSalary, currency)}`,
       `Paid: ${formatMoney(record.paidAmount ?? 0, currency)}`,
       `Balance: ${formatMoney(record.balanceDue ?? record.netSalary, currency)}`
-    ].join('\\n');
+    ].join('\n');
     try {
       await navigator.clipboard.writeText(summary);
       setCopiedId(record.id);
