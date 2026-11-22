@@ -69,7 +69,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       }
       const order = [1, 2, 3, 4, 5, 0, 6, 7, 8, 9];
       const skippedSteps = current.progress.skippedSteps.filter(id => !current.checklist[id]?.ready);
-      const completedSteps = order.filter(id => current.checklist[id]?.ready && !skippedSteps.includes(id));
+      const completedSteps = order.filter(id => current.checklist[id]?.ready && !skippedSteps.includes(id)).sort((a, b) => a - b);
       const currentStep = order.find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) ?? 10;
       const unchanged = current.progress.currentStep === currentStep
         && JSON.stringify(current.progress.completedSteps) === JSON.stringify(completedSteps)
