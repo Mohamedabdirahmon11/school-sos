@@ -6483,15 +6483,15 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
     return;
   }
-  const schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
-  if (date > schoolToday) {
-    res.status(422).json({ error: 'Attendance cannot be recorded for a future school date.' });
-    return;
-  }
   const attendanceClass = await db.getClassById(normalizedClassId, school.id);
   if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
   if (attendanceClass.classTeacherId !== user.id) {
     res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
+    return;
+  }
+  const schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  if (date > schoolToday) {
+    res.status(422).json({ error: 'Attendance cannot be recorded for a future school date.' });
     return;
   }
   const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
@@ -6539,6 +6539,23 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     db.logAudit({action:'ATTENDANCE_UPDATED',category:'academics',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:JSON.stringify({classId:normalizedClassId,date,source:source==='document_template'?'document_template':'attendance_module',changes}),severity:'info'});
   }
   res.json({ success: true, count: saved.length, records: saved });
+});
+
+apiRouter.put('/attendance', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only the assigned Form Teacher can update daily attendance.' });
+    return;
+  }
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  if (!classId) { res.status(400).json({ error: 'A class is required.' }); return; }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can update its daily attendance.' });
+    return;
+  }
+  res.status(405).json({ error: 'Use POST /attendance for the atomic once-per-day attendance upsert.' });
 });
 
 // ==============================================================================
