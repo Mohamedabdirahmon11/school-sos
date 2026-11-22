@@ -1,6 +1,5 @@
 -- Atomic upsert of normalized teacher assignments, dependent timetable cleanup, legacy curriculum link and audit.
 -- Additive and idempotent; all writes happen in one PostgreSQL transaction.
-DROP FUNCTION IF EXISTS public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar);
 CREATE OR REPLACE FUNCTION public.upsert_teacher_assignment_atomic(
   p_assignment_id uuid,
   p_school_id varchar,
