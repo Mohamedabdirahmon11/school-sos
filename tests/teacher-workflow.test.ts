@@ -266,7 +266,7 @@ test('daily attendance uses one atomic bulk upsert on the existing natural key',
 test('Form Teacher attendance authorization loads its class once without subject-assignment lookups', () => {
   const api = read('../src/server/api.ts');
   const start = api.indexOf("apiRouter.post('/attendance'");
-  const end = api.indexOf('// 6. EXAMS & RESULTS', start);
+  const end = api.indexOf("apiRouter.put('/attendance'", start);
   const route = api.slice(start, end);
   assert.equal(route.split('db.getClassById(').length - 1, 1);
   assert.ok(route.includes('attendanceClass.classTeacherId !== user.id'));
