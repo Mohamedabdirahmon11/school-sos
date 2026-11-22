@@ -37,3 +37,12 @@ for (const width of viewports) {
     });
   }
 }
+
+
+test('write the screenshot comparison overview', async () => {
+  const folder = path.join(root, 'artifacts', 'teacher-portal');
+  fs.mkdirSync(folder, { recursive: true });
+  const links = themes.flatMap(theme => viewports.map(width => `<li><a href="${theme}/${width}/index.html">${width}px · ${theme}</a></li>`)).join('');
+  fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Teacher Portal screenshot matrix</title><style>body{font:16px system-ui;margin:40px;background:#f1f5f9;color:#17212b}li{margin:12px 0}a{color:#0f766e;font-weight:700}</style><h1>Teacher Portal · Reference and SchoolOS</h1><p>10 sections × 4 viewport widths × 2 themes. Open a comparison page to view the supplied teacher-portal.html next to the live SchoolOS components.</p><ul>${links}</ul>`);
+  expect(fs.existsSync(path.join(folder, 'index.html'))).toBeTruthy();
+});
