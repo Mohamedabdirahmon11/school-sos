@@ -49,6 +49,8 @@ const subject = db.createSubject({ schoolId: school.id, name: 'Mathematics', cod
 const otherSubject = db.createSubject({ schoolId: school.id, name: 'Science', code: 'SCI', category: 'core', isActive: true } as any);
 const student = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-001', firstName: 'Test', middleName: '', lastName: 'Student', gender: 'female', admissionDate: today, fatherPhone: '+251900000001', classId: klass.id, status: 'active' } as any);
 const otherStudent = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-002', firstName: 'Other', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: otherClass.id, status: 'active' } as any);
+parentUser.linkedStudentIds = [student.id];
+await db.flush();
 await memory.from('class_subjects').insert([
   { id: 'ta-cs-math', school_id: school.id, class_id: klass.id, subject_id: subject.id, teacher_id: subjectTeacher.id, 'teachers.user_id': subjectTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 3, is_active: true },
   { id: 'ta-cs-other-class', school_id: school.id, class_id: otherClass.id, subject_id: subject.id, teacher_id: otherTeacher.id, 'teachers.user_id': otherTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 2, is_active: true }
@@ -129,7 +131,6 @@ test('15.7 marks in a locked semester are forbidden with HTTP 403', async () => 
 });
 
 test('15.8 parents cannot see submitted marks until the admin publishes them', async () => {
-  parentUser.linkedStudentIds = [student.id];
   const config = await db.getExamConfig(school.id, '2026-2027');
   const assessmentScores = Object.fromEntries(config.assessmentComponents.map(component => [component.id, Math.min(5, component.maxMarks)]));
   const [saved] = await db.saveStudentMarks(school.id, klass.id, subject.id, 'Semester 1', [{ studentId: student.id, assessmentScores, status: 'submitted' }], subjectTeacherUser.id);
@@ -155,7 +156,6 @@ test('15.9 another teacher cannot grade or modify a colleague homework submissio
 });
 
 test('15.10 a parent cannot message a teacher who is not assigned to the linked child class', async () => {
-  parentUser.linkedStudentIds = [student.id];
   const response = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, content: 'Please discuss my child.' });
   assert.equal(response.status, 403);
 });
