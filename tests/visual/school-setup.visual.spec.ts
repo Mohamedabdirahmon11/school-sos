@@ -95,7 +95,7 @@ test('School Setup Wizard screenshot matrix index and difference notes', async (
   fs.writeFileSync(path.join(folder, 'DIFFERENCES.md'), [
     '# Reference vs SchoolOS visual differences',
     '',
-    '- Profile and Academic Year still open the existing SchoolOS settings editors; the reference HTML renders their inputs directly inside the wizard.',
+    '- Profile and Academic Year now render editable SchoolOS forms inside the wizard and save through the existing setup-data API; the reference HTML and SchoolOS still differ in exact copy, spacing and field grouping.',
     '- Classes, Subjects/Curriculum, Teachers, Teacher Assignment, Students and Timetable now render live database-backed forms and lists inside the wizard.',
     '- SchoolOS uses the shared SchoolOS API and authorization scope; the reference fixture is static visual sample data.',
     '- Reference copy and SchoolOS copy differ in wording and some labels; layout tokens, 290px sidebar, 860px content width, card surfaces and mobile breakpoint are aligned.',
