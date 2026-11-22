@@ -97,7 +97,8 @@ async function getCurrentAcademicYearId(schoolId: string): Promise<string> {
   const cached = currentAcademicYearCache.get(schoolId);
   if (cached && cached.expiresAt > Date.now()) return cached.promise;
 
-  const promise = db.queryPage('academic_years', { school_id: schoolId, is_current: 'true' }, 1, 1, undefined, 'id')
+  let promise: Promise<string>;
+  promise = db.queryPage('academic_years', { school_id: schoolId, is_current: 'true' }, 1, 1, undefined, 'id')
     .then(page => String((page.items[0] as any)?.id || ''))
     .catch(error => {
       if (currentAcademicYearCache.get(schoolId)?.promise === promise) currentAcademicYearCache.delete(schoolId);
