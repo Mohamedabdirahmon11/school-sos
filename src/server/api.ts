@@ -9928,12 +9928,6 @@ async function requireTeacherAssignmentsReady(req: any, res: any, next: (error?:
   }
 }
 
-async function requireTeacherAssignmentsReadyForTeacher(req: any, res: any, next: (error?: unknown) => void) {
-  if (normalizeRole(req.user?.role) !== 'teacher') { next(); return; }
-  await requireTeacherAssignmentsReady(req, res, next);
-}
-
-
 apiRouter.post('/school/logo', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext,
   express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: '1572864' }),
   async (req, res) => {
@@ -11687,6 +11681,19 @@ apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireSc
     res.status(400).json({ error: 'Dooro qaybta, fasalka, maaddada iyo liiska ardayda.' }); return;
   }
   const client = termMarksServiceClient(res); if (!client) return;
+  const { data: teacher } = await client.from('teachers').select('id').eq('school_id', school.id).eq('user_id', user.id).maybeSingle();
+  if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
+  const { data: component } = await client.from('mark_components').select('structure_id').eq('school_id', school.id).eq('id', componentId).maybeSingle();
+  if (!component) { res.status(404).json({ error: 'Qaybtan dhibcaha lama helin.' }); return; }
+  const { data: structure } = await client.from('mark_structures').select('term_id').eq('school_id', school.id).eq('id', component.structure_id).maybeSingle();
+  if (!structure) { res.status(404).json({ error: 'Qaab-dhismeedka dhibcaha lama helin.' }); return; }
+  const { data: term } = await client.from('terms').select('academic_year_id').eq('school_id', school.id).eq('id', structure.term_id).maybeSingle();
+  if (!term) { res.status(404).json({ error: 'Term-kan lama helin.' }); return; }
+  const { data: assignments } = await client.from('teacher_class_subject_assignments').select('id')
+    .eq('school_id', school.id).eq('teacher_id', teacher.id).eq('academic_year_id', term.academic_year_id)
+    .eq('class_id', classId).eq('subject_id', subjectId).or(`term_id.is.null,term_id.eq.${structure.term_id}`).limit(1);
+  if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
+  if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const { data, error } = await client.rpc('schoolos_save_component_marks', {
     p_school_id: school.id, p_actor_id: user.id, p_component_id: componentId,
     p_class_id: classId, p_subject_id: subjectId, p_marks: marks
