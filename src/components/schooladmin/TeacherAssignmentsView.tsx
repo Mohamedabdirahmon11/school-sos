@@ -24,7 +24,8 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   const [teacherUserIds, setTeacherUserIds] = useState<Record<string, string>>({});
   const [yearId, setYearId] = useState('');
   const [termId, setTermId] = useState('');
-  const [view, setView] = useState<'matrix' | 'teacher'>('matrix');
+  const [view, setView] = useState<'class' | 'matrix' | 'teacher'>('class');
+  const [assignmentClassId, setAssignmentClassId] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('');
   const [teacherFilter, setTeacherFilter] = useState('');
@@ -64,6 +65,11 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   }, [school?.id, yearId, termId]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (data?.classes.length && !data.classes.some(row => row.id === assignmentClassId)) {
+      setAssignmentClassId(data.classes[0].id);
+    }
+  }, [data, assignmentClassId]);
 
   useEffect(() => {
     let active = true;
@@ -159,6 +165,13 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   }), [data, classFilter, subjectFilter, unassignedOnly, teacherFilter, search, yearId, termId]);
   const visibleRowKeys = new Set(filteredRows.map(row => row.class_id + ':' + row.subject_id));
   const assignedPercent = data?.totalClassSubjects ? Math.round((data.assignedCount / data.totalClassSubjects) * 100) : 0;
+  const classViewClassId = data.classes.some(row => row.id === assignmentClassId) ? assignmentClassId : (data.classes[0]?.id || '');
+  const classViewClass = data.classes.find(row => row.id === classViewClassId);
+  const classViewRows = data.curriculum.filter(row => row.class_id === classViewClassId);
+  const formTeacherClass = formTeacherClasses.find(row => row.id === classViewClassId);
+  const formTeacherUserId = formTeacherClass?.classTeacherId || '';
+  const formTeacherName = data.teachers.find(row => teacherUserIds[row.id] === formTeacherUserId)?.full_name || 'lama dooran';
+  const classViewUnassigned = classViewRows.filter(row => !assignmentFor(row.class_id, row.subject_id)).length;
 
   const doBulk = async () => {
     if (!data || !bulkTeacher || !bulkSubject || !bulkClasses.length) return;
@@ -248,6 +261,7 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"><CheckCircle2 className="mr-2 inline h-4 w-4" />{notice}</div>}
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">{error}</div>}
     <div className="inline-flex min-h-9 items-center rounded-full border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] px-3 text-xs font-bold text-[var(--schoolos-accent)]">{data.unassignedCount > 0 ? data.unassignedCount + " maaddo macallin la’aan" : "Dhammaan waa la qoondeeyay"}</div>
+    {view !== 'class' && <>
     <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {[['Maaddooyinka fasallada', data.totalClassSubjects], ['La qoondeeyey', data.assignedCount], ['Maaddo macallin la’aan', data.unassignedCount], ['Macallimiin culayskoodu badan yahay', data.overloadedCount]].map(([label, value]) =>
         <Card key={String(label)} className="p-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{value}</p></Card>)}
@@ -256,7 +270,8 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
       <div className="flex items-center justify-between text-sm"><span className="font-semibold">Horumarka qoondeynta</span><strong>{assignedPercent}% la qoondeeyey</strong></div>
       <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-teal-600 transition-all" style={{ width: assignedPercent + '%' }} /></div>
     </Card>
-    <div className="schoolos-assignment-toolbar flex flex-wrap items-end gap-3">
+    </>}
+    {view !== 'class' && <div className="schoolos-assignment-toolbar flex flex-wrap items-end gap-3">
       <FormRow label="Sannad-dugsiyeed"><select value={yearId} onChange={e => { setYearId(e.target.value); setTermId(''); }} className="min-w-40 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">{data.academicYears.map(y => <option key={y.id} value={y.id}>{y.name}{y.is_current ? ' · Hadda' : ''}</option>)}</select></FormRow>
       <FormRow label="Term"><select value={termId} onChange={e => setTermId(e.target.value)} className="min-w-36 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Sannadka oo dhan</option>{data.terms.filter(t => t.academic_year_id === yearId).map(t => <option key={t.id} value={t.id}>{t.name}{t.is_current ? ' · Hadda' : ''}</option>)}</select></FormRow>
       <FormRow label="Fasal"><select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="min-w-36 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Dhammaan fasallada</option>{data.classes.map(c => <option key={c.id} value={c.id}>{className(c.id)}</option>)}</select></FormRow>
@@ -264,15 +279,58 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
       <FormRow label="Macallin"><select value={teacherFilter} onChange={e => setTeacherFilter(e.target.value)} className="min-w-36 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">Dhammaan macallimiinta</option>{data.teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}</select></FormRow>
       <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" checked={unassignedOnly} onChange={e => setUnassignedOnly(e.target.checked)} /> Kuwa bannaan oo keliya</label>
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Raadi fasal ama maaddo..." className="min-w-40 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900" />
-    </div>
+    </div>}
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex gap-2"><Button variant={view === 'matrix' ? 'primary' : 'secondary'} onClick={() => setView('matrix')}>Matrix</Button><Button variant={view === 'teacher' ? 'primary' : 'secondary'} onClick={() => setView('teacher')}>Macallin kasta</Button></div>
+      <div className="flex gap-2"><Button variant={view === 'class' ? 'primary' : 'secondary'} onClick={() => setView('class')}>Class view</Button><Button variant={view === 'matrix' ? 'primary' : 'secondary'} onClick={() => setView('matrix')}>Matrix</Button><Button variant={view === 'teacher' ? 'primary' : 'secondary'} onClick={() => setView('teacher')}>Macallin kasta</Button></div>
       <div className="flex flex-wrap gap-2"><Button disabled={isReadOnly} onClick={() => setBulkOpen(!bulkOpen)}>Ku dar</Button><Button disabled={isReadOnly} onClick={() => setReplaceOpen(!replaceOpen)}>Beddel macallin</Button><Button disabled={isReadOnly} onClick={() => setCopyOpen(!copyOpen)}><Copy className="mr-1 inline h-4 w-4" /> Koobiyeey</Button><Button onClick={() => window.print()}><Printer className="mr-1 inline h-4 w-4" /> Daabac / PDF</Button><Button onClick={() => void load()}><RefreshCw className="mr-1 inline h-4 w-4" /> Cusboonaysii</Button></div>
     </div>
     {bulkOpen && <Card className="grid gap-3 p-4 md:grid-cols-2"><h3 className="font-semibold md:col-span-2">Hal macallin ku qoondee fasallo badan</h3><FormRow label="Macallin"><select value={bulkTeacher} onChange={e => setBulkTeacher(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{[...data.teachers].filter(t => t.status === 'active').sort((a,b) => Number(qualified(bulkSubject, b.id)) - Number(qualified(bulkSubject, a.id))).map(t => <option key={t.id} value={t.id}>{qualified(bulkSubject, t.id) ? '' : '⚠ '}{t.full_name}</option>)}</select></FormRow><FormRow label="Maaddo"><select value={bulkSubject} onChange={e => setBulkSubject(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro maaddo</option>{data.subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></FormRow><div className="md:col-span-2 flex flex-wrap gap-3">{data.classes.filter(c => !bulkSubject || data.curriculum.some(r => r.class_id === c.id && r.subject_id === bulkSubject)).map(c => <label key={c.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={bulkClasses.includes(c.id)} onChange={e => setBulkClasses(old => e.target.checked ? [...old, c.id] : old.filter(id => id !== c.id))} />{className(c.id)}</label>)}</div><div className="flex gap-2"><Button variant="primary" disabled={saving || isReadOnly} onClick={() => void doBulk()}>Kaydi qoondeynta</Button><Button onClick={() => setBulkOpen(false)}>Xir</Button></div></Card>}
     {replaceOpen && <Card className="grid gap-3 p-4 md:grid-cols-2"><h3 className="font-semibold md:col-span-2">U wareeji dhammaan qoondeynta macallin kale</h3><FormRow label="Macallinka hadda"><select value={replaceFrom} onChange={e => setReplaceFrom(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{data.teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}</select></FormRow><FormRow label="Macallinka cusub"><select value={replaceTo} onChange={e => setReplaceTo(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro macallin</option>{data.teachers.filter(t => t.status === 'active').sort((a,b) => Number(qualifiedForReplacement(b.id)) - Number(qualifiedForReplacement(a.id))).map(t => <option key={t.id} value={t.id}>{qualifiedForReplacement(t.id) ? '' : '⚠ '}{t.full_name}</option>)}</select></FormRow><label className="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" checked={replaceOverride} onChange={e => setReplaceOverride(e.target.checked)} /> Oggolow ka-reebis aqooneed (digniin)</label><div className="flex gap-2"><Button variant="primary" disabled={saving || isReadOnly} onClick={() => void doReplace()}>Beddel dhammaan / kuwa la doortay</Button><Button onClick={() => setReplaceOpen(false)}>Xir</Button></div></Card>}
     {copyOpen && <Card className="grid gap-3 p-4 md:grid-cols-2"><h3 className="font-semibold md:col-span-2">Ka soo koobiyee sannad ama term hore</h3><FormRow label="Sannadka laga koobiyeeynayo"><select value={copyYear} onChange={e => { setCopyYear(e.target.value); setCopyTerm(''); }} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Dooro sannad</option>{data.academicYears.map(y => <option key={y.id} value={y.id}>{y.name}</option>)}</select></FormRow><FormRow label="Term-ka laga koobiyeeynayo"><select value={copyTerm} onChange={e => setCopyTerm(e.target.value)} className="rounded-xl border p-2 dark:bg-slate-900"><option value="">Sannadka oo dhan</option>{data.terms.filter(t => t.academic_year_id === copyYear).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></FormRow><div className="flex gap-2"><Button variant="primary" disabled={saving || isReadOnly || !copyYear} onClick={() => void doCopy()}>Koobiyee, iska dhaaf isku dhacyada</Button><Button onClick={() => setCopyOpen(false)}>Xir</Button></div></Card>}
-    {view === 'matrix' ? <Card className="overflow-hidden p-0"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr><th className="p-3">Fasal / Qayb</th>{filteredSubjects.map(s => <th key={s.id} className="p-3">{s.name}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{filteredClasses.map(c => <tr key={c.id}><th className="p-3 font-semibold">{className(c.id)}</th>{filteredSubjects.map(s => { const row = data.curriculum.find(r => r.class_id === c.id && r.subject_id === s.id); const assigned = row ? assignmentFor(c.id, s.id) : undefined; const isVisible = row && visibleRowKeys.has(c.id + ':' + s.id); const teacherIds = data.qualifiedTeacherIdsBySubject[s.id] || []; const options = [...data.teachers].filter(t => t.status === 'active').sort((a,b) => Number(teacherIds.includes(b.id)) - Number(teacherIds.includes(a.id))); return <td key={s.id} className="p-2">{!row || !isVisible ? <span className="text-slate-300">—</span> : <div className={!assigned ? 'rounded-lg bg-amber-50 p-1 dark:bg-amber-950/40' : ''}><select aria-label={className(c.id) + ' ' + s.name} disabled={isReadOnly || saving} value={assigned?.teacher_id || ''} onChange={e => void saveCell(row, e.target.value)} className="w-full min-w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="">— Lama qoondeyn —</option>{options.map(t => <option key={t.id} value={t.id}>{teacherIds.includes(t.id) ? '' : '⚠ '}{t.full_name}</option>)}</select>{assigned?.qualification_override && <p className="mt-1 text-[10px] text-amber-700">⚠ Ka-reebis</p>}</div>}</td>; })}</tr>)}</tbody></table></div>{!data.curriculum.length && <EmptyState><BookOpen className="mx-auto h-8 w-8 text-teal-700" /><p>Manhaj lama helin.</p><Button onClick={() => onNavigate('sch_curriculum')}>Tag Manhajka (Tallaabada 4)</Button></EmptyState>}</Card>
+    {view === 'class' ? <section className="gr">
+      <section className="card">
+        <div className="bar">
+          <div className="f"><label htmlFor="assignment-year">Sannad-dugsiyeed</label><select id="assignment-year" value={yearId} onChange={event => { setYearId(event.target.value); setTermId(''); }}><option value="">Dooro sannad</option>{data.academicYears.map(year => <option key={year.id} value={year.id}>{year.name}</option>)}</select></div>
+          <div className="f"><label htmlFor="assignment-term">Term</label><select id="assignment-term" value={termId} onChange={event => setTermId(event.target.value)}><option value="">Sannadka oo dhan</option>{data.terms.filter(term => term.academic_year_id === yearId).map(term => <option key={term.id} value={term.id}>{term.name}</option>)}</select></div>
+          <div className="f"><label htmlFor="assignment-class">Class</label><select id="assignment-class" value={classViewClassId} onChange={event => setAssignmentClassId(event.target.value)}>{data.classes.map(row => <option key={row.id} value={row.id}>{className(row.id)}</option>)}</select></div>
+          <span className="spacer" />
+          <span className={`pill ${classViewUnassigned ? 'bad' : ''}`}>{classViewUnassigned ? classViewUnassigned + " maaddo macallin la’aan" : "Dhammaan waa la qoondeeyay"}</span>
+        </div>
+        {notice && <div role="status" className="msg ok">{notice}</div>}
+        {error && <div role="alert" className="msg bad">{error}</div>}
+        <p className="mut" style={{ marginBottom: 10 }}>Form Teacher: <b style={{ color: 'var(--fg)' }}>{formTeacherName}</b> · {Number(formTeacherClass?.shift || 1) === 2 ? 'Afternoon' : 'Morning'} shift</p>
+        <div className="scroll"><table><thead><tr><th>Subject</th><th className="n">Periods</th><th>Teacher</th></tr></thead><tbody>
+          {classViewRows.map(row => {
+            const assigned = assignmentFor(row.class_id, row.subject_id);
+            const teacherIds = data.qualifiedTeacherIdsBySubject[row.subject_id] || [];
+            const options = [...data.teachers].filter(teacher => teacher.status === 'active').sort((a, b) => Number(teacherIds.includes(b.id)) - Number(teacherIds.includes(a.id)));
+            return <tr key={row.id}>
+              <td><b>{subjectName(row.subject_id)}</b></td>
+              <td className="n">{row.periods_per_week}</td>
+              <td><select aria-label={className(row.class_id) + ' ' + subjectName(row.subject_id)} disabled={isReadOnly || saving} value={assigned?.teacher_id || ''} onChange={event => void saveCell(row, event.target.value)}>
+                <option value="">— Dooro macallin —</option>{options.map(teacher => <option key={teacher.id} value={teacher.id}>{teacherIds.includes(teacher.id) ? '' : '⚠ '}{teacher.full_name}</option>)}
+              </select>{assigned?.qualification_override && <span className="mut"> · Ka-reebis</span>}</td>
+            </tr>;
+          })}
+          {!classViewRows.length && <tr><td colSpan={3} className="mut">Fasalkan maaddo ma leh. Ka dooro Class Curriculum.</td></tr>}
+        </tbody></table></div>
+      </section>
+      <aside className="card">
+        <div className="lbl" style={{ marginBottom: 10 }}>Culeyska macallimiinta</div>
+        <div className="wl">{data.teachers.map(teacher => {
+          const workload = workloadByTeacher.get(teacher.id);
+          const periods = workload?.periodsPerWeek || 0;
+          const max = workload?.maxPeriodsPerWeek || 30;
+          const assignments = data.assignments.filter(item => item.teacher_id === teacher.id);
+          return <div key={teacher.id}>
+            <div className="r"><b>{teacher.full_name}</b><span className={workload?.overloaded ? 'pill bad' : 'mut'}>{periods}/{max}</span></div>
+            <div className={`meter ${workload?.overloaded ? 'over' : ''}`}><i style={{ width: Math.min(100, periods / max * 100) + '%' }} /></div>
+            <div className="mut" style={{ fontSize: 12, marginTop: 3 }}>{assignments.length ? assignments.map(item => className(item.class_id) + ' · ' + subjectName(item.subject_id)).join(', ') : 'Wali lama qoondayn'}</div>
+          </div>;
+        })}</div>
+      </aside>
+    </section>
+    : view === 'matrix' ? <Card className="overflow-hidden p-0"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"><tr><th className="p-3">Fasal / Qayb</th>{filteredSubjects.map(s => <th key={s.id} className="p-3">{s.name}</th>)}</tr></thead><tbody className="divide-y divide-slate-100 dark:divide-slate-800">{filteredClasses.map(c => <tr key={c.id}><th className="p-3 font-semibold">{className(c.id)}</th>{filteredSubjects.map(s => { const row = data.curriculum.find(r => r.class_id === c.id && r.subject_id === s.id); const assigned = row ? assignmentFor(c.id, s.id) : undefined; const isVisible = row && visibleRowKeys.has(c.id + ':' + s.id); const teacherIds = data.qualifiedTeacherIdsBySubject[s.id] || []; const options = [...data.teachers].filter(t => t.status === 'active').sort((a,b) => Number(teacherIds.includes(b.id)) - Number(teacherIds.includes(a.id))); return <td key={s.id} className="p-2">{!row || !isVisible ? <span className="text-slate-300">—</span> : <div className={!assigned ? 'rounded-lg bg-amber-50 p-1 dark:bg-amber-950/40' : ''}><select aria-label={className(c.id) + ' ' + s.name} disabled={isReadOnly || saving} value={assigned?.teacher_id || ''} onChange={e => void saveCell(row, e.target.value)} className="w-full min-w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="">— Lama qoondeyn —</option>{options.map(t => <option key={t.id} value={t.id}>{teacherIds.includes(t.id) ? '' : '⚠ '}{t.full_name}</option>)}</select>{assigned?.qualification_override && <p className="mt-1 text-[10px] text-amber-700">⚠ Ka-reebis</p>}</div>}</td>; })}</tr>)}</tbody></table></div>{!data.curriculum.length && <EmptyState><BookOpen className="mx-auto h-8 w-8 text-teal-700" /><p>Manhaj lama helin.</p><Button onClick={() => onNavigate('sch_curriculum')}>Tag Manhajka (Tallaabada 4)</Button></EmptyState>}</Card>
     : <section className="schoolos-teacher-roster space-y-3">
       <div className="grid grid-cols-1 gap-2 rounded-xl border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-[var(--schoolos-muted)] md:grid-cols-[minmax(170px,.8fr)_minmax(280px,1.8fr)_minmax(150px,.7fr)]">
         <span>Macallin</span><span>Fasallada uu dhigo (maaddo)</span><span>Form Teacher</span>
