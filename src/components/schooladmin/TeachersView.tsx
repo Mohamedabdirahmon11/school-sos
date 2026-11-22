@@ -209,11 +209,7 @@ export const TeachersView: React.FC = () => {
             <Download className="w-4 h-4" />
             <span>Soo dejiso CSV</span>
           </button>
-          <button onClick={() => setShowAddModal(true)} disabled={isReadOnly}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#0b6f68] disabled:opacity-50">
-            <Plus className="w-4 h-4" />
-            <span>Diiwaangeli macallin</span>
-          </button>
+          <span className="text-xs font-semibold text-teal-50">Macallimiinta dugsiga</span>
         </div>
         </div>
       </header>
@@ -232,6 +228,30 @@ export const TeachersView: React.FC = () => {
           </article>
         ))}
       </section>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-[#d8e6e2] bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-[#132A29]">Maamulka macallimiinta</h2>
+          <p className="mt-1 text-xs text-[#64748B]">Ku dar macallin cusub ama maamul macallimiinta hore u diiwaangashan.</p>
+        </div>
+        <button
+          type="button"
+          data-testid="add-teacher-button"
+          aria-label="Add Teacher"
+          title={isReadOnly ? "School is in read-only mode" : "Add a new teacher"}
+          onClick={() => {
+            if (isReadOnly) {
+              setNotice("Dugsigan hadda waa read-only; ku darista macallin lama oggola ilaa rukhsadda dugsiga la hawlgeliyo.");
+              return;
+            }
+            setShowAddModal(true);
+          }}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0F766E] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#0D655E] focus:outline-none focus:ring-2 focus:ring-[#0F766E] focus:ring-offset-2"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Add Teacher · Ku dar macallin</span>
+        </button>
+      </div>
 
       {notice && (
         <div role="status" className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
