@@ -67,7 +67,9 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Class examination register/);
   assert.match(teacher, /Student name \/ ID/);
   assert.match(teacher, /examRegisterRows/);
-  assert.match(teacher, /let currentRank = 0/);
+  assert.match(teacher, /rankExamStudentResults/);
+  assert.match(teacher, /allClassMarksSubmitted/);
+  assert.match(teacher, /rankByStudent/);
   assert.match(teacher, /Enter individual assessment components/);
   assert.match(teacher, /activeTab === 'exam_results'/);
   assert.match(teacher, /activeTab === 'assignments'/);
@@ -164,7 +166,7 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
   assert.match(teacher, /Loading students and attendance/);
   assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects.length \|\| !students.length/);
-  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData\}/);
+  assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData \|\| !allClassMarksSubmitted \|\| classAlreadyForwarded\}/);
 });
 
 

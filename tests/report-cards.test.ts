@@ -99,6 +99,7 @@ test('report card page includes student, subject marks, percentages, max marks, 
   assert.ok(text.includes('Exam maximum marks: Small 10 + Big 40 = 50'));
   assert.ok(text.includes('Yearly average: 90%'));
   assert.ok(text.includes('Result: PASS'));
+  assert.ok(text.includes('TEACHER REMARKS'));
   assert.ok(text.includes('Term 1 teacher comments:'));
   assert.ok(text.includes('Term 2 teacher comments:'));
   assert.ok(text.includes('Administrator remarks:'));

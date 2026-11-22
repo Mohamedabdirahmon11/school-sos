@@ -3291,17 +3291,27 @@ class StorageEngine {
       };
     });
 
-    const yearlyRanks = rankExamStudentResults(yearlyResults.map(result => ({
-      studentId: result.student.id, total: result.yearlyPercentage, complete: result.annualComplete
-    })));
-    const yearlyRankByStudent = new Map(yearlyRanks.map(row => [row.studentId, row.rank]));
+    yearlyResults.sort((a, b) => Number(b.annualComplete) - Number(a.annualComplete) || b.yearlyPercentage - a.yearlyPercentage);
+
+    let completedRank = 0;
+    let previousPercentage: number | null = null;
+    let previousRank = 0;
     for (const result of yearlyResults) {
-      result.yearlyRank = yearlyRankByStudent.get(result.student.id) ?? 0;
+      if (!result.annualComplete) {
+        result.yearlyRank = 0;
+        result.isTopThree = false;
+        continue;
+      }
+      completedRank += 1;
+      if (previousPercentage !== null && result.yearlyPercentage === previousPercentage) {
+        result.yearlyRank = previousRank;
+      } else {
+        result.yearlyRank = completedRank;
+        previousRank = completedRank;
+        previousPercentage = result.yearlyPercentage;
+      }
       result.isTopThree = result.yearlyRank > 0 && result.yearlyRank <= 3;
     }
-    yearlyResults.sort((a, b) => a.yearlyRank > 0 && b.yearlyRank > 0
-      ? a.yearlyRank - b.yearlyRank || a.student.firstName.localeCompare(b.student.firstName)
-      : a.student.firstName.localeCompare(b.student.firstName) || a.student.lastName.localeCompare(b.student.lastName));
 
     const term1Ranks = rankExamStudentResults(yearlyResults.map(result => ({ studentId: result.student.id, total: result.term1Total, complete: result.term1Complete })));
     const term2Ranks = rankExamStudentResults(yearlyResults.map(result => ({ studentId: result.student.id, total: result.term2Total, complete: result.term2Complete })));
