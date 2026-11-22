@@ -9,7 +9,8 @@ const ui = readFileSync(new URL('../src/components/superadmin/BroadcastsView.tsx
 const migration = readFileSync(new URL('../supabase/migrations/20261108182000_platform_broadcast_notice_fanout_hardening.sql', import.meta.url), 'utf8');
 
 test('scheduled broadcasts are checked immediately and periodically by the server', () => {
-  assert.match(server, /prepareRequestContext\(false, 'broadcast-scheduler', false\)/);
+  assert.match(server, /createRequestContext\('broadcast-scheduler'\)/);
+  assert.doesNotMatch(server, /prepareRequestContext\(false, 'broadcast-scheduler', false\)/);
   assert.match(server, /runDueBroadcastCheck\(\)\.catch/);
   assert.match(server, /setInterval\(\(\) => \{\s*void runDueBroadcastCheck\(\)\.catch/);
   assert.match(server, /60 \* 1000/);
