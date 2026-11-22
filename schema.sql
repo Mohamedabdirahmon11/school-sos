@@ -464,7 +464,7 @@ BEGIN
 
   INSERT INTO public.teacher_subjects (school_id, teacher_id, subject_id, is_active)
   SELECT p_school_id, v_teacher_id, subject_id, TRUE
-  FROM unnest(COALESCE(p_subject_ids, ARRAY[]::TEXT[])) AS subject_id
+  FROM unnest(COALESCE(p_subject_ids, ARRAY[]::TEXT[])) AS subjects(subject_id)
   ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = TRUE;
 
   IF p_form_teacher_class_id IS NOT NULL THEN
