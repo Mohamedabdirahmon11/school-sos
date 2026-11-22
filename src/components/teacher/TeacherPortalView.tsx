@@ -151,7 +151,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       });
     return () => { cancelled = true; };
   }, [activeTab, classes.length, school?.id]);
-  const notices: SchoolNotice[] = Array.isArray(noticesState.data) ? noticesState.data : [];
+  const notices: SchoolNotice[] = Array.isArray(noticesState.data)
+    ? [...noticesState.data].sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || String(b.publishDate || '').localeCompare(String(a.publishDate || '')))
+    : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
   const [assignmentTitle, setAssignmentTitle] = useState('');
@@ -1364,7 +1366,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               {notices.map(n => (
                 <article key={n.id} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-[#132A29]">{n.title}</span>
+                    <span className="flex flex-wrap items-center gap-2 font-bold text-sm text-[#132A29]">{n.title}{n.isPinned && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Important</span>}</span>
                     <span className="text-[10px] text-[#64748B] font-mono">{n.publishDate}</span>
                   </div>
                   <p className="text-[#334155]">{n.content}</p>
