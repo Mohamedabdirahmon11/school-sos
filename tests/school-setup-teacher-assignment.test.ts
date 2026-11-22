@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import {
   applySchoolSetupProgressUpdate,
@@ -96,4 +97,13 @@ test('completion is rejected while Teacher Assignment is not ready', () => {
     checks,
     new Date().toISOString()
   ), /Teacher assignments missing/);
+});
+
+test('Timetable, teacher attendance and teacher marks endpoints enforce assignment readiness', () => {
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(api, /apiRouter\.get\('\/timetable', requireAuth, requireSchoolContext, requireTeacherAssignmentsReady,/);
+  assert.match(api, /apiRouter\.post\('\/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady,/);
+  assert.match(api, /apiRouter\.post\('\/attendance', requireAuth, requireSchoolContext, requireTeacherAssignmentsReadyForTeacher,/);
+  assert.match(api, /apiRouter\.post\('\/exams\/marks', requireAuth, requireSchoolContext, requireTeacherAssignmentsReadyForTeacher,/);
+  assert.match(api, /apiRouter\.post\('\/term-marks\/entry', requireAuth, requireSchoolContext, requireTeacherAssignmentsReadyForTeacher,/);
 });
