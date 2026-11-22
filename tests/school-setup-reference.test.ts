@@ -107,7 +107,7 @@ test('teacher assignment slot cleanup is inside the atomic RPC and failure rolls
   const api = read('src/server/api.ts');
   const sqlTest = read('tests/sql/school-setup-migrations.test.sql');
   assert.match(migration, /p_clear_dependent_slots boolean DEFAULT false/);
-  assert.match(migration, /DELETE FROM public\.timetable_slots/);
+  assert.match(migration, /UPDATE public\.timetable_slots/);
   assert.match(migration, /p_clear_dependent_slots THEN/);
   assert.match(api, /p_clear_dependent_slots: clearDependentSlots/);
   assert.match(sqlTest, /simulated timetable cleanup failure/);
