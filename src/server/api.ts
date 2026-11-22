@@ -9339,9 +9339,16 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
   let contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
   if (user.role === 'teacher') {
     const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
-    const assignedStudents = assignedClassIds.length
-      ? await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone')
+    const currentYearId = await getCurrentAcademicYearId(school.id);
+    const activeEnrollments = currentYearId && assignedClassIds.length
+      ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', class_id: assignedClassIds }, 'student_id,class_id')
       : [];
+    const enrolledStudentIds = [...new Set(activeEnrollments.map((enrollment: any) => String(enrollment.studentId || '')).filter(Boolean))];
+    const assignedStudents = !assignedClassIds.length
+      ? []
+      : currentYearId
+        ? enrolledStudentIds.length ? await queryAllRows('students', { school_id: school.id, id: enrolledStudentIds }, 'id,student_id,class_id,father_phone,mother_phone') : []
+        : await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone');
     const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
     const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
     const phones = new Set(assignedStudents.flatMap((student: any) => [student.fatherPhone, student.motherPhone]).filter(Boolean));
