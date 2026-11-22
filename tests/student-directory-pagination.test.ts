@@ -43,7 +43,9 @@ test('student directory uses active current-year enrollments for class filters a
   const start = api.indexOf("apiRouter.get('/students'");
   const end = api.indexOf("apiRouter.get('/students/export'", start);
   const route = api.slice(start, end);
-  assert.match(route, /academic_years', \{ school_id: school\.id, is_current: 'true' \}/);
+  assert.match(route, /const currentYearId = await getCurrentAcademicYearId\(school\.id\);/);
+  assert.match(api, /db\.queryPage\('academic_years', \{ school_id: schoolId, is_current: 'true' \}/);
+  assert.match(api, /invalidateCurrentAcademicYearCache\(schoolId\)/);
   assert.match(route, /'enrollments', \{[\s\S]*?academic_year_id: currentYearId,[\s\S]*?status: 'active',[\s\S]*?class_id: enrollmentClassScope[\s\S]*?\}/);
   assert.match(route, /filters\.id = enrolledStudentIds/);
   assert.match(route, /className: klass \? \[klass\.name, section\].*'Not assigned'/s);
