@@ -63,3 +63,12 @@ test('teacher assignment writes use the atomic database RPC and migration locks 
   assert.match(migration, /REVOKE ALL ON FUNCTION/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION .* TO service_role/);
 });
+
+test('Form Teacher uniqueness is enforced by the existing API guard and additive database index', () => {
+  const api = read('src/server/api.ts');
+  const migration = read('supabase/migrations/20261122121000_one_active_form_teacher_per_school.sql');
+  assert.match(api, /hasActiveFormTeacherConflict/);
+  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS classes_one_active_form_teacher_per_school_uidx/);
+  assert.match(migration, /GROUP BY school_id, class_teacher_id/);
+  assert.match(migration, /RAISE EXCEPTION 'Duplicate active Form Teacher assignments exist/);
+});
