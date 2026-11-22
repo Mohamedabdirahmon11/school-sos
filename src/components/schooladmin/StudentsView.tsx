@@ -202,7 +202,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const openAssignClass = (student: any) => {
     setSelectedStudent(student);
     setActiveProfileTab('enrollments');
-    setTransferClassId(student.classId || student.class_id || classes[0]?.id || '');
+    setTransferClassId(student.classId || student.class_id || '');
     setModalError(null);
     void loadStudentDetails(student);
   };
@@ -546,8 +546,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           <div className="grid gap-2 p-3 md:hidden">
             {visibleStudents.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No students found.</p> :
               visibleStudents.map((student:any) => (
-                <div role="button" tabIndex={0} key={student.id} onClick={()=>void loadStudentDetails(student)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); void loadStudentDetails(student); } }} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
-                  <div className="flex items-start justify-between gap-2"><span className="font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</span><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
+                <div key={student.id} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
+                  <div className="flex items-start justify-between gap-2"><button type="button" onClick={() => void loadStudentDetails(student)} className="text-left font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</button><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
                   <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{resolveStudentClassName(student, classes)}</span><span>{guardianPhoneLookupErrors[student.id] && !(student.fatherPhone || student.father_phone || student.motherPhone || student.mother_phone) ? <button type="button" onClick={event => { event.stopPropagation(); void loadGuardianPhone(student.id); }} className="text-rose-700 underline">Phone unavailable · Try again</button> : resolveStudentParentPhone(student, guardianPhoneByStudent[student.id])}</span></div>
                   {resolveStudentClassName(student, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(student); }} className="mt-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs"><span className="text-slate-500">{resolveStudentGender(student.gender)}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{resolveStudentStatus(student.status).toUpperCase()}</span></div>
@@ -823,6 +823,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                     {academicYears.map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
                   </select>
                   <select value={transferClassId} onChange={e=>setTransferClassId(e.target.value)} className="w-full rounded-lg border p-2">
+                    <option value="">Dooro fasalka…</option>
                     {classes.filter(item=>!item.isArchived && item.id!==selectedStudent.classId).map(item=><option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}
                   </select>
                   <button type="button" disabled={isReadOnly || enrollmentBusy || !transferClassId || !selectedAcademicYearId} onClick={()=>void handleStudentTransfer()} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':(enrollmentRows.some(row => String(row.academic_year_id || '') === selectedAcademicYearId && row.status === 'active') ? 'Wareeji ardayga' : 'Assign class')}</button>
