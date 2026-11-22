@@ -167,16 +167,28 @@ apiRouter.use((req, res, next) => {
     }
   });
   if (typeof storage.prepareRequestContext !== 'function') { next(); return; }
-  const requestStarted = process.env.NODE_ENV === 'development' ? performance.now() : 0;
-  res.once('finish', () => {
-    if (process.env.NODE_ENV !== 'development') return;
-    const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
-    console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
-  });
+  const requestId = randomUUID();
+  const requestStarted = performance.now();
+  res.setHeader('X-Request-Id', requestId);
   void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
-    storage.runWithRequestContext(context, next);
-  }).catch(() => {
-    if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });
+    storage.runWithRequestContext(context, () => {
+      // Register inside the request's AsyncLocalStorage scope so finish-time
+      // metrics are attributed to this request rather than the global context.
+      res.once('finish', () => {
+        const metrics = storage.getRequestQueryMetrics?.(context) || { count: 0, durationMs: 0 };
+        const schoolId = String((req as any).school?.id || (req as any).user?.schoolId || (req as any).user?.school_id || 'none');
+        console.info(`[api-perf] request_id=${requestId} route=${req.method} ${req.path} status=${res.statusCode} duration_ms=${Math.round(performance.now() - requestStarted)} db_queries=${metrics.count} db_ms=${metrics.durationMs} school_id=${schoolId}`);
+      });
+      next();
+    });
+  }).catch((error: unknown) => {
+    const detail = error instanceof Error ? error.message : 'unknown storage context error';
+    console.error(`[api-context-error] request_id=${requestId} route=${req.method} ${req.path} error=${detail}`);
+    if (!res.headersSent) res.status(503).json({
+      error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.',
+      code: 'STORAGE_CONTEXT_UNAVAILABLE',
+      requestId
+    });
   });
 });
 
@@ -11239,14 +11251,13 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
       throw error;
     }
   } else if (Array.isArray(body.studentIds) && body.studentIds.length > 0 && body.studentIds.length <= 100) {
-    for (const rawId of body.studentIds) {
-      if (typeof rawId !== 'string') continue;
-      const byPk = await db.getStudentById(rawId,school.id);
-      if (byPk) students.push(byPk);
-      else {
-        const match = await db.queryPage<Student>('students',{school_id:school.id,student_id:rawId},1,1,undefined,'*');
-        if (match.items[0]) students.push(match.items[0]);
-      }
+    const identifiers = body.studentIds.filter((rawId: unknown): rawId is string => typeof rawId === 'string');
+    const foundStudents = await db.getStudentsByIdentifiers(identifiers, school.id);
+    const byPrimaryKey = new Map(foundStudents.map(student => [student.id, student]));
+    const byStudentId = new Map(foundStudents.map(student => [student.studentId, student]));
+    for (const rawId of identifiers) {
+      const student = byPrimaryKey.get(rawId) || byStudentId.get(rawId);
+      if (student) students.push(student);
     }
   } else {
     res.status(400).json({ error: 'Dooro hal arday ama fasal.' }); return;
@@ -11256,21 +11267,41 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   try { today = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
   catch { today = new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
   const classesById = new Map<string,SchoolClass>();
+  const requestedClassIds = [...new Set(students.map(student=>student.classId).filter(Boolean))];
   if (classRecord) classesById.set(classRecord.id,classRecord);
-  for (const classId of new Set(students.map(student=>student.classId))) {
-    if (!classesById.has(classId)) {
-      const klass = await db.getClassById(classId,school.id);
-      if (klass) classesById.set(classId,klass);
-    }
+  else {
+    const resolvedClasses = await db.getClassesByIds(requestedClassIds,school.id);
+    for (const klass of resolvedClasses) classesById.set(klass.id,klass);
   }
   const marksByClass = new Map<string,any[]>();
   const teacherByClass = new Map<string,{name:string;staffId:string}>();
-  for (const klass of classesById.values()) {
-    const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
-    marksByClass.set(klass.id,await db.getMarks(school.id,klass.id,undefined,annualDocument ? undefined : school.currentSemester));
-    if (klass.classTeacherId) {
-      const teacher = (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0];
-      teacherByClass.set(klass.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
+  const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
+  const selectedSemester = annualDocument ? undefined : school.currentSemester;
+  const classRows = [...classesById.values()];
+  const teacherIds = [...new Set(classRows.map(klass=>klass.classTeacherId).filter((id): id is string => Boolean(id)))];
+  const teacherPagePromise = teacherIds.length
+    ? db.queryPage<any>('teachers',{school_id:school.id,id:teacherIds},1,100,undefined,'id,full_name,staff_id')
+    : Promise.resolve({items:[] as any[]});
+  if (classRecord) {
+    const [classMarks, teacherPage] = await Promise.all([
+      db.getMarks(school.id,classRecord.id,undefined,selectedSemester),
+      teacherPagePromise
+    ]);
+    marksByClass.set(classRecord.id,classMarks);
+    const teacher = teacherPage.items[0];
+    if (classRecord.classTeacherId) teacherByClass.set(classRecord.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
+  } else if (classRows.length) {
+    const studentIds = [...new Set(students.map(student=>student.id))];
+    const [marks, teacherPage] = await Promise.all([
+      db.getMarksForStudents(school.id,studentIds,classRows.map(klass=>klass.id),selectedSemester),
+      teacherPagePromise
+    ]);
+    const teachersById = new Map(teacherPage.items.map((teacher:any)=>[teacher.id,teacher]));
+    for (const klass of classRows) {
+      const classMarks = marks.filter(mark => mark.classId === klass.id && (!klass.academicYear || mark.academicYear === klass.academicYear));
+      marksByClass.set(klass.id,classMarks);
+      const teacher = klass.classTeacherId ? teachersById.get(klass.classTeacherId) : undefined;
+      if (klass.classTeacherId) teacherByClass.set(klass.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
     }
   }
   const feeBalanceByStudent = new Map<string,number>();
@@ -12047,9 +12078,13 @@ apiRouter.get('/term-marks/report-cards/classes/:classId/pdf', requireAuth, requ
     .order('rank_in_class',{ascending:true});
   if (error || !cards?.length) { res.status(404).json({ error: 'Report cards fasalkan lama helin.' }); return; }
   if (cards.some((card:any)=>card.is_stale)) { res.status(409).json({ error: 'Report Cards-ka fasalkan waa duugoobeen; dib u samee ka hor PDF.' }); return; }
-  const students = await Promise.all(cards.map((card: any) => db.getStudentById(card.student_id,school.id)));
+  const students = await db.getStudentsByIds(cards.map((card: any) => card.student_id), school.id);
+  const studentById = new Map(students.map(student => [student.id, student]));
   const klass = await db.getClassById(req.params.classId,school.id);
-  const pages = cards.flatMap((card: any,index: number) => students[index] ? [termReportCardPdfPage(school,card,students[index],`${klass?.name || ''} ${klass?.section || ''}`.trim())] : []);
+  const pages = cards.flatMap((card: any) => {
+    const student = studentById.get(card.student_id);
+    return student ? [termReportCardPdfPage(school,card,student,`${klass?.name || ''} ${klass?.section || ''}`.trim())] : [];
+  });
   if (!pages.length) { res.status(404).json({ error: 'Arday lama helin.' }); return; }
   sendPdf(res,`term-report-cards-${klass?.name || 'class'}`,pages);
 });

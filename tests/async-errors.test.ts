@@ -38,7 +38,11 @@ after(async () => {
 test('async route rejections become JSON 500 responses instead of hanging', async () => {
   const response = await fetch(`${baseUrl}/async-throws`);
   assert.equal(response.status, 500);
-  assert.deepEqual(await response.json(), { error: 'An unexpected server error occurred. Please try again.' });
+  const body = await response.json();
+  assert.equal(body.error, 'An unexpected server error occurred. Please try again.');
+  assert.equal(body.code, 'INTERNAL_SERVER_ERROR');
+  assert.equal(typeof body.requestId, 'string');
+  assert.equal(response.headers.get('x-request-id'), body.requestId);
 });
 
 test('synchronous route throws become JSON 500 responses', async () => {

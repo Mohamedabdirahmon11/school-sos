@@ -611,8 +611,9 @@ class StorageEngine {
     return this.contexts.run(context, callback);
   }
 
-  public getRequestQueryMetrics(): { count: number; durationMs: number } {
-    return { count: this.state.queryCount, durationMs: Math.round(this.state.queryDurationMs * 100) / 100 };
+  public getRequestQueryMetrics(context?: StorageContext): { count: number; durationMs: number } {
+    const state = context || this.state;
+    return { count: state.queryCount, durationMs: Math.round(state.queryDurationMs * 100) / 100 };
   }
 
   public async checkSupabaseHealth(): Promise<{ ok: boolean; roundTripMs: number }> {
@@ -746,14 +747,15 @@ class StorageEngine {
     return { items: (data || []).map((row: any) => fromSupabaseRow(row, table)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
   }
 
-  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>): Promise<T[]> {
+  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>, columns = '*'): Promise<T[]> {
     const rows: T[] = [];
     for (let page = 1;; page += 1) {
-      const result = await this.queryPage<T>(table, filters, page, 100);
+      const result = await this.queryPage<T>(table, filters, page, 100, undefined, columns);
       rows.push(...result.items);
       if (rows.length >= result.total || result.items.length === 0) break;
     }
-    this.cacheQueryRows(table, rows);
+    // Partial projections must not pollute the in-memory write-through cache.
+    if (columns === '*') this.cacheQueryRows(table, rows);
     return rows;
   }
 
@@ -1750,6 +1752,39 @@ class StorageEngine {
     return this.queryRows<Student>('students', { school_id: schoolId, class_id: classId, branch_id: branchId });
   }
 
+  public async getStudentsByIds(ids: string[], schoolId: string): Promise<Array<Pick<Student, 'id' | 'studentId' | 'firstName' | 'middleName' | 'lastName'>>> {
+    const uniqueIds = [...new Set(ids.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueIds.length) return [];
+    return this.queryRows<Pick<Student, 'id' | 'studentId' | 'firstName' | 'middleName' | 'lastName'>>(
+      'students',
+      { id: uniqueIds, school_id: schoolId },
+      'id,school_id,student_id,first_name,middle_name,last_name'
+    );
+  }
+
+  public async getStudentsByIdentifiers(identifiers: string[], schoolId: string): Promise<Student[]> {
+    const uniqueIdentifiers = [...new Set(identifiers.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueIdentifiers.length) return [];
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const primaryKeyStartedAt = performance.now();
+    const studentIdStartedAt = performance.now();
+    const [byPrimaryKey, byStudentId] = await Promise.all([
+      client.from('students').select('*').eq('school_id', schoolId).in('id', uniqueIdentifiers),
+      client.from('students').select('*').eq('school_id', schoolId).in('student_id', uniqueIdentifiers)
+    ]);
+    this.recordQuery('students', 'select-batch-id', primaryKeyStartedAt);
+    this.recordQuery('students', 'select-batch-student-id', studentIdStartedAt);
+    if (byPrimaryKey.error) throw new Error('Unable to resolve student IDs: ' + byPrimaryKey.error.message);
+    if (byStudentId.error) throw new Error('Unable to resolve student codes: ' + byStudentId.error.message);
+    const merged = new Map<string, Student>();
+    for (const row of [...(byPrimaryKey.data || []), ...(byStudentId.data || [])]) {
+      const student = fromSupabaseRow(row, 'students') as Student;
+      merged.set(student.id, student);
+    }
+    return [...merged.values()];
+  }
+
   public async getStudentById(id: string, schoolId?: string): Promise<Student | null> {
     return (await this.queryRows<Student>('students', { id, school_id: schoolId }))[0] || null;
   }
@@ -2111,6 +2146,12 @@ class StorageEngine {
   // -------------------------------------------------------------
   public async getClasses(schoolId: string, branchId?: string): Promise<SchoolClass[]> {
     return this.queryRows<SchoolClass>('classes', { school_id: schoolId, branch_id: branchId });
+  }
+
+  public async getClassesByIds(ids: string[], schoolId: string): Promise<SchoolClass[]> {
+    const uniqueIds = [...new Set(ids.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueIds.length) return [];
+    return this.queryRows<SchoolClass>('classes', { id: uniqueIds, school_id: schoolId });
   }
 
   public async getClassById(id: string, schoolId?: string): Promise<SchoolClass | null> {
@@ -2770,6 +2811,15 @@ class StorageEngine {
         className: student ? (classNames.get(student.classId) || student.classId || '—') + (student.section ? ' · ' + student.section : '') : '—'
       };
     }).sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
+  }
+
+  public async getMarksForStudents(schoolId: string, studentIds: string[], classIds: string[], semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
+    const uniqueStudentIds = [...new Set(studentIds.filter(id => typeof id === 'string' && id.length > 0))];
+    const uniqueClassIds = [...new Set(classIds.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueStudentIds.length || !uniqueClassIds.length) return [];
+    return this.queryRows<StudentMark>('student_marks', {
+      school_id: schoolId, student_id: uniqueStudentIds, class_id: uniqueClassIds, semester
+    });
   }
 
   public async getMarks(schoolId: string, classId: string, subjectId?: string, semester?: 'Semester 1' | 'Semester 2'): Promise<StudentMark[]> {
