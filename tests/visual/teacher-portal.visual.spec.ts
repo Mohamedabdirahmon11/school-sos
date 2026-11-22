@@ -1,0 +1,50 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const root = process.cwd();
+const referenceUrl = pathToFileURL(path.join(root, 'tests/fixtures/teacher-portal-reference.html')).href;
+const sections = ['dashboard', 'timetable', 'students', 'attendance', 'marks', 'homework', 'notices', 'messages', 'payslip', 'profile'];
+const viewports = [360, 390, 768, 1280];
+const themes = ['light', 'dark'];
+
+for (const width of viewports) {
+  for (const theme of themes) {
+    test(`reference and live Teacher Portal sections · ${width}px · ${theme}`, async ({ browser }) => {
+      const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme as 'light' | 'dark' });
+      const reference = await context.newPage();
+      const live = await context.newPage();
+      live.on('pageerror', error => console.log('[teacher-portal visual pageerror]', error.stack || error.message));
+      live.on('console', message => { if (message.type() === 'error') console.log('[teacher-portal visual console]', message.text()); });
+      const folder = path.join(root, 'artifacts', 'teacher-portal', theme, String(width));
+      fs.mkdirSync(path.join(folder, 'reference'), { recursive: true });
+      fs.mkdirSync(path.join(folder, 'schoolos'), { recursive: true });
+      for (const section of sections) {
+        await reference.goto(`${referenceUrl}#${section}`);
+        await reference.emulateMedia({ colorScheme: theme as 'light' | 'dark' });
+        if (theme === 'dark') await reference.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+        else await reference.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+        await expect(reference.locator('#view')).toBeVisible();
+        await reference.screenshot({ path: path.join(folder, 'reference', `${section}.png`), fullPage: true });
+
+        await live.goto(`http://127.0.0.1:4173/teacher-portal-visual.html?section=${section}&theme=${theme}`);
+        await expect(live.locator('#root > *').first()).toBeVisible();
+        await expect(live.locator('h1, h2').first()).toBeVisible();
+        await live.screenshot({ path: path.join(folder, 'schoolos', `${section}.png`), fullPage: true });
+      }
+      const pairs = sections.map(section => `<section><h2>${section}</h2><div class="pair"><figure><figcaption>teacher-portal.html</figcaption><img src="reference/${section}.png"></figure><figure><figcaption>SchoolOS component</figcaption><img src="schoolos/${section}.png"></figure></div></section>`).join('');
+      fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Teacher Portal comparison · ${width}px · ${theme}</title><style>body{font:14px system-ui;margin:24px;background:#eef2f7;color:#17212b}h1{margin-bottom:24px}section{margin:0 0 32px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}figure{margin:0;background:white;padding:10px;border:1px solid #ccd4df;border-radius:10px}figcaption{font-weight:700;margin:0 0 8px}img{width:100%;height:auto;border:1px solid #e2e8f0}@media(max-width:700px){.pair{grid-template-columns:1fr}}</style><h1>Reference vs SchoolOS · ${width}px · ${theme}</h1>${pairs}`);
+      await context.close();
+    });
+  }
+}
+
+
+test('write the screenshot comparison overview', async () => {
+  const folder = path.join(root, 'artifacts', 'teacher-portal');
+  fs.mkdirSync(folder, { recursive: true });
+  const links = themes.flatMap(theme => viewports.map(width => `<li><a href="${theme}/${width}/index.html">${width}px · ${theme}</a></li>`)).join('');
+  fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>Teacher Portal screenshot matrix</title><style>body{font:16px system-ui;margin:40px;background:#f1f5f9;color:#17212b}li{margin:12px 0}a{color:#0f766e;font-weight:700}</style><h1>Teacher Portal · Reference and SchoolOS</h1><p>10 sections × 4 viewport widths × 2 themes. Open a comparison page to view the supplied teacher-portal.html next to the live SchoolOS components.</p><ul>${links}</ul>`);
+  expect(fs.existsSync(path.join(folder, 'index.html'))).toBeTruthy();
+});

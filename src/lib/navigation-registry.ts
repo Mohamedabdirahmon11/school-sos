@@ -82,7 +82,7 @@ export const NAVIGATION_REGISTRY: readonly NavigationRoute[] = [
   { id: 't_students', label: 'Students', labelKey: 'students', icon: GraduationCap, roles: teacher, group: 'Teaching & Learning' },
   { id: 't_attendance', label: 'Attendance', labelKey: 'attendance', icon: CalendarCheck, roles: teacher, group: 'Teaching & Learning', mobile: teacher },
   { id: 't_grades', label: 'Exam Marks', icon: FileSpreadsheet, roles: teacher, group: 'Teaching & Learning', mobile: teacher },
-  { id: 't_exam_results', label: 'Exam Results', icon: FileCheck2, roles: teacher, group: 'Teaching & Learning' },
+  { id: 't_profile', label: 'My Profile', icon: Users, roles: teacher, group: 'Teaching & Learning' },
   { id: 't_assignments', label: 'Assignments', labelKey: 'assignments', icon: FileCheck2, roles: teacher, group: 'Teaching & Learning' },
   { id: 't_notices', label: 'Notices', labelKey: 'notice_board', icon: BellRing, roles: teacher, group: 'Teaching & Learning' },
   { id: 't_messages', label: 'Messages', labelKey: 'messages', icon: MessageSquare, roles: teacher, group: 'Teaching & Learning' },

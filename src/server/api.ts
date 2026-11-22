@@ -495,7 +495,8 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
   const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
   const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
-  const allowedCredentialRoutes = user.role === 'school_admin' ? schoolAdminCredentialRoutes : superAdminCredentialRoutes;
+  const teacherCredentialRoutes = ['/auth/me', '/auth/change-teacher-pin', '/auth/logout'];
+  const allowedCredentialRoutes = user.role === 'school_admin' ? schoolAdminCredentialRoutes : user.role === 'teacher' ? teacherCredentialRoutes : superAdminCredentialRoutes;
   if (isBootstrap) {
     if (!user.mustChangePassword || !allowedCredentialRoutes.includes(req.path)
       || !['super_admin', 'school_admin'].includes(user.role)) {
@@ -1533,6 +1534,53 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   await db.flush();
   await issueSessionCookie(res, updated, req);
   res.json({ success: true, message: 'PIN set successfully.' });
+});
+
+// Teacher self-service PIN change. The current PIN is verified before a new hash is stored.
+apiRouter.post('/auth/change-teacher-pin', requireAuth, async (req, res) => {
+  const user = (req as any).user as User;
+  if (user.role !== 'teacher') {
+    res.status(403).json({ error: 'Only teachers can change a teacher sign-in PIN.' });
+    return;
+  }
+  const currentPin = typeof req.body?.currentPin === 'string' ? req.body.currentPin.trim() : '';
+  const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
+  if (!currentPin || !newPin) {
+    res.status(400).json({ error: 'Current PIN and new PIN are required.' });
+    return;
+  }
+  if (!verifyPin(currentPin, String(user.pin || ''))) {
+    res.status(401).json({ error: 'Current PIN is incorrect.' });
+    return;
+  }
+  if (!/^\d{4,6}$/.test(newPin)) {
+    res.status(422).json({ error: 'New PIN must contain 4 to 6 digits.' });
+    return;
+  }
+  if (verifyPin(newPin, String(user.pin || ''))) {
+    res.status(422).json({ error: 'Choose a PIN different from your current PIN.' });
+    return;
+  }
+  const updated = db.updateUser(user.id, { pin: hashPin(newPin), failedLoginAttempts: 0, lockedUntil: null });
+  if (!updated) {
+    res.status(404).json({ error: 'Teacher account was not found; PIN was not changed.' });
+    return;
+  }
+  invalidateAuthenticatedSnapshot(user.id);
+  await db.flush();
+  db.logAudit({
+    action: 'TEACHER_PIN_CHANGED',
+    category: 'auth',
+    schoolId: user.schoolId,
+    userId: user.id,
+    userName: user.fullName,
+    userRole: 'teacher',
+    details: 'Teacher changed their own sign-in PIN after verifying the current PIN.',
+    severity: 'info'
+  });
+  await db.flush();
+  await issueSessionCookie(res, updated, req);
+  res.json({ success: true, message: 'Teacher PIN updated successfully.' });
 });
 
 // Current User Profile (Sanitized)
@@ -4304,8 +4352,9 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
   if (role === 'teacher') {
     const own = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
     if (!own.items.length) { res.json([]); return; }
-    if (String(req.query.scope || '') === 'school') teacherId = '';
-    else teacherId = String(own.items[0].id);
+    // Teacher timetable access is always restricted to the authenticated teacher profile.
+    // A client-supplied scope must never widen this server-side filter.
+    teacherId = String(own.items[0].id);
   } else if (role === 'parent' || role === 'student') {
     let studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
     if (role === 'student') {
@@ -5224,7 +5273,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   let teacherAssignedClassIds: string[] = [];
   if (user.role === 'teacher') {
     const ownFormTeacherClasses = await getTeacherFormTeacherClassIds(school.id, user.id);
-    const assigned = ownFormTeacherClasses.length ? ownFormTeacherClasses : await getTeacherAssignedClassIds(school.id, user.id);
+    const assigned = [...new Set([...ownFormTeacherClasses, ...await getTeacherAssignedClassIds(school.id, user.id)])];
     teacherAssignedClassIds = assigned;
     if (classId && !assigned.includes(classId)) { res.status(403).json({ error: 'Student access is limited to your assigned classes.' }); return; }
     if (!assigned.length) { res.json([]); return; }
@@ -6490,6 +6539,11 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
     return;
   }
+  const schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  if (date > schoolToday) {
+    res.status(422).json({ error: 'Attendance cannot be recorded for a future school date.' });
+    return;
+  }
   const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
   const seenStudentIds = new Set<string>();
   for (const record of records) {
@@ -6536,6 +6590,23 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     db.logAudit({action:'ATTENDANCE_UPDATED',category:'academics',schoolId:school.id,schoolName:school.name,userId:user.id,userName:user.fullName,userRole:user.role,details:JSON.stringify({classId:normalizedClassId,date,source:source==='document_template'?'document_template':'attendance_module',changes}),severity:'info'});
   }
   res.json({ success: true, count: saved.length, records: saved });
+});
+
+apiRouter.put('/attendance', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only the assigned Form Teacher can update daily attendance.' });
+    return;
+  }
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  if (!classId) { res.status(400).json({ error: 'A class is required.' }); return; }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can update its daily attendance.' });
+    return;
+  }
+  res.status(405).json({ error: 'Use POST /attendance for the atomic once-per-day attendance upsert.' });
 });
 
 // ==============================================================================
@@ -7522,7 +7593,16 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     const saved = await db.saveStudentMarks(school.id, classId, subjectId, semester, marks, user.id, user.fullName, user.role);
     res.json({ success: true, count: saved.length, marks: saved });
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid marks.' });
+    const message = error instanceof Error ? error.message : 'Invalid marks.';
+    if (/locked by the School Admin/i.test(message)) {
+      res.status(403).json({ error: message });
+      return;
+    }
+    if (/must be between 0 and|configured maximums|assessment components are not configured|maximum/i.test(message)) {
+      res.status(422).json({ error: message });
+      return;
+    }
+    res.status(400).json({ error: message });
   }
 });
 

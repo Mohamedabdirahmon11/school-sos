@@ -1,0 +1,61 @@
+/* Teacher Portal design tokens from teacher-portal.html.
+ * Scoped to the teacher workspace; existing app-wide styles remain untouched. */
+.teacher-portal-design {
+  --tp-bg:#f2f5f8;--tp-surface:#fff;--tp-fg:#13202d;--tp-muted:#5a6878;--tp-line:#dbe2ea;
+  --tp-brand:var(--school-brand-color,#0e6a62);--tp-brand-fg:#fff;--tp-soft:#e3f1ef;
+  --tp-bad:#b8302a;--tp-bad-bg:#fde9e7;--tp-ok:#1d7a4a;--tp-ok-bg:#e0f3e8;
+  --tp-warn:#8a5a00;--tp-warn-bg:#fff1d6;--tp-slot-bg:91%;--tp-slot-fg:24%;
+  color:var(--tp-fg);background:var(--tp-bg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;line-height:1.5;min-width:0;
+}
+.teacher-portal-design[data-theme="dark"],.dark .teacher-portal-design {
+  --tp-bg:#0d141b;--tp-surface:#151e28;--tp-fg:#e5ebf1;--tp-muted:#92a0b1;--tp-line:#263342;
+  --tp-brand:#4cc3b5;--tp-brand-fg:#06201d;--tp-soft:#16332f;
+  --tp-bad:#ff8c82;--tp-bad-bg:#3b1d1b;--tp-ok:#6fd49b;--tp-ok-bg:#16301f;--tp-warn:#f2c14e;--tp-warn-bg:#3a2e12;--tp-slot-bg:23%;--tp-slot-fg:86%;
+}
+.teacher-portal-design :is(h1,h2,h3,h4){font-family:"Space Grotesk",Inter,system-ui,sans-serif;letter-spacing:-.01em}
+.teacher-portal-design :is(button,input,select,textarea){min-height:38px;border-radius:8px}
+.teacher-portal-design :is(button,input,select,textarea):focus-visible,
+.teacher-portal-design a:focus-visible{outline:2px solid var(--tp-brand);outline-offset:2px}
+.teacher-portal-design table{font-variant-numeric:tabular-nums}
+.teacher-portal-design .tp-card{background:var(--tp-surface);border:1px solid var(--tp-line);border-radius:12px}
+.teacher-portal-design .tp-muted{color:var(--tp-muted)}
+
+.teacher-portal-design .tp-stat{min-width:0;padding:12px 14px;border:1px solid var(--tp-line);border-radius:12px;background:var(--tp-surface)}
+.teacher-portal-design .tp-stat small{display:block;color:var(--tp-muted);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.teacher-portal-design .tp-stat b{display:block;margin-top:2px;font-family:"Space Grotesk",Inter,system-ui,sans-serif;font-size:26px;font-variant-numeric:tabular-nums}
+
+.teacher-portal-design [role="status"]{min-height:20px}
+@media(max-width:860px){.teacher-portal-design .tp-navigation{display:flex;overflow-x:auto;white-space:nowrap}}
+
+/* Exact visual overrides for the reference's neutral header + compact workspace. */
+.teacher-portal-design{max-width:1140px!important}
+.teacher-portal-design>header{background:var(--tp-surface)!important;color:var(--tp-fg)!important;border:1px solid var(--tp-line)!important;border-radius:12px!important;box-shadow:none!important}
+.teacher-portal-design>header :is(h1,p,span){color:var(--tp-fg)!important}
+.teacher-portal-design>header p{color:var(--tp-muted)!important}
+.teacher-portal-design :is(.rounded-3xl,.rounded-2xl){border-radius:12px!important}
+.teacher-portal-design :is(.shadow-lg,.shadow-md,.shadow-sm){box-shadow:none!important}
+.teacher-portal-design :is(.bg-white,.bg-gradient-to-br){background:var(--tp-surface)!important}
+.teacher-portal-design :is(.border-slate-200,.border-slate-300){border-color:var(--tp-line)!important}
+.teacher-portal-design :is(button,input,select,textarea){border-radius:8px!important;min-height:38px}
+.teacher-portal-design table{min-width:520px}
+.teacher-portal-design .overflow-x-auto{max-width:100%}
+@media(max-width:860px){.teacher-portal-design{padding-inline:12px!important}.teacher-portal-design nav{max-width:100%;overflow-x:auto}}
+
+.teacher-portal-design>header [class*="bg-white/10"],.teacher-portal-design>header [class*="border-white/15"]{background:var(--tp-soft)!important;border-color:var(--tp-line)!important;color:var(--tp-brand)!important}
+/* Follow the operating-system theme unless the user selected Light or Dark. */
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .teacher-portal-design{
+    --tp-bg:#0d141b;--tp-surface:#151e28;--tp-fg:#e5ebf1;--tp-muted:#92a0b1;--tp-line:#263342;
+    --tp-brand:#4cc3b5;--tp-brand-fg:#06201d;--tp-soft:#16332f;
+    --tp-bad:#ff8c82;--tp-bad-bg:#3b1d1b;--tp-ok:#6fd49b;--tp-ok-bg:#16301f;--tp-warn:#f2c14e;--tp-warn-bg:#3a2e12;
+  }
+}
+:root[data-theme="dark"] .teacher-portal-design,.dark .teacher-portal-design{
+  --tp-bg:#0d141b;--tp-surface:#151e28;--tp-fg:#e5ebf1;--tp-muted:#92a0b1;--tp-line:#263342;
+  --tp-brand:#4cc3b5;--tp-brand-fg:#06201d;--tp-soft:#16332f;
+  --tp-bad:#ff8c82;--tp-bad-bg:#3b1d1b;--tp-ok:#6fd49b;--tp-ok-bg:#16301f;--tp-warn:#f2c14e;--tp-warn-bg:#3a2e12;
+}
+.teacher-portal-design button[class*="bg-teal-700"],.teacher-portal-design button[class*="bg-[#0F766E]"]{
+  background:var(--tp-brand)!important;border-color:var(--tp-brand)!important;color:var(--tp-brand-fg)!important;
+}

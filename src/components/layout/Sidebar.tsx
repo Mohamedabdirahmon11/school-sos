@@ -196,9 +196,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       { title: 'Teaching', items: [
         item('t_attendance', menuT('attendance'), CalendarCheck),
         item('t_grades', 'Exam Marks', FileSpreadsheet),
-        item('t_exam_results', 'Exam Results', FileCheck2),
         item('t_assignments', menuT('assignments'), FileCheck2),
-        item('sch_documents', 'School Documents', FileText)
+        item('t_profile', 'My Profile', Users)
       ] },
       { title: 'Communication', items: [
         item('t_notices', noticeLabel, BellRing),

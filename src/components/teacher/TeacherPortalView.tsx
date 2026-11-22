@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import './teacher-portal-design.css';
 import { ApiClient } from '../../services/api.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
@@ -44,22 +45,69 @@ import {
   Clock3
 } from 'lucide-react';
 
+const formatTeacherGuardianPhone = (...values: unknown[]) => {
+  const value = values.find(item => typeof item === 'string' && item.trim());
+  if (typeof value !== 'string') return 'Phone not provided';
+  const raw = value.trim().replace(/[\s().-]/g, '');
+  if (raw.startsWith('+')) return raw;
+  if (raw.startsWith('00')) return `+${raw.slice(2)}`;
+  if (raw.startsWith('251')) return `+${raw}`;
+  if (raw.startsWith('0') && raw.length === 10) return `+251${raw.slice(1)}`;
+  if (/^[79]\d{8}$/.test(raw)) return `+251${raw}`;
+  return raw || 'Phone not provided';
+};
+
+const getTeacherSubjectHue = (subjectId: string) => {
+  let hash = 0;
+  for (const character of subjectId) hash = (hash * 31 + character.charCodeAt(0)) | 0;
+  return Math.abs(hash) % 360;
+};
+
 interface TeacherPortalViewProps {
-  initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices';
+  initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices' | 'profile';
 }
 
 const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolClass[]] = [[], null, [], []];
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
-  const { user, school, isReadOnly } = useAuth();
+  const { user, school, isReadOnly, language, setLanguage } = useAuth();
+  const [portalTheme, setPortalTheme] = useState<'system' | 'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'system';
+    const saved = window.localStorage.getItem('schoolos-teacher-theme');
+    return saved === 'light' || saved === 'dark' ? saved : 'system';
+  });
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [isChangingPin, setIsChangingPin] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
   useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
+  useEffect(() => {
+    window.localStorage.setItem('schoolos-teacher-theme', portalTheme);
+  }, [portalTheme]);
+
   const initialData = useApi(async () => Promise.all([
     ApiClient.getTeacherSubjectAssignments(),
     ApiClient.getExamConfig(),
     ApiClient.getTimetable(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
+  // Revalidate assignments and timetable when an administrator changes the teacher's
+  // scope in another session. Focus/visibility refresh is immediate; the interval
+  // also covers a teacher who keeps the portal open while the admin is working.
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') initialData.retry();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    const refreshInterval = window.setInterval(refreshWhenVisible, 60_000);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.clearInterval(refreshInterval);
+    };
+  }, [initialData.retry]);
   const [assignmentsData, examConfigData, timetableData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
   // Notices are independent from core teacher data: a notices API outage must
   // not prevent teachers from opening lessons, attendance, marks or homework.
@@ -93,55 +141,60 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // record on the server. Do not re-filter those trusted rows against a second
   // client-side assignment payload (which can differ in shape/cache timing).
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
-  const [timetableScope, setTimetableScope] = useState<'mine' | 'school'>('mine');
-  const [schoolTimetable, setSchoolTimetable] = useState<TimetableSlot[]>([]);
-  const [schoolTimetableLoading, setSchoolTimetableLoading] = useState(false);
-  const [schoolTimetableError, setSchoolTimetableError] = useState<string | null>(null);
   const [timetableDay, setTimetableDay] = useState<'all' | TimetableSlot['dayOfWeek']>('all');
   const [studentSearch, setStudentSearch] = useState('');
-  const isMyTimetableSlot = (slot: TimetableSlot) =>
-    Boolean(slot.teacherId) && teacherAssignments.some((assignment: any) =>
-      !assignment.isFormTeacher &&
-      assignment.teacherId === slot.teacherId &&
-      assignment.classId === slot.classId &&
-      assignment.subjectId === slot.subjectId
-    );
-  useEffect(() => {
-    if (timetableScope !== 'school') return;
-    let cancelled = false;
-    setSchoolTimetableLoading(true);
-    setSchoolTimetableError(null);
-    ApiClient.getTimetable({ scope: 'school' })
-      .then(rows => { if (!cancelled) setSchoolTimetable(Array.isArray(rows) ? rows : []); })
-      .catch(error => { if (!cancelled) setSchoolTimetableError(error instanceof Error ? error.message : 'Unable to load the school timetable.'); })
-      .finally(() => { if (!cancelled) setSchoolTimetableLoading(false); });
-    return () => { cancelled = true; };
-  }, [timetableScope, school?.id]);
-  const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const timetableRows = timetableScope === 'mine' ? timetable : schoolTimetable;
+  const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const timetableRows = timetable;
   const visibleTimetable = timetableRows
     .filter(slot => timetableDay === 'all' || slot.dayOfWeek === timetableDay)
     .slice()
     .sort((a, b) => timetableDays.indexOf(a.dayOfWeek) - timetableDays.indexOf(b.dayOfWeek) || a.periodNumber - b.periodNumber);
+  const timetablePeriods = [...new Map(timetable.map(slot => [slot.periodNumber, slot])).values()]
+    .sort((a, b) => a.periodNumber - b.periodNumber);
+  const timetableMatrixDays = timetableDay === 'all' ? timetableDays : [timetableDay];
   const visibleStudents = students.filter(student =>
     `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId} ${student.rollNumber || ''}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
   ).sort((a, b) =>
     `${a.firstName} ${a.middleName || ''} ${a.lastName}`.localeCompare(`${b.firstName} ${b.middleName || ''} ${b.lastName}`) ||
     (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true })
   );
-  const [assignedClassStudentCounts, setAssignedClassStudentCounts] = useState<Record<string, number>>({});
   const [assignedClassStudentTotal, setAssignedClassStudentTotal] = useState(0);
+  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
   useEffect(() => {
     let cancelled = false;
-    if (activeTab !== 'dashboard' || !classes.length) { setAssignedClassStudentCounts({}); setAssignedClassStudentTotal(0); return; }
-    Promise.all(classes.map(async klass => ({ id: klass.id, count: (await ApiClient.getAllStudents(klass.id)).length })))
-      .then(rows => { if (!cancelled) { setAssignedClassStudentCounts(Object.fromEntries(rows.map(row => [row.id, row.count]))); setAssignedClassStudentTotal(rows.reduce((sum, row) => sum + row.count, 0)); } })
-      .catch(() => { if (!cancelled) { setAssignedClassStudentCounts({}); setAssignedClassStudentTotal(0); } });
+    if (activeTab !== 'dashboard' || !classes.length) {
+      setAssignedClassStudentTotal(0);
+      setDashboardSummary(null);
+      return;
+    }
+    // The database RPC returns tenant-scoped student, class and attendance aggregates.
+    // Do not download every student row merely to calculate dashboard counts.
+    ApiClient.getSchoolDashboard()
+      .then(summary => {
+        if (cancelled) return;
+        setDashboardSummary(summary || null);
+        setAssignedClassStudentTotal(Number(summary?.stats?.totalStudents || 0));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDashboardSummary(null);
+        setAssignedClassStudentTotal(0);
+      });
     return () => { cancelled = true; };
-  }, [activeTab, classes, school?.id]);
-  const notices: SchoolNotice[] = Array.isArray(noticesState.data) ? noticesState.data : [];
+  }, [activeTab, classes.length, initialData.data, school?.id]);
+  const notices: SchoolNotice[] = Array.isArray(noticesState.data)
+    ? [...noticesState.data].sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || String(b.publishDate || '').localeCompare(String(a.publishDate || '')))
+    : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
+  const schoolWeekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', timeZone: school?.timezone || 'Africa/Addis_Ababa'
+  }).format(new Date());
+  const todaysLessons = timetable.filter(slot => slot.dayOfWeek === schoolWeekday)
+    .slice().sort((a, b) => a.periodNumber - b.periodNumber);
+  const weeklyPeriods = Number(dashboardSummary?.totalPeriodsPerWeek ?? timetable.length);
+  const openHomeworkCount = Number(dashboardSummary?.openHomeworkCount ??
+    homework.filter(item => String(item.dueDate || '') >= getSchoolLocalDate(school?.timezone)).length);
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [assignmentDescription, setAssignmentDescription] = useState('');
   const [assignmentDueDate, setAssignmentDueDate] = useState('');
@@ -626,21 +679,43 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     nextRow?.querySelector<HTMLInputElement>('[data-mark-component="' + componentId + '"]')?.focus();
   };
 
+  const handleChangeTeacherPin = async () => {
+    if (!/^\d{4,6}$/.test(newPin)) { setNotice('PIN-ka cusub waa inuu ka koobnaadaa 4 ilaa 6 lambar.'); return; }
+    if (newPin !== confirmPin) { setNotice('Xaqiijinta PIN-ku isma laha.'); return; }
+    setIsChangingPin(true);
+    try {
+      await ApiClient.changeTeacherPin(currentPin, newPin);
+      setCurrentPin(''); setNewPin(''); setConfirmPin('');
+      setNotice('PIN-kaaga si guul leh ayaa loo beddelay.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'PIN-ka lama beddeli karin.');
+    } finally {
+      setIsChangingPin(false);
+    }
+  };
+
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
+    <div className="teacher-portal-design mx-auto w-full max-w-[1140px] space-y-5 p-3 sm:p-5 lg:p-7" data-theme={portalTheme === "system" ? undefined : portalTheme} style={{ "--school-brand-color": school?.brandColor || "#0e6a62" } as React.CSSProperties}>
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
         <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div aria-hidden="true" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-full bg-[#0e6a62] font-semibold text-white">
+              {(user?.fullName || 'T').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('')}
+            </div>
+            <div className="min-w-0">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-100">
               <GraduationCap className="h-3.5 w-3.5" /> Faculty workspace
             </div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Good day, {user?.fullName || 'Teacher'}</h1>
-            <p className="mt-1 text-sm text-teal-100/90">{school?.name || 'Your school'} · Your classes, lessons and student progress in one place.</p>
+            <p className="mt-1 text-xs text-teal-100/90">
+              Teacher · {(user as any)?.teacherCode || user?.staffId || '—'} · {school?.code || '—'} · Form Teacher of {formTeacherClasses.length ? formTeacherClasses.map(klass => `${klass.name}${klass.section ? ` · ${klass.section}` : ''}`).join(', ') : '—'}
+            </p>
+          </div>
           </div>
           <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
             <div className="rounded-xl bg-white/10 p-2.5"><CalendarDays className="h-5 w-5 text-teal-100" /></div>
@@ -657,24 +732,52 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       )}
 
       {activeTab === 'dashboard' && (
-        <section className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <section className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Form Teacher responsibility</p>
-              <h2 className="mt-1 text-base font-bold text-slate-900">Your assigned class</h2>
-              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}<span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-[11px] text-teal-800">{assignedClassStudentCounts[klass.id] ?? '…'} arday</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
-            </section>
-            <section className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Teaching assignments</p>
-              <h2 className="mt-1 text-base font-bold text-slate-900">Subjects you teach</h2>
-              {teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).length ? <ul className="mt-3 space-y-2">{teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => <li key={`${assignment.classId}:${assignment.subject.id}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold text-slate-800">{assignment.subject.name}</span><span className="text-slate-500">{assignment.class?.name || 'Assigned class'}</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No teaching subjects have been assigned yet.</p>}
-            </section>
+        <section className="space-y-4" aria-labelledby="teacher-dashboard-heading">
+          <div>
+            <h2 id="teacher-dashboard-heading" className="text-lg font-semibold">Dashboard</h2>
+            <p className="mt-1 text-sm text-slate-500">Fasalladaada, casharrada maanta iyo shaqooyinka furan.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <article className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">Ardayda fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{assignedClassStudentTotal}</p><p className="mt-1 text-[10px] text-slate-500">Wadarta ardayda fasalladaada</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{new Set([...teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => assignment.classId), ...formTeacherClasses.map(klass => klass.id)]).size}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Maaddooyinka aad dhigto</p><p className="mt-2 text-2xl font-black text-slate-900">{subjects.length}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Casharrada laguu qoondeeyay</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.length}</p><p className="mt-1 text-[10px] text-slate-500">Casharrada toddobaadka</p></article>
+            <article className="tp-stat"><small>Fasallo</small><b>{Number(dashboardSummary?.totalClasses ?? classes.length)}</b></article>
+            <article className="tp-stat"><small>Arday</small><b>{assignedClassStudentTotal}</b></article>
+            <article className="tp-stat"><small>Xiisado/toddobaad</small><b>{weeklyPeriods}</b></article>
+            <article className="tp-stat"><small>Shaqo guri furan</small><b>{openHomeworkCount}</b></article>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <article className="tp-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">Casharrada maanta</h3>
+              {todaysLessons.length ? (
+                <div className="divide-y divide-slate-100">
+                  {todaysLessons.map(slot => {
+                    const klass = classes.find(item => item.id === slot.classId);
+                    const subject = subjects.find(item => item.id === slot.subjectId);
+                    return <div key={slot.id} className="flex items-center gap-3 py-2 text-sm">
+                      <span className="w-24 shrink-0 font-mono text-xs text-slate-500">{String(slot.startTime).slice(0,5)}–{String(slot.endTime).slice(0,5)}</span>
+                      <span className="min-w-0 flex-1 font-semibold">{(slot as any).subjectName || subject?.name || '—'} <span className="font-normal text-slate-500">· {(slot as any).className || klass?.name || '—'}{klass?.section ? ` · ${klass.section}` : ''}</span></span>
+                      <span className="text-xs text-slate-500">P{slot.periodNumber}</span>
+                    </div>;
+                  })}
+                </div>
+              ) : <p className="text-sm text-slate-500">Maanta cashar ma jiro.</p>}
+            </article>
+            <article className="tp-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">Waxa la sameeyo</h3>
+              <div className="divide-y divide-slate-100">
+                <div className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span>Attendance — {formTeacherClasses[0] ? `${formTeacherClasses[0].name}${formTeacherClasses[0].section ? ` · ${formTeacherClasses[0].section}` : ''}` : 'Form Teacher'}</span>
+                  {formTeacherClasses.length
+                    ? <span className={`rounded-full px-2 py-1 text-xs font-semibold ${Number(dashboardSummary?.attendanceRecordedToday || 0) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{Number(dashboardSummary?.attendanceRecordedToday || 0) > 0 ? 'La qaaday' : 'Weli lama qaadin'}</span>
+                    : <span className="text-xs text-slate-500">Form Teacher keliya</span>}
+                  <a href="#attendance" className="font-semibold text-teal-700">Fur</a>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span>Gelinta dhibcaha</span><a href="#grades" className="font-semibold text-teal-700">Fur</a>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span>Notice cusub</span><span className="text-xs text-slate-500">{notices.length}</span><a href="#notices" className="font-semibold text-teal-700">Eeg</a>
+                </div>
+              </div>
+            </article>
           </div>
         </section>
       )}
@@ -687,51 +790,64 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Teaching schedule</p>
               <h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900">
                 <CalendarDays className="h-5 w-5 text-teal-700" />
-                {timetableScope === 'mine' ? 'My teaching timetable' : 'Full school timetable'}
+                My teaching timetable
               </h2>
-              <p className="mt-1 text-xs text-slate-500">Start with your own lessons; switch to the school view when needed.</p>
+              <p className="mt-1 text-xs text-slate-500">Your assigned lessons only.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Timetable scope">
-                  <button type="button" aria-pressed={timetableScope === 'mine'} onClick={() => { setTimetableScope('mine'); setTimetableDay('all'); }} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'mine' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>My lessons</button>
-                  <button type="button" aria-pressed={timetableScope === 'school'} onClick={() => { setTimetableScope('school'); setTimetableDay('all'); }} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'school' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>School</button>
-                </div>
-                <select aria-label="Filter timetable by day" value={timetableDay} onChange={event => setTimetableDay(event.target.value as typeof timetableDay)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
-                  <option value="all">All days</option>
-                  {timetableDays.map(day => <option key={day} value={day}>{day}</option>)}
-                </select>
-              </div>
+              <select aria-label="Filter timetable by day" value={timetableDay} onChange={event => setTimetableDay(event.target.value as typeof timetableDay)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                <option value="all">All days</option>
+                {timetableDays.map(day => <option key={day} value={day}>{day}</option>)}
+              </select>
               <span aria-label={`${visibleTimetable.length} periods shown`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} lessons</span>
             </div>
           </div>
-          {(schoolTimetableLoading && timetableScope === 'school') ? <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Loading school timetable…</div> : schoolTimetableError && timetableScope === 'school' ? <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{schoolTimetableError}</div> : visibleTimetable.length === 0 ? (
+          {visibleTimetable.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-[#64748B]">
               {timetableDay !== 'all'
                 ? `No lessons scheduled for ${timetableDay} in this view. Choose another day or All days.`
-                : timetableScope === 'mine' && timetable.length === 0
+                : timetable.length === 0
                   ? 'Your personal timetable has no published lessons yet. Ask the administrator to assign your teacher profile to the class timetable.'
                   : 'No schedule slots have been published yet. Contact school administration to set your timetable.'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {visibleTimetable.map(slot => {
-                const c = classes.find(cls => cls.id === slot.classId);
-                const mySlot = timetableScope === 'mine' || isMyTimetableSlot(slot);
-                const s = subjects.find(sub => sub.id === slot.subjectId);
-                return (
-                  <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#132A29]">{slot.dayOfWeek}</span>
-                      <span className="font-mono text-[11px] font-bold text-[#0F766E]">Period {slot.periodNumber}</span>
-                    </div>
-                    <p className="font-semibold text-teal-900">{(slot as any).subjectName || s?.name || 'Subject'}</p>
-                    <p className="text-[11px] text-[#64748B]">{(slot as any).className || c?.name || 'Class'} · Room {slot.roomNumber || 'TBA'}</p>
-                    {mySlot && <span className="inline-flex rounded-full bg-teal-700 px-2 py-1 text-[10px] font-bold text-white">Your lesson</span>}
-                    <p className="font-mono text-[10px] text-[#94A3B8]">{slot.startTime} - {slot.endTime}</p>
-                  </div>
-                );
-              })}
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="sticky left-0 bg-slate-50 px-3 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Day</th>
+                    {timetablePeriods.map(period => (
+                      <th key={period.periodNumber} className="min-w-28 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        <span className="block">Period {period.periodNumber}</span>
+                        <span className="mt-1 block font-mono font-normal normal-case">{String(period.startTime).slice(0,5)}–{String(period.endTime).slice(0,5)}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {timetableMatrixDays.map(day => (
+                    <tr key={day}>
+                      <th className="sticky left-0 bg-white px-3 py-3 text-xs font-semibold text-slate-700">{day}</th>
+                      {timetablePeriods.map(period => {
+                        const slot = timetable.find(item => item.dayOfWeek === day && item.periodNumber === period.periodNumber);
+                        const klass = slot ? classes.find(item => item.id === slot.classId) : null;
+                        const subject = slot ? subjects.find(item => item.id === slot.subjectId) : null;
+                        return (
+                          <td key={period.periodNumber} className="p-2 align-top">
+                            {slot ? (
+                              <div className="min-h-16 rounded-lg border border-slate-200 p-2" style={{ backgroundColor: `hsl(${getTeacherSubjectHue(slot.subjectId)} 60% var(--tp-slot-bg, 91%))`, color: `hsl(${getTeacherSubjectHue(slot.subjectId)} 55% var(--tp-slot-fg, 24%))` }}>
+                                <p className="font-semibold">{(slot as any).subjectName || subject?.name || 'Subject'}</p>
+                                <p className="mt-1 text-[10px] opacity-80">{(slot as any).className || klass?.name || 'Class'}{klass?.section ? ` · ${klass.section}` : ''}</p>
+                                <p className="mt-1 text-[10px] opacity-75">Room {slot.roomNumber || 'TBA'}</p>
+                              </div>
+                            ) : <div className="flex min-h-16 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-400">—</div>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -759,13 +875,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 {visibleStudents.map((student, index) => <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-slate-400">#{index + 1}</span><span className="rounded-lg bg-white px-2 py-1 font-mono text-[11px] text-slate-600">{student.rollNumber || student.studentId}</span></div>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p>
+                  <p className="mt-1 text-xs text-slate-500">Parent phone: {formatTeacherGuardianPhone((student as any).fatherPhone, (student as any).motherPhone, (student as any).guardianPhone)}</p>
+                  <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">{student.status || 'Active'}</span>
                 </article>)}
                 {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
               </div>
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[620px] text-left text-xs">
-                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Student ID</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">{visibleStudents.map((student, index) => <tr key={student.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-400">{index + 1}</td><td className="px-4 py-3 font-semibold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</td><td className="px-4 py-3 font-mono text-slate-500">{student.studentId}</td></tr>)}</tbody>
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Student ID</th><th className="px-4 py-3">Parent phone</th><th className="px-4 py-3">Status</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100">{visibleStudents.length ? visibleStudents.map((student, index) => <tr key={student.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-400">{index + 1}</td><td className="px-4 py-3 font-semibold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</td><td className="px-4 py-3 font-mono text-slate-500">{student.studentId}</td><td className="px-4 py-3 font-mono text-slate-600">{formatTeacherGuardianPhone((student as any).fatherPhone, (student as any).motherPhone, (student as any).guardianPhone)}</td><td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">{student.status || 'Active'}</span></td></tr>) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No students match your search.</td></tr>}</tbody>
                 </table>
               </div>
               </>
@@ -811,6 +929,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <input
                 type="date"
                 value={attendanceDate}
+                max={getSchoolLocalDate(school?.timezone)}
                 onChange={e => setAttendanceDate(e.target.value)}
                 className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl"
               />
@@ -1270,6 +1389,66 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       )}
 
       {/* TAB 4: CIRCULARS & NOTICES */}
+      {activeTab === 'profile' && (
+        <section className="space-y-4" aria-labelledby="teacher-profile-heading">
+          <div>
+            <h2 id="teacher-profile-heading" className="text-lg font-semibold">My Profile</h2>
+            <p className="mt-1 text-sm text-slate-500">Xogta macallinka iyo fasallada iyo maaddooyinka laguu qoondeeyay.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <article className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-semibold">Xogtaada</h3>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <dt className="text-slate-500">Magac</dt><dd className="text-right font-medium">{user?.fullName || '—'}</dd>
+                <dt className="text-slate-500">Teacher ID</dt><dd className="text-right font-medium">{(user as any)?.teacherCode || user?.staffId || '—'}</dd>
+                <dt className="text-slate-500">Dugsi</dt><dd className="text-right font-medium">{school?.name || '—'}</dd>
+                <dt className="text-slate-500">Email</dt><dd className="text-right font-medium break-all">{user?.email || '—'}</dd>
+                <dt className="text-slate-500">Phone</dt><dd className="text-right font-medium">{user?.phone || '—'}</dd>
+                <dt className="text-slate-500">Form Teacher</dt><dd className="text-right font-medium">{formTeacherClasses.length ? formTeacherClasses.map(klass => `${klass.name}${klass.section ? ` · ${klass.section}` : ''}`).join(', ') : '—'}</dd>
+              </dl>
+            </article>
+            <article className="rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="mb-3 text-sm font-semibold">Maaddooyinka laguu qoondeeyay</h3>
+              {teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).length ? (
+                <ul className="space-y-2 text-sm">
+                  {teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => (
+                    <li key={`${assignment.classId}:${assignment.subject.id}`} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 last:border-0">
+                      <span className="font-medium">{assignment.subject.name}</span>
+                      <span className="text-right text-xs text-slate-500">{assignment.class?.name || '—'}{assignment.class?.section ? ` · ${assignment.class.section}` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="text-sm text-slate-500" role="status">Weli ma jiro maaddo laguu qoondeeyay. Weydii maamulka dugsiga.</p>}
+            </article>
+          </div>
+          <article className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold">Display preferences</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">Theme
+                <select value={portalTheme} onChange={event => setPortalTheme(event.target.value as typeof portalTheme)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="system">Follow device</option><option value="light">Light</option><option value="dark">Dark</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">Language
+                <select value={language} onChange={event => setLanguage(event.target.value as typeof language)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="en">English</option><option value="so">Somali</option><option value="am">Amharic</option><option value="ar">Arabic</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <h3 className="text-sm font-semibold">Change sign-in PIN</h3>
+              <p className="mt-1 text-xs text-slate-500">Enter your current PIN, then choose and confirm a new 4–6 digit PIN.</p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <input aria-label="Current PIN" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={currentPin} onChange={event => setCurrentPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Current PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input aria-label="New PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={newPin} onChange={event => setNewPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="New PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input aria-label="Confirm new PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={confirmPin} onChange={event => setConfirmPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </div>
+              <button type="button" onClick={() => void handleChangeTeacherPin()} disabled={isReadOnly || isChangingPin || !currentPin || !newPin || !confirmPin} className="mt-3 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isChangingPin ? 'Updating…' : 'Update PIN'}</button>
+            </div>
+          </article>
+        </section>
+      )}
+
       {activeTab === 'notices' && (
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1290,7 +1469,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               {notices.map(n => (
                 <article key={n.id} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-[#132A29]">{n.title}</span>
+                    <span className="flex flex-wrap items-center gap-2 font-bold text-sm text-[#132A29]">{n.title}{n.isPinned && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Important</span>}</span>
                     <span className="text-[10px] text-[#64748B] font-mono">{n.publishDate}</span>
                   </div>
                   <p className="text-[#334155]">{n.content}</p>

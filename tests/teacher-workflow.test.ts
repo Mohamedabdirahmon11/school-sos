@@ -83,8 +83,9 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /attendanceCounts/);
   assert.match(teacher, /Teaching schedule/);
   assert.match(teacher, /lessons/);
-  assert.match(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
-  assert.match(teacher, /Your lesson/);
+  assert.doesNotMatch(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
+  assert.match(teacher, /timetableMatrixDays\.map\(day/);
+  assert.match(teacher, /Period \{period\.periodNumber\}/);
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
   assert.match(teacher, /Submit marks/);
@@ -131,9 +132,10 @@ test('teacher messages and personal payslips remain available through role navig
   const messages = read('../src/components/schooladmin/MessagesView.tsx');
   const payroll = read('../src/components/accountant/AccountantPayrollView.tsx');
   assert.match(sidebar, /item\('t_students'/);
-  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.doesNotMatch(sidebar, /item\('t_exam_results'/);
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
+  assert.match(sidebar, /item\('t_profile'/);
   assert.match(app, /activeView === 't_messages' && <MessagesView \/>/);
   assert.match(app, /activeView === 't_payslips' && <StaffPayslipsView \/>/);
   assert.match(messages, /const isTeacher = user\?\.role === 'teacher'/);
@@ -202,7 +204,7 @@ test('teacher has separate subject-wise Small Exam and Big Exam entry and a read
   assert.match(mobileNav, /id: 't_grades'/);
   assert.match(sidebar, /item\('t_students'/);
   assert.match(sidebar, /item\('t_grades'/);
-  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.doesNotMatch(sidebar, /item\('t_exam_results'/);
   assert.match(app, /activeView\.replace\('t_', ''\)/);
   assert.match(teacher, /examType === 'small' \? 'continuous' : 'final'/);
   assert.match(teacher, /gradeSubjects\.map\(subject =>/);
@@ -227,15 +229,18 @@ test('Form Teacher exam register reviews every active class subject while edits 
   assert.match(teacher, /const examRegisterRows = useMemo/);
 });
 
-test('teacher dashboard shows Form Teacher class and assigned teaching subjects without duplicate task shortcuts', () => {
+test('teacher dashboard matches the reference four stats, today lessons and task shortcuts', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /EMPTY_TEACHER_DATA/);
   assert.match(teacher, /useMemo\(\(\) => \[\.\.\.new Map/);
   assert.match(teacher, /assignedClassStudentTotal/);
-  assert.match(teacher, /Casharrada laguu qoondeeyay/);
-  assert.match(teacher, /Form Teacher responsibility/);
-  assert.match(teacher, /Your assigned class/);
-  assert.match(teacher, /Subjects you teach/);
+  assert.match(teacher, /<small>Fasallo<\/small>/);
+  assert.match(teacher, /<small>Arday<\/small>/);
+  assert.match(teacher, /<small>Xiisado\/toddobaad<\/small>/);
+  assert.match(teacher, /<small>Shaqo guri furan<\/small>/);
+  assert.match(teacher, /Casharrada maanta/);
+  assert.match(teacher, /Waxa la sameeyo/);
+  assert.match(teacher, /openHomeworkCount/);
   assert.doesNotMatch(teacher, /Enter marks<\/button>/);
   assert.doesNotMatch(teacher, /Class attendance<\/button>/);
 });
@@ -265,7 +270,7 @@ test('daily attendance uses one atomic bulk upsert on the existing natural key',
 test('Form Teacher attendance authorization loads its class once without subject-assignment lookups', () => {
   const api = read('../src/server/api.ts');
   const start = api.indexOf("apiRouter.post('/attendance'");
-  const end = api.indexOf('// 6. EXAMS & RESULTS', start);
+  const end = api.indexOf("apiRouter.put('/attendance'", start);
   const route = api.slice(start, end);
   assert.equal(route.split('db.getClassById(').length - 1, 1);
   assert.ok(route.includes('attendanceClass.classTeacherId !== user.id'));
@@ -297,19 +302,14 @@ test('teaching-class authorization avoids subject queries for the assigned Form 
 });
 
 
-test('teacher portal provides personal timetable first and a deliberate school-wide switch', () => {
+test('teacher portal exposes only the authenticated teacher timetable with day filtering', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
-  assert.match(teacher, /timetableScope, setTimetableScope/);
   assert.match(teacher, /ApiClient\.getTimetable\(\)/);
-  assert.match(teacher, /ApiClient\.getTimetable\(\{ scope: 'school' \}\)/);
-  assert.match(teacher, /const timetableRows = timetableScope === 'mine' \? timetable : schoolTimetable/);
-  assert.match(teacher, /assignment\.teacherId === slot\.teacherId/);
+  assert.match(teacher, /const timetableRows = timetable/);
   assert.match(teacher, /Filter timetable by day/);
   assert.match(teacher, /All days/);
-  assert.match(teacher, /My lessons/);
-  assert.match(teacher, /Full school timetable/);
-  const client = read('../src/services/api.ts');
-  assert.match(client, /params\.append\('scope', 'school'\)/);
+  assert.match(teacher, /My teaching timetable/);
+  assert.doesNotMatch(teacher, /scope: 'school'|Full school timetable|schoolTimetable/);
 });
 
 test('teacher workflows provide mobile student cards, searchable registers, and touch-sized attendance and mark inputs', () => {
@@ -328,7 +328,7 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
   assert.match(mobile, /id: 't_timetable'/);
   assert.match(mobile, /id: 't_attendance'/);
   assert.match(mobile, /id: 't_grades'/);
-  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.doesNotMatch(sidebar, /item\('t_exam_results'/);
   assert.match(sidebar, /item\('t_assignments'/);
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
@@ -386,4 +386,64 @@ test('teacher subject directory is restricted to active class-subject assignment
   assert.match(route, /'teachers\.school_id': school\.id/);
   assert.match(route, /is_active: 'true'/);
   assert.match(route, /assignedSubjectIds\.has\(subject\.id\)/);
+});
+
+test('teacher timetable scope cannot be widened to the whole school by a query parameter', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.get('/timetable'");
+  const end = api.indexOf("\napiRouter.", start + 1);
+  const route = api.slice(start, end);
+  assert.match(route, /teacherId = String\(own\.items\[0\]\.id\)/);
+  assert.doesNotMatch(route, /scope.*school|teacherId = ''/);
+});
+
+
+test('teacher timetable is a weekday period matrix backed by the authenticated teacher timetable slots', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /const timetableDays: TimetableSlot\['dayOfWeek'\]\[\] = \['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'\]/);
+  assert.match(teacher, /const timetablePeriods = \[\.\.\.new Map\(timetable\.map/);
+  assert.match(teacher, /timetableMatrixDays\.map\(day/);
+  assert.match(teacher, /item\.dayOfWeek === day && item\.periodNumber === period\.periodNumber/);
+  assert.match(teacher, /getTeacherSubjectHue\(slot\.subjectId\)/);
+  assert.match(teacher, /period\.startTime/);
+  assert.match(teacher, /period\.endTime/);
+});
+
+test('teacher student register includes parent phone and explicit mobile and desktop empty states', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /Parent phone: \{formatTeacherGuardianPhone/);
+  assert.match(teacher, /formatTeacherGuardianPhone\(\(student as any\)\.fatherPhone/);
+  assert.match(teacher, /Phone not provided/);
+  assert.match(teacher, /No students match your search\./);
+  assert.match(teacher, /No students found in this assigned class\./);
+});
+
+test('teacher payslips are read-only, show ETB breakdown and offer copy instead of PDF download', () => {
+  const payroll = read('../src/components/accountant/AccountantPayrollView.tsx');
+  assert.match(payroll, /const isTeacher = user\?\.role === 'teacher'/);
+  assert.match(payroll, /copyPayslipSummary/);
+  assert.match(payroll, /isTeacher \? 'ETB'/);
+  assert.match(payroll, /Copy summary/);
+  assert.match(payroll, /: <button type="button" onClick=\{\(\) => void downloadPayslip/);
+});
+
+test('teacher profile offers theme/language preferences and verified self-service PIN change', () => {
+  const portal = read('../src/components/teacher/TeacherPortalView.tsx');
+  const api = read('../src/server/api.ts');
+  const client = read('../src/services/api.ts');
+  assert.match(portal, /Follow device/);
+  assert.match(portal, /value={language}/);
+  assert.match(portal, /ApiClient\.changeTeacherPin\(currentPin, newPin\)/);
+  assert.match(api, /apiRouter\.post\('\/auth\/change-teacher-pin'/);
+  assert.match(api, /verifyPin\(currentPin, String\(user\.pin \|\| ''\)\)/);
+  assert.match(api, /pin: hashPin\(newPin\)/);
+  assert.match(client, /changeTeacherPin\(currentPin: string, newPin: string\)/);
+});
+
+test('teacher portal refreshes assignments and timetable after administrator changes', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /initialData\.retry\(\)/);
+  assert.match(teacher, /addEventListener\('focus', refreshWhenVisible\)/);
+  assert.match(teacher, /addEventListener\('visibilitychange', refreshWhenVisible\)/);
+  assert.match(teacher, /setInterval\(refreshWhenVisible, 60_000\)/);
 });
