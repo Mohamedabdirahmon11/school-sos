@@ -151,7 +151,7 @@ test('student and teacher messages are limited to current assignment classes',as
 });
 
 test('teacher attendance is visible in the student attendance endpoint and other student IDs are forbidden',async()=>{
- const attendance=await post('/attendance',cookies.form,{classId:klass.id,date:today,records:[{studentId:student.id,status:'present'}]});
+ const attendance=await post('/attendance',cookies.form,{classId:klass.id,date:today,records:[{studentId:student.id,status:'present'},{studentId:sameClassStudent.id,status:'present'}]});
  assert.equal(attendance.status,200,await attendance.clone().text());
  const own=await request('/attendance/student?studentId='+encodeURIComponent(student.id),cookies.student);
  assert.equal(own.status,200,await own.clone().text());assert.ok((await own.json() as any[]).some(row=>row.studentId===student.id||row.student_id===student.id));
