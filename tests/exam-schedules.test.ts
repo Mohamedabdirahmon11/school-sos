@@ -17,6 +17,7 @@ const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const termUi = readFileSync(new URL('../src/components/schooladmin/TermExamSchedulingPanel.tsx', import.meta.url), 'utf8');
 const teacherUi = readFileSync(new URL('../src/components/teacher/TeacherPortalView.tsx', import.meta.url), 'utf8');
+const academicsWorkspace = readFileSync(new URL('../src/components/schooladmin/AcademicsWorkspace.tsx', import.meta.url), 'utf8');
 
 test('exam schedule schema is tenant-scoped and protects room and seat allocations', () => {
   assert.match(migration, /ALTER TABLE public\.exam_schedules ENABLE ROW LEVEL SECURITY/);
@@ -138,7 +139,7 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(client.includes('updateExamRoom'));
   assert.ok(client.includes('/exams/schedules'));
   assert.ok(client.includes('updateExamSchedule'));
-  assert.ok(app.includes("activeView === 'sch_marks_approval' ? 'approval' : 'marks'"), 'Marks and Marks Approval have distinct sidebar routes.');
+  assert.ok(app.includes("activeView === 'sch_marks_approval'") && app.includes('<ExamsResultsView initialTab="approval" />') && academicsWorkspace.includes('<ExamsResultsView initialTab="marks" />'), 'Marks and Marks Approval have distinct sidebar routes through the academic workspace.');
   assert.ok(ui.includes("initialTab === 'approval' ? 'Marks Approval' : 'Marks'"), 'The selected route displays its own page title.');
   assert.ok(!ui.includes("setActiveTab('marks')"), 'Marks is no longer switched inside the combined workspace.');
   assert.ok(!ui.includes("setActiveTab('approval')"), 'Marks Approval is no longer switched inside the combined workspace.');

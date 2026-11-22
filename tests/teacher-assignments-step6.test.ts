@@ -8,6 +8,7 @@ const api = read('../src/server/api.ts');
 const view = read('../src/components/schooladmin/TeacherAssignmentsView.tsx');
 const app = read('../src/App.tsx');
 const sidebar = read('../src/components/layout/Sidebar.tsx');
+const workspace = read('../src/components/schooladmin/AcademicsWorkspace.tsx');
 
 test('Step 6 uses a dedicated table and does not alter homework assignments', () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.teacher_class_subject_assignments/);
@@ -57,8 +58,10 @@ test('Assignment page includes matrix, teacher workload, filters, and print acti
 });
 
 test('Assignment page is reachable from the School Admin app and sidebar', () => {
-  assert.match(app, /TeacherAssignmentsView/);
+  assert.match(app, /AcademicsWorkspace/);
   assert.match(app, /sch_teacher_assignments/);
+  assert.match(workspace, /TeacherAssignmentsView/);
+  assert.match(workspace, /activeView/);
   assert.match(sidebar, /sch_teacher_assignments/);
 });
 
