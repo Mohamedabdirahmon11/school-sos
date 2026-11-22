@@ -332,7 +332,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {data.terms.map((term, index) => <div key={index} className="rounded-lg border p-3 space-y-2" style={{borderColor:'var(--sw-line)'}}>
               <strong>{index === 0 ? 'Semester 1' : index === 1 ? 'Semester 2' : 'Semester 3'}</strong>
-              {field('Magaca', term.name, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, name: value } : item))}
+              {field('Magaca', term.name, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, name: value } : item)))}
               {field('Bilowga', term.startDate, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, startDate: value } : item)), 'date')}
               {field('Dhammaadka', term.endDate, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, endDate: value } : item)), 'date')}
             </div>)}
