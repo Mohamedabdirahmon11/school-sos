@@ -9208,7 +9208,7 @@ apiRouter.get('/student/notices', requireAuth, requireSchoolContext, async (req,
     : { items: [] as any[] };
   const readIds = new Set(reads.items.map((row: any) => String(row.noticeId)));
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)), 'Cache-Control': 'private, no-store, max-age=0' });
-  res.json({ ok: true, data: result.items.map((notice: any) => ({ ...notice, isRead: readIds.has(String(notice.id)) })), error: null });
+  res.json({ ok: true, data: { items: result.items.map((notice: any) => ({ ...notice, isRead: readIds.has(String(notice.id)) })), pagination: { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: Math.ceil(result.total / result.pageSize) } }, error: null });
 });
 
 apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
