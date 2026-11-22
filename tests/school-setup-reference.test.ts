@@ -135,6 +135,12 @@ test('six setup modules render inside the wizard and use existing database-backe
   for (const step of ['classes', 'subjects', 'teachers', 'assign', 'students', 'timetable']) {
     assert.ok(wizard.includes(`SchoolSetupInlineEditor step="${step}"`), `${step} must render inside the wizard`);
   }
+  assert.match(wizard, /current\.id === 'profile'[\s\S]*?saveReferenceProfile/);
+  assert.match(wizard, /current\.id === 'year'[\s\S]*?saveReferenceYear/);
+  assert.ok(wizard.includes('ApiClient.saveSchoolSetupStep(1, { schoolInformation: data.schoolInformation })'));
+  assert.ok(wizard.includes('ApiClient.saveSchoolSetupStep(2, { academicYear: data.academicYear })'));
+  assert.ok(wizard.includes('ApiClient.saveSchoolSetupStep(3, { terms: data.terms })'));
+  assert.doesNotMatch(wizard, /onNavigate\('sch_settings'\)|onNavigate\('sch_setup_academics'\)/);
   for (const method of ['getClasses', 'createClass', 'deleteClass', 'getSubjects', 'createSubject', 'saveClassCurriculum', 'getTeachers', 'createTeacher', 'getStudents', 'createStudent', 'setTimetableSlot']) {
     assert.ok(editor.includes(`ApiClient.${method}`), `inline editor must use ${method}`);
   }
