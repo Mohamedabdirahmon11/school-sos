@@ -41,6 +41,7 @@ test('student notices are class-scoped, paginated, and include per-user read rec
   assert.match(route, /notice_reads/);
   assert.match(route, /user_id: user\.id/);
   assert.match(route, /isRead:/);
+  assert.equal((route.match(/queryPage\(/g) || []).length, 2, 'notice read state must use bounded set queries, not per-notice queries');
 });
 
 test('student marks are published-only at the server and again filtered in the portal', () => {
@@ -93,4 +94,7 @@ test('student portal reference layout preserves desktop sidebar, four-button mob
   assert.match(portal, /aria-current=\{selected\?'page':undefined\}/);
   assert.match(portal, /sp-bottom-nav/);
   assert.match(portal, /Dheeraad/);
+  assert.match(portal, /noticePage/);
+  assert.match(portal, /messagePage/);
+  assert.match(portal, /sp-pagination/);
 });
