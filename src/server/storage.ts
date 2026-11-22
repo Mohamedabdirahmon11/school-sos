@@ -1762,6 +1762,18 @@ class StorageEngine {
     );
   }
 
+  public async getStudentsByIdentifiers(identifiers: string[], schoolId: string): Promise<Student[]> {
+    const uniqueIdentifiers = [...new Set(identifiers.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueIdentifiers.length) return [];
+    const [byPrimaryKey, byStudentId] = await Promise.all([
+      this.queryPage<Student>('students', { school_id: schoolId, id: uniqueIdentifiers }, 1, 100, undefined, '*'),
+      this.queryPage<Student>('students', { school_id: schoolId, student_id: uniqueIdentifiers }, 1, 100, undefined, '*')
+    ]);
+    const merged = new Map<string, Student>();
+    for (const student of [...byPrimaryKey.items, ...byStudentId.items]) merged.set(student.id, student);
+    return [...merged.values()];
+  }
+
   public async getStudentById(id: string, schoolId?: string): Promise<Student | null> {
     return (await this.queryRows<Student>('students', { id, school_id: schoolId }))[0] || null;
   }
