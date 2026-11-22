@@ -76,8 +76,9 @@ const cookies = {
 };
 const setupGateSchool = makeSchool('Incomplete Setup Gate School', 'SETUPGATE');
 const setupGateTeacher = makeUser(setupGateSchool.id, 'teacher', 'Setup Gate Teacher');
-db.updateSchool(setupGateSchool.id, { setupProgress: { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null, startedAt: new Date().toISOString() } } as any);
+const setupGateAdmin = makeUser(setupGateSchool.id, 'school_admin', 'Setup Gate Admin');
 const setupGateCookie = cookieFor(setupGateTeacher, 'setup-gate');
+const setupGateAdminCookie = cookieFor(setupGateAdmin, 'setup-gate-admin');
 
 const app = express();
 app.use(express.json());
@@ -97,7 +98,11 @@ const postJson = (path: string, cookie: string, body: unknown) =>
 after(async () => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
 
 
-test('15.0 incomplete new-school setup returns HTTP 423 before attendance data is accessed', async () => {
+test('15.0 opening the new-school wizard persists startedAt and incomplete setup returns HTTP 423', async () => {
+  const progressResponse = await request('/school/setup-progress', setupGateAdminCookie);
+  assert.equal(progressResponse.status, 200, await progressResponse.clone().text());
+  const progress = await progressResponse.json() as any;
+  assert.ok(progress.progress.startedAt);
   const response = await request('/attendance', setupGateCookie);
   assert.equal(response.status, 423, await response.clone().text());
   const payload = await response.json() as any;
