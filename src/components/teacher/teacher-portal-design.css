@@ -1,0 +1,24 @@
+/* Teacher Portal design tokens from teacher-portal.html.
+ * Scoped to the teacher workspace; existing app-wide styles remain untouched. */
+.teacher-portal-design {
+  --tp-bg:#f2f5f8;--tp-surface:#fff;--tp-fg:#13202d;--tp-muted:#5a6878;--tp-line:#dbe2ea;
+  --tp-brand:var(--school-brand-color,#0e6a62);--tp-brand-fg:#fff;--tp-soft:#e3f1ef;
+  --tp-bad:#b8302a;--tp-bad-bg:#fde9e7;--tp-ok:#1d7a4a;--tp-ok-bg:#e0f3e8;
+  --tp-warn:#8a5a00;--tp-warn-bg:#fff1d6;
+  color:var(--tp-fg);background:var(--tp-bg);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;line-height:1.5;min-width:0;
+}
+.teacher-portal-design[data-theme="dark"],.dark .teacher-portal-design {
+  --tp-bg:#0d141b;--tp-surface:#151e28;--tp-fg:#e5ebf1;--tp-muted:#92a0b1;--tp-line:#263342;
+  --tp-brand:#4cc3b5;--tp-brand-fg:#06201d;--tp-soft:#16332f;
+  --tp-bad:#ff8c82;--tp-bad-bg:#3b1d1b;--tp-ok:#6fd49b;--tp-ok-bg:#16301f;--tp-warn:#f2c14e;--tp-warn-bg:#3a2e12;
+}
+.teacher-portal-design :is(h1,h2,h3,h4){font-family:"Space Grotesk",Inter,system-ui,sans-serif;letter-spacing:-.01em}
+.teacher-portal-design :is(button,input,select,textarea){min-height:38px;border-radius:8px}
+.teacher-portal-design :is(button,input,select,textarea):focus-visible,
+.teacher-portal-design a:focus-visible{outline:2px solid var(--tp-brand);outline-offset:2px}
+.teacher-portal-design table{font-variant-numeric:tabular-nums}
+.teacher-portal-design .tp-card{background:var(--tp-surface);border:1px solid var(--tp-line);border-radius:12px}
+.teacher-portal-design .tp-muted{color:var(--tp-muted)}
+.teacher-portal-design [role="status"]{min-height:20px}
+@media(max-width:860px){.teacher-portal-design .tp-navigation{display:flex;overflow-x:auto;white-space:nowrap}}
