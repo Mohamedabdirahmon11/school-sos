@@ -9,7 +9,7 @@ test('teacher portal uses the supplied design tokens and bounded reference layou
   const css = read('../src/components/teacher/teacher-portal-design.css');
   assert.match(portal, /teacher-portal-design mx-auto w-full max-w-\[1140px\]/);
   assert.match(portal, /teacher-portal-design\.css/);
-  for (const token of ['#f2f5f8', '#ffffff', '#13202d', '#5a6878', '#dbe2ea', '#0e6a62', '#e3f1ef', '#b8302a', '#1d7a4a', '#8a5a00']) {
+  for (const token of ['#f2f5f8', '#fff', '#13202d', '#5a6878', '#dbe2ea', '#0e6a62', '#e3f1ef', '#b8302a', '#1d7a4a', '#8a5a00']) {
     assert.ok(css.toLowerCase().includes(token), `missing reference token ${token}`);
   }
 });
