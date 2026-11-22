@@ -9973,6 +9973,8 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   if (role !== 'school_admin' && role !== 'teacher' && role !== 'super_admin') {
     res.status(403).json({ error: 'Your role cannot access school setup operations.' }); return;
   }
+  if (req.query?.setupWizard === 'true' && ['school_admin', 'super_admin'].includes(role)
+      && ['GET', 'POST', 'DELETE'].includes(req.method) && String(req.path || '').startsWith('/timetable')) { next(); return; }
   // Legacy schools without an explicit wizard-start timestamp are grandfathered. The
   // setup-progress endpoint stamps startedAt when a School Admin opens the wizard.
   const savedProgress = normalizeSchoolSetupProgress(school.setupProgress);
