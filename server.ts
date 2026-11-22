@@ -102,7 +102,7 @@ async function startServer() {
     await db.runWithRequestContext(context, () => db.runSubscriptionDailyCheck());
   };
 
-  const runDueBroadcastCheck = async () => {
+  const publishDueBroadcasts = async () => {
     const context = await db.prepareRequestContext(false, 'broadcast-scheduler', false);
     const published = await db.runWithRequestContext(context, () => db.publishDueBroadcasts());
     if (published > 0) console.info(`[broadcast-scheduler] published=${published}`);
@@ -141,20 +141,20 @@ async function startServer() {
   subscriptionTimer.unref();
 
   let broadcastCheckInFlight = false;
-  const runBroadcastCheckSafely = async () => {
+  const runDueBroadcastCheck = async () => {
     if (broadcastCheckInFlight) return;
     broadcastCheckInFlight = true;
     try {
-      await runDueBroadcastCheck();
+      await publishDueBroadcasts();
     } finally {
       broadcastCheckInFlight = false;
     }
   };
-  void runBroadcastCheckSafely().catch(error => {
+  void runDueBroadcastCheck().catch(error => {
     console.error(`[broadcast-scheduler] initial check failed: ${error instanceof Error ? error.message : 'unknown error'}`);
   });
   const broadcastTimer = setInterval(() => {
-    void runBroadcastCheckSafely().catch(error => {
+    void runDueBroadcastCheck().catch(error => {
       console.error(`[broadcast-scheduler] scheduled check failed: ${error instanceof Error ? error.message : 'unknown error'}`);
     });
   }, 60 * 1000);
