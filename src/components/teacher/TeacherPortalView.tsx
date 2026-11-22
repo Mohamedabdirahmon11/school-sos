@@ -150,7 +150,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         setAssignedClassStudentTotal(0);
       });
     return () => { cancelled = true; };
-  }, [activeTab, classes.length, school?.id]);
+  }, [activeTab, classes.length, initialData.data, school?.id]);
   const notices: SchoolNotice[] = Array.isArray(noticesState.data)
     ? [...noticesState.data].sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || String(b.publishDate || '').localeCompare(String(a.publishDate || '')))
     : [];
