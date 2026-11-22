@@ -84,7 +84,8 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Teaching schedule/);
   assert.match(teacher, /lessons/);
   assert.doesNotMatch(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
-  assert.match(teacher, /Your lesson/);
+  assert.match(teacher, /timetableMatrixDays\.map\(day/);
+  assert.match(teacher, /Period \{period\.periodNumber\}/);
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
   assert.match(teacher, /Submit marks/);
@@ -399,9 +400,9 @@ test('teacher timetable is a weekday period matrix backed by the authenticated t
   assert.match(teacher, /const timetableDays: TimetableSlot\['dayOfWeek'\]\[\] = \['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'\]/);
   assert.match(teacher, /const timetablePeriods = \[\.\.\.new Map\(timetable\.map/);
   assert.match(teacher, /timetableMatrixDays\.map\(day/);
-  assert.match(teacher, /slot\.dayOfWeek === day && item\.periodNumber === period\.periodNumber/);
-  assert.match(teacher, /slot\.startTime/);
-  assert.match(teacher, /slot\.endTime/);
+  assert.match(teacher, /item\.dayOfWeek === day && item\.periodNumber === period\.periodNumber/);
+  assert.match(teacher, /period\.startTime/);
+  assert.match(teacher, /period\.endTime/);
 });
 
 test('teacher student register includes parent phone and explicit mobile and desktop empty states', () => {
