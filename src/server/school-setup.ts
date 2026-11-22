@@ -104,7 +104,7 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
       : 1;
   const completedAt = fullyComplete ? rawCompletedAt : null;
   const startedAt = typeof source.startedAt === 'string' && source.startedAt.trim() ? source.startedAt : null;
-  return { currentStep, completedSteps, skippedSteps, completedAt, startedAt };
+  return { currentStep, completedSteps, skippedSteps, completedAt, ...(startedAt ? { startedAt } : {}) };
 }
 
 function validDate(value: unknown): value is string {
