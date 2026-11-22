@@ -45,3 +45,12 @@ test('bulk template API synchronizes only the requested grade bands', () => {
   assert.doesNotMatch(periodRoute, /requestedBands/);
   assert.match(bulkRoute, /syncPrimarySubjectTemplates\(school, templates, periods, requestedBands as PrimarySubjectGradeBand\[\]\)/);
 });
+
+test('subject removal stops if curriculum synchronization fails', () => {
+  assert.match(view, /const synchronized = await save\(nextTemplates, draftPeriods, bands\)/);
+  assert.match(view, /if \(!synchronized\) return/);
+});
+
+test('new subject weekly periods are validated before creation', () => {
+  assert.match(view, /newPeriods < 1 \|\| newPeriods > 10/);
+});

@@ -73,6 +73,10 @@ export const SubjectsView: React.FC<{ onNavigate: (view: string) => void }> = ({
     event.preventDefault();
     const name = newName.trim();
     if (!name) return;
+    if (!Number.isInteger(newPeriods) || newPeriods < 1 || newPeriods > 10) {
+      setNotice({ kind: 'error', text: 'Xiisadaha maaddadu waa inay u dhexeeyaan 1 ilaa 10.' });
+      return;
+    }
     if (subjects.some(subject => sameName(subject.name, name))) {
       setNotice({ kind: 'error', text: 'Maaddadan hore ayay uga jirtaa dugsigan.' });
       return;
@@ -89,8 +93,8 @@ export const SubjectsView: React.FC<{ onNavigate: (view: string) => void }> = ({
     } finally { setBusy(false); }
   };
 
-  const save = async (nextTemplates = draftTemplates, nextPeriods = draftPeriods, bands = dirtyBands) => {
-    if (!nextTemplates || !bands.length || isReadOnly) return;
+  const save = async (nextTemplates = draftTemplates, nextPeriods = draftPeriods, bands = dirtyBands): Promise<boolean> => {
+    if (!nextTemplates || !bands.length || isReadOnly) return false;
     setBusy(true); setNotice(null);
     try {
       const result = await ApiClient.savePrimarySubjectTemplates(nextTemplates, nextPeriods, bands);
@@ -99,8 +103,10 @@ export const SubjectsView: React.FC<{ onNavigate: (view: string) => void }> = ({
       setPeriods({ ...result.periods });
       setDraftPeriods({ ...result.periods });
       setNotice({ kind: 'ok', text: `Subjects, curricula iyo teacher assignments waa la waafajiyey (${result.updatedClasses} fasal).` });
+      return true;
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Template-ka lama kaydin karin.' });
+      return false;
     } finally { setBusy(false); }
   };
 
@@ -131,7 +137,8 @@ export const SubjectsView: React.FC<{ onNavigate: (view: string) => void }> = ({
       catch { setNotice({ kind: 'error', text: 'Maaddadani waxay ku jirtaa natiijooyin ama diiwaanno hore; xogteeda waa la ilaaliyey.' }); }
       return;
     }
-    await save(nextTemplates, draftPeriods, bands);
+    const synchronized = await save(nextTemplates, draftPeriods, bands);
+    if (!synchronized) return;
     // Curriculum links are deactivated and teacher assignments detached by the
     // template sync. Keep the subject row when marks/history still reference it.
     try {
@@ -149,7 +156,7 @@ export const SubjectsView: React.FC<{ onNavigate: (view: string) => void }> = ({
     if (!draftTemplates) return {} as Record<BandKey, number>;
     return Object.fromEntries(BANDS.map(band => [
       band.key,
-      draftTemplates[band.key].reduce((sum, name) => sum + Number(draftPeriods[name] || periods[name] || 2), 0)
+      draftTemplates[band.key].reduce((sum, name) => sum + Number(draftPeriods[name] ?? periods[name] ?? 2), 0)
     ])) as Record<BandKey, number>;
   }, [draftTemplates, draftPeriods, periods]);
 
