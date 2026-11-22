@@ -45,7 +45,7 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
 ];
 
 export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) => {
-  const { school } = useAuth();
+  const { school, user } = useAuth();
   const [data, setData] = useState<SchoolSetupData>(DEFAULT_DATA);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -314,6 +314,8 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
 
       {step === 1 && <div className="grid gap-4 sm:grid-cols-2">
         {field('School name', data.schoolInformation.name, v => patch('schoolInformation', { ...data.schoolInformation, name: v }))}
+        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School code</span><input readOnly value={school?.code || ''} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-600" /></label>
+        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School Administrator / Principal</span><input readOnly value={user?.fullName || ''} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-600" /></label>
         <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School logo (PNG, JPEG or WebP · max 1.5 MB)</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={logoUploading} onChange={e => { const input = e.currentTarget; const file = input.files?.[0]; if (!file) return; if (file.size > 1_572_864 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setError('Choose a PNG, JPEG or WebP logo smaller than 1.5 MB.'); input.value = ''; return; } setLogoUploading(true); setError(null); void ApiClient.uploadSchoolLogo(file).then(result => setData(current => ({ ...current, schoolInformation: { ...current.schoolInformation, logoUrl: result.logoUrl } }))).catch(err => setError(err instanceof Error ? err.message : 'The school logo could not be uploaded.')).finally(() => { setLogoUploading(false); input.value = ''; }); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:opacity-50" />{logoUploading && <span className="text-xs text-teal-700">Uploading logo securely to Supabase Storage…</span>}{!logoUploading && data.schoolInformation.logoUrl && <div className="flex items-center gap-3 text-xs text-teal-700"><img src={data.schoolInformation.logoUrl} alt="School logo preview" className="h-12 w-12 rounded-lg border border-slate-200 object-contain" />Logo uploaded and ready to save.</div>}</label>
         {field('School address', data.schoolInformation.address, v => patch('schoolInformation', { ...data.schoolInformation, address: v }))}
         {field('City / Town', data.schoolInformation.city, v => patch('schoolInformation', { ...data.schoolInformation, city: v }))}
