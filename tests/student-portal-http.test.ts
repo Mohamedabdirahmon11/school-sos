@@ -92,7 +92,7 @@ test('student notices include school and own-class audience only with read recei
  db.createNotice({schoolId:otherSchool.id,title:'Other school notice',content:'Not for this school',audience:'school',publishDate:today,isPinned:false,authorName:'Admin',authorRole:'school_admin',isActive:true} as any);
  await db.markNoticeRead(school.id,schoolNotice.id,studentUser.id);await db.flush();
  const response=await request('/student/notices?page=1&pageSize=20',cookies.student);assert.equal(response.status,200,await response.clone().text());
- const rows=(await response.json() as any).data as any[];
+ const rows=(await response.json() as any).data.items as any[];
  assert.deepEqual(new Set(rows.map(row=>row.id)),new Set([schoolNotice.id,classNotice.id]));
  assert.equal(rows.find(row=>row.id===schoolNotice.id).isRead,true);
  assert.equal(rows.find(row=>row.id===classNotice.id).isRead,false);
