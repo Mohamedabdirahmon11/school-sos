@@ -124,6 +124,44 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  student-portal-visual:
+    name: Student Portal responsive reference screenshots
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Install Playwright test runner
+        run: npm install --no-save --no-package-lock @playwright/test
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Capture Student Portal reference comparison matrix
+        run: npx playwright test --config tests/visual/playwright.config.ts --grep 'Student Portal'
+
+      - name: Upload Student Portal screenshots and comparisons
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-portal-visual-${{ github.sha }}
+          path: |
+            artifacts/student-portal/
+            artifacts/playwright-results/
+          if-no-files-found: warn
+          retention-days: 14
+
   school-setup-visual:
     name: School Setup Wizard responsive screenshots
     runs-on: ubuntu-latest
