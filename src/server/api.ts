@@ -3791,6 +3791,13 @@ apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContex
   res.json({ success: true, comment: { id: data.id, studentId: data.student_id, semester: data.semester, comment: data.comment, teacherUserId: data.teacher_user_id, updatedAt: data.updated_at } });
 });
 
+apiRouter.get('/subjects/ethiopia-defaults', requireAuth, requireSchoolContext, async (req, res) => {
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view Ethiopia primary defaults.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({ templates: PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, periods: PRIMARY_SUBJECT_TEMPLATE_PERIODS });
+});
+
 apiRouter.get('/subjects/templates', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const role = normalizeRole((req as any).user.role);
@@ -3804,7 +3811,7 @@ apiRouter.get('/subjects/template-periods', requireAuth, requireSchoolContext, a
   const role = normalizeRole((req as any).user.role);
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view subject periods.' }); return; }
   res.setHeader('Cache-Control', 'private, no-store');
-  res.json(school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS);
+  res.json({ ...PRIMARY_SUBJECT_TEMPLATE_PERIODS, ...(school.setupData?.subjectTemplatePeriods || {}) });
 });
 
 apiRouter.put('/subjects/template-periods', requireAuth, requireSchoolContext, async (req, res) => {
@@ -3826,7 +3833,7 @@ apiRouter.put('/subjects/template-periods', requireAuth, requireSchoolContext, a
   }
   const templates = getPrimarySubjectTemplates(school);
   try {
-    const sync = await syncPrimarySubjectTemplates(school, templates, periods);
+    const sync = await syncPrimarySubjectTemplates(school, templates, periods, requestedBands as PrimarySubjectGradeBand[]);
     const setupData = { ...(school.setupData || {}), subjectTemplatePeriods: periods } as NonNullable<School['setupData']>;
     if (!db.updateSchool(school.id, { setupData })) { res.status(404).json({ error: 'School not found.' }); return; }
     await db.flush();
@@ -3853,6 +3860,10 @@ apiRouter.put('/subjects/templates', requireAuth, requireSchoolContext, async (r
       res.status(422).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return;
     }
     templates[band] = names;
+  }
+  const requestedBands = req.body?.bands === undefined ? bands : req.body.bands;
+  if (!Array.isArray(requestedBands) || !requestedBands.length || requestedBands.some((band: unknown) => !bands.includes(band as PrimarySubjectGradeBand)) || new Set(requestedBands).size !== requestedBands.length) {
+    res.status(422).json({ error: 'Choose one or more valid grade bands to synchronize.' }); return;
   }
   const periodInput = req.body?.periods || school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS;
   const periods: Record<string, number> = {};
@@ -3957,7 +3968,7 @@ apiRouter.delete('/subjects/:id', requireAuth, requireSchoolContext, async (req,
   const subject = (await db.getSubjects(school.id)).find(item => item.id === String(req.params.id));
   if (!subject) { res.status(404).json({ error: 'Maaddada lagama helin dugsigan.' }); return; }
   const dependencies = await Promise.all([
-    db.queryPage('class_subjects', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
+    db.queryPage('class_subjects', { school_id: school.id, subject_id: subject.id, is_active: 'true' }, 1, 1, undefined, 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
     db.queryPage('student_marks', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
     db.queryPage('exam_schedules', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),

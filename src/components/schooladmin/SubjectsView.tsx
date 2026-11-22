@@ -1,143 +1,227 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { BookOpen, CheckCircle2, Loader2, Pencil, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { subjectText } from '../../lib/academic-translations.ts';
-import { useApi } from '../../hooks/useApi.ts';
 import { Subject } from '../../types/index.ts';
+import { AcademicSetupHeader } from './AcademicSetupHeader.tsx';
+import './academic-setup.css';
 
-export const SubjectsView: React.FC = () => {
-  const { school, isReadOnly, language } = useAuth();
-  const tx = (key: string, values: Record<string, string | number> = {}) => Object.entries(values).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)), subjectText(language, key));
-  const load = useApi(() => ApiClient.getSubjects(), [school?.id], Boolean(school));
-  const subjects: Subject[] = Array.isArray(load.data) ? load.data : [];
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [editing, setEditing] = useState<Subject | null>(null);
-  const [search, setSearch] = useState('');
+type BandKey = '1-4' | '5-6' | '7-8';
+type Templates = Record<BandKey, string[]>;
+type PeriodMap = Record<string, number>;
+type Band = { key: BandKey; label: string };
+const BANDS: Band[] = [
+  { key: '1-4', label: 'Grade 1–4' },
+  { key: '5-6', label: 'Grade 5–6' },
+  { key: '7-8', label: 'Grade 7–8' }
+];
+const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+const hasName = (names: string[], name: string) => names.some(item => sameName(item, name));
+const cloneTemplates = (value: Templates): Templates => ({ '1-4': [...value['1-4']], '5-6': [...value['5-6']], '7-8': [...value['7-8']] });
+
+export const SubjectsView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
+  const { school, isReadOnly } = useAuth();
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [templates, setTemplates] = useState<Templates | null>(null);
+  const [draftTemplates, setDraftTemplates] = useState<Templates | null>(null);
+  const [periods, setPeriods] = useState<PeriodMap>({});
+  const [draftPeriods, setDraftPeriods] = useState<PeriodMap>({});
+  const [defaults, setDefaults] = useState<{ templates: Templates; periods: PeriodMap } | null>(null);
+  const [newName, setNewName] = useState('');
+  const [newPeriods, setNewPeriods] = useState(2);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
-  const [error, setError] = useState('');
+  const [resetArmed, setResetArmed] = useState(false);
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    if (!load.error) return;
-    if (load.error.code === 'MUST_CHANGE_PASSWORD') window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
-    else if (load.error.status === 401) window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: 401, message: load.error.message } }));
-  }, [load.error]);
-
-  const visible = useMemo(() => subjects.filter(subject =>
-    [subject.name, subject.code || ''].some(value => String(value).toLowerCase().includes(search.trim().toLowerCase()))
-  ).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })), [subjects, search]);
-
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(''), 3500);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
-  const resetForm = () => { setName(''); setCode(''); setEditing(null); setError(''); };
-
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError('');
-    const cleanName = name.trim();
-    const cleanCode = code.trim().toUpperCase();
-    if (!cleanName) { setError(tx('enterName')); return; }
-    if (cleanCode.length > 6) { setError(tx('codeLength')); return; }
-    setBusy(true);
+  const load = useCallback(async () => {
+    if (!school?.id) return;
+    setLoading(true);
     try {
-      if (editing) await ApiClient.updateSubject(editing.id, { name: cleanName, code: cleanCode });
-      else await ApiClient.addSubject({ name: cleanName, code: cleanCode });
-      await load.retry();
-      setNotice(editing ? tx('updated') : tx('saved'));
-      resetForm();
-    } catch (cause) {
-      setError(tx('saveError'));
+      const [subjectRows, savedTemplates, savedPeriods, standard] = await Promise.all([
+        ApiClient.getSubjects(),
+        ApiClient.getPrimarySubjectTemplates(),
+        ApiClient.getPrimarySubjectTemplatePeriods(),
+        ApiClient.getEthiopiaPrimaryDefaults()
+      ]);
+      setSubjects(subjectRows);
+      setTemplates(cloneTemplates(savedTemplates));
+      setDraftTemplates(cloneTemplates(savedTemplates));
+      setPeriods({ ...savedPeriods });
+      setDraftPeriods({ ...savedPeriods });
+      setDefaults({ templates: cloneTemplates(standard.templates), periods: { ...standard.periods } });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Maaddooyinka lama soo qaadi karin.' });
+    } finally { setLoading(false); }
+  }, [school?.id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const visible = useMemo(() => [...subjects].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })), [subjects]);
+
+  const dirtyBands = useMemo(() => {
+    if (!templates || !draftTemplates) return [] as BandKey[];
+    const changedPeriods = new Set(Object.keys(draftPeriods).filter(name => Number(draftPeriods[name]) !== Number(periods[name])));
+    return BANDS.map(band => band.key).filter(band => {
+      const before = templates[band], after = draftTemplates[band];
+      const templateChanged = before.length !== after.length || before.some((name, index) => !sameName(name, after[index] || ''));
+      const periodChanged = after.some(name => changedPeriods.has(name));
+      return templateChanged || periodChanged;
+    });
+  }, [templates, draftTemplates, periods, draftPeriods]);
+
+  const addSubject = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    if (subjects.some(subject => sameName(subject.name, name))) {
+      setNotice({ kind: 'error', text: 'Maaddadan hore ayay uga jirtaa dugsigan.' });
+      return;
+    }
+    setBusy(true); setNotice(null);
+    try {
+      const created = await ApiClient.addSubject({ name, code: '' });
+      setSubjects(current => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setDraftPeriods(current => ({ ...current, [created.name]: newPeriods }));
+      setNewName('');
+      setNotice({ kind: 'ok', text: `${created.name} waa lagu daray. Calaamadee level-ka ay khusayso, kadib kaydi.` });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Maaddada lama abuuri karin.' });
     } finally { setBusy(false); }
   };
 
-  const addDefaults = async () => {
-    setError('');
-    setBusy(true);
+  const save = async (nextTemplates = draftTemplates, nextPeriods = draftPeriods, bands = dirtyBands) => {
+    if (!nextTemplates || !bands.length || isReadOnly) return;
+    setBusy(true); setNotice(null);
     try {
-      const result = await ApiClient.addDefaultSubjects();
-      await load.retry();
-      setNotice(result.createdCount
-        ? tx('defaultAdded',{created:result.createdCount,skipped:result.skippedCount})
-        : tx('defaultsExist'));
-    } catch (cause) {
-      setError(tx('defaultsError'));
+      const result = await ApiClient.savePrimarySubjectTemplates(nextTemplates, nextPeriods, bands);
+      setTemplates(cloneTemplates(result.templates));
+      setDraftTemplates(cloneTemplates(result.templates));
+      setPeriods({ ...result.periods });
+      setDraftPeriods({ ...result.periods });
+      setNotice({ kind: 'ok', text: `Subjects, curricula iyo teacher assignments waa la waafajiyey (${result.updatedClasses} fasal).` });
+    } catch (error) {
+      setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Template-ka lama kaydin karin.' });
     } finally { setBusy(false); }
+  };
+
+  const reset = () => {
+    if (!defaults) return;
+    if (!resetArmed) {
+      setResetArmed(true);
+      window.setTimeout(() => setResetArmed(false), 3500);
+      return;
+    }
+    setResetArmed(false);
+    setDraftTemplates(cloneTemplates(defaults.templates));
+    setDraftPeriods({ ...defaults.periods });
+    setNotice({ kind: 'ok', text: 'Ethiopia standard waa la doortay. Riix Save template changes si loo waafajiyo fasallada.' });
   };
 
   const remove = async (subject: Subject) => {
-    if (!window.confirm(tx('confirmDelete',{name:subject.name}))) return;
-    setError('');
-    setBusy(true);
+    if (!draftTemplates) return;
+    if (!window.confirm(`Remove ${subject.name} from all grade-band templates? Historical marks will be preserved.`)) return;
+    const nextTemplates: Templates = {
+      '1-4': draftTemplates['1-4'].filter(name => !sameName(name, subject.name)),
+      '5-6': draftTemplates['5-6'].filter(name => !sameName(name, subject.name)),
+      '7-8': draftTemplates['7-8'].filter(name => !sameName(name, subject.name))
+    };
+    const bands = BANDS.map(band => band.key).filter(band => draftTemplates[band].some(name => sameName(name, subject.name)));
+    if (!bands.length) {
+      try { await ApiClient.deleteSubject(subject.id); setSubjects(current => current.filter(item => item.id !== subject.id)); setNotice({ kind: 'ok', text: 'Maaddada waa la tirtiray.' }); }
+      catch { setNotice({ kind: 'error', text: 'Maaddadani waxay ku jirtaa natiijooyin ama diiwaanno hore; xogteeda waa la ilaaliyey.' }); }
+      return;
+    }
+    await save(nextTemplates, draftPeriods, bands);
+    // Curriculum links are deactivated and teacher assignments detached by the
+    // template sync. Keep the subject row when marks/history still reference it.
     try {
       await ApiClient.deleteSubject(subject.id);
-      await load.retry();
-      if (editing?.id === subject.id) resetForm();
-      setNotice(tx('deleted'));
-    } catch (cause) {
-      setError(tx('deleteError'));
-    } finally { setBusy(false); }
+      setSubjects(current => current.filter(item => item.id !== subject.id));
+      setNotice({ kind: 'ok', text: 'Maaddada iyo xiriirradii firfircoonaa waa laga saaray.' });
+    } catch {
+      setNotice({ kind: 'ok', text: 'Maaddada waxaa laga saaray manhajka iyo qoondaynta; diiwaanka waxaa loo reebay ilaalinta natiijooyinkii hore.' });
+    }
+    setDraftTemplates(nextTemplates);
+    setTemplates(nextTemplates);
   };
 
-  if (load.loading) return <div className="mx-auto w-full max-w-5xl space-y-4 p-5 md:p-8"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-2xl bg-white" /></div>;
-  if (load.error) return <div className="p-5 md:p-8"><section role="alert" className="mx-auto my-8 max-w-xl rounded-xl border border-rose-200 bg-white p-5 text-sm shadow-sm"><h2 className="font-semibold text-[#132A29]">{tx('loadError')}</h2><p className="mt-1 text-[#64748B]">{tx('loadErrorDetail')}</p><button type="button" onClick={load.retry} className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2 font-semibold text-white hover:bg-[#0D655E]"><Loader2 className="h-4 w-4" /> {tx('retry')}</button></section></div>;
+  const totals = useMemo(() => {
+    if (!draftTemplates) return {} as Record<BandKey, number>;
+    return Object.fromEntries(BANDS.map(band => [
+      band.key,
+      draftTemplates[band.key].reduce((sum, name) => sum + Number(draftPeriods[name] || periods[name] || 2), 0)
+    ])) as Record<BandKey, number>;
+  }, [draftTemplates, draftPeriods, periods]);
+
+  if (loading) return <div className="academic-setup"><div className="wrap"><AcademicSetupHeader active="sch_subjects" onNavigate={onNavigate} /><div className="loading">Loading subjects…</div></div></div>;
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-5xl space-y-6 p-5 md:p-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#102522] dark:text-white">{tx('title')}</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{tx('subtitle')}</p>
-        </div>
-        <span className="rounded-full bg-[#E7F4F0] px-3 py-1.5 text-xs font-semibold text-[#0F766E]">{subjects.length} {tx('count')}</span>
-      </header>
-
-      {notice && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
-      {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-
-      <section className="space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-700">
-          <h2 className="flex items-center gap-2 text-base font-bold text-[#132A29] dark:text-white"><BookOpen className="h-5 w-5 text-[#0F766E]" />{editing ? tx('editTitle') : tx('addTitle')}</h2>
-          <button type="button" disabled={busy || isReadOnly} onClick={() => void addDefaults()} className="inline-flex items-center gap-2 rounded-xl border border-[#B7D8D0] px-3 py-2 text-xs font-semibold text-[#0F766E] hover:bg-[#F3F8F6] disabled:opacity-50">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} {tx('addDefaults')}
-          </button>
-        </div>
-        <form onSubmit={save} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{tx('name')} *
-            <input value={name} onChange={event => setName(event.target.value)} maxLength={150} required disabled={busy || isReadOnly} placeholder={tx('namePlaceholder')} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
-          </label>
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">{tx('code')}
-            <input value={code} onChange={event => setCode(event.target.value.toUpperCase().slice(0, 6))} maxLength={6} disabled={busy || isReadOnly} placeholder={tx('codePlaceholder')} className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal uppercase text-slate-900 outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
-          </label>
-          <div className="flex gap-2">
-            <button type="submit" disabled={busy || isReadOnly || !name.trim()} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F766E] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50"><Plus className="h-4 w-4" />{editing ? tx('save') : tx('add')}</button>
-            {editing && <button type="button" onClick={resetForm} className="rounded-xl border border-slate-300 px-3 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300" aria-label={tx('cancel')}><X className="h-4 w-4" /></button>}
-          </div>
-        </form>
-      </section>
-
-      <section className="space-y-4 rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-bold text-[#132A29] dark:text-white">{tx('list')}</h2>
-          <label className="relative block w-full sm:max-w-xs"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder={tx('search')} aria-label={tx('search')} className="w-full rounded-xl border border-slate-300 bg-[#F8FBFA] py-2.5 pl-9 pr-3 text-sm outline-none focus:border-[#0F766E] dark:border-slate-600 dark:bg-slate-800 dark:text-white" /></label>
-        </div>
-        {visible.length === 0 ? <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700">{search ? tx('noResults') : tx('empty')}</div> : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {visible.map(subject => <article key={subject.id} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-              <div className="min-w-0"><h3 className="truncate text-sm font-bold text-[#132A29] dark:text-white">{subject.name}</h3>{subject.code && <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">{subject.code}</span>}</div>
-              <div className="flex shrink-0 gap-1">
-                <button type="button" disabled={busy || isReadOnly} onClick={() => { setEditing(subject); setName(subject.name); setCode(subject.code || ''); setError(''); }} aria-label={`${tx('edit')} ${subject.name}`} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 hover:text-[#0F766E] disabled:opacity-50 dark:border-slate-600"><Pencil className="h-4 w-4" /></button>
-                <button type="button" disabled={busy || isReadOnly} onClick={() => void remove(subject)} aria-label={`${tx('delete')} ${subject.name}`} className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+    <div className="academic-setup">
+      <div className="wrap">
+        <AcademicSetupHeader active="sch_subjects" onNavigate={onNavigate} />
+        <h2>Subjects</h2>
+        <p className="lead">Template-ka Ethiopia Primary: maaddo kasta waxay ku jirtaa level kasta oo aad calaamadayso, waxayna si toos ah ugu darmaysaa fasallada level-kaas. Dugsi kasta wuu beddeli karaa.</p>
+        {notice && <div role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite" className={`msg ${notice.kind === 'error' ? 'bad' : 'ok'}`}>{notice.text}</div>}
+        <section className="card">
+          {!isReadOnly && (
+            <form className="bar" onSubmit={addSubject}>
+              <div className="f">
+                <label htmlFor="sn">Maaddo cusub</label>
+                <input id="sn" type="text" maxLength={150} value={newName} onChange={event => setNewName(event.target.value)} placeholder="tusaale Quraan" />
               </div>
-            </article>)}
+              <div className="f">
+                <label htmlFor="sp">Xiisad/toddobaad</label>
+                <input id="sp" type="number" min={1} max={10} value={newPeriods} onChange={event => setNewPeriods(Number(event.target.value))} style={{ width: 90 }} />
+              </div>
+              <button className="primary" type="submit" disabled={busy || !newName.trim()}>Add subject</button>
+              <span className="spacer" />
+              <button type="button" onClick={reset} disabled={busy || !defaults}>{resetArmed ? 'Click again to confirm' : 'Reset to Ethiopia standard'}</button>
+              <button type="button" className="primary" onClick={() => void save()} disabled={busy || !dirtyBands.length}>Save template changes</button>
+            </form>
+          )}
+          <div className="bar" style={{ alignItems: 'center' }}>
+            {BANDS.map(band => <span key={band.key} className={`pill ${totals[band.key] > 30 ? 'bad' : ''}`}>{band.label}: {totals[band.key] || 0}/30</span>)}
+            <span className="spacer" />
+            <span className="mut">Conduct is not a subject. Arabic and Islamic Studies/Quraan are optional.</span>
           </div>
-        )}
-      </section>
+          <div className="scroll">
+            <table>
+              <thead><tr><th>Subject</th><th>Levels</th><th className="n">Periods / week</th><th></th></tr></thead>
+              <tbody>
+                {visible.map(subject => (
+                  <tr key={subject.id}>
+                    <td><b>{subject.name}</b></td>
+                    <td>
+                      {BANDS.map(band => (
+                        <label key={band.key} className="cb">
+                          <input type="checkbox" checked={Boolean(draftTemplates?.[band.key] && hasName(draftTemplates[band.key], subject.name))} disabled={isReadOnly || busy}
+                            aria-label={`${subject.name} ${band.label}`}
+                            onChange={event => setDraftTemplates(current => {
+                              if (!current) return current;
+                              const names = [...current[band.key]];
+                              const index = names.findIndex(name => sameName(name, subject.name));
+                              if (event.target.checked && index < 0) names.push(subject.name);
+                              if (!event.target.checked && index >= 0) names.splice(index, 1);
+                              return { ...current, [band.key]: names };
+                            })} />
+                          {band.label}
+                        </label>
+                      ))}
+                    </td>
+                    <td className="n">
+                      <input type="number" min={1} max={10} value={draftPeriods[subject.name] ?? periods[subject.name] ?? 2} disabled={isReadOnly || busy}
+                        aria-label={`Periods per week ${subject.name}`}
+                        onChange={event => setDraftPeriods(current => ({ ...current, [subject.name]: Number(event.target.value) }))} />
+                    </td>
+                    <td><button type="button" className="ghost" disabled={isReadOnly || busy} aria-label={`Delete ${subject.name}`} onClick={() => void remove(subject)}>Delete</button></td>
+                  </tr>
+                ))}
+                {!visible.length && <tr><td colSpan={4} className="mut">Maaddo lama helin.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   );
 };

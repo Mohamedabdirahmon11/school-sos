@@ -630,8 +630,27 @@ export class ApiClient {
     return this.request<{created:number;skipped:number}>('/class-groups/defaults',{method:'POST'});
   }
 
+  public static async getEthiopiaPrimaryDefaults() {
+    return this.request<{ templates: Record<'1-4' | '5-6' | '7-8', string[]>; periods: Record<string, number> }>('/subjects/ethiopia-defaults');
+  }
+
+  public static async getPrimarySubjectTemplatePeriods() {
+    return this.request<Record<string, number>>('/subjects/template-periods');
+  }
+
   public static async getPrimarySubjectTemplates() {
     return this.request<Record<'1-4' | '5-6' | '7-8', string[]>>('/subjects/templates');
+  }
+
+  public static async savePrimarySubjectTemplates(
+    templates: Record<'1-4' | '5-6' | '7-8', string[]>,
+    periods: Record<string, number>,
+    bands: Array<'1-4' | '5-6' | '7-8'>
+  ) {
+    return this.request<{ success: boolean; templates: Record<'1-4' | '5-6' | '7-8', string[]>; periods: Record<string, number> }>(
+      '/subjects/templates',
+      { method: 'PUT', body: JSON.stringify({ templates, periods, bands }) }
+    );
   }
 
   public static async savePrimarySubjectTemplate(gradeBand: '1-4' | '5-6' | '7-8', subjects: string[]) {
