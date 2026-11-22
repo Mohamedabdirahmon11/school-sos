@@ -171,13 +171,15 @@ apiRouter.use((req, res, next) => {
   res.setHeader('X-Request-Id', requestId);
   if (typeof storage.prepareRequestContext !== 'function') { next(); return; }
   const requestStarted = performance.now();
+  let requestContext: any;
   res.once('finish', () => {
-    const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
+    const metrics = storage.getRequestQueryMetrics?.(requestContext) || { count: 0, durationMs: 0 };
     const user = (req as any).user;
     const schoolId = user?.schoolId || user?.school_id || (req as any).schoolId || 'unresolved';
     console.info(`[api-perf] request_id=${requestId} route=${req.method} ${req.path} status=${res.statusCode} duration_ms=${Math.round(performance.now() - requestStarted)} db_queries=${metrics.count} db_ms=${metrics.durationMs} school_id=${schoolId}`);
   });
   void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
+    requestContext = context;
     storage.runWithRequestContext(context, next);
   }).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : 'unknown storage context error';
