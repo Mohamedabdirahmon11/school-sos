@@ -88,6 +88,9 @@ td input.bad{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
  .menu a{white-space:nowrap;border:1px solid var(--line);background:var(--surface)}.menu a[aria-current="page"]{border-color:var(--brand)}}
 </style>
 
+
+</head>
+<body>
 <div class="wrap">
  <div class="top"><div class="av">MM</div><div><b>Mohamed Muuse</b><span>Teacher · T004 · BUS10 · Form Teacher of Grade 4 · A</span></div><span class="sp"></span><span class="pill" id="today"></span></div>
  <div class="grid"><nav class="menu" id="menu" aria-label="Teacher portal"></nav><main id="view"></main></div>
@@ -259,6 +262,5 @@ const R={dashboard,timetable,students,attendance,marks,homework,notices,messages
 function route(){const h=(location.hash||'').slice(1),t=R[h]?h:'dashboard';note('');menu(t);R[t]();window.scrollTo(0,0)}
 window.addEventListener('hashchange',route);applyTheme();route();
 </script>
-</head>
-<body></body>
+</body>
 </html>
