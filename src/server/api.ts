@@ -47,7 +47,7 @@ import { isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfig
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
-import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
+import { buildSchoolSetupChecklist, canFinishSchoolSetup, evaluateTeacherAssignmentReadiness, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
@@ -9834,37 +9834,17 @@ async function getSchoolSetupState(school: School) {
     ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
     : [];
   const accountsById = new Map<string, any>(teacherAccounts.map((account: any) => [String(account.id), account] as [string, any]));
-  const activeClasses = classes.filter((item: any) => item.isArchived !== true);
-  const teacherById = new Map<string, any>(teachers.map((teacher: any) => [String(teacher.id), teacher]));
-  const teacherByUserId = new Map<string, any>(teachers.filter((teacher: any) => teacher.userId).map((teacher: any) => [String(teacher.userId), teacher]));
-  const classById = new Map<string, any>(activeClasses.map((klass: any) => [String(klass.id), klass]));
-  const subjectById = new Map<string, any>(allSubjects.map((subject: any) => [String(subject.id), subject]));
-  const teacherAssignmentIssues: string[] = [];
-  if (!activeClasses.length) teacherAssignmentIssues.push('Marka hore ku dar Classes');
-  for (const klass of activeClasses) {
-    const formTeacher = klass.classTeacherId ? teacherByUserId.get(String(klass.classTeacherId)) : null;
-    if (!formTeacher) teacherAssignmentIssues.push(`${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}: Form Teacher la'aan`);
-  }
-  const periodsByTeacher = new Map<string, number>();
-  for (const assignment of classSubjects) {
-    const klass = classById.get(String(assignment.classId));
-    if (!klass) continue;
-    const subjectName = String(subjectById.get(String(assignment.subjectId))?.name || 'Maaddo');
-    const teacher = assignment.teacherId ? teacherById.get(String(assignment.teacherId)) : null;
-    const classLabel = `${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}`;
-    if (!teacher) teacherAssignmentIssues.push(`${classLabel}: ${subjectName} macallin la'aan`);
-    else periodsByTeacher.set(String(teacher.id), (periodsByTeacher.get(String(teacher.id)) || 0) + Number(assignment.periodsPerWeek || 0));
-  }
-  for (const [teacherId, periods] of periodsByTeacher) {
-    if (periods > 30) {
-      const teacher = teacherById.get(teacherId);
-      teacherAssignmentIssues.push(`${teacher?.fullName || 'Macallin'}: ${periods}/30 xiisadood toddobaadkii`);
-    }
-  }
+  const assignmentReadiness = evaluateTeacherAssignmentReadiness(
+    school.id,
+    classes.map((item: any) => ({ id: String(item.id), name: item.name, section: item.section, classTeacherId: item.classTeacherId, isArchived: item.isArchived })),
+    teachers.map((teacher: any) => ({ id: String(teacher.id), userId: teacher.userId, fullName: teacher.fullName, status: 'active' })),
+    classSubjects.map((row: any) => ({ classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
+    allSubjects.map((subject: any) => ({ id: String(subject.id), name: subject.name }))
+  );
   const checklist = buildSchoolSetupChecklist(school, {
-    classNames: activeClasses.map((item: any) => String(item.name || '')),
-    teacherAssignmentReady: teacherAssignmentIssues.length === 0 && activeClasses.length > 0,
-    teacherAssignmentIssues,
+    classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
+    teacherAssignmentReady: assignmentReadiness.ready,
+    teacherAssignmentIssues: assignmentReadiness.issues,
     subjectCount: subjects.total,
     teachers: teachers.map((teacher: any) => {
       const account = accountsById.get(String(teacher.userId || '')) as any;
