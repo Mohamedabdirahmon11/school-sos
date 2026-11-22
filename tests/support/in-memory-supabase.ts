@@ -60,20 +60,28 @@ class MemoryQuery implements PromiseLike<any> {
   }
 
   private matchesOr(row: Record<string, any>, expression: string): boolean {
-    return splitOrTerms(expression).some(part => {
-      const match = /^([a-zA-Z0-9_]+)\.(eq|ilike|in)\.(.*)$/.exec(part.trim());
-      if (!match) return false;
-      const [, column, operator, raw] = match;
-      if (operator === 'eq') return String(valueFor(row, column) ?? '') === raw;
-      if (operator === 'in') {
-        const values = raw.replace(/^\(|\)$/g, '').split(',');
-        return values.includes(String(valueFor(row, column) ?? ''));
-      }
-      const pattern = raw.replace(/^\*|\*$/g, '').replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-      return new RegExp(pattern, 'i').test(String(valueFor(row, column) ?? ''));
-    });
+    const value = expression.trim();
+    if ((value.startsWith('and(') || value.startsWith('or(')) && value.endsWith(')')) {
+      const operator = value.startsWith('and(') ? 'and' : 'or';
+      const parts = splitOrTerms(value.slice(operator.length + 1, -1));
+      return operator === 'and'
+        ? parts.every(part => this.matchesOr(row, part))
+        : parts.some(part => this.matchesOr(row, part));
+    }
+    const match = /^([a-zA-Z0-9_]+)\.(eq|lte|gte|ilike|in)\.(.*)$/.exec(value);
+    if (!match) return false;
+    const [, column, operator, raw] = match;
+    const actual = String(valueFor(row, column) ?? '');
+    if (operator === 'eq') return actual === raw;
+    if (operator === 'lte') return actual <= raw;
+    if (operator === 'gte') return actual >= raw;
+    if (operator === 'in') {
+      const values = raw.replace(/^\(|\)$/g, '').split(',');
+      return values.includes(actual);
+    }
+    const pattern = raw.replace(/^\*|\*$/g, '').replaceAll('.', '\\.').replaceAll('+', '\\+').replaceAll('*', '.*');
+    return new RegExp(pattern, 'i').test(actual);
   }
-
   private project(row: Record<string, any>) {
     if (!this.columns || this.columns === '*' || this.columns.includes('!inner')) return { ...row };
     const selected: Record<string, any> = {};
