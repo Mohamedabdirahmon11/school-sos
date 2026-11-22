@@ -2595,3 +2595,59 @@ body { font-family: var(--schoolos-font-body); }
 .dark .schoolos-marks-page > div:first-of-type {
   background: linear-gradient(120deg, #163632, #142a28 72%);
 }
+
+/* Teacher Mark Entry shares the academic design system without changing
+   its existing save, submit, approval, or teacher-scope behavior. */
+.schoolos-teacher-portal {
+  --schoolos-accent: #0e6a62;
+  --schoolos-line: #dce8e5;
+  --schoolos-ink: #18312f;
+  --schoolos-muted: #647875;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.schoolos-teacher-portal h2,
+.schoolos-teacher-portal h3 { font-family: "Space Grotesk", Inter, sans-serif; }
+.schoolos-teacher-portal .schoolos-mark-entry-toolbar,
+.schoolos-teacher-portal .schoolos-mark-entry-summary,
+.schoolos-teacher-portal .schoolos-mark-progress {
+  border-color: var(--schoolos-line);
+  border-radius: 16px;
+  box-shadow: 0 3px 14px rgba(17, 54, 49, .04);
+}
+.schoolos-teacher-portal input[type="number"] {
+  min-height: 42px;
+  border-color: #cbdad6;
+  border-radius: 10px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.schoolos-teacher-portal input[type="number"]:focus-visible {
+  border-color: #0e6a62;
+  outline: 3px solid rgba(14, 106, 98, .18);
+  outline-offset: 1px;
+}
+.schoolos-teacher-portal button { min-height: 38px; }
+.schoolos-teacher-portal table { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.schoolos-teacher-portal table thead th {
+  font-family: "Space Grotesk", Inter, sans-serif;
+  letter-spacing: .025em;
+}
+.schoolos-teacher-portal table tbody tr:hover { background: #f0f8f6; }
+.dark .schoolos-teacher-portal {
+  --schoolos-accent: #4cc3b5;
+  --schoolos-line: #294844;
+  --schoolos-ink: #e2efec;
+  --schoolos-muted: #a5bbb6;
+}
+.dark .schoolos-teacher-portal .schoolos-mark-entry-toolbar,
+.dark .schoolos-teacher-portal .schoolos-mark-entry-summary,
+.dark .schoolos-teacher-portal .schoolos-mark-progress {
+  border-color: var(--schoolos-line);
+}
+@media (max-width: 719px) {
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar { grid-template-columns: minmax(0, 1fr); }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar > div:last-child { flex-wrap: wrap; }
+  .schoolos-teacher-portal .schoolos-mark-entry-toolbar > div:last-child button { min-width: 0; }
+  .schoolos-teacher-portal .schoolos-mark-entry-summary { align-items: flex-start; }
+}
