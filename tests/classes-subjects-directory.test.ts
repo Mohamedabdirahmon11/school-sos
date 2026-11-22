@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const classesSource = readFileSync(new URL('../src/components/schooladmin/ClassesSubjectsView.tsx', import.meta.url), 'utf8');
+const classesSubjectsSource = classesSource;
 const teachersSource = readFileSync(new URL('../src/components/schooladmin/TeachersView.tsx', import.meta.url), 'utf8');
 const apiSource = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 
