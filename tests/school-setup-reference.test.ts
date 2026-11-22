@@ -5,15 +5,16 @@ import path from 'node:path';
 
 const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), 'utf8');
 
-test('School Setup UI exposes the ten requested steps in order and the responsive 290px/860px layout', () => {
+test('School Setup UI exposes the nine reference steps in order and the responsive 290px/860px layout', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  const ids = ['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'timetable', 'attendance', 'fees', 'finish'];
+  const ids = ['profile', 'year', 'classes', 'subjects', 'teachers', 'assign', 'students', 'timetable', 'finish'];
   const positions = ids.map(id => source.indexOf("id: '" + id + "'"));
-  assert.ok(positions.every(position => position >= 0), 'all ten setup steps must exist');
+  assert.ok(positions.every(position => position >= 0), 'all nine setup steps must exist');
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'steps must follow the requested order');
   assert.ok(source.includes("view: 'sch_setup_academics'"));
   assert.ok(source.includes("view: 'sch_settings'"));
-  assert.ok(source.includes('assignmentEvidence: 0'));
+  assert.ok(source.includes("id: 'assign'"));
+  assert.ok(source.includes("<SchoolSetupInlineEditor step=\"assign\""));
   assert.ok(source.includes('REFERENCE_STEP_BY_PROGRESS_ID'));
   assert.ok(source.includes('Tallaabada {referenceStep + 1} ee {wizardSteps.length}'));
   assert.ok(source.includes('{completedCount}/{wizardSteps.length} diyaar'));
@@ -25,7 +26,7 @@ test('School Setup UI exposes the ten requested steps in order and the responsiv
   assert.ok(source.includes('prefers-color-scheme:dark'));
   assert.match(source, /\{ id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8,/);
   assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'attendance'\]/);
-  assert.ok(source.includes('Dashboard-ku ma furmayo ilaa attendance rules iyo exam configuration la xaqiijiyo.'));
+  assert.ok(source.includes('Dashboard-ka lama furi karo ilaa dhammaan toddobada tallaabo ee aasaasiga ah la xaqiijiyo.'));
 });
 
 test('setup readiness is shared by API reads and writes and protects attendance, marks, and timetable routes', () => {
@@ -60,7 +61,7 @@ test('completed existing schools are grandfathered and are not relocked by setup
 
 test('legacy setup checklist identifiers remain mapped to the new wizard evidence', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  for (const evidence of ['evidence: 1', 'evidence: 2', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'assignmentEvidence: 0', 'evidence: 6', 'evidence: 7', 'evidence: 8', 'evidence: 9']) {
+  for (const evidence of ['evidence: 1', 'evidence: 2', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'evidence: 0', 'evidence: 6', 'evidence: 7']) {
     assert.ok(source.includes(evidence), `legacy checklist mapping missing: ${evidence}`);
   }
 });
@@ -125,4 +126,19 @@ test('PostgreSQL CI integration covers atomic rollback, Form Teacher uniqueness 
   assert.match(sqlTest, /cross-school RLS isolation failed/);
   assert.match(formTeacherMigration, /GROUP BY school_id, class_teacher_id/);
   assert.match(formTeacherMigration, /RAISE EXCEPTION 'Duplicate active Form Teacher assignments exist/);
+});
+
+
+test('six setup modules render inside the wizard and use existing database-backed APIs', () => {
+  const wizard = read('src/components/schooladmin/SchoolSetupWizard.tsx');
+  const editor = read('src/components/schooladmin/SchoolSetupInlineEditor.tsx');
+  for (const step of ['classes', 'subjects', 'teachers', 'assign', 'students', 'timetable']) {
+    assert.ok(wizard.includes(`SchoolSetupInlineEditor step="${step}"`), `${step} must render inside the wizard`);
+  }
+  for (const method of ['getClasses', 'createClass', 'deleteClass', 'getSubjects', 'createSubject', 'saveClassCurriculum', 'getTeachers', 'createTeacher', 'getStudents', 'createStudent', 'setTimetableSlot']) {
+    assert.ok(editor.includes(`ApiClient.${method}`), `inline editor must use ${method}`);
+  }
+  assert.match(editor, /request\\(.*teacher-assignments/);
+  assert.match(editor, /request\\(.*timetable/);
+  assert.doesNotMatch(editor, /localStorage/);
 });
