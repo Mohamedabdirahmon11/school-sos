@@ -36,3 +36,12 @@ test('attendance and its class roster are fetched concurrently, with exact Form 
   assert.match(portal, /Promise\.all\(\[ApiClient\.getAllStudents\(selectedClassId\), attendanceRequest, marksRequest\]\)/);
   assert.match(api, /klass\.classTeacherId !== user\.id/);
 });
+
+test('Form Teacher class bootstrap remains read-only and available before school-wide setup completion', () => {
+  const start = api.indexOf("apiRouter.get('/teacher/form-teacher-classes'");
+  const end = api.indexOf("apiRouter.get('/teacher/exam-invigilation'", start);
+  const route = api.slice(start, end);
+  assert.doesNotMatch(route.split('async (req, res)')[0], /requireSchoolSetupReady/);
+  assert.match(route, /normalizeRole\(user\.role\) !== 'teacher'/);
+  assert.match(route, /class_teacher_id: user\.id/);
+});
