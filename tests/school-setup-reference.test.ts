@@ -41,8 +41,8 @@ test('setup readiness is shared by API reads and writes and protects attendance,
 
 test('completed existing schools are grandfathered and are not relocked by setup gates', () => {
   const source = read('src/server/api.ts');
-  assert.match(source, /!school\.setupProgress/);
-  assert.match(source, /normalizeSchoolSetupProgress\(school\.setupProgress\)\.completedAt/);
+  assert.match(source, /const savedProgress = normalizeSchoolSetupProgress\(school\.setupProgress\)/);
+  assert.match(source, /if \(!savedProgress\.startedAt \|\| savedProgress\.completedAt\) \{ next\(\); return; \}/);
   assert.match(source, /const requiredIds = \[1, 2, 3, 4, 5, 0, 6\]/);
 });
 
