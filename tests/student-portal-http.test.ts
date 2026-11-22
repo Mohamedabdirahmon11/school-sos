@@ -96,6 +96,8 @@ test('student notices include school and own-class audience only with read recei
  assert.deepEqual(new Set(rows.map(row=>row.id)),new Set([schoolNotice.id,classNotice.id]));
  assert.equal(rows.find(row=>row.id===schoolNotice.id).isRead,true);
  assert.equal(rows.find(row=>row.id===classNotice.id).isRead,false);
+ const page=await request('/student/notices?page=1&pageSize=1',cookies.student);const pagePayload=await page.json() as any;
+ assert.equal(pagePayload.data.pagination.page,1);assert.equal(pagePayload.data.pagination.pageSize,1);assert.equal(pagePayload.data.pagination.total,2);assert.equal(pagePayload.data.pagination.totalPages,2);
  assert.equal((await request('/student/notices',cookies.parent)).status,403);
 });
 
