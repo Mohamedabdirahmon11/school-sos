@@ -90,7 +90,7 @@ test('student notices include school and own-class audience only with read recei
  const classNotice=db.createNotice({schoolId:school.id,title:'Grade 8 notice',content:'For Grade 8 only',audience:'class',classId:klass.id,publishDate:today,isPinned:false,authorName:'Admin',authorRole:'school_admin',isActive:true} as any);
  db.createNotice({schoolId:school.id,title:'Other class notice',content:'Not for this class',audience:'class',classId:otherClass.id,publishDate:today,isPinned:false,authorName:'Admin',authorRole:'school_admin',isActive:true} as any);
  db.createNotice({schoolId:otherSchool.id,title:'Other school notice',content:'Not for this school',audience:'school',publishDate:today,isPinned:false,authorName:'Admin',authorRole:'school_admin',isActive:true} as any);
- await db.markNoticeRead(school.id,schoolNotice.id,studentUser.id);await db.flush();
+ await db.flush();const marked=await post('/notices/'+schoolNotice.id+'/read',cookies.student,{});assert.equal(marked.status,200,await marked.clone().text());
  const response=await request('/student/notices?page=1&pageSize=20',cookies.student);assert.equal(response.status,200,await response.clone().text());
  const rows=(await response.json() as any).data.items as any[];
  assert.deepEqual(new Set(rows.map(row=>row.id)),new Set([schoolNotice.id,classNotice.id]));
@@ -165,7 +165,7 @@ test('teacher attendance is visible in the student attendance endpoint and other
 test('submitted marks stay hidden from the student until the admin publishes them',async()=>{
  const config=await db.getExamConfig(school.id,'2026-2027');
  const assessmentScores=Object.fromEntries(config.assessmentComponents.map((component:any)=>[component.id,Math.min(5,component.maxMarks)]));
- const [saved]=await db.saveStudentMarks(school.id,klass.id,subject.id,'Semester 1',[{studentId:student.id,assessmentScores,status:'submitted'}],subjectUser.id);
+ const [saved]=await db.saveStudentMarks(school.id,klass.id,subject.id,'Semester 1',[{studentId:student.id,assessmentScores,status:'submitted'},{studentId:sameClassStudent.id,assessmentScores,status:'submitted'}],subjectUser.id);
  await db.flush();
  const hidden=await request('/exams/marks?studentId='+encodeURIComponent(student.id),cookies.student);
  assert.equal(hidden.status,200,await hidden.clone().text());
