@@ -1,4 +1,5 @@
 -- Create teacher account, profile, subject links and optional Form Teacher link in one transaction.
+BEGIN;
 CREATE OR REPLACE FUNCTION public.schoolos_create_teacher(
   p_school_id VARCHAR,
   p_user JSONB,
@@ -53,7 +54,7 @@ BEGIN
 
   INSERT INTO public.teacher_subjects (school_id, teacher_id, subject_id, is_active)
   SELECT p_school_id, v_teacher_id, subject_id, TRUE
-  FROM unnest(COALESCE(p_subject_ids, ARRAY[]::TEXT[])) AS subject_id
+  FROM unnest(COALESCE(p_subject_ids, ARRAY[]::TEXT[])) AS subjects(subject_id)
   ON CONFLICT (teacher_id, subject_id) DO UPDATE SET is_active = TRUE;
 
   IF p_form_teacher_class_id IS NOT NULL THEN
@@ -70,3 +71,6 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.schoolos_create_teacher(VARCHAR, JSONB, JSONB, TEXT[], VARCHAR) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_create_teacher(VARCHAR, JSONB, JSONB, TEXT[], VARCHAR) TO service_role;
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
