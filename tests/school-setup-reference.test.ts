@@ -51,3 +51,15 @@ test('legacy setup checklist identifiers remain mapped to the new wizard evidenc
     assert.ok(source.includes(evidence), `legacy checklist mapping missing: ${evidence}`);
   }
 });
+
+
+test('teacher assignment writes use the atomic database RPC and migration locks teacher workload', () => {
+  const api = read('src/server/api.ts');
+  const migration = read('supabase/migrations/20261122120000_atomic_teacher_assignment_upsert.sql');
+  assert.match(api, /client\\.rpc\\('upsert_teacher_assignment_atomic'/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /used_periods \\+ requested_periods > teacher_limit/);
+  assert.match(migration, /INSERT INTO public\\.teacher_assignment_audit/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION .* TO service_role/);
+});
