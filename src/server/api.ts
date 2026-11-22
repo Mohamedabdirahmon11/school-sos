@@ -1497,7 +1497,10 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   if (user.role !== 'school_admin' || !user.mustChangePassword) {
-    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });    return;  }  const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
+    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });
+    return;
+  }
+  const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
   if (!/^\d{4,6}$/.test(newPin)) {
     res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' });
     return;
@@ -2994,9 +2997,12 @@ apiRouter.get('/school/reports/finance/export', requireAuth, requireSchoolContex
     const payments = (await queryAllRows('fee_payments', { school_id: school.id },
       'receipt_number,reference_number,student_id,academic_year,month,fee_type,amount_due,amount_paid,remaining_amount,payment_method,status,date,voided_at'))
       .filter((payment: any) => !payment.voidedAt);
-    const cell = (value: unknown) => {      const raw = String(value ?? '');
-      const safe = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;      return `"${safe.replace(/"/g, '""')}"`;
-    };    const rows = [
+    const cell = (value: unknown) => {
+      const raw = String(value ?? '');
+      const safe = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
+      return `"${safe.replace(/"/g, '""')}"`;
+    };
+    const rows = [
       ['Receipt Number', 'Reference', 'Student ID', 'Academic Year', 'Month', 'Fee Type', 'Amount Due', 'Amount Paid', 'Remaining Arrears', 'Method', 'Status', 'Date'],
       ...payments.map((payment: any) => [
         payment.receiptNumber, payment.referenceNumber, payment.studentId, payment.academicYear, payment.month,
@@ -4491,11 +4497,14 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
   if (settings.shiftCount === 1) {
     const shiftTwoClasses = await db.queryPage('classes', { school_id: school.id, shift: '2' }, 1, 1, undefined, 'id');
     if (shiftTwoClasses.total > 0) {
-      res.status(409).json({ error: 'Move all classes assigned to Shift 2 back to Shift 1 before disabling the second shift.' });      return;
+      res.status(409).json({ error: 'Move all classes assigned to Shift 2 back to Shift 1 before disabling the second shift.' });
+      return;
     }
-  }  if (settings.shiftCount === 2) {
+  }
+  if (settings.shiftCount === 2) {
     const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
-    const closingTime = school.setupData?.workingHours?.closingTime;    if (!isShiftWithinSchoolClosingTime(settings, periodsPerDay, closingTime)) {
+    const closingTime = school.setupData?.workingHours?.closingTime;
+    if (!isShiftWithinSchoolClosingTime(settings, periodsPerDay, closingTime)) {
       res.status(400).json({ error: 'Second shift must finish at or before the school closing time configured in School Setup.' });
       return;
     }
@@ -5988,13 +5997,16 @@ apiRouter.put('/teachers/:id/subjects', requireAuth, requireSchoolContext, requi
   const teacher = (await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id')).items[0];
   if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
   const ids = [...new Set(subjectIds.map((id: string) => id.trim()))];
-  const valid = ids.length ? await queryAllRows('subjects', { school_id: school.id, id: ids }, 'id') : [];  if (valid.length !== ids.length) { res.status(400).json({ error: 'Maaddooyinka la doortay dhammaantood waa inay ka tirsan yihiin dugsigan.' }); return; }
+  const valid = ids.length ? await queryAllRows('subjects', { school_id: school.id, id: ids }, 'id') : [];
+  if (valid.length !== ids.length) { res.status(400).json({ error: 'Maaddooyinka la doortay dhammaantood waa inay ka tirsan yihiin dugsigan.' }); return; }
   await db.saveTeacherSubjects(school.id, teacherId, ids);
   res.json({ success: true, subjectIds: ids });
 });
+
 apiRouter.delete('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
-  const teacherId = String(req.params.id || '');  const teacher = (await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id,user_id,full_name')).items[0] as any;
+  const teacherId = String(req.params.id || '');
+  const teacher = (await db.queryPage('teachers', { school_id: school.id, id: teacherId }, 1, 1, undefined, 'id,user_id,full_name')).items[0] as any;
   if (!teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
   const userId = String(teacher.userId || '');
   const [assignments, timetable, curriculum, payroll, classes, attendance] = await Promise.all([
@@ -7485,15 +7497,18 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireTeacher
         !['draft', 'submitted'].includes(mark.status) ||
         (typeof mark.teacherRemarks === 'string' && mark.teacherRemarks.length > 1000)) {
       res.status(400).json({ error: 'Every mark row must include a student, numeric marks, a valid status, and remarks of at most 1,000 characters.' });
-      return;    }
+      return;
+    }
     if (seenStudentIds.has(mark.studentId)) {
       res.status(400).json({ error: 'Duplicate students are not allowed in one marks submission.' });
       return;
-    }    seenStudentIds.add(mark.studentId);
+    }
+    seenStudentIds.add(mark.studentId);
   }
   const classStudents = await queryAllRows('students', { school_id: school.id, class_id: classId }, 'id');
   const classStudentIds = new Set(classStudents.map((student: any) => student.id));
-  if (marks.some(mark => !classStudentIds.has(mark.studentId))) {    res.status(400).json({ error: 'Marks can only be entered for students currently enrolled in the selected class.' });
+  if (marks.some(mark => !classStudentIds.has(mark.studentId))) {
+    res.status(400).json({ error: 'Marks can only be entered for students currently enrolled in the selected class.' });
     return;
   }
 
@@ -8982,17 +8997,20 @@ apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) =>
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const filters: Record<string, any> = { school_id: school.id, is_active: true };
-  if (!['school_admin', 'super_admin', 'accountant'].includes(user.role)) {    const audience = user.role === 'teacher' ? 'teachers' : user.role === 'parent' ? 'parents' : 'students';
+  if (!['school_admin', 'super_admin', 'accountant'].includes(user.role)) {
+    const audience = user.role === 'teacher' ? 'teachers' : user.role === 'parent' ? 'parents' : 'students';
     const classIds = await getNoticeClassIds(school.id, user);
     const terms = ['audience.eq.all', 'audience.eq.school', `audience.eq.${audience}`];
     if (classIds.length) terms.push(`and(audience.eq.class,class_id.in.(${[...new Set(classIds)].join(',')}))`);
     let schoolToday: string;
-    try {      schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+    try {
+      schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
     } catch {
       schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date());
     }
     await sendDatabasePage(req, res, 'school_notices', filters, `and(publish_date.lte.${schoolToday},or(${terms.join(',')}))`);
-    return;  }
+    return;
+  }
   await sendDatabasePage(req, res, 'school_notices', filters);
 });
 
@@ -10491,7 +10509,8 @@ apiRouter.put('/documents/:id', requireAuth, requireSchoolContext, async (req, r
     const title = body.title.trim().slice(0,180);
     if (!title) { res.status(400).json({ error: 'Cinwaanka dukumentiga lama madhin karo.' }); return; }
     updates.title = title;
-  }  if (typeof body.contentHtml === 'string') updates.content_html = sanitizeDocumentHtml(body.contentHtml);
+  }
+  if (typeof body.contentHtml === 'string') updates.content_html = sanitizeDocumentHtml(body.contentHtml);
   if (body.status === 'final') { updates.status = 'final'; updates.locked_at = new Date().toISOString(); updates.locked_by = user.id; updates.lock_reason = 'Final document'; }
   else if (body.status === 'draft') { updates.status = 'draft'; }
   if (['A4','A5','Letter','CR80'].includes(body.pageSize)) updates.page_size = body.pageSize;
@@ -10509,7 +10528,8 @@ apiRouter.post('/documents/:id/download-audit', requireAuth, requireSchoolContex
   const client=documentServiceClient(res);if(!client)return;
   const {data:document}=await client.from('school_documents').select('id,title,serial_number,student_id,status').eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
   if(!document||!await familyDocumentAllowed(school.id,user,document)){res.status(404).json({error:'Dukumentiga lama helin.'});return;}
-  if(!await hasDocumentGrant(client,school.id,user,document.id,'download')){res.status(403).json({error:'Ma lihid ogolaanshaha soo dejinta dukumentigan.'});return;}  const {error}=await client.from('school_document_audit_events').insert({school_id:school.id,document_id:document.id,actor_user_id:user.id,action:'document_download_requested',details:{serialNumber:document.serial_number||null,title:document.title}});
+  if(!await hasDocumentGrant(client,school.id,user,document.id,'download')){res.status(403).json({error:'Ma lihid ogolaanshaha soo dejinta dukumentigan.'});return;}
+  const {error}=await client.from('school_document_audit_events').insert({school_id:school.id,document_id:document.id,actor_user_id:user.id,action:'document_download_requested',details:{serialNumber:document.serial_number||null,title:document.title}});
   if(error){res.status(503).json({error:'Diiwaanka download-ka lama kaydin karin.'});return;}
   res.json({success:true});
 });
@@ -10535,6 +10555,7 @@ apiRouter.post('/documents/:id/restore', requireAuth, requireSchoolContext, requ
   if (error || !data) { res.status(404).json({ error: 'Dukumentiga lama soo celin karin.' }); return; }
   res.json(documentClientRow(data,true));
 });
+
 apiRouter.post('/documents/:id/duplicate', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
@@ -11812,3 +11833,12 @@ apiRouter.get('/term-marks/report-cards/classes/:classId/pdf', requireAuth, requ
   if (error || !cards?.length) { res.status(404).json({ error: 'Report cards fasalkan lama helin.' }); return; }
   if (cards.some((card:any)=>card.is_stale)) { res.status(409).json({ error: 'Report Cards-ka fasalkan waa duugoobeen; dib u samee ka hor PDF.' }); return; }
   const students = await Promise.all(cards.map((card: any) => db.getStudentById(card.student_id,school.id)));
+  const klass = await db.getClassById(req.params.classId,school.id);
+  const pages = cards.flatMap((card: any,index: number) => students[index] ? [termReportCardPdfPage(school,card,students[index],`${klass?.name || ''} ${klass?.section || ''}`.trim())] : []);
+  if (!pages.length) { res.status(404).json({ error: 'Arday lama helin.' }); return; }
+  sendPdf(res,`term-report-cards-${klass?.name || 'class'}`,pages);
+});
+
+
+
+forwardAsyncErrors(apiRouter);
