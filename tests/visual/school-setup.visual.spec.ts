@@ -22,12 +22,16 @@ for (const width of widths) {
       await expect(page.getByText('Setup Wizard', { exact: true })).toBeVisible();
       const folder = path.join(root, 'artifacts', 'school-setup', theme, String(width));
       fs.mkdirSync(folder, { recursive: true });
+      const pageLinks: string[] = [];
       for (let index = 0; index < steps.length; index += 1) {
         const nav = page.getByRole('navigation', { name: 'Tallaabooyinka' });
         await nav.getByRole('button', { name: new RegExp(steps[index].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click();
         await expect(page.locator('.sw-main h2')).toHaveText(steps[index]);
-        await page.screenshot({ path: path.join(folder, `step-${index + 1}.png`), fullPage: true });
+        const imageName = `step-${index + 1}.png`;
+        await page.screenshot({ path: path.join(folder, imageName), fullPage: true });
+        pageLinks.push(`<li><a href="${imageName}">${steps[index]}</a></li>`);
       }
+      fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>School Setup ${width}px ${theme}</title><h1>School Setup · ${width}px · ${theme}</h1><ol>${pageLinks.join('')}</ol>`);
       await context.close();
     });
   }
