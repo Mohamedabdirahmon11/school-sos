@@ -22,11 +22,6 @@ AS $function$
     WHERE school_id = p_school_id
       AND teacher_id = p_teacher_id
       AND is_active = TRUE
-    UNION
-    SELECT id AS class_id
-    FROM public.classes
-    WHERE school_id = p_school_id
-      AND class_teacher_id = p_teacher_id
   ),
   active_students AS (
     SELECT student.id, student.student_id, student.first_name,
