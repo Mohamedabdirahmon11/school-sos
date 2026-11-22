@@ -17,6 +17,14 @@ export const SCHOOL_SETUP_STEP_TARGETS = {
   fees: 'sch_fees'
 } as const;
 
+export const SCHOOL_SETUP_ROLLOUT_AT = '2026-11-22T00:00:00.000Z';
+
+export function isSchoolSetupWizardEligible(createdAt: unknown): boolean {
+  if (typeof createdAt !== 'string' || !createdAt.trim()) return false;
+  const createdAtTime = Date.parse(createdAt);
+  return Number.isFinite(createdAtTime) && createdAtTime >= Date.parse(SCHOOL_SETUP_ROLLOUT_AT);
+}
+
 
 /**
  * Only a fully validated onboarding record may unlock the School Admin dashboard.
@@ -28,7 +36,7 @@ export function isSchoolSetupProgressComplete(progress: unknown): boolean {
   if (typeof value.completedAt !== 'string' || !value.completedAt.trim()) return false;
   const completed = new Set(Array.isArray(value.completedSteps) ? value.completedSteps.filter(Number.isInteger) as number[] : []);
   const skipped = new Set(Array.isArray(value.skippedSteps) ? value.skippedSteps.filter(Number.isInteger) as number[] : []);
-  const required = [1, 2, 3, 4, 5, 6, 10];
+  const required = [1, 2, 3, 4, 5, 6, 8, 10];
   return required.every(step => completed.has(step))
     && [7, 9].every(step => completed.has(step) || skipped.has(step))
     && [...skipped].every(step => (step === 7 || step === 9) && !completed.has(step));

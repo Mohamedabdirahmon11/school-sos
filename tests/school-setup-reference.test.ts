@@ -23,6 +23,8 @@ test('School Setup UI exposes the ten requested steps in order and the responsiv
   assert.ok(source.includes('START HERE'));
   assert.ok(source.includes('Wax ka maqan'));
   assert.ok(source.includes('prefers-color-scheme:dark'));
+  assert.match(source, /\{ id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8,/);
+  assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'attendance'\]/);
 });
 
 test('setup readiness is shared by API reads and writes and protects attendance, marks, and timetable routes', () => {
@@ -48,7 +50,10 @@ test('setup readiness is shared by API reads and writes and protects attendance,
 test('completed existing schools are grandfathered and are not relocked by setup gates', () => {
   const source = read('src/server/api.ts');
   assert.match(source, /const savedProgress = normalizeSchoolSetupProgress\(school\.setupProgress\)/);
-  assert.match(source, /if \(!savedProgress\.startedAt \|\| savedProgress\.completedAt\) \{ next\(\); return; \}/);
+  assert.match(source, /if \(!isSchoolSetupWizardEligible\(school\.createdAt\) \|\| !savedProgress\.startedAt \|\| savedProgress\.completedAt\) \{ next\(\); return; \}/);
+  assert.match(source, /if \(isSchoolSetupWizardEligible\(school\.createdAt\) && !saved\.startedAt && !saved\.completedAt\)/);
+  assert.match(source, /role === 'school_admin' && isSchoolSetupWizardEligible\(school\.createdAt\)/);
+  assert.ok(read('src/App.tsx').includes('isSchoolSetupWizardEligible(school?.createdAt)'));
   assert.match(source, /const requiredIds = \[1, 2, 3, 4, 5, 0, 6\]/);
 });
 

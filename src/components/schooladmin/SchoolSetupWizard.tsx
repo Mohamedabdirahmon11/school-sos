@@ -216,7 +216,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   if (loading) return <div className="mx-auto max-w-4xl p-8 text-sm text-slate-500">Loading school setup…</div>;
 
   if (showChecklist) {
-    const wizardSteps: Array<{ id: string; title: string; required: boolean; evidence: number; assignmentEvidence?: number; followUp?: boolean; needs: string[]; view?: string }> = [
+    const wizardSteps: Array<{ id: string; title: string; required: boolean; evidence: number; assignmentEvidence?: number; needs: string[]; view?: string }> = [
       { id: 'year', title: 'Sanad dugsiyeed & Semesters', required: true, evidence: 1, needs: [], view: 'sch_setup_academics' },
       { id: 'profile', title: 'Macluumaadka dugsiga & WhatsApp', required: true, evidence: 2, needs: ['year'], view: 'sch_settings' },
       { id: 'classes', title: 'Classes & Grades (KG 1 / KG 2)', required: true, evidence: 3, needs: ['year', 'profile'], view: 'sch_classes' },
@@ -224,9 +224,9 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       { id: 'teachers', title: 'Macallimiinta & Teacher Assignment', required: true, evidence: 5, assignmentEvidence: 0, needs: ['classes', 'subjects'], view: 'sch_teachers' },
       { id: 'students', title: 'Ardayda & Waalidiinta', required: true, evidence: 6, needs: ['teachers'], view: 'sch_students' },
       { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['students'], view: 'sch_timetable' },
-      { id: 'attendance', title: 'Attendance & Exams', required: false, evidence: 8, followUp: true, needs: ['students'] },
+      { id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8, needs: ['students'] },
       { id: 'fees', title: 'Fees & Extra Modules', required: false, evidence: 9, needs: ['students'], view: 'sch_fees' },
-      { id: 'finish', title: 'Hubinta ugu dambaysa & Dashboard', required: true, evidence: -1, needs: ['year', 'profile', 'classes', 'subjects', 'teachers', 'students'] }
+      { id: 'finish', title: 'Hubinta ugu dambaysa & Dashboard', required: true, evidence: -1, needs: ['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'attendance'] }
     ];
     const readyFor = (id: string) => {
       const item = wizardSteps.find(candidate => candidate.id === id);

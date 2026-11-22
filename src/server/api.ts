@@ -50,7 +50,7 @@ import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/sub
 import { buildSchoolSetupChecklist, canFinishSchoolSetup, evaluateTeacherAssignmentReadiness, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
-import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
+import { isSchoolSetupProgressComplete, isSchoolSetupWizardEligible } from '../lib/school-setup-navigation.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
 import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from '../lib/documents/variables.ts';
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
@@ -2944,7 +2944,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
   }
   try {
     const school = (req as any).school as School;
-    if (role === 'school_admin' && !(await evaluateReadiness(school.id)).canFinish) {
+    if (role === 'school_admin' && isSchoolSetupWizardEligible(school.createdAt) && !(await evaluateReadiness(school.id)).canFinish) {
       res.status(423).json({
         error: 'Complete the first-time school setup before opening the dashboard.',
         code: 'SCHOOL_SETUP_REQUIRED'
@@ -9976,7 +9976,7 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   // Legacy schools without an explicit wizard-start timestamp are grandfathered. The
   // setup-progress endpoint stamps startedAt when a School Admin opens the wizard.
   const savedProgress = normalizeSchoolSetupProgress(school.setupProgress);
-  if (!savedProgress.startedAt || savedProgress.completedAt) { next(); return; }
+  if (!isSchoolSetupWizardEligible(school.createdAt) || !savedProgress.startedAt || savedProgress.completedAt) { next(); return; }
   try {
     const state = await evaluateReadiness(school.id);
     const requiredIds = [1, 2, 3, 4, 5, 0, 6];
@@ -10182,7 +10182,7 @@ apiRouter.get('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
   try {
     const state = await evaluateReadiness(school.id);
     const saved = normalizeSchoolSetupProgress(school.setupProgress);
-    if (!saved.startedAt && !saved.completedAt) {
+    if (isSchoolSetupWizardEligible(school.createdAt) && !saved.startedAt && !saved.completedAt) {
       const startedProgress = { ...state.progress, startedAt: new Date().toISOString() };
       const updated = db.updateSchool(school.id, { setupProgress: startedProgress });
       if (updated) {
