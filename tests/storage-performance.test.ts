@@ -110,7 +110,9 @@ test('bulk document generation resolves up to 100 student identifiers with two s
   const method = storage.slice(methodStart, methodEnd);
   assert.match(method, /Promise\.all\(/);
   assert.match(method, /school_id: schoolId, id: uniqueIdentifiers/);
-  assert.match(method, /school_id: schoolId, student_id: uniqueIdentifiers/);
+  assert.match(method, /school_id', schoolId\)[\s\S]*?in\('student_id', uniqueIdentifiers\)/);
+  assert.match(method, /select\('\*'\)/);
+  assert.doesNotMatch(method, /count:\s*'exact'/);
   const routeStart = api.indexOf("apiRouter.post('/documents/generate'");
   const routeEnd = api.indexOf("apiRouter.", routeStart + 30);
   const route = api.slice(routeStart, routeEnd < 0 ? api.length : routeEnd);
