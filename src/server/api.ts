@@ -41,6 +41,7 @@ import { classGradeMismatchError } from './class-grade-validation.ts';
 import { hasActiveClassIdentityConflict, hasActiveFormTeacherConflict } from './class-setup-validation.ts';
 import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, PRIMARY_SUBJECT_TEMPLATE_PERIODS, getDefaultSubjectPeriods, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
+import { getGradeLabel } from '../lib/grading.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
 import { isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfigSettings, sanitizeSchoolSettings, sanitizeTimetableSettings } from './school-settings.ts';
@@ -9393,7 +9394,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
       const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
       const phones = new Set(assignedStudents.flatMap((student: any) => [student.fatherPhone, student.motherPhone]).filter(Boolean));
       contacts = contacts.filter(contact => contact.role === 'parent'
-        ? (contact.linkedStudentIds || []).some(id => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone))
+        ? (contact.linkedStudentIds || []).some((id: string) => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone))
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
     }
     if (user.role === 'parent') {
