@@ -47,7 +47,7 @@ import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.
 import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
-import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
+import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 interface DatabaseSchema {
@@ -119,6 +119,24 @@ interface CachedAuthContext {
 }
 
 const AUTH_CONTEXT_TTL_MS = 60_000;
+// Reuse a successful session-row check briefly across bursty API requests.
+// Local logout/revocation invalidates this immediately; remote revocations
+// become visible within this short bounded window.
+const AUTH_SESSION_VALIDATION_TTL_MS = 2_000;
+const authSessionValidationCache = new Map<string, {
+  userId: string;
+  schoolId: string | null;
+  session: UserSession;
+  expiresAt: number;
+}>();
+
+export function shouldReuseCachedAuthSession(
+  cacheExpiresAt: number,
+  sessionExpiresAt: string,
+  now = Date.now()
+): boolean {
+  return cacheExpiresAt > now && isSessionExpiryValid(sessionExpiresAt, now);
+}
 const BRANCH_LIST_TTL_MS = 60_000;
 const NOTICE_COUNT_TTL_MS = 15_000;
 const authContextCache = new Map<string, CachedAuthContext>();
@@ -1567,6 +1585,7 @@ class StorageEngine {
 
   // Sessions
   public async createSession(session: UserSession): Promise<void> {
+    authSessionValidationCache.delete(session.id);
     this.data.sessions.push(session);
     this.save();
     // Do not issue a cookie until its backing database session is durable.
@@ -1594,6 +1613,16 @@ class StorageEngine {
     }
     const cachedAuth = authContextCache.get(userId);
     if (cachedAuth && cachedAuth.expiresAt > Date.now() && (!schoolId || cachedAuth.user.schoolId === schoolId)) {
+      const cachedSession = authSessionValidationCache.get(sessionId);
+      if (cachedSession
+        && cachedSession.userId === userId
+        && (!schoolId || cachedSession.schoolId === schoolId)
+        && shouldReuseCachedAuthSession(cachedSession.expiresAt, cachedSession.session.expiresAt)) {
+        this.cacheQueryRows('user_sessions', [cachedSession.session]);
+        this.cacheQueryRows('users', [cachedAuth.user]);
+        return { session: cachedSession.session, user: cachedAuth.user, school: cachedAuth.school };
+      }
+      if (cachedSession) authSessionValidationCache.delete(sessionId);
       let sessionQuery = client.from('user_sessions').select('id,user_id,user_role,school_id,expires_at,created_at,last_activity_at').eq('id', sessionId).eq('user_id', userId);
       if (schoolId) sessionQuery = sessionQuery.eq('school_id', schoolId);
       const startedAt = performance.now();
@@ -1603,6 +1632,12 @@ class StorageEngine {
       if (!data) return null;
       const session = fromSupabaseRow(data) as UserSession;
       if (session.userId !== userId || schoolId && session.schoolId !== schoolId) return null;
+      authSessionValidationCache.set(sessionId, {
+        userId,
+        schoolId: session.schoolId || null,
+        session,
+        expiresAt: Date.now() + AUTH_SESSION_VALIDATION_TTL_MS
+      });
       this.cacheQueryRows('user_sessions', [session]);
       this.cacheQueryRows('users', [cachedAuth.user]);
       return { session, user: cachedAuth.user, school: cachedAuth.school };
@@ -1638,6 +1673,12 @@ class StorageEngine {
       school: normalizedSchoolContext,
       expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS
     });
+    authSessionValidationCache.set(sessionId, {
+      userId,
+      schoolId: normalizedSession.schoolId || null,
+      session: normalizedSession,
+      expiresAt: Date.now() + AUTH_SESSION_VALIDATION_TTL_MS
+    });
     return { session: normalizedSession, user: normalizedUser, school: normalizedSchoolContext };
   }
 
@@ -1646,6 +1687,7 @@ class StorageEngine {
   }
 
   public async touchSession(id: string, expiresAt: string): Promise<void> {
+    authSessionValidationCache.delete(id);
     const session = await this.getSessionById(id);
     if (!session || !shouldTouchSession(session.expiresAt, expiresAt)) return;
     session.expiresAt = expiresAt;
@@ -1655,6 +1697,7 @@ class StorageEngine {
   }
 
   public async revokeSession(id: string): Promise<boolean> {
+    authSessionValidationCache.delete(id);
     await this.getSessionById(id);
     const previous = this.data.sessions.length;
     this.data.sessions = this.data.sessions.filter(session => session.id !== id);
@@ -1669,6 +1712,7 @@ class StorageEngine {
   }
 
   public deleteSession(id: string): void {
+    authSessionValidationCache.delete(id);
     this.data.sessions = this.data.sessions.filter(s => s.id !== id);
     this.save();
   }
