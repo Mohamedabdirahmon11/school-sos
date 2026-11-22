@@ -1080,6 +1080,14 @@ export class ApiClient {
     };
   }
 
+  public static async getStudentNotices(params?: { page?: number; pageSize?: number }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    const response = await this.request<any>('/student/notices?' + query.toString());
+    return response?.data ?? response;
+  }
+
   public static async getStudentProfile() {
     const response = await this.request<any>('/student/me');
     return response?.data ?? response;
