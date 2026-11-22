@@ -133,7 +133,8 @@ test('teacher messages and personal payslips remain available through role navig
   assert.match(sidebar, /item\('t_students'/);
   assert.doesNotMatch(sidebar, /item\('t_exam_results'/);
   assert.match(sidebar, /item\('t_messages'/);
-  assert.match(sidebar, /item\('t_payslips'/);\n  assert.match(sidebar, /item\('t_profile'/);
+  assert.match(sidebar, /item\('t_payslips'/);
+  assert.match(sidebar, /item\('t_profile'/);
   assert.match(app, /activeView === 't_messages' && <MessagesView \/>/);
   assert.match(app, /activeView === 't_payslips' && <StaffPayslipsView \/>/);
   assert.match(messages, /const isTeacher = user\?\.role === 'teacher'/);
