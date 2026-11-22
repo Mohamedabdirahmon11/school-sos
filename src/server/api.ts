@@ -7606,7 +7606,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       ? await db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, 'id,name,code')
       : { items: [] as any[] };
     const subjectNames = new Map(subjects.items.map((item: any) => [item.id, item.name]));
-    res.json(marks.map(mark => ({ ...mark, subjectName: subjectNames.get(mark.subjectId) || mark.subjectId })));
+    res.json(marks.map(mark => ({ ...mark, subjectName: subjectNames.get(mark.subjectId) || mark.subjectId, grade: getGradeLabel(mark.percentage, school.gradingScale) })));
     return;
   }
   if (!classId) { res.status(400).json({ error: 'classId is required' }); return; }
