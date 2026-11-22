@@ -22,10 +22,11 @@ test('RLS performance migration keeps one SELECT policy per protected table and 
     { name: 'term_status_read', table: 'term_status', roles: ['school_admin', 'super_admin', 'teacher'] }
   ];
   for (const { name, table, roles } of policyCases) {
-    const create = migration.indexOf(\`CREATE POLICY \${name}\`);
-    const drop = migration.indexOf(\`DROP POLICY IF EXISTS \${name} ON public.\${table}\`);
-    assert.ok(drop >= 0 && drop < create, \`\${name} must be dropped before recreation\`);
-    assert.match(migration.slice(create, migration.indexOf(';', create)), /SELECT private\.auth_user_role\(\)/);
-    for (const expectedRole of roles) assert.ok(migration.includes(\`'\${expectedRole}'\`), \`\${name} retains \${expectedRole}\`);
+    const create = migration.indexOf('CREATE POLICY ' + name);
+    const drop = migration.indexOf('DROP POLICY IF EXISTS ' + name + ' ON public.' + table);
+    assert.ok(drop >= 0 && drop < create, name + ' must be dropped before recreation');
+    const policyBody = migration.slice(create, migration.indexOf(';', create));
+    assert.match(policyBody, /SELECT private\.auth_user_role\(\)/);
+    for (const expectedRole of roles) assert.ok(policyBody.includes("'" + expectedRole + "'"), name + ' retains ' + expectedRole);
   }
 });
