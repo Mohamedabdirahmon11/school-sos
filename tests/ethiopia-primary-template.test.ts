@@ -57,3 +57,16 @@ test('subject template APIs are restricted to school administrators and expose s
   assert.match(api, /apiRouter\.put\('\/subjects\/templates'/);
   assert.match(api, /role !== 'school_admin' && role !== 'super_admin'/);
 });
+test('New class creation refuses to attach a grade template that exceeds the school weekly capacity', () => {
+  const apply = api.slice(api.indexOf('async function applyPrimarySubjectTemplate'), api.indexOf('async function readClassCurriculumRows'));
+  assert.match(apply, /const totalPeriods = selectedSubjects\.reduce/);
+  assert.match(apply, /totalPeriods > capacity\.weeklyCapacity/);
+  assert.match(apply, /error\.status = 422/);
+});
+
+test('Grade 7–8 Ethiopia starter template is explicitly recognized as 33 periods, above the 30-period reference cap', () => {
+  const total = PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['7-8'].reduce((sum, name) => sum + PRIMARY_SUBJECT_TEMPLATE_PERIODS[name], 0);
+  assert.equal(total, 33);
+  assert.equal(total > 30, true);
+});
+

@@ -3358,6 +3358,12 @@ async function applyPrimarySubjectTemplate(school: School, klass: SchoolClass) {
   const capacity = await getClassCurriculumCapacity(school.id);
   const periods = school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS;
   const selectedSubjects = names.map(name => subjectByName.get(name.trim().toLocaleLowerCase())).filter(Boolean) as Array<{ id: string; name: string }>;
+  const totalPeriods = selectedSubjects.reduce((sum, subject) => sum + getDefaultSubjectPeriods(subject.name, periods), 0);
+  if (totalPeriods > capacity.weeklyCapacity) {
+    const error = new Error(`The Grade ${klass.gradeLevel} Ethiopia template contains ${totalPeriods} weekly periods, exceeding this school's ${capacity.weeklyCapacity}-period capacity. Reduce the template periods or remove optional subjects before applying it.`) as Error & { status: number };
+    error.status = 422;
+    throw error;
+  }
   const payload = selectedSubjects.filter(subject => !existingSubjectIds.has(subject.id))
     .map(subject => ({ id: randomUUID(), school_id: school.id, class_id: klass.id, subject_id: subject.id, periods_per_week: getDefaultSubjectPeriods(subject.name, periods), teacher_id: null, small_exam_enabled: false, big_exam_enabled: false, is_active: true }));
   if (payload.length) {
