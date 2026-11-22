@@ -37,3 +37,9 @@ test('Teacher timetable clash validation checks both teacher and class period co
   assert.match(timetable, /period_number/);
   assert.match(timetable, /409/);
 });
+
+test('Teacher assignment update preserves HTTP 409 and 422 validation statuses', () => {
+  const putRoute = api.slice(api.indexOf("apiRouter.put('/teacher-assignments/:id'"), api.indexOf("apiRouter.delete('/teacher-assignments/:id'"));
+  assert.match(putRoute, /Number\(error\?\.status\)/);
+  assert.match(putRoute, /409/);
+});

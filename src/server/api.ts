@@ -11082,9 +11082,9 @@ async function checkTeacherAssignment(client: any, school: School, body: any, ex
     const previous = byClassSubject.get(key);
     if (!previous || (termId && row.term_id === termId)) byClassSubject.set(key, row);
   }
-  const periodsByClassSubject = new Map((curriculumRows.data || []).map((row: any) => [
+  const periodsByClassSubject = new Map<string, number>((curriculumRows.data || []).map((row: any) => [
     `${row.class_id}:${row.subject_id}`, Number(row.periods_per_week || 0)
-  ]));
+  ] as [string, number]));
   const usedPeriods = [...byClassSubject.keys()].reduce((sum, key) => sum + (periodsByClassSubject.get(key) || 0), 0);
   const currentKey = `${classId}:${subjectId}`;
   const requestedPeriods = byClassSubject.has(currentKey) ? 0 : Number(curriculum.data.periods_per_week || 0);
@@ -11223,7 +11223,7 @@ apiRouter.post('/teacher-assignments', requireAuth, requireSchoolAdminOrSuperAdm
 });
 apiRouter.put('/teacher-assignments/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   try { res.json({ success: true, ...await upsertTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, req.body, String(req.params.id)) }); }
-  catch (error: any) { res.status(error?.message?.includes('jadwal') ? 409 : 400).json({ error: error?.message || 'Qoondeynta lama beddeli karin.' }); }
+  catch (error: any) { res.status(Number(error?.status) || (error?.message?.includes('jadwal') ? 409 : 400)).json({ error: error?.message || 'Qoondeynta lama beddeli karin.' }); }
 });
 apiRouter.delete('/teacher-assignments/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   try { await removeTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, String(req.params.id), req.body?.clearDependentEntries === true); res.json({ success: true }); }
