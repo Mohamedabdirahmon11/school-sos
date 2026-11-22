@@ -83,7 +83,7 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
   const currentStep = fullyComplete
     ? 10
     : Number.isInteger(rawCurrentStep)
-      ? Math.min(10, Math.max(0, rawCurrentStep))
+      ? Math.min(10, Math.max(0, rawCurrentStep === 5 && [1, 2, 3, 4, 5].every(step => completedSteps.includes(step)) ? 6 : rawCurrentStep))
       : 1;
   const completedAt = fullyComplete ? rawCompletedAt : null;
   return { currentStep, completedSteps, skippedSteps, completedAt };
