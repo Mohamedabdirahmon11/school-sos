@@ -11031,39 +11031,69 @@ async function syncTeacherAssignmentLegacy(client: any, schoolId: string, yearId
     .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId);
   if (updateError) throw new Error('Qoondeynta waa la beddelay, balse macallinka manhajka lama waafajin karin.');
 }
-async function checkTeacherAssignment(client: any, school: School, body: any) {
+async function checkTeacherAssignment(client: any, school: School, body: any, excludeAssignmentId?: string) {
   const yearId = String(body?.academicYearId || ''), termId = body?.termId ? String(body.termId) : null;
   const classId = String(body?.classId || ''), sectionId = body?.sectionId ? String(body.sectionId) : null;
   const subjectId = String(body?.subjectId || ''), teacherId = String(body?.teacherId || '');
-  if (!yearId || !classId || !subjectId || !teacherId) throw new Error('Dooro sannad-dugsiyeed, fasal, maaddo iyo macallin.');
+  if (!yearId || !classId || !subjectId || !teacherId) { const error = new Error('Dooro sannad-dugsiyeed, fasal, maaddo iyo macallin.') as Error & { status: number }; error.status = 422; throw error; }
   const [year, klass, subject, teacher, curriculum] = await Promise.all([
     client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).eq('id', yearId).maybeSingle(),
     client.from('classes').select('id,academic_year,is_archived').eq('school_id', school.id).eq('id', classId).maybeSingle(),
     client.from('subjects').select('id').eq('school_id', school.id).eq('id', subjectId).maybeSingle(),
-    client.from('teachers').select('id,status').eq('school_id', school.id).eq('id', teacherId).maybeSingle(),
+    client.from('teachers').select('id,status,max_periods_per_week').eq('school_id', school.id).eq('id', teacherId).maybeSingle(),
     client.from('class_subjects').select('id,periods_per_week').eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId).eq('is_active', true).maybeSingle()
   ]);
-  if (year.error || !year.data) throw new Error('Sannadka waxbarasho lagama helin dugsigan.');
+  if (year.error || !year.data) { const error = new Error('Sannadka waxbarasho lagama helin dugsigan.') as Error & { status: number }; error.status = 422; throw error; }
   if (termId) {
     const { data: term } = await client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('id', termId).maybeSingle();
-    if (!term || term.academic_year_id !== yearId) throw new Error('Term-ka la doortay kuma jiro sannad-dugsiyeedkan.');
+    if (!term || term.academic_year_id !== yearId) { const error = new Error('Term-ka la doortay kuma jiro sannad-dugsiyeedkan.') as Error & { status: number }; error.status = 422; throw error; }
   }
-  if (klass.error || !klass.data || klass.data.is_archived) throw new Error('Fasalkan lagama helin dugsigan.');
+  if (klass.error || !klass.data) { const error = new Error('Fasalkan lagama helin dugsigan.') as Error & { status: number }; error.status = 403; throw error; }
+  if (klass.data.is_archived) { const error = new Error('Fasalkan waa la archive-gareeyey.') as Error & { status: number }; error.status = 422; throw error; }
   const yearKey = String(year.data.name || '').replace(/[^0-9]/g, '');
   const classYearKey = String(klass.data.academic_year || '').replace(/[^0-9]/g, '');
-  if (yearKey && classYearKey && yearKey !== classYearKey) throw new Error('Fasalkan kuma jiro sannad-dugsiyeedka la doortay.');
-  if (subject.error || !subject.data) throw new Error('Maaddadani kama tirsana dugsigan.');
+  if (yearKey && classYearKey && yearKey !== classYearKey) { const error = new Error('Fasalkan kuma jiro sannad-dugsiyeedka la doortay.') as Error & { status: number }; error.status = 422; throw error; }
+  if (subject.error || !subject.data) { const error = new Error('Maaddadani kama tirsana dugsigan.') as Error & { status: number }; error.status = 422; throw error; }
   if (curriculum.error) throw new Error('Manhajka lama xaqiijin karin.');
-  if (!curriculum.data) throw new Error('Maaddadan kuma jirto manhajka fasalkan. Marka hore ku dar Manhajka (Tallaabada 4).');
-  if (teacher.error || !teacher.data || String(teacher.data.status).toLowerCase() !== 'active') throw new Error('Macallinka lagama helin dugsigan ama ma aha mid shaqaynaya.');
+  if (!curriculum.data) { const error = new Error('Maaddadan kuma jirto manhajka fasalkan. Marka hore ku dar Manhajka (Tallaabada 4).') as Error & { status: number }; error.status = 422; throw error; }
+  if (teacher.error || !teacher.data || String(teacher.data.status).toLowerCase() !== 'active') { const error = new Error('Macallinka lagama helin dugsigan ama ma aha mid shaqaynaya.') as Error & { status: number }; error.status = 422; throw error; }
   if (sectionId) {
     const { data: section } = await client.from('class_sections').select('id,legacy_class_id').eq('school_id', school.id).eq('id', sectionId).maybeSingle();
-    if (!section || section.legacy_class_id !== classId) throw new Error('Qaybtani kuma jirto fasalkan.');
+    if (!section || section.legacy_class_id !== classId) { const error = new Error('Qaybtani kuma jirto fasalkan.') as Error & { status: number }; error.status = 422; throw error; }
   }
   const { data: qualified, error: qError } = await client.from('teacher_subjects').select('id')
     .eq('school_id', school.id).eq('teacher_id', teacherId).eq('subject_id', subjectId).eq('is_active', true).maybeSingle();
   if (qError) throw new Error('Aqoonta macallinka lama xaqiijin karin.');
-  if (!qualified && body?.override !== true) throw new Error('Macallinkan kuma xirna maaddadan. Dooro ka-reebis cad haddii aad rabto inaad sii waddo.');
+  if (!qualified && body?.override !== true) { const error = new Error('Macallinkan kuma xirna maaddadan. Dooro ka-reebis cad haddii aad rabto inaad sii waddo.') as Error & { status: number }; error.status = 422; throw error; }
+
+  const [assignmentRows, curriculumRows] = await Promise.all([
+    client.from('teacher_class_subject_assignments').select('id,class_id,subject_id,term_id')
+      .eq('school_id', school.id).eq('academic_year_id', yearId).eq('teacher_id', teacherId),
+    client.from('class_subjects').select('class_id,subject_id,periods_per_week')
+      .eq('school_id', school.id).eq('is_active', true)
+  ]);
+  if (assignmentRows.error || curriculumRows.error) throw new Error('Culayska macallinka lama xaqiijin karin.');
+  const relevant = (assignmentRows.data || []).filter((row: any) =>
+    row.id !== excludeAssignmentId && (termId ? (!row.term_id || row.term_id === termId) : !row.term_id)
+  );
+  const byClassSubject = new Map<string, any>();
+  for (const row of relevant) {
+    const key = `${row.class_id}:${row.subject_id}`;
+    const previous = byClassSubject.get(key);
+    if (!previous || (termId && row.term_id === termId)) byClassSubject.set(key, row);
+  }
+  const periodsByClassSubject = new Map((curriculumRows.data || []).map((row: any) => [
+    `${row.class_id}:${row.subject_id}`, Number(row.periods_per_week || 0)
+  ]));
+  const usedPeriods = [...byClassSubject.keys()].reduce((sum, key) => sum + (periodsByClassSubject.get(key) || 0), 0);
+  const currentKey = `${classId}:${subjectId}`;
+  const requestedPeriods = byClassSubject.has(currentKey) ? 0 : Number(curriculum.data.periods_per_week || 0);
+  const teacherLimit = Math.min(30, teacher.data.max_periods_per_week == null ? 30 : Math.max(1, Number(teacher.data.max_periods_per_week)));
+  if (usedPeriods + requestedPeriods > teacherLimit) {
+    const error = new Error(`Macallinku wuxuu gaari lahaa ${usedPeriods + requestedPeriods}/${teacherLimit} xiisadood toddobaadkii; xadka ugu sarreeya waa 30.`) as Error & { status: number };
+    error.status = 422;
+    throw error;
+  }
   return {
     school_id: school.id, academic_year_id: yearId, term_id: termId, class_id: classId,
     section_id: sectionId, subject_id: subjectId, teacher_id: teacherId,
@@ -11071,7 +11101,7 @@ async function checkTeacherAssignment(client: any, school: School, body: any) {
   };
 }
 async function upsertTeacherAssignment(client: any, school: School, user: User, body: any, id?: string) {
-  const payload = await checkTeacherAssignment(client, school, body);
+  const payload = await checkTeacherAssignment(client, school, body, id);
   let query = client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id)
     .eq('academic_year_id', payload.academic_year_id).eq('class_id', payload.class_id).eq('subject_id', payload.subject_id);
   query = payload.term_id ? query.eq('term_id', payload.term_id) : query.is('term_id', null);
@@ -11094,7 +11124,7 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
   const saved = old
     ? await client.from('teacher_class_subject_assignments').update({ ...payload, updated_at: new Date().toISOString() }).eq('school_id', school.id).eq('id', old.id).select('*').single()
     : await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
-  if (saved.error || !saved.data) throw new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.');
+  if (saved.error || !saved.data) { const error = new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.') as Error & { status: number }; error.status = saved.error?.code === '23505' ? 409 : 503; throw error; }
   await syncTeacherAssignmentLegacy(client, school.id, payload.academic_year_id, payload.class_id, payload.subject_id, payload.section_id);
   await teacherAssignmentAudit(client, school.id, user.id, old ? 'updated' : 'created', old, saved.data);
   return { assignment: saved.data, warning: payload.qualification_override ? 'Digniin: macallinku kuma xirna maaddadan.' : null };
@@ -11173,8 +11203,8 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
         const row: any = cur.find((c: any) => c.class_id === a.class_id && c.subject_id === a.subject_id);
         return sum + Number(row?.periods_per_week || 0);
       }, 0);
-      const max = t.max_periods_per_week == null ? null : Number(t.max_periods_per_week);
-      return { teacherId: t.id, periodsPerWeek: periods, maxPeriodsPerWeek: max, overloaded: max != null && periods > max };
+      const max = Math.min(30, t.max_periods_per_week == null ? 30 : Math.max(1, Number(t.max_periods_per_week)));
+      return { teacherId: t.id, periodsPerWeek: periods, maxPeriodsPerWeek: max, overloaded: periods > max };
     });
     res.setHeader('Cache-Control', 'private, no-store');
     res.json({
@@ -11189,7 +11219,7 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
 });
 apiRouter.post('/teacher-assignments', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   try { res.status(201).json({ success: true, ...await upsertTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, req.body) }); }
-  catch (error: any) { res.status(error?.message?.includes('jadwal') ? 409 : 400).json({ error: error?.message || 'Qoondeynta lama kaydin karin.' }); }
+  catch (error: any) { res.status(Number(error?.status) || (error?.message?.includes('jadwal') ? 409 : 400)).json({ error: error?.message || 'Qoondeynta lama kaydin karin.' }); }
 });
 apiRouter.put('/teacher-assignments/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   try { res.json({ success: true, ...await upsertTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, req.body, String(req.params.id)) }); }
@@ -11248,7 +11278,7 @@ apiRouter.put('/teacher-assignments/teachers/:teacherId/workload-limit', require
   const school = (req as any).school as School, user = (req as any).user as User;
   const raw = req.body?.maxPeriodsPerWeek;
   const value = raw === null || raw === '' ? null : Number(raw);
-  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 60)) { res.status(400).json({ error: 'Xadka xiisadaha waa inuu noqdaa tiro dhan oo u dhexeysa 1 ilaa 60, ama bannaan.' }); return; }
+  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 30)) { res.status(422).json({ error: 'Xadka xiisadaha waa inuu noqdaa tiro dhan oo u dhexeysa 1 ilaa 30, ama bannaan.' }); return; }
   const client = teacherAssignmentClient();
   const { data: teacher, error } = await client.from('teachers').select('id,max_periods_per_week').eq('school_id', school.id).eq('id', String(req.params.teacherId)).maybeSingle();
   if (error || !teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
