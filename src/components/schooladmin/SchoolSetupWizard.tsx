@@ -207,6 +207,28 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     finally { setSaving(false); }
   };
 
+  const saveReferenceProfile = async () => {
+    setSaving(true); setError(null);
+    try {
+      const result = await ApiClient.saveSchoolSetupStep(1, { schoolInformation: data.schoolInformation });
+      setData(result.data); setSaved(result.data.completedSteps || []);
+      await refreshSetupProgress();
+    } catch (err) { setError(err instanceof Error ? err.message : 'School profile lama kaydin karin.'); }
+    finally { setSaving(false); }
+  };
+
+  const saveReferenceYear = async () => {
+    setSaving(true); setError(null);
+    try {
+      const yearResult = await ApiClient.saveSchoolSetupStep(2, { academicYear: data.academicYear });
+      const termsResult = await ApiClient.saveSchoolSetupStep(3, { terms: data.terms });
+      setData(termsResult.data || yearResult.data);
+      setSaved(termsResult.data.completedSteps || yearResult.data.completedSteps || []);
+      await refreshSetupProgress();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Academic year iyo semesters lama kaydin karin.'); }
+    finally { setSaving(false); }
+  };
+
   const field = (label: string, value: string, onChange: (value: string) => void, type = 'text', placeholder = '') => (
     <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><input type={type} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100" />{type === 'date' && value && <span className="block text-xs text-teal-700">Ethiopian date: {getEthiopianCalendarInfo(value).dateLabel} · Gregorian date: {value}</span>}</label>
   );
@@ -285,8 +307,38 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2>{current.title}</h2><p className="sw-sub">{current.followUp ? 'Tallaabo dabagal ah · ma xannibayso Dashboard-ka' : current.required ? 'Tallaabo khasab ah' : 'Tallaabo optional ah'} · Tallaabada {referenceStep + 1} ee {wizardSteps.length}</p></div><div className="text-sm font-semibold">{completedCount}/{wizardSteps.length} diyaar</div></div>
         {error && <div role="alert" className="sw-miss"><strong>Cilad:</strong> {error}</div>}
         {current.id !== 'finish' && current.id !== 'timetable' && current.id !== 'fees' && currentEvidence && <div className={'sw-miss' + (currentEvidence.ready ? ' sw-good' : '')} role="status"><strong>{currentEvidence.ready ? 'Tallaabadani waa diyaar ✓' : 'Wax ka maqan:'}</strong>{!currentEvidence.ready && <p className="mt-1">{currentEvidence.reason}</p>}</div>}
-        {current.id === 'profile' && <section className="sw-card"><p className="sw-sub">Diiwaangeli magaca rasmiga ah, cinwaanka, magaalada, telefoonka, email-ka iyo lambarka WhatsApp-ka maamulka oo leh country code.</p><button className="sw-btn" type="button" onClick={() => openTarget('profile')}>Fur School Profile & WhatsApp →</button></section>}
-        {current.id === 'year' && <section className="sw-card"><p className="sw-sub">Deji sannad-dugsiyeedka iyo labada semester, taariikhahooda bilowga iyo dhammaadka. Xogtu waxay ku kaydsamaysaa School Settings → Academics.</p><button className="sw-btn" type="button" onClick={() => openTarget('year')}>Fur Academic Year & Semesters →</button></section>}
+        {current.id === 'profile' && <section className="sw-card">
+          <p className="sw-sub">Diiwaangeli xogta rasmiga ah ee dugsiga. Isbeddellada waxaa si toos ah loogu kaydinayaa SchoolOS.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {field('Magaca dugsiga', data.schoolInformation.name, value => patch('schoolInformation', { ...data.schoolInformation, name: value }))}
+            {field('Cinwaanka', data.schoolInformation.address, value => patch('schoolInformation', { ...data.schoolInformation, address: value }))}
+            {field('Magaalada', data.schoolInformation.city, value => patch('schoolInformation', { ...data.schoolInformation, city: value }))}
+            {field('Telefoonka', data.schoolInformation.phone, value => patch('schoolInformation', { ...data.schoolInformation, phone: value }), 'tel')}
+            {field('Email', data.schoolInformation.email, value => patch('schoolInformation', { ...data.schoolInformation, email: value }), 'email')}
+            {field('WhatsApp-ka maamulka (+country code)', data.schoolInformation.whatsappPhone, value => patch('schoolInformation', { ...data.schoolInformation, whatsappPhone: value }), 'tel', '+251…')}
+            {select('Nooca dugsiga', data.schoolInformation.schoolType, [['primary','Primary'],['secondary','Secondary'],['combined','Combined']], value => patch('schoolInformation', { ...data.schoolInformation, schoolType: value as any }))}
+          </div>
+          <div className="mt-4"><button className="sw-btn" type="button" disabled={saving} onClick={() => void saveReferenceProfile()}>{saving ? 'Kaydinaya…' : 'Kaydi School Profile'}</button></div>
+        </section>}
+        {current.id === 'year' && <section className="sw-card">
+          <p className="sw-sub">Deji sannad-dugsiyeedka iyo semester-yada adigoo ku jira wizard-ka.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {field('Sannad-dugsiyeedka (YYYY/YYYY)', data.academicYear.name, value => patch('academicYear', { ...data.academicYear, name: value }), 'text', '2026/2027')}
+            {field('Taariikhda bilowga', data.academicYear.startDate, value => patch('academicYear', { ...data.academicYear, startDate: value }), 'date')}
+            {field('Taariikhda dhammaadka', data.academicYear.endDate, value => patch('academicYear', { ...data.academicYear, endDate: value }), 'date')}
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={data.academicYear.isCurrent} onChange={event => patch('academicYear', { ...data.academicYear, isCurrent: event.target.checked })} /> Sannad-dugsiyeedka hadda socda</label>
+          </div>
+          <h3 className="mt-5 mb-2 font-semibold">Semesters / Terms</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {data.terms.map((term, index) => <div key={index} className="rounded-lg border p-3 space-y-2" style={{borderColor:'var(--sw-line)'}}>
+              <strong>{index === 0 ? 'Semester 1' : index === 1 ? 'Semester 2' : 'Semester 3'}</strong>
+              {field('Magaca', term.name, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, name: value } : item))}
+              {field('Bilowga', term.startDate, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, startDate: value } : item)), 'date')}
+              {field('Dhammaadka', term.endDate, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, endDate: value } : item)), 'date')}
+            </div>)}
+          </div>
+          <div className="mt-4"><button className="sw-btn" type="button" disabled={saving} onClick={() => void saveReferenceYear()}>{saving ? 'Kaydinaya…' : 'Kaydi Academic Year & Semesters'}</button></div>
+        </section>}
         {current.id === 'classes' && <SchoolSetupInlineEditor step="classes" onChanged={refreshSetupProgress} />}
         {current.id === 'subjects' && <SchoolSetupInlineEditor step="subjects" onChanged={refreshSetupProgress} />}
         {current.id === 'teachers' && <SchoolSetupInlineEditor step="teachers" onChanged={refreshSetupProgress} />}
