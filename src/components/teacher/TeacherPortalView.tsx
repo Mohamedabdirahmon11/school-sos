@@ -1326,6 +1326,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 <dt className="text-slate-500">Magac</dt><dd className="text-right font-medium">{user?.fullName || '—'}</dd>
                 <dt className="text-slate-500">Teacher ID</dt><dd className="text-right font-medium">{(user as any)?.teacherCode || user?.staffId || '—'}</dd>
                 <dt className="text-slate-500">Dugsi</dt><dd className="text-right font-medium">{school?.name || '—'}</dd>
+                <dt className="text-slate-500">Email</dt><dd className="text-right font-medium break-all">{user?.email || '—'}</dd>
+                <dt className="text-slate-500">Phone</dt><dd className="text-right font-medium">{user?.phone || '—'}</dd>
                 <dt className="text-slate-500">Form Teacher</dt><dd className="text-right font-medium">{formTeacherClasses.length ? formTeacherClasses.map(klass => `${klass.name}${klass.section ? ` · ${klass.section}` : ''}`).join(', ') : '—'}</dd>
               </dl>
             </article>
