@@ -11267,21 +11267,34 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   try { today = new Intl.DateTimeFormat('en-GB',{timeZone:school.timezone || 'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
   catch { today = new Intl.DateTimeFormat('en-GB',{timeZone:'Africa/Addis_Ababa',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date()); }
   const classesById = new Map<string,SchoolClass>();
+  const requestedClassIds = [...new Set(students.map(student=>student.classId).filter(Boolean))];
   if (classRecord) classesById.set(classRecord.id,classRecord);
-  for (const classId of new Set(students.map(student=>student.classId))) {
-    if (!classesById.has(classId)) {
-      const klass = await db.getClassById(classId,school.id);
-      if (klass) classesById.set(classId,klass);
-    }
+  else {
+    const resolvedClasses = await db.getClassesByIds(requestedClassIds,school.id);
+    for (const klass of resolvedClasses) classesById.set(klass.id,klass);
   }
   const marksByClass = new Map<string,any[]>();
   const teacherByClass = new Map<string,{name:string;staffId:string}>();
-  for (const klass of classesById.values()) {
-    const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
-    marksByClass.set(klass.id,await db.getMarks(school.id,klass.id,undefined,annualDocument ? undefined : school.currentSemester));
-    if (klass.classTeacherId) {
-      const teacher = (await db.queryPage<any>('teachers',{school_id:school.id,id:klass.classTeacherId},1,1,undefined,'id,full_name,staff_id')).items[0];
-      teacherByClass.set(klass.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
+  const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
+  const selectedSemester = annualDocument ? undefined : school.currentSemester;
+  const classRows = [...classesById.values()];
+  if (classRecord) {
+    marksByClass.set(classRecord.id,await db.getMarks(school.id,classRecord.id,undefined,selectedSemester));
+  } else if (classRows.length) {
+    const studentIds = [...new Set(students.map(student=>student.id))];
+    const teacherIds = [...new Set(classRows.map(klass=>klass.classTeacherId).filter((id): id is string => Boolean(id)))];
+    const [marks, teacherPage] = await Promise.all([
+      db.getMarksForStudents(school.id,studentIds,classRows.map(klass=>klass.id),selectedSemester),
+      teacherIds.length
+        ? db.queryPage<any>('teachers',{school_id:school.id,id:teacherIds},1,100,undefined,'id,full_name,staff_id')
+        : Promise.resolve({items:[] as any[]})
+    ]);
+    const teachersById = new Map(teacherPage.items.map((teacher:any)=>[teacher.id,teacher]));
+    for (const klass of classRows) {
+      const classMarks = marks.filter(mark => mark.classId === klass.id && (!klass.academicYear || mark.academicYear === klass.academicYear));
+      marksByClass.set(klass.id,classMarks);
+      const teacher = klass.classTeacherId ? teachersById.get(klass.classTeacherId) : undefined;
+      if (klass.classTeacherId) teacherByClass.set(klass.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
     }
   }
   const feeBalanceByStudent = new Map<string,number>();
