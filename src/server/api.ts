@@ -9949,6 +9949,11 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   const school = req.school as School | undefined;
   if (!school) { res.status(403).json({ error: 'School context is required.' }); return; }
   const role = normalizeRole(req.user?.role);
+  // Form Teachers may open the read-only attendance register for their own class
+  // before the school-wide onboarding checklist is complete. The route handler
+  // still enforces the exact class_teacher_id match before returning any records.
+  // Writes remain gated by setup readiness.
+  if (role === 'teacher' && req.method === 'GET' && req.path === '/attendance' && typeof req.query.classId === 'string' && req.query.classId.trim()) { next(); return; }
   if (role !== 'school_admin' && role !== 'teacher' && role !== 'super_admin') {
     res.status(403).json({ error: 'Your role cannot access school setup operations.' }); return;
   }
