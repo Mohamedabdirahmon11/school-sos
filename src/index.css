@@ -2377,3 +2377,196 @@ body { font-family: var(--schoolos-font-body); }
     max-height: 100dvh !important;
   }
 }
+
+
+/* SchoolOS academics: shared design tokens for assignment, timetable and marks.
+   Presentation-only overrides; preserve school-scoped data, permissions and API behavior. */
+.schoolos-assignment-page,
+.schoolos-timetable-page,
+.schoolos-marks-page {
+  --schoolos-font-body: Inter, ui-sans-serif, system-ui, sans-serif;
+  --schoolos-font-heading: "Space Grotesk", Inter, ui-sans-serif, sans-serif;
+  --schoolos-accent: #0e6a62;
+  --schoolos-accent-soft: #e8f5f2;
+  --schoolos-ink: #18312f;
+  --schoolos-muted: #647875;
+  --schoolos-line: #dce8e5;
+  --schoolos-surface: #ffffff;
+  --schoolos-canvas: #f5f8f7;
+  font-family: var(--schoolos-font-body);
+  color: var(--schoolos-ink);
+}
+.schoolos-assignment-page h1,
+.schoolos-assignment-page h2,
+.schoolos-assignment-page h3,
+.schoolos-timetable-page h1,
+.schoolos-timetable-page h2,
+.schoolos-timetable-page h3,
+.schoolos-marks-page h1,
+.schoolos-marks-page h2,
+.schoolos-marks-page h3 {
+  font-family: var(--schoolos-font-heading);
+  letter-spacing: -.025em;
+}
+.schoolos-assignment-page button,
+.schoolos-assignment-page select,
+.schoolos-assignment-page input,
+.schoolos-timetable-page button,
+.schoolos-timetable-page select,
+.schoolos-timetable-page input,
+.schoolos-marks-page button,
+.schoolos-marks-page select,
+.schoolos-marks-page input,
+.schoolos-marks-page textarea {
+  min-height: 38px;
+  font-family: var(--schoolos-font-body);
+}
+.schoolos-assignment-page :focus-visible,
+.schoolos-timetable-page :focus-visible,
+.schoolos-marks-page :focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--schoolos-accent) 42%, transparent);
+  outline-offset: 2px;
+}
+.schoolos-assignment-page .schoolos-teacher-row {
+  border-color: var(--schoolos-line) !important;
+  border-radius: 16px !important;
+  background: var(--schoolos-surface);
+  box-shadow: 0 2px 10px rgba(17, 54, 49, .035);
+}
+.schoolos-assignment-page .schoolos-assignment-toolbar {
+  padding: 14px;
+  border: 1px solid var(--schoolos-line);
+  border-radius: 16px;
+  background: var(--schoolos-surface);
+}
+.schoolos-assignment-page .schoolos-assignment-chip {
+  border-radius: 999px;
+  font-weight: 650;
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+.schoolos-assignment-page .schoolos-assignment-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(17, 54, 49, .08);
+}
+.schoolos-timetable-page {
+  max-width: 1500px;
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--schoolos-canvas);
+}
+.schoolos-timetable-page > div:first-child > div:last-child {
+  border-color: var(--schoolos-line);
+  border-radius: 16px;
+  box-shadow: 0 3px 14px rgba(17, 54, 49, .045);
+}
+.schoolos-timetable-page table {
+  min-width: 660px;
+  font-family: var(--schoolos-font-body);
+}
+.schoolos-timetable-page table th {
+  color: #526b67;
+  font-weight: 750;
+  letter-spacing: .025em;
+}
+.schoolos-timetable-page table td > div {
+  min-height: 48px;
+  border-radius: 10px;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+.schoolos-timetable-page table td > div:hover {
+  box-shadow: 0 3px 12px rgba(14, 106, 98, .09);
+}
+.schoolos-timetable-page button,
+.schoolos-timetable-page select,
+.schoolos-timetable-page input {
+  border-radius: 10px;
+}
+.schoolos-marks-page {
+  --exam-teal: #0e6a62;
+  --exam-teal-dark: #084f49;
+  --exam-line: var(--schoolos-line);
+  --exam-canvas: var(--schoolos-canvas);
+  --exam-ink: var(--schoolos-ink);
+  --exam-muted: var(--schoolos-muted);
+}
+.schoolos-marks-page > div:first-of-type {
+  padding: 20px 22px;
+  border: 1px solid var(--schoolos-line);
+  border-radius: 18px;
+  background: linear-gradient(120deg, #f0f8f6, #ffffff 72%);
+}
+.schoolos-marks-page table thead th {
+  font-family: var(--schoolos-font-heading);
+}
+.schoolos-marks-page table tbody tr:focus-within {
+  background: #f1f8f6;
+}
+.schoolos-marks-page input[type="number"] {
+  min-width: 74px;
+  border: 1px solid var(--schoolos-line);
+  border-radius: 9px;
+  padding: 7px 9px;
+  font-variant-numeric: tabular-nums;
+}
+.schoolos-marks-page input[aria-invalid="true"],
+.schoolos-marks-page input:invalid {
+  border-color: #dc5555;
+  background: #fff4f3;
+}
+@media (prefers-color-scheme: dark) {
+  .schoolos-assignment-page,
+  .schoolos-timetable-page,
+  .schoolos-marks-page {
+    --schoolos-accent: #4cc3b5;
+    --schoolos-accent-soft: #123c38;
+    --schoolos-ink: #e2efec;
+    --schoolos-muted: #a5bbb6;
+    --schoolos-line: #294844;
+    --schoolos-surface: #142a28;
+    --schoolos-canvas: #0d1d1b;
+  }
+  .schoolos-timetable-page,
+  .schoolos-assignment-page,
+  .schoolos-marks-page { color: var(--schoolos-ink); }
+  .schoolos-assignment-page .schoolos-teacher-row,
+  .schoolos-assignment-page .schoolos-assignment-toolbar,
+  .schoolos-timetable-page > div:first-child > div:last-child,
+  .schoolos-marks-page > div:first-of-type {
+    background: var(--schoolos-surface);
+    border-color: var(--schoolos-line);
+  }
+  .schoolos-timetable-page table th,
+  .schoolos-timetable-page table td { border-color: var(--schoolos-line); }
+  .schoolos-marks-page > div:first-of-type { background: linear-gradient(120deg, #163632, #142a28 72%); }
+}
+@media (max-width: 719px) {
+  .schoolos-assignment-page,
+  .schoolos-timetable-page,
+  .schoolos-marks-page {
+    width: 100%;
+    max-width: 100%;
+    padding: 12px !important;
+    border-radius: 0;
+  }
+  .schoolos-assignment-page .schoolos-teacher-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px;
+  }
+  .schoolos-assignment-page .schoolos-assignment-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .schoolos-timetable-page .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+  .schoolos-timetable-page table { min-width: 660px; }
+  .schoolos-marks-page > div:first-of-type { padding: 16px; }
+}
+@media (min-width: 720px) and (max-width: 900px) {
+  .schoolos-assignment-page,
+  .schoolos-timetable-page,
+  .schoolos-marks-page { padding: 16px !important; }
+}
