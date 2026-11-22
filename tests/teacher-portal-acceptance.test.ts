@@ -51,7 +51,6 @@ const student = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-001'
 const otherStudent = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-002', firstName: 'Other', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: otherClass.id, status: 'active' } as any);
 await memory.from('class_subjects').insert([
   { id: 'ta-cs-math', school_id: school.id, class_id: klass.id, subject_id: subject.id, teacher_id: subjectTeacher.id, periods_per_week: 3, is_active: true },
-  { id: 'ta-cs-science', school_id: school.id, class_id: klass.id, subject_id: otherSubject.id, teacher_id: otherTeacher.id, periods_per_week: 2, is_active: true },
   { id: 'ta-cs-other-class', school_id: school.id, class_id: otherClass.id, subject_id: subject.id, teacher_id: otherTeacher.id, periods_per_week: 2, is_active: true }
 ]);
 await db.flush();
