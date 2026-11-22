@@ -17,6 +17,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { LoadingState } from '../common/AsyncState.tsx';
 import { formatMoney } from '../../lib/money.ts';
+import { resolvePrimaryGuardianPhone, resolveStudentClassName, resolveStudentGender, resolveStudentParentPhone, resolveStudentStatus } from '../../lib/student-row-data.ts';
 import { 
   GraduationCap, 
   Search, 
@@ -74,6 +75,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [enrollmentLoading, setEnrollmentLoading] = useState(false);
   const [enrollmentBusy, setEnrollmentBusy] = useState(false);
   const [guardianRows, setGuardianRows] = useState<any[]>([]);
+  const [guardianPhoneByStudent, setGuardianPhoneByStudent] = useState<Record<string, string>>({});
+  const [guardianPhoneLoadedIds, setGuardianPhoneLoadedIds] = useState<Record<string, boolean>>({});
+  const [guardianPhoneLookupErrors, setGuardianPhoneLookupErrors] = useState<Record<string, string>>({});
   const [guardianNameInput, setGuardianNameInput] = useState('');
   const [guardianPhoneInput, setGuardianPhoneInput] = useState('');
   const [guardianRelation, setGuardianRelation] = useState<'aabo'|'hooyo'|'walaal'|'kale'>('kale');
@@ -105,10 +109,12 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const branches: SchoolBranch[] = Array.isArray(branchRows) ? branchRows : [];
   const feeStructures: FeeStructureItem[] = Array.isArray(feeStructureRows) ? feeStructureRows : [];
   const feeStructureForStudent = (student: any): FeeStructureItem | undefined => {
-    const studentClass = classes.find(item => item.id === student.classId);
+    const studentClass = classes.find(item => item.id === (student.classId || student.class_id));
     if (!studentClass) return undefined;
+    const currentAcademicYear = String(school?.academicYear || '').trim();
     return feeStructures
-      .filter(item => item.isActive && item.feeType === 'monthly_tuition' && (
+      .filter(item => item.isActive && item.feeType === 'monthly_tuition'
+        && (!(item as any).academicYear || !currentAcademicYear || String((item as any).academicYear).trim() === currentAcademicYear) && (
         item.classId ? item.classId === studentClass.id : item.minGrade !== undefined && item.maxGrade !== undefined && studentClass.gradeLevel >= item.minGrade && studentClass.gradeLevel <= item.maxGrade
       ))
       .sort((a, b) => Number(Boolean(b.classId)) - Number(Boolean(a.classId)))[0];
@@ -116,6 +122,34 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const isLoading = studentLoad.loading;
 
   const fetchStudents = studentLoad.retry;
+  const loadGuardianPhone = async (studentId: string) => {
+    setGuardianPhoneLoadedIds(previous => ({ ...previous, [studentId]: true }));
+    setGuardianPhoneLookupErrors(previous => ({ ...previous, [studentId]: '' }));
+    try {
+      const rows = await ApiClient.getStudentGuardians(studentId);
+      const phone = resolvePrimaryGuardianPhone(rows);
+      if (phone) setGuardianPhoneByStudent(previous => ({ ...previous, [studentId]: phone }));
+    } catch (error: any) {
+      setGuardianPhoneLookupErrors(previous => ({ ...previous, [studentId]: error?.message || 'Guardian phone could not be loaded.' }));
+    }
+  };
+  useEffect(() => {
+    const pending = students.filter(student => student.id
+      && !(student.fatherPhone || student.father_phone || student.motherPhone || student.mother_phone)
+      && !guardianPhoneLoadedIds[student.id]);
+    if (!pending.length) return;
+    let cancelled = false;
+    let cursor = 0;
+    const worker = async () => {
+      while (!cancelled) {
+        const student = pending[cursor++];
+        if (!student) return;
+        await loadGuardianPhone(student.id);
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(4, pending.length) }, () => worker()));
+    return () => { cancelled = true; };
+  }, [studentRows, school?.id]);
   useEffect(() => { if (classes.length > 0 && !classId) setClassId(classes[0].id); }, [classes, classId]);
   useEffect(() => { setPageInfo((studentRows as any)?.pagination || null); }, [studentRows]);
   useEffect(() => {
@@ -164,6 +198,21 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     return () => { cancelled = true; };
   }, [activeProfileTab, selectedStudent?.id, school?.id]);
 
+
+  const openAssignClass = (student: any) => {
+    setSelectedStudent(student);
+    setActiveProfileTab('enrollments');
+    setTransferClassId(student.classId || student.class_id || classes[0]?.id || '');
+    setModalError(null);
+    void loadStudentDetails(student);
+  };
+
+  const openFeesSetup = () => {
+    const navigationButtons = Array.from(document.querySelectorAll('aside button'));
+    const feesButton = navigationButtons.find(button => /fees|fee structures|kharash|lacag/i.test(button.textContent || '')) as HTMLButtonElement | undefined;
+    if (feesButton) feesButton.click();
+    else setNotice('Open Fees & Payments from the navigation menu to configure a fee structure.');
+  };
 
   const loadStudentDetails = async (student: any) => {
     setSelectedStudent(student);
@@ -499,8 +548,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               visibleStudents.map((student:any) => (
                 <button type="button" key={student.id} onClick={()=>void loadStudentDetails(student)} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
                   <div className="flex items-start justify-between gap-2"><span className="font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</span><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
-                  <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{student.className || 'Not assigned'}</span><span>{student.fatherPhone || '—'}</span></div>
-                  <div className="mt-2 text-xs"><span className="font-semibold text-slate-500">Fee structure: </span><span className="font-medium text-[#0F766E]">{feeStructureForStudent(student)?.name || 'Not configured'}</span>{feeStructureForStudent(student) && <span className="ml-1 text-slate-500">· {formatMoney(feeStructureForStudent(student)!.amount, school?.currency)} / {feeStructureForStudent(student)!.cadence}</span>}</div>
+                  <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{resolveStudentClassName(student, classes)}</span><span>{resolveStudentParentPhone(student, guardianPhoneByStudent[student.id])}</span></div>
+                  {resolveStudentClassName(student, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(student); }} className="mt-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs"><span className="text-slate-500">{resolveStudentGender(student.gender)}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{resolveStudentStatus(student.status).toUpperCase()}</span></div>
+                  <div className="mt-2 text-xs"><span className="font-semibold text-slate-500">Fee structure: </span>{feeStructureForStudent(student) ? <><span className="font-medium text-[#0F766E]">{feeStructureForStudent(student)!.name}</span><span className="ml-1 text-slate-500">· {formatMoney(feeStructureForStudent(student)!.amount, school?.currency)} / {feeStructureForStudent(student)!.cadence}</span></> : <><span className="font-medium text-slate-400">Not configured</span><button type="button" onClick={event => { event.stopPropagation(); openFeesSetup(); }} className="ml-2 font-semibold text-[#0F766E] underline">Set up fees</button></>}</div>
                 </button>
               ))}
           </div>
@@ -540,15 +591,15 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 text-slate-400">{((pageInfo?.page || 1) - 1) * 50 + rowIndex + 1}</td>
                         <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
-                        <td className="px-5 py-4 text-[#334155]">{s.className || 'Not assigned'}</td>
-                        <td className="px-5 py-4"><div className="font-medium text-[#18312d]">{feeStructureForStudent(s)?.name || <span className="text-slate-400">Not configured</span>}</div>{feeStructureForStudent(s) && <div className="mt-1 text-xs text-slate-500">{formatMoney(feeStructureForStudent(s)!.amount, school?.currency)} / {feeStructureForStudent(s)!.cadence}</div>}</td>
-                        <td className="px-5 py-4 capitalize text-[#334155]">{s.gender || '—'}</td>
-                        <td className="px-5 py-4 font-mono text-xs text-[#334155]">{s.fatherPhone || s.motherPhone || '—'}</td>
+                        <td className="px-5 py-4 text-[#334155]">{resolveStudentClassName(s, classes)}{resolveStudentClassName(s, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(s); }} className="ml-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}</td>
+                        <td className="px-5 py-4"><div className="font-medium text-[#18312d]">{feeStructureForStudent(s)?.name || <span className="text-slate-400">Not configured</span>}</div>{feeStructureForStudent(s) ? <div className="mt-1 text-xs text-slate-500">{formatMoney(feeStructureForStudent(s)!.amount, school?.currency)} / {feeStructureForStudent(s)!.cadence}</div> : <button type="button" onClick={event => { event.stopPropagation(); openFeesSetup(); }} className="mt-1 text-xs font-semibold text-[#0F766E] underline">Set up fees</button>}</td>
+                        <td className="px-5 py-4 capitalize text-[#334155]">{resolveStudentGender(s.gender)}</td>
+                        <td className="px-5 py-4 font-mono text-xs text-[#334155]">{guardianPhoneLookupErrors[s.id] && !(s.fatherPhone || s.father_phone || s.motherPhone || s.mother_phone) ? <button type="button" onClick={event => { event.stopPropagation(); void loadGuardianPhone(s.id); }} className="text-rose-700 underline">Phone unavailable · Try again</button> : resolveStudentParentPhone(s, guardianPhoneByStudent[s.id])}</td>
                         <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                          s.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
-                          s.status === 'inactive' ? 'bg-slate-100 text-slate-600' :
+                          resolveStudentStatus(s.status) === 'active' ? 'bg-emerald-100 text-emerald-800' :
+                          resolveStudentStatus(s.status) === 'inactive' ? 'bg-slate-100 text-slate-600' :
                           'bg-amber-100 text-amber-800'
-                        }`}>{String(s.status || 'active').toUpperCase()}</span></td>
+                        }`}>{resolveStudentStatus(s.status).toUpperCase()}</span></td>
                         <td className="px-5 py-4">
                           <button type="button" disabled={isReadOnly} onClick={event => {
                             event.stopPropagation();
@@ -767,14 +818,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                     </div>
                   ))}
                 <div className="border-t border-[#E2E8F0] pt-3 space-y-2">
-                  <p className="font-semibold text-[#132A29]">U wareeji fasal kale</p>
+                  <p className="font-semibold text-[#132A29]">{enrollmentRows.some(row => String(row.academic_year_id || '') === selectedAcademicYearId && row.status === 'active') ? 'U wareeji fasal kale' : 'Assign class'}</p>
                   <select value={selectedAcademicYearId} onChange={e=>setSelectedAcademicYearId(e.target.value)} className="w-full rounded-lg border p-2">
                     {academicYears.map(year=><option key={year.id} value={year.id}>{year.name}{year.is_current?' · Current':''}</option>)}
                   </select>
                   <select value={transferClassId} onChange={e=>setTransferClassId(e.target.value)} className="w-full rounded-lg border p-2">
                     {classes.filter(item=>!item.isArchived && item.id!==selectedStudent.classId).map(item=><option key={item.id} value={item.id}>{item.name} · {item.section}</option>)}
                   </select>
-                  <button type="button" disabled={isReadOnly || enrollmentBusy || !transferClassId || !selectedAcademicYearId} onClick={()=>void handleStudentTransfer()} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':'Wareeji ardayga'}</button>
+                  <button type="button" disabled={isReadOnly || enrollmentBusy || !transferClassId || !selectedAcademicYearId} onClick={()=>void handleStudentTransfer()} className="w-full rounded-lg bg-[#0F766E] px-3 py-2 font-semibold text-white disabled:opacity-50">{enrollmentBusy?'Saving…':(enrollmentRows.some(row => String(row.academic_year_id || '') === selectedAcademicYearId && row.status === 'active') ? 'Wareeji ardayga' : 'Assign class')}</button>
                   <button type="button" disabled={isReadOnly || enrollmentBusy || !selectedAcademicYearId} onClick={()=>void handleStudentWithdraw()} className="w-full rounded-lg border border-rose-200 px-3 py-2 font-semibold text-rose-700 disabled:opacity-50">Ka saar ardayga (xogta ha sii jirto)</button>
                 </div>
               </div>
