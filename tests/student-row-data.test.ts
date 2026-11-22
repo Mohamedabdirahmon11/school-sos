@@ -50,7 +50,7 @@ test('class label falls back to a same-school class record when supplied', () =>
 });
 
 test('student reconciliation migration is additive, tenant-scoped, and never overwrites existing enrollments', () => {
-  const migration = readFileSync(new URL('../supabase/migrations/20261122070000_students_row_data_reconciliation.sql', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../supabase/migrations/20261122062848_students_row_data_reconciliation.sql', import.meta.url), 'utf8');
   assert.match(migration, /ALTER COLUMN status SET DEFAULT 'active'/);
   assert.match(migration, /JOIN current_year cy ON cy\.school_id = s\.school_id/);
   assert.match(migration, /e\.academic_year_id = cy\.academic_year_id/);
