@@ -229,15 +229,18 @@ test('Form Teacher exam register reviews every active class subject while edits 
   assert.match(teacher, /const examRegisterRows = useMemo/);
 });
 
-test('teacher dashboard shows Form Teacher class and assigned teaching subjects without duplicate task shortcuts', () => {
+test('teacher dashboard matches the reference four stats, today lessons and task shortcuts', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /EMPTY_TEACHER_DATA/);
   assert.match(teacher, /useMemo\(\(\) => \[\.\.\.new Map/);
   assert.match(teacher, /assignedClassStudentTotal/);
-  assert.match(teacher, /Casharrada laguu qoondeeyay/);
-  assert.match(teacher, /Form Teacher responsibility/);
-  assert.match(teacher, /Your assigned class/);
-  assert.match(teacher, /Subjects you teach/);
+  assert.match(teacher, /<small>Fasallo<\/small>/);
+  assert.match(teacher, /<small>Arday<\/small>/);
+  assert.match(teacher, /<small>Xiisado\/toddobaad<\/small>/);
+  assert.match(teacher, /<small>Shaqo guri furan<\/small>/);
+  assert.match(teacher, /Casharrada maanta/);
+  assert.match(teacher, /Waxa la sameeyo/);
+  assert.match(teacher, /openHomeworkCount/);
   assert.doesNotMatch(teacher, /Enter marks<\/button>/);
   assert.doesNotMatch(teacher, /Class attendance<\/button>/);
 });
@@ -407,8 +410,9 @@ test('teacher timetable is a weekday period matrix backed by the authenticated t
 
 test('teacher student register includes parent phone and explicit mobile and desktop empty states', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
-  assert.match(teacher, /Parent phone: \{student\.fatherPhone \|\| student\.motherPhone \|\| '—'\}/);
-  assert.match(teacher, /student\.fatherPhone \|\| student\.motherPhone \|\| '—'/);
+  assert.match(teacher, /Parent phone: \{formatTeacherGuardianPhone/);
+  assert.match(teacher, /formatTeacherGuardianPhone\(\(student as any\)\.fatherPhone/);
+  assert.match(teacher, /Phone not provided/);
   assert.match(teacher, /No students match your search\./);
   assert.match(teacher, /No students found in this assigned class\./);
 });
