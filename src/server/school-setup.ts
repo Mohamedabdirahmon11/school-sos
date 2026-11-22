@@ -56,8 +56,8 @@ export interface SchoolSetupEvidence {
   timetableSlotCount: number;
   hasExamConfig: boolean;
   feeStructureCount: number;
-  teacherAssignmentReady: boolean;
-  teacherAssignmentIssues: string[];
+  teacherAssignmentReady?: boolean;
+  teacherAssignmentIssues?: string[];
 }
 
 export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgress {
@@ -83,7 +83,7 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
   const currentStep = fullyComplete
     ? 10
     : Number.isInteger(rawCurrentStep)
-      ? Math.min(10, Math.max(0, rawCurrentStep === 5 && [1, 2, 3, 4, 5].every(step => completedSteps.includes(step)) ? 0 : rawCurrentStep === 6 && [1, 2, 3, 4, 5].every(step => completedSteps.includes(step)) ? 0 : rawCurrentStep))
+      ? Math.min(10, Math.max(0, rawCurrentStep))
       : 1;
   const completedAt = fullyComplete ? rawCompletedAt : null;
   return { currentStep, completedSteps, skippedSteps, completedAt };
@@ -124,7 +124,7 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
     4: step(evidence.subjectCount > 0, false, 'Add at least one school subject.'),
     5: step(teachersReady, false, 'Add at least one teacher; every teacher needs a school-specific ID and a linked teacher login with a password/PIN hash.'),
-    0: step(evidence.teacherAssignmentReady, false, evidence.teacherAssignmentIssues.length ? 'Marka hore qoondee macallimiinta: ' + evidence.teacherAssignmentIssues.join(' · ') : 'Qoondee Form Teacher fasal kasta iyo macallin maaddo kasta; culayska macallin kasta waa inuu ahaadaa 30 xiisadood ama ka yar toddobaadkii.'),
+    0: step(Boolean(evidence.teacherAssignmentReady), false, (evidence.teacherAssignmentIssues || []).length ? 'Marka hore qoondee macallimiinta: ' + (evidence.teacherAssignmentIssues || []).join(' · ') : 'Qoondee Form Teacher fasal kasta iyo macallin maaddo kasta; culayska macallin kasta waa inuu ahaadaa 30 xiisadood ama ka yar toddobaadkii.'),
     6: step(evidence.studentCount > 0 && evidence.guardianContactCount > 0, false, 'Add students and at least one parent/guardian contact number.'),
     7: step(evidence.timetableSlotCount > 0, true, 'Create at least one active timetable period, or skip and configure the timetable later.'),
     8: step(Boolean(school.attendanceRules) && evidence.hasExamConfig, false, 'Review attendance rules and ensure this school has an exam configuration.'),
