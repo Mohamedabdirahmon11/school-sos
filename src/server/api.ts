@@ -7267,6 +7267,39 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
   }
 });
 
+apiRouter.post('/exams/reopen-subject', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'teacher') {
+    res.status(403).json({ error: 'Only the assigned Form Teacher can reopen a subject before forwarding.' });
+    return;
+  }
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  const subjectId = typeof req.body?.subjectId === 'string' ? req.body.subjectId.trim() : '';
+  const semester = req.body?.semester;
+  if (!classId || !subjectId || !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Choose a class, subject, and valid semester.' });
+    return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  if (klass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Only the Form Teacher assigned to this class can reopen a subject.' });
+    return;
+  }
+  try {
+    const reopenedCount = await db.reopenClassSubjectMarks(
+      school.id, classId, subjectId, semester, user.id, user.fullName, user.role
+    );
+    res.json({ success: true, reopenedCount });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Subject marks could not be reopened.' });
+  }
+});
+
 apiRouter.post('/exams/forward-class', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -7399,6 +7432,36 @@ apiRouter.post('/exams/publish', requireAuth, requireSchoolContext, requireSchoo
   }
 });
 
+apiRouter.post('/exams/unpublish', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('grades_manage'), async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const classId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+  const semester = req.body?.semester;
+  if (!classId || !['Semester 1', 'Semester 2'].includes(semester)) {
+    res.status(400).json({ error: 'Choose a class and valid semester before withdrawing results.' });
+    return;
+  }
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass || klass.isArchived) {
+    res.status(404).json({ error: 'The selected class was not found in this school.' });
+    return;
+  }
+  try {
+    const unpublishedCount = await db.unpublishClassSemesterResults(
+      school.id, classId, semester, user.id, user.fullName, user.role
+    );
+    const noticeTitle = `Exam results published · ${semester}`;
+    const notices = (await db.getNotices(school.id)).filter(notice =>
+      notice.classId === classId && notice.title === noticeTitle && notice.isActive !== false
+    );
+    for (const notice of notices) await db.archiveNotice(notice.id, school.id);
+    await db.flush();
+    res.json({ success: true, unpublishedCount });
+  } catch (error) {
+    res.status(409).json({ error: error instanceof Error ? error.message : 'Results could not be withdrawn.' });
+  }
+});
+
 // Semester 1 Results & Ranking (Highlight Top 3)
 async function canReadClassResults(req: Request, res: Response, classId: string): Promise<boolean> {
   const user = (req as any).user as User;
@@ -7439,14 +7502,22 @@ apiRouter.get('/exams/rankings/semester', requireAuth, requireSchoolContext, asy
 
 // Semester 2 Combined Yearly Results & Ranking (for Final Report Card)
 apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
   const { classId } = req.query;
-  if (!classId || typeof classId !== 'string') {
-    res.status(400).json({ error: 'classId is required.' });
-    return;
-  }
+  if (!classId || typeof classId !== 'string') { res.status(400).json({ error: 'classId is required.' }); return; }
   if (!await canReadClassResults(req, res, classId)) return;
-  res.json(await db.getClassYearlyRankings(school.id, classId));
+  const [rankings, klass] = await Promise.all([db.getClassYearlyRankings(school.id, classId), db.getClassById(classId, school.id)]);
+  const studentIds = rankings.map(row => row.student.id);
+  const commentsResult = studentIds.length
+    ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
+    : { data: [], error: null };
+  const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
+  for (const row of commentsResult.data || []) {
+    const comments = commentsByStudent.get(row.student_id) || [];
+    comments.push({ semester: row.semester, comment: row.comment || '' });
+    commentsByStudent.set(row.student_id, comments);
+  }
+  res.json(rankings.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] })));
 });
 
 // Year-End Promotion Confirmation

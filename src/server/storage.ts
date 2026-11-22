@@ -17,6 +17,7 @@ import {
   AttendanceRecord,
   ExamConfig,
   StudentMark,
+  ExamScoreValue,
   PromotionRecord,
   FeePayment,
   FeeStructureItem,
@@ -43,6 +44,7 @@ import {
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
 import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.ts';
+import { rankExamStudentResults } from '../lib/exam-calculations.ts';
 import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
@@ -2678,7 +2680,7 @@ class StorageEngine {
     classId: string,
     subjectId: string,
     semester: 'Semester 1' | 'Semester 2',
-    marks: { studentId: string; smallExamMarks?: number; bigExamMarks?: number; assessmentScores?: Record<string, number>; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
+    marks: { studentId: string; smallExamMarks?: number; bigExamMarks?: number; assessmentScores?: Record<string, ExamScoreValue>; teacherRemarks?: string; status: 'draft' | 'submitted' }[],
     submittedBy: string,
     submittedByName = 'Teacher',
     submittedByRole: UserRole = 'teacher'
@@ -2707,7 +2709,7 @@ class StorageEngine {
       return allocated;
     };
     const normalized = marks.map(mark => {
-      let scores: Record<string, number>;
+      let scores: Record<string, ExamScoreValue>;
       if (mark.assessmentScores && typeof mark.assessmentScores === 'object' && !Array.isArray(mark.assessmentScores)) {
         const unknownIds = Object.keys(mark.assessmentScores).filter(id => !components.some(component => component.id === id));
         if (unknownIds.length) throw new Error('One or more assessment components are not configured for this school.');
@@ -2715,8 +2717,8 @@ class StorageEngine {
         for (const component of components) {
           if (!Object.prototype.hasOwnProperty.call(mark.assessmentScores, component.id)) continue;
           const value = mark.assessmentScores[component.id];
-          if (!Number.isFinite(value) || value < 0 || value > component.maxMarks) {
-            throw new Error(`Marks for ${component.name} must be between 0 and ${component.maxMarks}.`);
+          if (value !== 'ABS' && value !== 'LB' && (!Number.isFinite(value) || value < 0 || value > component.maxMarks)) {
+            throw new Error(`Marks for ${component.name} must be between 0 and ${component.maxMarks}, or use ABS/LB.`);
           }
           scores[component.id] = value;
         }
@@ -2734,8 +2736,8 @@ class StorageEngine {
           ...allocateLegacyTotal(big, finalComponents)
         };
       }
-      const smallExamMarks = continuousComponents.reduce((sum, component) => sum + (scores[component.id] || 0), 0);
-      const bigExamMarks = finalComponents.reduce((sum, component) => sum + (scores[component.id] || 0), 0);
+      const smallExamMarks = continuousComponents.reduce((sum, component) => sum + (typeof scores[component.id] === 'number' ? scores[component.id] as number : 0), 0);
+      const bigExamMarks = finalComponents.reduce((sum, component) => sum + (typeof scores[component.id] === 'number' ? scores[component.id] as number : 0), 0);
       const totalMarks = smallExamMarks + bigExamMarks;
       const percentage = maxTotal > 0 ? Math.round((totalMarks / maxTotal) * 10000) / 100 : 0;
       return { ...mark, assessmentScores: scores, smallExamMarks, bigExamMarks, totalMarks, percentage };
@@ -2848,6 +2850,62 @@ class StorageEngine {
     this.save();
     await this.flush();
     return results;
+  }
+
+  public async reopenClassSubjectMarks(
+    schoolId: string,
+    classId: string,
+    subjectId: string,
+    semester: 'Semester 1' | 'Semester 2',
+    reopenedBy: string,
+    reopenedByName: string,
+    reopenedByRole: UserRole
+  ): Promise<number> {
+    const klass = await this.getClassById(classId, schoolId);
+    if (!klass || klass.isArchived) throw new Error('The selected class was not found in this school.');
+    const assignment = await this.queryRows<any>('class_subjects', {
+      school_id: schoolId, class_id: classId, subject_id: subjectId, is_active: 'true'
+    });
+    if (!assignment.length) throw new Error('The subject is not active in this class.');
+    const [rows, students] = await Promise.all([
+      this.getMarks(schoolId, classId, subjectId, semester),
+      this.getStudents(schoolId, classId)
+    ]);
+    if (!rows.length || rows.length !== students.length || rows.some(mark => mark.status !== 'submitted' || mark.publishedAt)) {
+      throw new Error('Only a subject submitted to the Form Teacher and not yet forwarded can be reopened.');
+    }
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam marks storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('student_marks')
+      .update({ status: 'draft', correction_reason: 'Reopened by Form Teacher', updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId)
+      .eq('class_id', classId)
+      .eq('subject_id', subjectId)
+      .eq('academic_year', klass.academicYear)
+      .eq('semester', semester)
+      .eq('status', 'submitted')
+      .is('published_at', null)
+      .select('*');
+    this.recordQuery('student_marks', 'reopen-form-teacher-subject', startedAt);
+    if (error) throw new Error(error.message || 'Subject marks could not be reopened.');
+    const reopened = Array.isArray(data) ? data.map((row: any) => fromSupabaseRow(row, 'student_marks') as StudentMark) : [];
+    for (const row of reopened) {
+      const index = this.data.marks.findIndex(mark => mark.id === row.id && mark.schoolId === schoolId);
+      if (index >= 0) this.data.marks[index] = row;
+    }
+    this.logAudit({
+      action: 'FORM_TEACHER_REOPENED_SUBJECT_MARKS',
+      category: 'academics',
+      schoolId,
+      userId: reopenedBy,
+      userName: reopenedByName,
+      userRole: reopenedByRole,
+      details: JSON.stringify({ classId, subjectId, semester, reopenedCount: reopened.length }),
+      severity: 'warning'
+    });
+    await this.flush();
+    return reopened.length;
   }
 
   public async forwardClassMarks(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2', forwardedBy: string, forwardedByName = 'Class Form Teacher'): Promise<{ count: number }> {
@@ -3024,6 +3082,49 @@ class StorageEngine {
     return { publishedCount, publishedAt };
   }
 
+  public async unpublishClassSemesterResults(
+    schoolId: string,
+    classId: string,
+    semester: 'Semester 1' | 'Semester 2',
+    unpublishedBy: string,
+    unpublishedByName: string,
+    unpublishedByRole: UserRole
+  ): Promise<number> {
+    const klass = await this.getClassById(classId, schoolId);
+    if (!klass) throw new Error('The selected class was not found in this school.');
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Exam result publication storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('student_marks')
+      .update({ published_at: null, published_by: null })
+      .eq('school_id', schoolId)
+      .eq('class_id', classId)
+      .eq('academic_year', klass.academicYear)
+      .eq('semester', semester)
+      .eq('status', 'approved')
+      .not('published_at', 'is', null)
+      .select('*');
+    this.recordQuery('student_marks', 'unpublish-class-semester-results', startedAt);
+    if (error) throw new Error(error.message || 'Exam results could not be unpublished.');
+    const rows = Array.isArray(data) ? data.map((row: any) => fromSupabaseRow(row, 'student_marks') as StudentMark) : [];
+    for (const row of rows) {
+      const index = this.data.marks.findIndex(mark => mark.id === row.id && mark.schoolId === schoolId);
+      if (index >= 0) this.data.marks[index] = row;
+    }
+    this.logAudit({
+      action: 'MARKS_UNPUBLISHED_FROM_PARENTS',
+      category: 'academics',
+      schoolId,
+      userId: unpublishedBy,
+      userName: unpublishedByName,
+      userRole: unpublishedByRole,
+      details: JSON.stringify({ classId, semester, unpublishedCount: rows.length }),
+      severity: 'warning'
+    });
+    await this.flush();
+    return rows.length;
+  }
+
   // Calculate Semester Results & Class Rank (Highlight top 3 students)
   public async getClassSemesterRankings(schoolId: string, classId: string, semester: 'Semester 1' | 'Semester 2') {
     const students = await this.getStudents(schoolId, classId);
@@ -3126,10 +3227,12 @@ class StorageEngine {
 
         return {
           subject: sub,
+          isActive: true,
           sem1Marks: markDetails(m1),
           sem2Marks: markDetails(m2),
           sem1Percentage: p1,
           sem2Percentage: p2,
+          yearlyMarks: m1 && m2 ? Math.round(((m1.totalMarks + m2.totalMarks) / 2) * 100) / 100 : null,
           yearlyPercentage: yearlyP,
           maxMarks: {
             small: config.smallExamMax,
@@ -3137,7 +3240,7 @@ class StorageEngine {
             total: (config.smallExamMax || 0) + (config.bigExamMax || 0)
           }
         };
-      }).filter(sr => sr.sem1Percentage !== null || sr.sem2Percentage !== null);
+      });
 
       const annualComplete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
         s1.some(mark => mark.subjectId === subjectId) && s2.some(mark => mark.subjectId === subjectId)
@@ -3146,6 +3249,11 @@ class StorageEngine {
         Boolean(s1.find(mark => mark.subjectId === subjectId)?.publishedAt) &&
         Boolean(s2.find(mark => mark.subjectId === subjectId)?.publishedAt)
       );
+      const term1Complete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId => s1.some(mark => mark.subjectId === subjectId));
+      const term2Complete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId => s2.some(mark => mark.subjectId === subjectId));
+      const term1Total = subjectResults.reduce((sum, row) => sum + (row.sem1Marks?.totalMarks || 0), 0);
+      const term2Total = subjectResults.reduce((sum, row) => sum + (row.sem2Marks?.totalMarks || 0), 0);
+      const yearlyTotal = subjectResults.reduce((sum, row) => sum + (row.yearlyMarks || 0), 0);
       const validPercentages = subjectResults.map(sr => sr.yearlyPercentage).filter((percentage): percentage is number => percentage !== null);
       const yearlyAvg = annualComplete && validPercentages.length === expectedSubjectIds.length
         ? Math.round((validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length) * 100) / 100
@@ -3169,6 +3277,13 @@ class StorageEngine {
         attendanceSummary,
         annualComplete,
         annualPublished,
+        term1Complete,
+        term2Complete,
+        term1Total,
+        term2Total,
+        yearlyTotal,
+        semester1Rank: 0,
+        semester2Rank: 0,
         yearlyPercentage: yearlyAvg,
         isPass,
         yearlyRank: 0,
@@ -3176,28 +3291,26 @@ class StorageEngine {
       };
     });
 
-    yearlyResults.sort((a, b) => Number(b.annualComplete) - Number(a.annualComplete) || b.yearlyPercentage - a.yearlyPercentage);
-
-    let completedRank = 0;
-    let previousPercentage: number | null = null;
-    let previousRank = 0;
+    const yearlyRanks = rankExamStudentResults(yearlyResults.map(result => ({
+      studentId: result.student.id, total: result.yearlyPercentage, complete: result.annualComplete
+    })));
+    const yearlyRankByStudent = new Map(yearlyRanks.map(row => [row.studentId, row.rank]));
     for (const result of yearlyResults) {
-      if (!result.annualComplete) {
-        result.yearlyRank = 0;
-        result.isTopThree = false;
-        continue;
-      }
-      completedRank += 1;
-      if (previousPercentage !== null && result.yearlyPercentage === previousPercentage) {
-        result.yearlyRank = previousRank;
-      } else {
-        result.yearlyRank = completedRank;
-        previousRank = completedRank;
-        previousPercentage = result.yearlyPercentage;
-      }
+      result.yearlyRank = yearlyRankByStudent.get(result.student.id) ?? 0;
       result.isTopThree = result.yearlyRank > 0 && result.yearlyRank <= 3;
     }
+    yearlyResults.sort((a, b) => a.yearlyRank > 0 && b.yearlyRank > 0
+      ? a.yearlyRank - b.yearlyRank || a.student.firstName.localeCompare(b.student.firstName)
+      : a.student.firstName.localeCompare(b.student.firstName) || a.student.lastName.localeCompare(b.student.lastName));
 
+    const term1Ranks = rankExamStudentResults(yearlyResults.map(result => ({ studentId: result.student.id, total: result.term1Total, complete: result.term1Complete })));
+    const term2Ranks = rankExamStudentResults(yearlyResults.map(result => ({ studentId: result.student.id, total: result.term2Total, complete: result.term2Complete })));
+    const term1RankByStudent = new Map(term1Ranks.map(row => [row.studentId, row.rank]));
+    const term2RankByStudent = new Map(term2Ranks.map(row => [row.studentId, row.rank]));
+    for (const result of yearlyResults) {
+      result.semester1Rank = term1RankByStudent.get(result.student.id) ?? 0;
+      result.semester2Rank = term2RankByStudent.get(result.student.id) ?? 0;
+    }
     return yearlyResults;
   }
 
