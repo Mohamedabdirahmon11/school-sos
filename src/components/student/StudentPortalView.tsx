@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
+import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
 import { Home, CalendarDays, CalendarCheck, ChartNoAxesColumn, BookOpen, Bell, MessageCircle, UserRound, Menu, Sun, Moon, Send, CheckCircle2, CircleAlert, ChevronRight, RefreshCw } from 'lucide-react';
 import './student-portal-design.css';
 
@@ -37,9 +38,11 @@ export const StudentPortalView:React.FC=()=>{
  const profileState=useApi(()=>ApiClient.getStudentProfile(),[school?.id,user?.id],Boolean(school&&user?.role==='student'));
  const profile:any=profileState.data;
  const student=profile?.student;
+ const studentRecord=student&&profile?{...student,classId:profile.classId}:undefined;
  const active=Boolean(student?.id);
  const home=view==='home';
  const timetableState=useApi(()=>ApiClient.getTimetable(profile?.classId?{classId:profile.classId}:undefined),[school?.id,user?.id,profile?.classId],active&&(home||view==='tt'));
+ const examSchedulesState=useApi(()=>studentRecord?.classId?ApiClient.getPublishedExamSchedules(studentRecord.classId):Promise.resolve([]),[studentRecord?.classId,school?.id],active&&Boolean(studentRecord?.classId)&&(home||view==='tt'));
  const attendanceState=useApi(()=>ApiClient.getStudentAttendance(student.id),[school?.id,student?.id],active&&(home||view==='att'));
  const marksState=useApi(()=>ApiClient.getStudentMarks(student.id),[school?.id,student?.id],active&&(home||view==='marks'));
  const homeworkState=useApi(()=>ApiClient.getAssignments(),[school?.id,user?.id],active&&(home||view==='hw'));
@@ -54,6 +57,7 @@ export const StudentPortalView:React.FC=()=>{
  useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId).catch(()=>undefined);},[view,contactId]);
 
  const timetable=Array.isArray(timetableState.data)?timetableState.data:[];
+ const publishedExamSchedules=Array.isArray(examSchedulesState.data)?examSchedulesState.data:[];
  const attendance=Array.isArray(attendanceState.data)?attendanceState.data:[];
  const marks=Array.isArray(marksState.data)?marksState.data.filter((m:any)=>Boolean(m.publishedAt)):[];
  const homework=Array.isArray(homeworkState.data)?homeworkState.data:[];
@@ -105,6 +109,7 @@ export const StudentPortalView:React.FC=()=>{
    </>}
 
    {active&&view==='tt'&&<section className="sp-card"><div className="sp-section-title"><h2>Jadwalka fasalka</h2><span className="sp-muted">Sabti – Khamiis · Jimce fasax</span></div>{timetableState.loading?<div className="sp-empty">Jadwalka waa la soo dejinayaa…</div>:timetableState.error?<PortalError error={timetableState.error} retry={timetableState.retry}/>:!timetable.length?<div className="sp-empty">Jadwal lama diiwaangelin fasalkaaga.</div>:<div className="sp-table-wrap"><table className="sp-table"><thead><tr><th>Waqti</th>{['Sabti','Axad','Isniin','Talaado','Arbaco','Khamiis'].map(d=><th key={d}>{d}</th>)}</tr></thead><tbody>{Array.from({length:Math.max(1,...timetable.map((s:any)=>Number(s.periodNumber||1)))},(_,i)=>i+1).map(p=><tr key={p}><td>Period {p}</td>{['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'].map(d=>{const s=timetable.find((x:any)=>x.dayOfWeek===d&&Number(x.periodNumber)===p);return <td key={d}>{s?<><b>{s.subjectName||s.subjectId}</b><small>{s.startTime}–{s.endTime}</small><small>{s.teacherName||''}</small></>:'—'}</td>;})}</tr>)}</tbody></table></div>}</section>}
+   {active&&view==='tt'&&publishedExamSchedules.length>0&&<section className="sp-card"><div className="sp-section-title"><h2>Jadwalka imtixaanka</h2><button className="sp-text-button" onClick={()=>printExamTimetable()}>Daabac jadwalka</button></div><ExamTimetablePrint schedules={publishedExamSchedules} school={school}/></section>}
 
    {active&&view==='att'&&<section className="sp-card"><div className="sp-section-title"><h2>Imaanshaha ardayga</h2><span className="sp-muted">{new Intl.DateTimeFormat('so',{month:'long',year:'numeric'}).format(new Date())}</span></div>{attendanceState.loading?<div className="sp-empty">Diiwaanka imaanshaha waa la soo dejinayaa…</div>:attendanceState.error?<PortalError error={attendanceState.error} retry={attendanceState.retry}/>:<><div className="sp-stat-grid sp-att-stats"><div><small>Joogay</small><b>{counts.present}</b></div><div><small>Maqnaa</small><b>{counts.absent}</b></div><div><small>Daahay</small><b>{counts.late}</b></div><div><small>Boqolkiiba</small><b>{percentage(attendance.length?counts.present/attendance.length*100:0)}</b></div></div><div className="sp-calendar">{['Ax','Is','Ta','Ar','Kh','Jim','Sab'].map(d=><b key={d}>{d}</b>)}{Array.from({length:firstDay},(_,i)=><i key={'blank'+i}/>)}{Array.from({length:monthDays},(_,i)=>{const date=month+'-'+String(i+1).padStart(2,'0');const status=attendanceByDate.get(date);return <span key={date} className={'sp-day '+(status==='present'?'is-present':status==='absent'?'is-absent':status==='late'?'is-late':status==='excused'?'is-excused':'')}>{i+1}</span>;})}</div><p className="sp-muted">Cagaar = joogay · Casaan = maqnaa · Huruud = daahay · Buluug = fasax la oggolaaday</p></>}</section>}
 
