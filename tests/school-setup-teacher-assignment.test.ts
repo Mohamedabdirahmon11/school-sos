@@ -74,7 +74,7 @@ test('legacy progress IDs 1–9 remain unchanged and next step becomes Teacher A
     skippedSteps: [7],
     completedAt: null
   });
-  assert.equal(progress.currentStep, 0);
+  assert.equal(progress.currentStep, 6);
   assert.deepEqual(progress.completedSteps, [1, 2, 3, 4, 5]);
   assert.deepEqual(progress.skippedSteps, [7]);
 });
