@@ -21,7 +21,7 @@ export type StudentClassLike = {
 export function normalizeStudentPhone(value: unknown): string {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
-  const digits = raw.replace(/\\D/g, '');
+  const digits = raw.replace(/\D/g, '');
   if (!digits) return '';
   if (digits.startsWith('00251')) return `+251${digits.slice(5)}`;
   if (digits.startsWith('251')) return `+${digits}`;
