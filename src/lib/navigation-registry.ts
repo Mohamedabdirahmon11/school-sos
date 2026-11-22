@@ -100,7 +100,7 @@ export const NAVIGATION_REGISTRY: readonly NavigationRoute[] = [
   { id: 'st_attendance', label: 'Attendance', labelKey: 'attendance', icon: CalendarCheck, roles: student, group: 'Student Portal' },
   { id: 'st_notices', label: 'Notices', labelKey: 'notice_board', icon: BellRing, roles: student, group: 'Student Portal' },
   { id: 'st_messages', label: 'Messages', labelKey: 'messages', icon: MessageSquare, roles: student, group: 'Student Portal' },
-  { id: 'st_profile', label: 'Profile', icon: UserRound, roles: student, group: 'Student Portal' }
+  { id: 'st_profile', label: 'Profile', icon: UserCheck, roles: student, group: 'Student Portal' }
 ] as const;
 
 export const NAVIGATION_BY_ID: Readonly<Record<string, NavigationRoute>> = Object.freeze(
