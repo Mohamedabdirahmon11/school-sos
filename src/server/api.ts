@@ -9193,6 +9193,10 @@ apiRouter.get('/student/notices', requireAuth, requireSchoolContext, async (req,
     res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_ONLY', message: 'Student accounts only.' } });
     return;
   }
+  if (!user.studentId) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_NOT_LINKED', message: 'Your account is not linked to a student record.' } });
+    return;
+  }
   const classIds = await getNoticeClassIds(school.id, user);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   const audiences = ['audience.eq.all', 'audience.eq.school', 'audience.eq.students'];
