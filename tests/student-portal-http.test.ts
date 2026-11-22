@@ -166,13 +166,13 @@ test('teacher attendance is visible in the student attendance endpoint and other
 test('submitted marks stay hidden from the student until the admin publishes them',async()=>{
  const config=await db.getExamConfig(school.id,'2026-2027');
  const assessmentScores=Object.fromEntries(config.assessmentComponents.map((component:any)=>[component.id,Math.min(5,component.maxMarks)]));
- const [saved]=await db.saveStudentMarks(school.id,klass.id,subject.id,'Semester 1',[{studentId:student.id,assessmentScores,status:'submitted'},{studentId:sameClassStudent.id,assessmentScores,status:'submitted'}],subjectUser.id);
+ const savedMarks=await db.saveStudentMarks(school.id,klass.id,subject.id,'Semester 1',[{studentId:student.id,assessmentScores,status:'submitted'},{studentId:sameClassStudent.id,assessmentScores,status:'submitted'}],subjectUser.id);const saved=savedMarks[0];
  await db.flush();
  const hidden=await request('/exams/marks?studentId='+encodeURIComponent(student.id),cookies.student);
  assert.equal(hidden.status,200,await hidden.clone().text());
  assert.equal((await hidden.json() as any[]).some(row=>row.id===saved.id),false);
  await db.forwardClassMarks(school.id,klass.id,'Semester 1',formUser.id,formUser.fullName);
- await db.approveMarks(school.id,[saved.id],adminUser.id,adminUser.fullName,adminUser.role);
+ await db.approveMarks(school.id,savedMarks.map(mark=>mark.id),adminUser.id,adminUser.fullName,adminUser.role);
  await db.flush();
  await db.publishClassSemesterResults(school.id,klass.id,'Semester 1',adminUser.id,adminUser.fullName,adminUser.role);
  await db.flush();
