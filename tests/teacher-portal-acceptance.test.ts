@@ -76,7 +76,7 @@ const cookies = {
 };
 const setupGateSchool = makeSchool('Incomplete Setup Gate School', 'SETUPGATE');
 const setupGateTeacher = makeUser(setupGateSchool.id, 'teacher', 'Setup Gate Teacher');
-db.updateSchool(setupGateSchool.id, { setupProgress: { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null } } as any);
+db.updateSchool(setupGateSchool.id, { setupProgress: { currentStep: 1, completedSteps: [], skippedSteps: [], completedAt: null, startedAt: new Date().toISOString() } } as any);
 const setupGateCookie = cookieFor(setupGateTeacher, 'setup-gate');
 
 const app = express();
