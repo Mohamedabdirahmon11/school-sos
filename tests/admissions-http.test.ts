@@ -456,6 +456,16 @@ test('concurrent attendance submissions converge on one daily row without automa
   assert.ok(assignedClassRow, 'class fixture must exist in the database adapter');
   assignedClassRow.class_teacher_id = teacherUser.id;
   assignedClassRow.classTeacherId = teacherUser.id;
+  // This endpoint now requires school-wide setup readiness. Complete the fixture's
+  // active classes and curriculum assignments so the test can focus on attendance writes.
+  for (const row of memory.rows('classes').filter(row => row.school_id === school.id && row.is_archived !== true)) {
+    row.class_teacher_id = teacherUser.id;
+    row.classTeacherId = teacherUser.id;
+  }
+  for (const row of memory.rows('class_subjects').filter(row => row.school_id === school.id && row.is_active !== false && row.is_active !== 'false')) {
+    row.teacher_id = 'attendance-teacher-profile';
+    row.periods_per_week = 1;
+  }
   const invalidNote = await fetch(`${baseUrl}/attendance`, {
     method: 'POST', headers: teacherHeaders,
     body: JSON.stringify({ classId: klass.id, date, records: [{ studentId: student.id, status: 'absent', note: { unexpected: true } }] })
