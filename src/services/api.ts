@@ -622,6 +622,17 @@ export class ApiClient {
     return this.request<{created:number;skipped:number}>('/class-groups/defaults',{method:'POST'});
   }
 
+  public static async getPrimarySubjectTemplates() {
+    return this.request<Record<'1-4' | '5-6' | '7-8', string[]>>('/subjects/templates');
+  }
+
+  public static async savePrimarySubjectTemplate(gradeBand: '1-4' | '5-6' | '7-8', subjects: string[]) {
+    return this.request<{ gradeBand: string; subjects: string[]; templates: Record<'1-4' | '5-6' | '7-8', string[]> }>(`/subjects/templates/${gradeBand}`, { method: 'PUT', body: JSON.stringify({ subjects }) });
+  }
+
+  public static async applyPrimarySubjectTemplate(classId: string) {
+    return this.request<{ success: boolean; count: number; gradeBand: string; added: number }>(`/curriculum/classes/${encodeURIComponent(classId)}/apply-template`, { method: 'POST' });
+  }
   public static async getSubjects(params?: any) {
     return this.request<Subject[]>('/subjects');
   }

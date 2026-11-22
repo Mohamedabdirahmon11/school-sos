@@ -37,3 +37,10 @@ test('registry metadata has no duplicate route keys and role routes remain scope
   assert.ok(getNavigationRoute('p_overview')?.roles.includes('parent'));
   assert.ok(getNavigationRoute('st_dashboard')?.roles.includes('student'));
 });
+
+
+test('Parents & Contacts navigation is available to Form Teachers as well as school admins', () => {
+  const route = NAVIGATION_REGISTRY.find(item => item.id === 'sch_parents');
+  assert.ok(route);
+  assert.deepEqual(route.roles, ['school_admin', 'super_admin', 'teacher']);
+});

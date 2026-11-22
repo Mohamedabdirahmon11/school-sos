@@ -57,7 +57,20 @@ export const ParentsView: React.FC = () => {
     const controller = new AbortController();
     setIsLoading(true);
     setLoadError(null);
-    ApiClient.getParentContacts({ page, pageSize: 50, search: debouncedSearch, classId: classFilter, signal: controller.signal })
+    const fetchWithRetry = async (): Promise<ParentContact[]> => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          return await ApiClient.getParentContacts({ page, pageSize: 50, search: debouncedSearch, classId: classFilter, signal: controller.signal });
+        } catch (error: any) {
+          const status = Number(error?.status || error?.statusCode || 0);
+          const retryable = !status || status === 429 || status >= 500;
+          if (!active || controller.signal.aborted || !retryable || attempt === 2) throw error;
+          await new Promise(resolve => window.setTimeout(resolve, 300 * (attempt + 1)));
+        }
+      }
+      return [];
+    };
+    fetchWithRetry()
       .then((rows: ParentContact[]) => {
         if (!active) return;
         setContacts(Array.isArray(rows) ? rows : []);
@@ -81,6 +94,7 @@ export const ParentsView: React.FC = () => {
   const contactActions = (phone: string) => {
     const value = phone.trim();
     const digits = value.replace(/\D/g, '');
+    if (!digits) return null;
     return (
       <div className="flex flex-wrap gap-1.5 mt-1">
         <a href={`tel:${value}`} aria-label={`Call ${value}`}

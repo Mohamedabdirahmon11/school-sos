@@ -53,13 +53,8 @@ export const TeachersView: React.FC = () => {
   const [selectedFormTeacherClassId, setSelectedFormTeacherClassId] = useState('');
   const [isCreatingTeacher, setIsCreatingTeacher] = useState(false);
 
-  const filteredTeachers = teachers.filter(teacher => {
-    const query = search.trim().toLowerCase();
-    const matchesSearch = !query || [teacher.fullName, teacher.staffId, teacher.teacherCode, teacher.phone, teacher.qualification]
-      .some(value => String(value || '').toLowerCase().includes(query));
-    const matchesSubject = !subjectFilter || (teacher.assignedSubjects || []).includes(subjectFilter);
-    return matchesSearch && matchesSubject;
-  });
+  // Search and subject filtering are applied by the API before pagination.
+  const filteredTeachers = teachers;
 
   const fetchData = teacherLoad.retry;
   useEffect(() => { setPage(1); }, [search, subjectFilter]);
@@ -266,7 +261,8 @@ export const TeachersView: React.FC = () => {
               <tr className="border-b border-[#E2E8F0]">
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Macallin</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Maaddooyin</th>
-                <th className="px-4 py-3 font-semibold text-[#64748B]">Fasallo</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Classes taught</th>
+                <th className="px-4 py-3 font-semibold text-[#64748B]">Form Teacher class</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Telefoon</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Xaalad</th>
                 <th className="px-4 py-3 font-semibold text-[#64748B]">Hawlgal</th>
@@ -274,8 +270,8 @@ export const TeachersView: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-[#E2E8F0]">
               {filteredTeachers.map(t => {
-                const formTeacherClassIds = new Set(classes.filter(klass => klass.classTeacherId === t.userId && !klass.isArchived).map(klass => klass.id));
-                const displayedClassIds = Array.from(new Set([...(t.assignedClasses || []), ...formTeacherClassIds]));
+                const formTeacherClass = classes.find(klass => klass.classTeacherId === t.userId && !klass.isArchived);
+                const displayedClassIds = Array.from(new Set(t.assignedClasses || []));
                 return (
                 <tr key={t.id} className="hover:bg-[#F5FAF8]">
                   <td className="px-4 py-3">
@@ -286,9 +282,9 @@ export const TeachersView: React.FC = () => {
                   <td className="px-4 py-3"><div className="flex max-w-xs flex-wrap gap-1">{(t.assignedSubjects || []).map(id => <span key={id} className="rounded-full bg-teal-50 px-2 py-1 text-[10px] font-semibold text-teal-800">{subjects.find(item => item.id === id)?.name || id}</span>)}{!(t.assignedSubjects || []).length && <span className="text-slate-400">Lama dooran</span>}</div></td>
                   <td className="px-4 py-3 text-[#334155]">{displayedClassIds.map(id => {
                     const klass = classes.find(item => item.id === id);
-                    const label = klass ? `${klass.name}${klass.section ? ` · ${klass.section}` : ''}` : id;
-                    return formTeacherClassIds.has(id) ? `${label} (Form Teacher)` : label;
+                    return klass ? `${klass.name}${klass.section ? ` · ${klass.section}` : ''}` : id;
                   }).join(', ') || 'Not assigned'}</td>
+                  <td className="px-4 py-3 text-[#334155]">{formTeacherClass ? `${formTeacherClass.name}${formTeacherClass.section ? ` · ${formTeacherClass.section}` : ''}` : 'Not assigned'}</td>
                   <td className="px-4 py-3 font-mono text-[#334155]">{t.phone || 'Phone not provided'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${String(t.status).toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{t.status}</span>
@@ -312,7 +308,7 @@ export const TeachersView: React.FC = () => {
               })}
               {filteredTeachers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-[#64748B]">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-[#64748B]">
                     {teachers.length ? 'Wax macallin ah lama helin.' : 'Weli macallin lama diiwaangelin.'}
                   </td>
                 </tr>

@@ -38,7 +38,7 @@ import {
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
-import { DEFAULT_SUBJECT_NAMES, normalizeSubjectCode, normalizeSubjectName, subjectNameExists } from './subject-validation.ts';
+import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
@@ -373,6 +373,19 @@ function getStaffForRequest(req: Request, userId: string, schoolId: string) {
   return requestLookup(req, `staff:${schoolId}:${userId}`, () => db.getStaffMemberByUserId(userId, schoolId));
 }
 
+async function getTeacherFormTeacherClassIds(schoolId: string, userId: string): Promise<string[]> {
+  const rows = await queryAllRows('classes', { school_id: schoolId, class_teacher_id: userId, is_archived: 'false' }, 'id');
+  return [...new Set(rows.map((row: any) => String(row.id)))];
+}
+
+async function getStudentCurrentClassId(schoolId: string, studentId: string, fallbackClassId = ''): Promise<string> {
+  const year = await db.queryPage('academic_years', { school_id: schoolId, is_current: 'true' }, 1, 1, undefined, 'id');
+  const academicYearId = String((year.items[0] as any)?.id || '');
+  if (!academicYearId) return fallbackClassId;
+  const enrollment = await db.queryPage('enrollments', { school_id: schoolId, academic_year_id: academicYearId, student_id: studentId, status: 'active' }, 1, 1, undefined, 'class_id');
+  return String((enrollment.items[0] as any)?.classId || '');
+}
+
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
   // Resolve both subject-teaching and Form Teacher scopes through school-bound
   // joins. This avoids a separate teachers lookup and avoids loading every class.
@@ -580,6 +593,18 @@ function requireSchoolStaff(req: Request, res: Response, next: () => void) {
   next();
 }
 
+async function canAccessFormTeacherClass(req: Request, res: Response, classId: string): Promise<boolean> {
+  const user = (req as any).user as User;
+  const school = (req as any).school as School;
+  if (normalizeRole(user.role) !== 'teacher') return true;
+  const klass = await db.getClassById(classId, school.id);
+  if (!klass) { res.status(404).json({ error: 'Class not found in this school.' }); return false; }
+  if (klass.classTeacherId !== user.id) {
+    res.status(403).json({ error: 'Attendance access is limited to your own Form Teacher class.' }); return false;
+  }
+  return true;
+}
+
 async function canAccessTeachingClass(req: Request, res: Response, classId: string): Promise<boolean> {
   const user = (req as any).user as User;
   const school = (req as any).school as School;
@@ -610,16 +635,18 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
   if (!student || (user.schoolId && student.schoolId !== user.schoolId)) return false;
   if (user.role === 'super_admin' || user.role === 'school_admin' || user.role === 'accountant') return true;
   if (user.role === 'teacher') {
+    const currentClassId = await getStudentCurrentClassId(student.schoolId, student.id, student.classId);
+    if (!currentClassId) return false;
+    const formTeacherClassIds = await getTeacherFormTeacherClassIds(student.schoolId, user.id);
+    // A Form Teacher is confined to their own class even if they also teach other subjects.
+    if (formTeacherClassIds.length) return formTeacherClassIds.includes(currentClassId);
     const teacherPage = await db.queryPage('teachers', { school_id: student.schoolId, user_id: user.id }, 1, 1, undefined, 'id,assigned_classes');
     const teacher = teacherPage.items[0] as any;
     if (!teacher) return false;
-    const klass = await db.getClassById(student.classId, student.schoolId);
-    if (klass && (
-      klass.classTeacherId === user.id ||
-      (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(student.classId))
-    )) return true;
+    const klass = await db.getClassById(currentClassId, student.schoolId);
+    if (klass && (Array.isArray(teacher.assignedClasses) && teacher.assignedClasses.includes(currentClassId))) return true;
     const assignment = await db.queryPage('class_subjects', {
-      school_id: student.schoolId, teacher_id: teacher.id, class_id: student.classId, is_active: 'true'
+      school_id: student.schoolId, teacher_id: teacher.id, class_id: currentClassId, is_active: 'true'
     }, 1, 1, undefined, 'id');
     return assignment.items.length > 0;
   }
@@ -3026,7 +3053,14 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
     classTeacherId: req.body?.classTeacherId || null,
     monthlyFee: Number(req.body?.monthlyFee || 0), shift: requestedShift as 1 | 2
   });
-  res.status(201).json(newClass);
+  await db.flush();
+  let subjectTemplateResult: { applied: boolean; count: number; gradeBand: string | null; added: number } = { applied: false, count: 0, gradeBand: null, added: 0 };
+  let subjectTemplateWarning: string | undefined;
+  if (gradeLevel >= 1 && gradeLevel <= 8) {
+    try { subjectTemplateResult = await applyPrimarySubjectTemplate(school, newClass); }
+    catch (error) { console.error('[classes] Primary subject template attachment failed.', { schoolId: school.id, classId: newClass.id, error }); subjectTemplateWarning = 'The class was created, but its subject template could not be attached. Open Curriculum and apply the template.'; }
+  }
+  res.status(201).json({ ...newClass, subjectTemplateApplied: subjectTemplateResult.applied, subjectTemplateCount: subjectTemplateResult.count, subjectTemplateWarning });
 });
 
 apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res) => {
@@ -3178,6 +3212,47 @@ async function findCurriculumDependency(schoolId: string, classId: string, subje
   }
   return null;
 }
+function primarySubjectBandForGrade(gradeLevel: number): PrimarySubjectGradeBand | null {
+  if (gradeLevel >= 1 && gradeLevel <= 4) return '1-4';
+  if (gradeLevel >= 5 && gradeLevel <= 6) return '5-6';
+  if (gradeLevel >= 7 && gradeLevel <= 8) return '7-8';
+  return null;
+}
+
+function getPrimarySubjectTemplates(school: School): PrimarySubjectTemplates {
+  const saved = school.setupData?.subjectTemplates;
+  return {
+    '1-4': Array.isArray(saved?.['1-4']) && saved['1-4'].length ? saved['1-4'] : [...PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['1-4']],
+    '5-6': Array.isArray(saved?.['5-6']) && saved['5-6'].length ? saved['5-6'] : [...PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['5-6']],
+    '7-8': Array.isArray(saved?.['7-8']) && saved['7-8'].length ? saved['7-8'] : [...PRIMARY_SUBJECT_TEMPLATE_DEFAULTS['7-8']]
+  };
+}
+
+async function applyPrimarySubjectTemplate(school: School, klass: SchoolClass) {
+  const band = primarySubjectBandForGrade(Number(klass.gradeLevel || 0));
+  if (!band) return { applied: false, count: 0, gradeBand: null, added: 0 };
+  const names = getPrimarySubjectTemplates(school)[band];
+  const existingSubjects = await db.getSubjects(school.id);
+  for (const name of names) {
+    if (subjectNameExists(existingSubjects, name)) continue;
+    existingSubjects.push(db.createSubject({ schoolId: school.id, name, code: '', description: `Ethiopian primary curriculum template: Grades ${band}.`, creditUnits: 0, department: '', assignedTeacherIds: [] }));
+  }
+  await db.flush();
+  const subjects = await db.getSubjects(school.id);
+  const subjectByName = new Map(subjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
+  const existingRows = await readClassCurriculumRows(school.id, klass.id);
+  const existingSubjectIds = new Set(existingRows.map((row: any) => String(row.subject_id)));
+  const capacity = await getClassCurriculumCapacity(school.id);
+  const periodsPerWeek = Math.max(1, Math.min(2, Math.floor(Math.max(names.length, capacity.weeklyCapacity) / Math.max(1, names.length))));
+  const selectedSubjects = names.map(name => subjectByName.get(name.trim().toLocaleLowerCase())).filter(Boolean) as Array<{ id: string }>;
+  const payload = selectedSubjects.filter(subject => !existingSubjectIds.has(subject.id))
+    .map(subject => ({ id: randomUUID(), school_id: school.id, class_id: klass.id, subject_id: subject.id, periods_per_week: periodsPerWeek, teacher_id: null, small_exam_enabled: false, big_exam_enabled: false, is_active: true }));
+  if (payload.length) {
+    const { error } = await classGroupsClient().from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
+    if (error) throw error;
+  }
+  return { applied: true, count: names.length, gradeBand: band, added: payload.length };
+}
 async function readClassCurriculumRows(schoolId: string, classId: string) {
   const { data, error } = await classGroupsClient().from('class_subjects')
     .select('id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at')
@@ -3291,6 +3366,20 @@ apiRouter.delete('/curriculum/classes/:classId/subjects/:subjectId', requireAuth
   }
 });
 
+apiRouter.post('/curriculum/classes/:classId/apply-template', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can apply curriculum templates.' }); return; }
+  const klass = await db.getClassById(String(req.params.classId || ''), school.id);
+  if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
+  try {
+    const result = await applyPrimarySubjectTemplate(school, klass);
+    if (!result.applied) { res.status(400).json({ error: 'Primary subject templates are available for Grades 1–8 only.' }); return; }
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(503).json({ error: error instanceof Error ? error.message : 'The subject template could not be applied.' });
+  }
+});
 apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
@@ -3406,7 +3495,19 @@ apiRouter.post('/class-groups/defaults', requireAuth, requireSchoolAdminOrSuperA
  const {error}=await client.from('class_groups').insert(missing.map((name,index)=>({school_id:school.id,name,sort_order:index})));if(error){res.status(500).json({error:'Fasallada caadiga ah lama abuuri karin.'});return;}res.json({created:missing.length,skipped:defaults.length-missing.length});
 });
 apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) === 'teacher') {
+    const assignedRows = await queryAllRows('class_subjects', {
+      school_id: school.id, is_active: 'true',
+      'teachers.user_id': user.id, 'teachers.school_id': school.id
+    }, 'subject_id,teachers!class_subjects_teacher_id_fkey!inner(user_id)');
+    const assignedSubjectIds = new Set(assignedRows.map((row: any) => String(row.subjectId)));
+    const subjects = (await db.getSubjects(school.id)).filter(subject => assignedSubjectIds.has(subject.id));
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json(subjects);
+    return;
+  }
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
 });
 
@@ -3581,6 +3682,32 @@ apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContex
   res.json({ success: true, comment: { id: data.id, studentId: data.student_id, semester: data.semester, comment: data.comment, teacherUserId: data.teacher_user_id, updatedAt: data.updated_at } });
 });
 
+apiRouter.get('/subjects/templates', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view subject templates.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json(getPrimarySubjectTemplates(school));
+});
+
+apiRouter.put('/subjects/templates/:gradeBand', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can edit subject templates.' }); return; }
+  const band = String(req.params.gradeBand || '') as PrimarySubjectGradeBand;
+  if (!['1-4', '5-6', '7-8'].includes(band)) { res.status(400).json({ error: 'Choose grade band 1-4, 5-6, or 7-8.' }); return; }
+  if (!Array.isArray(req.body?.subjects) || req.body.subjects.length < 1 || req.body.subjects.length > 30) { res.status(400).json({ error: 'A grade template must contain 1 to 30 subjects.' }); return; }
+  const subjects: string[] = (req.body.subjects as unknown[]).map((value: unknown) => normalizeSubjectName(value));
+  if (subjects.some(name => !name || name.length > 150) || new Set(subjects.map(name => name.toLocaleLowerCase())).size !== subjects.length) { res.status(400).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return; }
+  const templates = { ...getPrimarySubjectTemplates(school), [band]: subjects } as PrimarySubjectTemplates;
+  const setupData = { ...(school.setupData || {}), subjectTemplates: templates } as NonNullable<School['setupData']>;
+  const updated = db.updateSchool(school.id, { setupData });
+  if (!updated) { res.status(404).json({ error: 'School not found.' }); return; }
+  await db.flush();
+  db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATE_UPDATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated primary subject template for grades ${band}.`, severity: 'info' });
+  res.json({ gradeBand: band, subjects, templates });
+});
 apiRouter.post('/subjects/defaults', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
   const role = normalizeRole((req as any).user.role);
@@ -3767,10 +3894,10 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   return statuses;
 }
 
-async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string) {
+async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string) {
   const rows: any[] = [];
   for (let page = 1;; page += 1) {
-    const result = await db.queryPage(table, filters, page, 100, undefined, columns);
+    const result = await db.queryPage(table, filters, page, 100, undefined, columns, orderBy);
     rows.push(...result.items);
     if (rows.length >= result.total || result.items.length === 0) break;
   }
@@ -4693,22 +4820,63 @@ apiRouter.post('/timetable/generate-all', requireAuth, requireSchoolAdminOrSuper
 // 4. STUDENTS & TEACHERS
 // ==============================================================================
 
-apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (!role || !['school_admin', 'super_admin', 'teacher'].includes(role)) {
+    res.status(403).json({ error: 'Only school administrators and the assigned Form Teacher can view parent contacts.' }); return;
+  }
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
-  const classId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
+  const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
+  const classes = await db.getClasses(school.id);
+  let studentClassFilter: string | string[] | undefined = requestedClassId || undefined;
+  if (role === 'teacher') {
+    const ownClassIds = classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived).map(klass => klass.id);
+    if (!ownClassIds.length) { res.status(403).json({ error: 'You are not assigned as a Form Teacher to a class.' }); return; }
+    if (requestedClassId && !ownClassIds.includes(requestedClassId)) {
+      res.status(403).json({ error: 'Parent contacts are limited to your own Form Teacher class.' }); return;
+    }
+    studentClassFilter = requestedClassId || ownClassIds;
+  }
+  const classId = requestedClassId;
   const search = typeof req.query.search === 'string'
     ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
     : '';
 
-  const [classes, students, guardianRows, guardianLinks] = await Promise.all([
-    db.getClasses(school.id),
-    queryAllRows('students', { school_id: school.id, status: 'active', ...(classId ? { class_id: classId } : {}) }, LIST_QUERY_COLUMNS.students),
-    queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
-    queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary')
-  ]);
+  const currentYearPage = await db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id');
+  const currentYearId = String((currentYearPage.items[0] as any)?.id || '');
+  const currentEnrollments = currentYearId
+    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active' }, 'student_id,class_id,section_id')
+    : [];
+  const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
+  const classScope = studentClassFilter ? (Array.isArray(studentClassFilter) ? studentClassFilter : [studentClassFilter]) : null;
+  const studentIdsForFilter = currentYearId && classScope
+    ? [...new Set(currentEnrollments.filter((row: any) => classScope.includes(String(row.classId))).map((row: any) => String(row.studentId)))]
+    : null;
+  const studentFilters: Record<string, string | string[] | undefined> = { school_id: school.id, status: 'active' };
+  if (currentYearId && classScope) studentFilters.id = studentIdsForFilter || [];
+  else if (!currentYearId && studentClassFilter) studentFilters.class_id = studentClassFilter;
+  const sectionIds = [...new Set(currentEnrollments.map((row: any) => String(row.sectionId || '')).filter(Boolean))];
+  let students: any[] = [];
+  let guardianRows: any[] = [];
+  let guardianLinks: any[] = [];
+  let sectionRows: any[] = [];
+  try {
+    [students, guardianRows, guardianLinks, sectionRows] = await Promise.all([
+      currentYearId && classScope && !studentIdsForFilter?.length ? Promise.resolve([]) : queryAllRows('students', studentFilters, LIST_QUERY_COLUMNS.students),
+      queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
+      queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id'),
+      sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([])
+    ]);
+  } catch (error) {
+    console.error('[parents/contacts] Failed to load parent directory data.', { schoolId: school.id, error });
+    res.status(503).json({ error: 'Parent contacts are temporarily unavailable. Please retry.', code: 'PARENT_CONTACTS_UNAVAILABLE', retryable: true });
+    return;
+  }
   const classById = new Map<string, SchoolClass>(classes.map(klass => [klass.id, klass] as const));
+  const sectionById = new Map<string, string>(sectionRows.map((row: any) => [String(row.id), String(row.name || '')]));
   if (classId && !classById.has(classId)) {
     res.status(404).json({ error: 'The selected class was not found in this school.' });
     return;
@@ -4725,23 +4893,29 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const studentById = new Map<string, any>();
   const guardianById = new Map<string, any>(guardianRows.map((guardian: any) => [String(guardian.id), guardian]));
   const addContact = (phoneValue: unknown, nameValue: unknown, relationship: string, child: { id: string; studentId: string; fullName: string; className: string }) => {
-    const phone = String(phoneValue || '').trim();
-    const normalizedPhone = phone.replace(/\D/g, '');
-    if (!normalizedPhone) return;
-    let contact = contacts.get(normalizedPhone);
+    const rawPhone = String(phoneValue || '').trim();
+    const normalizedPhone = rawPhone.replace(/\D/g, '');
+    // A missing phone must remain visible; group those guardian roles per child
+    // because there is no safe phone-based identity to deduplicate across families.
+    const contactKey = normalizedPhone || `missing:${child.id}`;
+    const phone = normalizedPhone ? rawPhone : 'Phone not provided';
+    let contact = contacts.get(contactKey);
     if (!contact) {
-      contact = { id: `${school.id}:${normalizedPhone}`, phone, normalizedPhone, name: String(nameValue || ''), relationships: new Set<string>(), students: [] };
-      contacts.set(normalizedPhone, contact);
+      contact = { id: `${school.id}:${contactKey}`, phone, normalizedPhone, name: String(nameValue || ''), relationships: new Set<string>(), students: [] };
+      contacts.set(contactKey, contact);
     }
     if (!contact.name && nameValue) contact.name = String(nameValue);
     contact.relationships.add(relationship);
     if (!contact.students.some(item => item.id === child.id)) contact.students.push(child);
   };
   for (const student of students) {
+    const enrollment = enrollmentByStudent.get(String(student.id));
+    const currentClass = enrollment ? classById.get(String(enrollment.classId)) : currentYearId ? undefined : classById.get(String(student.classId));
+    const currentSection = enrollment?.sectionId ? sectionById.get(String(enrollment.sectionId)) || currentClass?.section || '' : currentClass?.section || '';
     const child = {
       id: student.id, studentId: student.studentId, fullName: studentNameKey(student),
-      className: [classById.get(student.classId)?.name, classById.get(student.classId)?.section].filter(Boolean).join(' · ') || 'Unassigned'
-    };
+      className: currentClass ? [currentClass.name, currentSection].filter(Boolean).join(' · ') : 'Not assigned'
+    };;
     studentById.set(String(student.id), child);
     addContact(student.fatherPhone, student.fatherName, 'Father', child);
     addContact(student.motherPhone, '', 'Mother', child);
@@ -4794,8 +4968,11 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   const feeStatus = canViewFeeStatus && ['paid', 'partial', 'unpaid'].includes(requestedFeeStatus) ? requestedFeeStatus : 'all';
   const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: classId, branch_id: branchId, gender, status: studentStatus };
   let roleFilter: string | undefined;
+  let teacherAssignedClassIds: string[] = [];
   if (user.role === 'teacher') {
-    const assigned = await getTeacherAssignedClassIds(school.id, user.id);
+    const ownFormTeacherClasses = await getTeacherFormTeacherClassIds(school.id, user.id);
+    const assigned = ownFormTeacherClasses.length ? ownFormTeacherClasses : await getTeacherAssignedClassIds(school.id, user.id);
+    teacherAssignedClassIds = assigned;
     if (classId && !assigned.includes(classId)) { res.status(403).json({ error: 'Student access is limited to your assigned classes.' }); return; }
     if (!assigned.length) { res.json([]); return; }
     filters.class_id = classId || assigned;
@@ -4837,16 +5014,61 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
 
+  // Resolve the displayed/filtered class from the active enrollment for the school's current year.
+  // students.class_id is retained for compatibility, but is not authoritative after year rollover.
+  const currentYearPage = await db.queryPage('academic_years', { school_id: school.id, is_current: 'true' }, 1, 1, undefined, 'id');
+  const currentYearId = String((currentYearPage.items[0] as any)?.id || '');
+  const currentEnrollments = currentYearId
+    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active' }, 'id,student_id,class_id,section_id,roll_number')
+    : [];
+  const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
+  const classRows = await db.getClasses(school.id);
+  const classById = new Map<string, SchoolClass>(classRows.map(klass => [klass.id, klass] as const));
+  const sectionIds = [...new Set(currentEnrollments.map((row: any) => String(row.sectionId || '')).filter(Boolean))];
+  const sectionRows = sectionIds.length
+    ? await queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name')
+    : [];
+  const sectionById = new Map<string, string>(sectionRows.map((row: any) => [String(row.id), String(row.name || '')]));
+  const decorateWithCurrentEnrollment = (rows: any[]) => rows.map(student => {
+    if (!currentYearId) {
+      const legacyClass = classById.get(String(student.classId || ''));
+      const legacySection = legacyClass?.section || student.section || '';
+      return { ...student, className: legacyClass ? [legacyClass.name, legacySection].filter(Boolean).join(' · ') : 'Not assigned' };
+    }
+    const enrollment = enrollmentByStudent.get(String(student.id));
+    const klass = enrollment ? classById.get(String(enrollment.classId)) : undefined;
+    const section = enrollment?.sectionId ? sectionById.get(String(enrollment.sectionId)) || klass?.section || '' : klass?.section || '';
+    return {
+      ...student,
+      classId: enrollment?.classId || '',
+      section,
+      rollNumber: enrollment?.rollNumber || student.rollNumber || '',
+      className: klass ? [klass.name, section].filter(Boolean).join(' · ') : 'Not assigned'
+    };
+  });
+  const enrollmentClassScope = classId ? [classId] : user.role === 'teacher' ? teacherAssignedClassIds : null;
+  if (currentYearId && enrollmentClassScope) {
+    const enrolledStudentIds = [...new Set(currentEnrollments
+      .filter((row: any) => enrollmentClassScope.includes(String(row.classId)))
+      .map((row: any) => String(row.studentId)))];
+    if (!enrolledStudentIds.length) {
+      res.set({ 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': '0', 'X-Total-Pages': '0' });
+      res.json([]); return;
+    }
+    filters.class_id = undefined;
+    filters.id = enrolledStudentIds;
+  }
+
   // One class selected: return the whole class at once (A-Z), so numbering 1, 2, 3 is stable.
-  if (typeof filters.class_id === 'string' && filters.class_id && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
+  if (classId && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
     const classStudents = (await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students))
       .filter((student: any) => !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
       .sort(compareStudentsByName);
     res.set({ 'X-Page': '1', 'X-Page-Size': String(Math.max(classStudents.length, 1)), 'X-Total-Count': String(classStudents.length), 'X-Total-Pages': '1' });
-    if (!canViewFeeStatus) { res.json(sanitizeStudents(classStudents)); return; }
+    if (!canViewFeeStatus) { res.json(sanitizeStudents(decorateWithCurrentEnrollment(classStudents))); return; }
     const classStatusMap = await getStudentFeeStatusMap(school.id, classStudents.map((student: any) => student.id), school.academicYear);
-    res.json(sanitizeStudents(classStudents.map((student: any) => ({ ...student, feeStatus: classStatusMap.get(student.id) || 'unpaid' }))));
+    res.json(sanitizeStudents(decorateWithCurrentEnrollment(classStudents.map((student: any) => ({ ...student, feeStatus: classStatusMap.get(student.id) || 'unpaid' })))));
     return;
   }
 
@@ -4863,7 +5085,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     const items = filtered.slice((page - 1) * pageSize, page * pageSize)
       .map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }));
     res.set({ 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': String(total), 'X-Total-Pages': String(Math.ceil(total / pageSize)) });
-    res.json(sanitizeStudents(items));
+    res.json(sanitizeStudents(decorateWithCurrentEnrollment(items)));
     return;
   }
 
@@ -4871,11 +5093,11 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
   const canDecorateFeeStatus = canViewFeeStatus;
   if (!canDecorateFeeStatus) {
-    res.json(sanitizeStudents(result.items));
+    res.json(sanitizeStudents(decorateWithCurrentEnrollment(result.items)));
     return;
   }
   const statusMap = await getStudentFeeStatusMap(school.id, result.items.map((student: any) => student.id), school.academicYear);
-  res.json(sanitizeStudents(result.items.map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }))));
+  res.json(sanitizeStudents(decorateWithCurrentEnrollment(result.items.map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' })))));
 });
 
 apiRouter.get('/students/export', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -5233,16 +5455,41 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
   }
 });
 
-apiRouter.put('/students/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
-  const school = (req as any).school;
+apiRouter.put('/students/:id', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  const studentId = String(req.params.id || '');
+  if (role === 'teacher') {
+    const currentClassId = await getStudentCurrentClassId(school.id, studentId);
+    const ownFormTeacherClasses = await getTeacherFormTeacherClassIds(school.id, user.id);
+    if (!currentClassId || !ownFormTeacherClasses.includes(currentClassId) || !await canAccessStudentRecord(user, studentId)) {
+      res.status(403).json({ error: 'You can only manage student profiles in your own Form Teacher class.' }); return;
+    }
+    const requestedClassId = typeof req.body?.classId === 'string' ? req.body.classId.trim() : '';
+    if (requestedClassId && requestedClassId !== currentClassId) {
+      res.status(403).json({ error: 'Form Teachers cannot move a student to another class.' }); return;
+    }
+    const restrictedFields = ['status', 'branchId', 'rollNumber', 'documents', 'busRouteId'];
+    if (restrictedFields.some(field => Object.prototype.hasOwnProperty.call(req.body || {}, field))) {
+      res.status(403).json({ error: 'Only school administrators can change student enrollment, status, documents, or transport assignments.' }); return;
+    }
+  } else if (role !== 'school_admin' && role !== 'super_admin') {
+    res.status(403).json({ error: 'Only school administrators and the assigned Form Teacher can update student records.' }); return;
+  }
   // Never accept identity, tenant, credential, or audit fields from the client.
   // Only the editable student profile fields may be changed through this route.
-  const editableFields = [
+  const adminEditableFields = [
     'firstName', 'middleName', 'lastName', 'gender', 'admissionDate',
     'dateOfBirth', 'studentPhone', 'fatherPhone', 'fatherName', 'address', 'motherPhone',
     'classId', 'section', 'status', 'branchId', 'bloodGroup', 'rollNumber',
     'allergies', 'busRouteId', 'documents', 'notes'
   ] as const;
+  const formTeacherEditableFields = [
+    'firstName', 'middleName', 'lastName', 'gender', 'studentPhone', 'fatherPhone', 'fatherName',
+    'motherPhone', 'address', 'bloodGroup', 'allergies', 'notes'
+  ] as const;
+  const editableFields: readonly string[] = role === 'teacher' ? formTeacherEditableFields : adminEditableFields;
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
   const payload = Object.fromEntries(editableFields
     .filter(field => Object.prototype.hasOwnProperty.call(body, field))
@@ -5895,7 +6142,7 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
     return;
   }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view attendance.' }); return; }
-  if (!await canAccessTeachingClass(req, res, classId as string)) return;
+  if (!await canAccessFormTeacherClass(req, res, classId as string)) return;
   res.json(await db.getAttendance(school.id, classId as string, date as string));
 });
 
@@ -5911,7 +6158,7 @@ apiRouter.get('/attendance/month', requireAuth, requireSchoolContext, requireSch
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) {
     res.status(403).json({ error:'Akoonka shaqaalaha ma laha rukhsadda xaadirinta.' }); return;
   }
-  if (!await canAccessTeachingClass(req, res, classId)) return;
+  if (!await canAccessFormTeacherClass(req, res, classId)) return;
   const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
   const endDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0,10);
   const client = documentServiceClient(res);

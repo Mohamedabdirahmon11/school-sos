@@ -35,7 +35,7 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 1, title: 'Academic Year & Semesters', description: 'Confirm the current academic year and semester dates.', coreSteps: [2, 3] },
   { id: 2, title: 'School Information & WhatsApp', description: 'Confirm the school profile and administration WhatsApp number.', coreSteps: [1] },
   { id: 3, title: 'Classes & Grades', description: 'Create the school classes and sections. KG 1 and KG 2 are supported.', views: [{ label: 'Open Classes', view: 'sch_classes' }] },
-  { id: 4, title: 'Subjects', description: 'Add the subjects taught by this school.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }] },
+  { id: 4, title: 'Subjects', description: 'Add school subjects and edit Ethiopian primary templates for Grades 1–4, 5–6 and 7–8. New Grade 1–8 classes receive their matching template automatically.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Primary Templates & Curriculum', view: 'sch_curriculum' }] },
   { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific IDs and PIN/password login.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }] },
   { id: 6, title: 'Students & Parents', description: 'Register students, bulk import records and PINs, and add parent contacts.', views: [{ label: 'Open Students', view: 'sch_students' }, { label: 'Open Parents', view: 'sch_parents' }] },
   { id: 7, title: 'Timetable', description: 'Review the school calendar and working hours, then create the timetable or skip timetable setup for now.', optional: true, coreSteps: [4, 5], views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },

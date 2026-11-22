@@ -329,3 +329,57 @@ test('teacher mobile quick navigation prioritizes daily teaching actions while t
   assert.match(sidebar, /item\('t_messages'/);
   assert.match(sidebar, /item\('t_payslips'/);
 });
+
+
+test('teacher directory separates subject-teaching classes from Form Teacher class and relies on server-side subject filtering', () => {
+  const view = read('../src/components/schooladmin/TeachersView.tsx');
+  const start = view.indexOf('const filteredTeachers = teachers;');
+  assert.notEqual(start, -1);
+  assert.match(view, /Classes taught/);
+  assert.match(view, /Form Teacher class/);
+  assert.match(view, /const displayedClassIds = Array\.from\(new Set\(t\.assignedClasses \|\| \[\]\)\)/);
+});
+
+test('Form Teachers are restricted to their own parent-contact class and attendance reads', () => {
+  const api = read('../src/server/api.ts');
+  const parentStart = api.indexOf("apiRouter.get('/parents/contacts'");
+  const parentEnd = api.indexOf("apiRouter.get('/students'", parentStart);
+  const parentRoute = api.slice(parentStart, parentEnd);
+  assert.match(parentRoute, /requireAuth, requireSchoolContext/);
+  assert.match(parentRoute, /ownClassIds\.includes\(requestedClassId\)/);
+  assert.match(parentRoute, /studentClassFilter = requestedClassId \|\| ownClassIds/);
+  assert.match(api, /async function canAccessFormTeacherClass/);
+  assert.match(api, /Attendance access is limited to your own Form Teacher class/);
+});
+
+test('Form Teacher student list and direct student reads are limited to current-year Form Teacher classes', () => {
+  const api = read('../src/server/api.ts');
+  assert.match(api, /async function getTeacherFormTeacherClassIds/);
+  assert.match(api, /const ownFormTeacherClasses = await getTeacherFormTeacherClassIds/);
+  assert.match(api, /if \(formTeacherClassIds\.length\) return formTeacherClassIds\.includes\(currentClassId\)/);
+  assert.match(api, /getStudentCurrentClassId\(student\.schoolId, student\.id, student\.classId\)/);
+});
+
+
+test('Form Teachers may update profiles only inside their current Form Teacher class', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.put('/students/:id'");
+  const end = api.indexOf("apiRouter.delete('/students/:id'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /ownFormTeacherClasses\.includes\(currentClassId\)/);
+  assert.match(route, /Form Teachers cannot move a student to another class/);
+  assert.match(route, /formTeacherEditableFields/);
+  assert.match(route, /Only school administrators can change student enrollment/);
+});
+
+
+test('teacher subject directory is restricted to active class-subject assignments', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.get('/subjects'");
+  const end = api.indexOf("apiRouter.get('/teacher/form-teacher-classes'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /'teachers\.user_id': user\.id/);
+  assert.match(route, /'teachers\.school_id': school\.id/);
+  assert.match(route, /is_active: 'true'/);
+  assert.match(route, /assignedSubjectIds\.has\(subject\.id\)/);
+});

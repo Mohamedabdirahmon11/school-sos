@@ -30,15 +30,21 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
   const [copying, setCopying] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  const [templates, setTemplates] = useState<Record<'1-4' | '5-6' | '7-8', string[]>>({ '1-4': [], '5-6': [], '7-8': [] });
+  const [templateBand, setTemplateBand] = useState<'1-4' | '5-6' | '7-8'>('1-4');
+  const [templateDraft, setTemplateDraft] = useState('');
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateApplying, setTemplateApplying] = useState(false);
 
   const loadBase = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [classRows, subjectRows] = await Promise.all([ApiClient.getClasses(), ApiClient.getSubjects()]);
+      const [classRows, subjectRows, templateRows] = await Promise.all([ApiClient.getClasses(), ApiClient.getSubjects(), ApiClient.getPrimarySubjectTemplates()]);
       const activeClasses = (Array.isArray(classRows) ? classRows : []).filter(row => !row.isArchived);
       setClasses(activeClasses);
       setSubjects(Array.isArray(subjectRows) ? subjectRows : []);
+      setTemplates(templateRows);
       setClassId(current => activeClasses.some(row => row.id === current) ? current : activeClasses[0]?.id || '');
     } catch (cause) {
       setError(errorMessage(cause, 'Fasallada iyo maaddooyinka lama soo qaadi karin.'));
@@ -75,6 +81,8 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
     return () => { active = false; };
   }, [classId, school?.id]);
 
+  useEffect(() => { setTemplateDraft((templates[templateBand] || []).join('\n')); }, [templates, templateBand]);
+
   const capacity = detail?.capacity.weeklyCapacity ?? 0;
   const total = useMemo(() => included.reduce((sum, id) => sum + (periods[id] || 1), 0), [included, periods]);
   const overCapacity = total > capacity;
@@ -86,6 +94,28 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
     if (checked) setPeriods(current => ({ ...current, [subjectId]: current[subjectId] || 1 }));
   };
 
+  const saveTemplate = async () => {
+    const names = templateDraft.split(/\r?\n/).map(name => name.trim()).filter(Boolean);
+    if (!names.length || names.length > 30 || new Set(names.map(name => name.toLocaleLowerCase())).size !== names.length) { setError('Enter 1–30 unique subject names, one per line.'); return; }
+    setTemplateSaving(true); setError(''); setNotice('');
+    try {
+      const result = await ApiClient.savePrimarySubjectTemplate(templateBand, names);
+      setTemplates(result.templates);
+      setNotice(`Template for Grades ${templateBand} saved for this school.`);
+    } catch (cause) { setError(errorMessage(cause, 'Subject template could not be saved.')); }
+    finally { setTemplateSaving(false); }
+  };
+
+  const applyTemplate = async () => {
+    if (!classId || isReadOnly) return;
+    setTemplateApplying(true); setError(''); setNotice('');
+    try {
+      const result = await ApiClient.applyPrimarySubjectTemplate(classId);
+      await Promise.all([loadBase(), loadDetail(classId)]);
+      setNotice(`Grades ${result.gradeBand} template applied. ${result.added} subjects added to the class curriculum.`);
+    } catch (cause) { setError(errorMessage(cause, 'Subject template could not be applied.')); }
+    finally { setTemplateApplying(false); }
+  };
   const save = async () => {
     if (!classId || overCapacity || isReadOnly) return;
     setSaving(true); setError(''); setNotice('');
@@ -119,6 +149,18 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
     <Stepper activeStep={4} labels={['Sannad & Xiisado', 'Fasallo', 'Maaddooyin', 'Manhaj']} ariaLabel="Tallaabooyinka dejinta waxbarashada" />
     {notice && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"><CheckCircle2 className="h-4 w-4 shrink-0" />{notice}</div>}
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">{error}</div>}
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-3"><h2 className="text-sm font-bold text-slate-900 dark:text-white">Ethiopian primary subject templates</h2><p className="mt-1 text-xs text-slate-500">Edit the school-specific subject list for each grade band. New Grade 1–8 classes receive the matching template automatically.</p></div>
+      <div className="grid gap-3 md:grid-cols-[180px_1fr]">
+        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Grade band
+          <select value={templateBand} onChange={event => setTemplateBand(event.target.value as '1-4' | '5-6' | '7-8')} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="1-4">Grades 1–4</option><option value="5-6">Grades 5–6</option><option value="7-8">Grades 7–8</option></select>
+        </label>
+        <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Subjects (one per line)
+          <textarea value={templateDraft} onChange={event => setTemplateDraft(event.target.value)} rows={4} maxLength={5000} disabled={isReadOnly} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950" />
+        </label>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2"><Button type="button" variant="primary" disabled={isReadOnly || templateSaving} onClick={() => void saveTemplate()}>{templateSaving ? 'Saving…' : 'Save school template'}</Button><Button type="button" variant="secondary" disabled={isReadOnly || templateApplying || !classId} onClick={() => void applyTemplate()}>{templateApplying ? 'Applying…' : 'Apply to selected class'}</Button></div>
+    </section>
 
     {!classes.length ? <Card><EmptyState><div className="space-y-3"><BookOpen className="mx-auto h-8 w-8 text-teal-700" /><p className="font-semibold text-slate-800 dark:text-white">Weli fasallo lama samayn.</p><p>Marka hore samee fasallada iyo qaybaha.</p><Button variant="primary" type="button" onClick={() => onNavigate('sch_classes')}>Tag Fasallada</Button></div></EmptyState></Card>
       : !subjects.length ? <Card><EmptyState><div className="space-y-3"><BookOpen className="mx-auto h-8 w-8 text-teal-700" /><p className="font-semibold text-slate-800 dark:text-white">Weli maaddooyin lama diiwaangelin.</p><p>Marka hore ku dar maaddooyinka dugsiga.</p><Button variant="primary" type="button" onClick={() => onNavigate('sch_subjects')}>Tag Maaddooyinka</Button></div></EmptyState></Card>
