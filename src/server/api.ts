@@ -9975,8 +9975,8 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   }
   // Legacy schools without a setup-progress record are grandfathered. New schools
   // initialize this record when the setup wizard first loads and are gated from then on.
-  if (!school.setupProgress || typeof school.setupProgress !== 'object'
-    || normalizeSchoolSetupProgress(school.setupProgress).completedAt) { next(); return; }
+  const savedProgress = normalizeSchoolSetupProgress(school.setupProgress);
+  if (!savedProgress.startedAt || savedProgress.completedAt) { next(); return; }
   try {
     const state = await evaluateReadiness(school.id);
     const requiredIds = [1, 2, 3, 4, 5, 0, 6];
@@ -10182,9 +10182,13 @@ apiRouter.get('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
   try {
     const state = await evaluateReadiness(school.id);
     const saved = normalizeSchoolSetupProgress(school.setupProgress);
-    if (state.progress.completedAt && state.progress.completedSteps.includes(0) && !saved.completedSteps.includes(0)) {
-      const updated = db.updateSchool(school.id, { setupProgress: state.progress });
-      if (updated) await db.flush();
+    if (!saved.startedAt && !saved.completedAt) {
+      const startedProgress = { ...state.progress, startedAt: new Date().toISOString() };
+      const updated = db.updateSchool(school.id, { setupProgress: startedProgress });
+      if (updated) {
+        await db.flush();
+        state.progress = startedProgress;
+      }
     }
     res.json(state);
   } catch {
