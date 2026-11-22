@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolSetupData, SchoolSetupState } from '../../types/index.ts';
 import { getEthiopianCalendarInfo } from '../../lib/ethiopian-calendar.ts';
+import { SchoolSetupInlineEditor } from './SchoolSetupInlineEditor.tsx';
 
 interface Props { onNavigate: (view: string) => void; onComplete: () => Promise<void>; }
 
@@ -44,7 +45,7 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 9, title: 'Fees & Extra Modules', description: 'Create fee structures or skip fees for the Accountant; configure optional modules as needed.', optional: true, views: [{ label: 'Open Fees', view: 'sch_fees' }, { label: 'Inventory', view: 'sch_inventory' }, { label: 'Library', view: 'sch_library' }, { label: 'Transport', view: 'sch_transport' }, { label: 'Discipline', view: 'sch_discipline' }, { label: 'Health', view: 'sch_health' }] }
 ];
 
-const REFERENCE_STEP_BY_PROGRESS_ID: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 0: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 9 };
+const REFERENCE_STEP_BY_PROGRESS_ID: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 0: 5, 6: 6, 7: 7, 8: 8, 9: 8, 10: 8 };
 
 export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) => {
   const { school, user } = useAuth();
@@ -219,23 +220,21 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     const wizardSteps: Array<{ id: string; title: string; required: boolean; evidence: number; assignmentEvidence?: number; followUp?: boolean; needs: string[]; view?: string }> = [
       { id: 'year', title: 'Sanad dugsiyeed & Semesters', required: true, evidence: 1, needs: [], view: 'sch_setup_academics' },
       { id: 'profile', title: 'Macluumaadka dugsiga & WhatsApp', required: true, evidence: 2, needs: ['year'], view: 'sch_settings' },
-      { id: 'classes', title: 'Classes & Grades (KG 1 / KG 2)', required: true, evidence: 3, needs: ['year', 'profile'], view: 'sch_classes' },
-      { id: 'subjects', title: 'Maaddooyinka & Curriculum', required: true, evidence: 4, needs: ['classes'], view: 'sch_subjects' },
-      { id: 'teachers', title: 'Macallimiinta & Teacher Assignment', required: true, evidence: 5, assignmentEvidence: 0, needs: ['classes', 'subjects'], view: 'sch_teachers' },
-      { id: 'students', title: 'Ardayda & Waalidiinta', required: true, evidence: 6, needs: ['teachers'], view: 'sch_students' },
-      { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['students'], view: 'sch_timetable' },
-      { id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8, needs: ['students'] },
-      { id: 'fees', title: 'Fees & Extra Modules', required: false, evidence: 9, needs: ['students'], view: 'sch_fees' },
-      { id: 'finish', title: 'Hubinta ugu dambaysa & Dashboard', required: true, evidence: -1, needs: ['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'attendance'] }
+      { id: 'classes', title: 'Classes & Sections', required: true, evidence: 3, needs: ['profile', 'year'] },
+      { id: 'subjects', title: 'Subjects & Curriculum', required: true, evidence: 4, needs: ['classes'] },
+      { id: 'teachers', title: 'Teachers', required: true, evidence: 5, needs: ['classes', 'subjects'] },
+      { id: 'assign', title: 'Teacher Assignment & Form Teachers', required: true, evidence: 0, needs: ['teachers', 'subjects'] },
+      { id: 'students', title: 'Students & Parents', required: true, evidence: 6, needs: ['assign'] },
+      { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['assign'] },
+      { id: 'finish', title: 'Hubinta ugu dambaysa & Dashboard', required: true, evidence: -1, needs: ['year', 'profile', 'classes', 'subjects', 'teachers', 'assign', 'students'] }
     ];
     const readyFor = (id: string) => {
       const item = wizardSteps.find(candidate => candidate.id === id);
       if (!item || !setupState) return false;
       if (id === 'finish') return Boolean(setupState.canFinish);
-      if (id === 'teachers') return Boolean(setupState.checklist[5]?.ready && setupState.checklist[0]?.ready);
+      if (id === 'teachers') return Boolean(setupState.checklist[5]?.ready);
+      if (id === 'assign') return Boolean(setupState.checklist[0]?.ready);
       if (id === 'timetable') return Boolean(setupState.checklist[7]?.ready || setupState.progress.skippedSteps.includes(7));
-      if (id === 'attendance') return Boolean(setupState.checklist[8]?.ready);
-      if (id === 'fees') return Boolean(setupState.checklist[9]?.ready || setupState.progress.skippedSteps.includes(9));
       return Boolean(setupState.checklist[item.evidence]?.ready);
     };
     const unlockedFor = (id: string) => {
@@ -288,14 +287,12 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         {current.id !== 'finish' && current.id !== 'timetable' && current.id !== 'fees' && currentEvidence && <div className={'sw-miss' + (currentEvidence.ready ? ' sw-good' : '')} role="status"><strong>{currentEvidence.ready ? 'Tallaabadani waa diyaar ✓' : 'Wax ka maqan:'}</strong>{!currentEvidence.ready && <p className="mt-1">{currentEvidence.reason}</p>}</div>}
         {current.id === 'profile' && <section className="sw-card"><p className="sw-sub">Diiwaangeli magaca rasmiga ah, cinwaanka, magaalada, telefoonka, email-ka iyo lambarka WhatsApp-ka maamulka oo leh country code.</p><button className="sw-btn" type="button" onClick={() => openTarget('profile')}>Fur School Profile & WhatsApp →</button></section>}
         {current.id === 'year' && <section className="sw-card"><p className="sw-sub">Deji sannad-dugsiyeedka iyo labada semester, taariikhahooda bilowga iyo dhammaadka. Xogtu waxay ku kaydsamaysaa School Settings → Academics.</p><button className="sw-btn" type="button" onClick={() => openTarget('year')}>Fur Academic Year & Semesters →</button></section>}
-        {current.id === 'classes' && <section className="sw-card"><p className="sw-sub">Samee fasallada iyo sections-ka. KG 1 iyo KG 2 waa la taageeraa, sidoo kale Grade 1–12 iyo fasallo isku-dhafan.</p><button className="sw-btn" type="button" onClick={() => openTarget('classes')}>Fur Classes & Grades →</button></section>}
-        {current.id === 'subjects' && <section className="sw-card"><p className="sw-sub">Ku dar maaddooyinka, kadibna ku xidh Class Curriculum. Fasal kasta oo firfircoon waa inuu leeyahay ugu yaraan hal maaddo.</p><div className="flex flex-wrap gap-2"><button className="sw-btn" type="button" onClick={() => openTarget('subjects')}>Fur Subjects →</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_curriculum')}>Fur Class Curriculum →</button></div></section>}
-        {current.id === 'teachers' && <section className="sw-card"><p className="sw-sub">Diiwaangeli macallimiinta adigoo siinaya Teacher ID u gaar ah dugsigan iyo PIN/password login. Kadib qoondee Form Teacher iyo macallimiinta maaddooyinka.</p><div className="space-y-1 text-sm"><p><strong>Teacher records:</strong> {setupState?.checklist[5]?.ready ? '✓ Diyaar' : 'Weli waa dhiman'}</p><p><strong>Teacher assignment:</strong> {assignmentEvidence?.ready ? '✓ Diyaar' : 'Weli waa dhiman'}</p>{!assignmentEvidence?.ready && assignmentEvidence?.reason && <p className="text-xs" style={{color:'var(--sw-muted)'}}>{assignmentEvidence.reason}</p>}</div><div className="flex flex-wrap gap-2"><button className="sw-btn" type="button" onClick={() => openTarget('teachers')}>Fur Teachers →</button><button className="sw-btn secondary" type="button" disabled={!setupState?.checklist[5]?.ready} onClick={() => onNavigate('sch_teacher_assignments')}>Fur Teacher Assignment →</button></div></section>}
-        
-        {current.id === 'students' && <section className="sw-card"><p className="sw-sub">Diiwaangeli ardayda iyo waalidiinta/mas'uuliyiinta. Students wuxuu taageeraa bulk import, PIN generation/reset iyo soo saarista PIN slips.</p><div className="flex flex-wrap gap-2"><button className="sw-btn" type="button" onClick={() => openTarget('students')}>Fur Students & Bulk Import →</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_parents')}>Fur Parents →</button></div></section>}
-        {current.id === 'timetable' && <section className="sw-card"><p className="sw-sub">Samee jadwalka fasallada ama ka bood hadda oo dib uga samee Timetable. Tallaabadani waa optional; ma xannibayso dejinta aasaasiga ah.</p><div className="flex flex-wrap gap-2"><button className="sw-btn" type="button" onClick={() => openTarget('timetable')}>Fur Timetable →</button><button className="sw-btn secondary" type="button" disabled={saving || !setupState} onClick={() => void skipOptionalStep(7)}>Ka bood hadda</button></div></section>}
-        {current.id === 'attendance' && <section className="sw-card"><p className="sw-sub">Hubi attendance rules-ka dugsiga iyo exam configuration-ka. Tallaabadani waa khasab; Dashboard-ku ma furmayo ilaa attendance rules iyo exam configuration la xaqiijiyo.</p><div className="flex flex-wrap gap-2"><button className="sw-btn" type="button" onClick={() => onNavigate('sch_attendance')}>Fur Attendance →</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_exams')}>Fur Exams →</button></div></section>}
-        {current.id === 'fees' && <section className="sw-card"><p className="sw-sub">Samee fee structures ama u daa Accountant-ka inuu dambe dejiyo. Inventory, Library, Transport, Discipline iyo Health waa modules dheeraad ah oo dugsigu dooran karo.</p><div className="flex flex-wrap gap-2"><button className="sw-btn" type="button" onClick={() => openTarget('fees')}>Fur Fees →</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_inventory')}>Inventory</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_library')}>Library</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_transport')}>Transport</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_discipline')}>Discipline</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_health')}>Health</button><button className="sw-btn secondary" type="button" disabled={saving || !setupState} onClick={() => void skipOptionalStep(9)}>Ka bood Fees & Modules</button></div></section>}
+        {current.id === 'classes' && <SchoolSetupInlineEditor step="classes" onChanged={refreshSetupProgress} />}
+        {current.id === 'subjects' && <SchoolSetupInlineEditor step="subjects" onChanged={refreshSetupProgress} />}
+        {current.id === 'teachers' && <SchoolSetupInlineEditor step="teachers" onChanged={refreshSetupProgress} />}
+        {current.id === 'assign' && <SchoolSetupInlineEditor step="assign" onChanged={refreshSetupProgress} />}
+        {current.id === 'students' && <SchoolSetupInlineEditor step="students" onChanged={refreshSetupProgress} />}
+        {current.id === 'timetable' && <><SchoolSetupInlineEditor step="timetable" onChanged={refreshSetupProgress} /><div className="sw-card"><p className="sw-sub">Timetable waa optional; waxaad ka boodi kartaa hadda oo dib ayaad uga dejin kartaa qaybta Timetable.</p><button className="sw-btn secondary" type="button" disabled={saving || !setupState} onClick={() => void skipOptionalStep(7)}>Ka bood hadda</button></div></>}
         {current.id === 'finish' && <>
           {setupState?.progress.completedAt && !setupState?.checklist[0]?.ready && <div className="sw-miss" role="status"><strong>Digniin: Teacher Assignment ayaa u baahan dib-u-eegis.</strong><p className="mt-1">Dugsigan hore ayuu setup-kiisa u dhammeeyey, sidaas darteed Dashboard-ka dib looma xirin. Fadlan hubi qoondeynta macallimiinta marka ay kuu suurto gasho.</p><button className="sw-btn secondary mt-2" type="button" onClick={() => onNavigate('sch_teacher_assignments')}>Hubi Teacher Assignment</button></div>}
           <section className="sw-card">
@@ -325,7 +322,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
               <div className="flex flex-wrap gap-2"><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_fees')}>Fur Fees</button>{!setupState?.checklist[9]?.ready && !setupState?.progress.skippedSteps.includes(9) && <button className="sw-btn secondary" type="button" disabled={saving} onClick={() => void skipOptionalStep(9)}>Ka bood</button>}</div>
             </div>
           </section>
-          {!setupState?.canFinish && <div className="sw-miss"><strong>Wax ka maqan:</strong><p className="mt-1">Dashboard-ka lama furi karo ilaa dhammaan hubinnada aasaasiga ah gudbaan, Timetable iyo Fees-na la dhammeeyo ama laga boodo.</p></div>}
+          {!setupState?.canFinish && <div className="sw-miss"><strong>Wax ka maqan:</strong><p className="mt-1">Dashboard-ka lama furi karo ilaa dhammaan toddobada tallaabo ee aasaasiga ah la xaqiijiyo.</p></div>}
           <button type="button" className="sw-btn" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()}>{saving ? 'Waa la dhammaynayaa…' : 'Dhammee setup-ka oo fur Dashboard'}</button>
         </>}
         <div className="sw-actions"><button type="button" className="sw-btn secondary" disabled={referenceStep === 0} onClick={() => setReferenceStep(value => Math.max(0, value - 1))}>← Hore</button><button type="button" className="sw-btn" disabled={referenceStep === wizardSteps.length - 1 || (current.required && !readyFor(current.id))} onClick={() => setReferenceStep(value => Math.min(wizardSteps.length - 1, value + 1))}>Xiga →</button></div>
