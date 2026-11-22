@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calculateSubscriptionGraceEnd, lockoutAttemptCountFromRow, shouldTouchSession } from '../src/server/storage.ts';
+import { calculateSubscriptionGraceEnd, lockoutAttemptCountFromRow, shouldTouchSession, shouldReuseCachedAuthSession } from '../src/server/storage.ts';
 
 test('session refresh persistence is throttled to at most once per minute', () => {
   const now = Date.UTC(2026, 10, 3, 12, 0, 0);
@@ -49,4 +49,14 @@ test('lockout counter rows read the canonical attempt_count alias without produc
   assert.equal(lockoutAttemptCountFromRow({ attempt_count: 5 }), 5);
   assert.equal(lockoutAttemptCountFromRow({ count: undefined }), 0);
   assert.equal(lockoutAttemptCountFromRow({ count: Number.NaN }), 0);
+});
+
+test('cached session validation is reused only inside its short TTL and while the session is unexpired', () => {
+  const now = Date.UTC(2026, 10, 22, 12, 0, 0);
+  const sessionExpiry = new Date(now + 60_000).toISOString();
+
+  assert.equal(shouldReuseCachedAuthSession(now + 1_999, sessionExpiry, now), true);
+  assert.equal(shouldReuseCachedAuthSession(now, sessionExpiry, now), false);
+  assert.equal(shouldReuseCachedAuthSession(now + 5_000, sessionExpiry, now), true);
+  assert.equal(shouldReuseCachedAuthSession(now + 1_000, new Date(now - 1).toISOString(), now), false);
 });
