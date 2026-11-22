@@ -138,6 +138,7 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
   lines.push('', `Term 1 total: ${term1Total} | average: ${term1Average}`, `Term 2 total: ${term2Total} | average: ${term2Average}`, `Final total: ${finalTotal} | average: ${result.yearlyPercentage}`);
   const term1Comments = activeRows.filter(row => row.sem1Marks?.teacherRemarks?.trim()).map(row => `${row.subject.name}: ${row.sem1Marks?.teacherRemarks}`);
   const term2Comments = activeRows.filter(row => row.sem2Marks?.teacherRemarks?.trim()).map(row => `${row.subject.name}: ${row.sem2Marks?.teacherRemarks}`);
+  const savedTeacherRemarks = [...term1Comments, ...term2Comments];
   if (blocks.teacherRemarks) lines.push('', `Term 1 teacher comments: ${term1Comments.join(' | ') || teacherRemark(result.yearlyPercentage)}`, `Term 2 teacher comments: ${term2Comments.join(' | ') || teacherRemark(result.yearlyPercentage)}`);
   const firstSubject = result.subjectResults[0];
   const semesterOneMaximum = firstSubject?.sem1Marks?.maxMarks || firstSubject?.maxMarks;
