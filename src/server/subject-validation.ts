@@ -10,39 +10,46 @@ export type PrimarySubjectTemplates = Record<PrimarySubjectGradeBand, string[]>;
  */
 export const PRIMARY_SUBJECT_TEMPLATE_DEFAULTS: PrimarySubjectTemplates = {
   '1-4': [
-    'Af-Hooyo (Af-Soomaali)',
-    'English',
-    'Mathematics',
-    'Environmental Science',
-    'Arts & Physical Education',
-    'Amharic',
-    'Moral Education'
+    'Af-Hooyo (Af-Soomaali)', 'English', 'Xisaab', 'Environmental Science',
+    'Arts', 'Physical Education', 'Amharic', 'Moral Education'
   ],
   '5-6': [
-    'Af-Hooyo (Af-Soomaali)',
-    'English',
-    'Amharic',
-    'Mathematics',
-    'Environmental Science (Science + Social)',
-    'Civics and Ethical Education',
-    'Arts',
-    'Physical Education'
+    'Af-Hooyo (Af-Soomaali)', 'English', 'Xisaab', 'Environmental Science',
+    'Arts', 'Physical Education', 'Amharic', 'Civics & Ethical Education'
   ],
   '7-8': [
-    'Af-Hooyo (Af-Soomaali)',
-    'English',
-    'Amharic',
-    'Mathematics',
-    'Biology',
-    'Chemistry',
-    'Physics',
-    'Social Studies (History + Geography)',
-    'Civics and Ethical Education',
-    'Arts',
-    'Physical Education',
-    'ICT'
+    'Af-Hooyo (Af-Soomaali)', 'English', 'Xisaab', 'Arts', 'Physical Education',
+    'Amharic', 'Civics & Ethical Education', 'Biology', 'Chemistry', 'Physics',
+    'Cilmi Bulsho', 'ICT'
   ]
 };
+
+export const PRIMARY_SUBJECT_TEMPLATE_PERIODS: Record<string, number> = {
+  'Af-Hooyo (Af-Soomaali)': 5,
+  English: 5,
+  Xisaab: 5,
+  'Environmental Science': 4,
+  Arts: 1,
+  'Physical Education': 2,
+  Amharic: 3,
+  'Moral Education': 1,
+  'Civics & Ethical Education': 2,
+  Biology: 2,
+  Chemistry: 2,
+  Physics: 2,
+  'Cilmi Bulsho': 3,
+  ICT: 1,
+  Arabic: 2,
+  'Islamic Studies/Quraan': 2
+};
+
+export function getDefaultSubjectPeriods(name: string, overrides?: Record<string, number>): number {
+  const key = name.trim().toLocaleLowerCase();
+  const override = Object.entries(overrides || {}).find(([candidate]) => candidate.trim().toLocaleLowerCase() === key)?.[1];
+  const base = Object.entries(PRIMARY_SUBJECT_TEMPLATE_PERIODS).find(([candidate]) => candidate.toLocaleLowerCase() === key)?.[1] ?? 2;
+  const value = Number(override ?? base);
+  return Number.isInteger(value) && value >= 1 && value <= 10 ? value : base;
+}
 
 /** Optional subjects schools may add to any grade-band template. */
 export const OPTIONAL_SCHOOL_SUBJECTS = [

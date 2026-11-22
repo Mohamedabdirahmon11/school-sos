@@ -38,7 +38,8 @@ import {
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
-import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
+import { hasActiveClassIdentityConflict, hasActiveFormTeacherConflict } from './class-setup-validation.ts';
+import { DEFAULT_SUBJECT_NAMES, PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, PRIMARY_SUBJECT_TEMPLATE_PERIODS, getDefaultSubjectPeriods, normalizeSubjectCode, normalizeSubjectName, subjectNameExists, type PrimarySubjectGradeBand, type PrimarySubjectTemplates } from './subject-validation.ts';
 import { normalizeRole } from '../lib/roles.ts';
 import { formatMoney } from '../lib/money.ts';
 import { extractImportFile, IMPORT_COLUMNS, isExampleImportRow, parseSchoolImport, SchoolImportRow, splitStudentName, validImportPhone } from './school-import.ts';
@@ -3039,6 +3040,9 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const gradeMismatch = classGradeMismatchError(name, gradeLevel);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   const existingClasses = await db.getClasses(school.id);
+  if (hasActiveClassIdentityConflict(existingClasses, { academicYear, gradeLevel, section })) {
+    res.status(409).json({ code: 'CLASS_SECTION_EXISTS', error: `Grade ${gradeLevel} · Section ${section || '—'} already exists for academic year ${academicYear}.` }); return;
+  }
   if (existingClasses.some(item => String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
     res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return;
   }
@@ -3046,6 +3050,9 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   if (req.body?.classTeacherId) {
     const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
     if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
+    if (hasActiveFormTeacherConflict(existingClasses, String(req.body.classTeacherId))) {
+      res.status(409).json({ code: 'FORM_TEACHER_ALREADY_ASSIGNED', error: 'This Form Teacher is already responsible for another active class.' }); return;
+    }
   }
   const newClass = db.createClass({
     schoolId: school.id, branchId: req.body?.branchId || undefined, name, classCode, academicYear, gradeLevel, section,
@@ -3076,6 +3083,13 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     res.status(400).json({ error: 'Class code and a valid consecutive academic year are required.' }); return;
   }
   const allClasses = await db.getClasses(school.id);
+  if (hasActiveClassIdentityConflict(allClasses, {
+    academicYear,
+    gradeLevel: Number(req.body?.gradeLevel ?? existing.gradeLevel),
+    section: String(req.body?.section ?? existing.section ?? '')
+  }, existing.id)) {
+    res.status(409).json({ code: 'CLASS_SECTION_EXISTS', error: 'Another active class already uses this school/year/grade/section.' }); return;
+  }
   if (allClasses.some(item => item.id !== existing.id && String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
     res.status(409).json({ error: `Class code ${classCode} already exists for academic year ${academicYear}.` }); return;
   }
@@ -3109,6 +3123,9 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     if (req.body.classTeacherId) {
       const formTeacher = await db.queryPage('teachers', { school_id: school.id, user_id: String(req.body.classTeacherId), status: 'active' }, 1, 1, undefined, 'id,user_id');
       if (!formTeacher.items.length) { res.status(400).json({ error: 'Form Teacher must be an active teacher in this school.' }); return; }
+      if (hasActiveFormTeacherConflict(allClasses, String(req.body.classTeacherId), existing.id)) {
+        res.status(409).json({ error: 'This Form Teacher is already responsible for another active class.' }); return;
+      }
     }
     updates.classTeacherId = req.body.classTeacherId || null;
   }
@@ -3150,6 +3167,10 @@ apiRouter.delete('/classes/:id', requireAuth, requireSchoolContext, async (req, 
   if (!klass) { res.status(404).json({ error: 'Class was not found.' }); return; }
   const students = await db.queryPage('students', { school_id: school.id, class_id: klass.id }, 1, 1, undefined, 'id');
   if (students.total) { res.status(409).json({ error: 'Class has students. Move the students before archiving it.' }); return; }
+  const dependency = await findClassDependency(classGroupsClient(), school.id, klass.id);
+  if (dependency) {
+    res.status(409).json({ code: 'CLASS_HAS_DEPENDENCIES', error: `Class has linked ${dependency}. Move or safely detach those records before archiving it.` }); return;
+  }
   const archived = await db.updateClass(klass.id, { isArchived: true }, school.id);
   db.logAudit({ action: 'CLASS_ARCHIVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Archived empty class ${klass.name} (${klass.id}).`, severity: 'warning' });
   res.json({ success: Boolean(archived), class: archived });
@@ -3194,15 +3215,17 @@ async function getClassCurriculumCapacity(schoolId: string) {
   if (days.error || periods.error) throw new Error('Awoodda xiisadaha lama akhrin karin.');
   const workingDays = Number(days.count || 0);
   const lessonPeriodsPerDay = Number(periods.count || 0);
-  return { workingDays, lessonPeriodsPerDay, weeklyCapacity: workingDays * lessonPeriodsPerDay };
+  // The school may configure fewer available periods, but the academic setup
+  // contract caps a normal week at five days × six lessons = 30.
+  const weeklyCapacity = Math.min(30, workingDays * lessonPeriodsPerDay);
+  return { workingDays, lessonPeriodsPerDay, weeklyCapacity };
 }
 async function findCurriculumDependency(schoolId: string, classId: string, subjectId: string): Promise<string | null> {
   const client = classGroupsClient();
   const dependencies: Array<{ table: string; label: string }> = [
     { table: 'timetable_slots', label: 'jadwalka fasalka' },
     { table: 'assignments', label: 'layliyada/shaqooyinka' },
-    { table: 'exam_schedules', label: 'jadwalka imtixaannada' },
-    { table: 'student_marks', label: 'dhibcaha ardayda' }
+    { table: 'exam_schedules', label: 'jadwalka imtixaannada' }
   ];
   for (const dependency of dependencies) {
     const { count, error } = await client.from(dependency.table).select('id', { count: 'exact', head: true })
@@ -3212,6 +3235,99 @@ async function findCurriculumDependency(schoolId: string, classId: string, subje
   }
   return null;
 }
+async function syncPrimarySubjectTemplates(
+  school: School,
+  templates: PrimarySubjectTemplates,
+  periods: Record<string, number>,
+  bands: PrimarySubjectGradeBand[] = ['1-4', '5-6', '7-8'],
+  classIds?: string[]
+) {
+  const classIdSet = classIds ? new Set(classIds) : null;
+  const allClasses = (await db.getClasses(school.id)).filter(klass => !klass.isArchived && (!classIdSet || classIdSet.has(klass.id)));
+  const existingSubjects = await db.getSubjects(school.id);
+  const subjectByNameBefore = new Map(existingSubjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
+  const capacity = await getClassCurriculumCapacity(school.id);
+  const plans: Array<{ klass: SchoolClass; rows: any[]; removed: any[]; names: string[] }> = [];
+
+  for (const band of bands) {
+    const names = templates[band].map(normalizeSubjectName);
+    const classRows = allClasses.filter(klass => primarySubjectBandForGrade(Number(klass.gradeLevel || 0)) === band);
+    for (const klass of classRows) {
+      const rows = await readClassCurriculumRows(school.id, klass.id);
+      const rowBySubject = new Map(rows.map((row: any) => [String(row.subject_id), row]));
+      const total = names.reduce((sum, name) => sum + getDefaultSubjectPeriods(name, periods), 0);
+      if (total > capacity.weeklyCapacity) {
+        const error = new Error(`Grades ${band} template has ${total} weekly periods; the school limit is ${capacity.weeklyCapacity}. Reduce periods before saving.`) as Error & { status: number };
+        error.status = 422;
+        throw error;
+      }
+      const selectedIds = new Set(names.map(name => subjectByNameBefore.get(name.toLocaleLowerCase())?.id).filter(Boolean));
+      const removed = rows.filter((row: any) => row.is_active !== false && !selectedIds.has(String(row.subject_id)));
+      for (const row of removed) {
+        const dependency = await findCurriculumDependency(school.id, klass.id, String(row.subject_id));
+        if (dependency) {
+          const error = new Error(`Cannot remove a curriculum subject while it is linked to ${dependency}. Clear that dependency first.`) as Error & { status: number };
+          error.status = 409;
+          throw error;
+        }
+      }
+      plans.push({ klass, rows, removed, names });
+    }
+  }
+
+  let subjectsAdded = 0;
+  for (const band of bands) {
+    for (const name of templates[band].map(normalizeSubjectName)) {
+      if (!name || subjectNameExists(existingSubjects, name)) continue;
+      existingSubjects.push(db.createSubject({
+        schoolId: school.id, name, code: '',
+        description: 'Ethiopian primary curriculum template.',
+        creditUnits: 0, department: '', assignedTeacherIds: []
+      }));
+      subjectsAdded += 1;
+    }
+  }
+  if (subjectsAdded) await db.flush();
+  const subjects = await db.getSubjects(school.id);
+  const subjectByName = new Map(subjects.map(subject => [subject.name.trim().toLocaleLowerCase(), subject]));
+  const client = classGroupsClient();
+  let subjectsRemoved = 0;
+  let curriculumAdded = 0;
+
+  for (const plan of plans) {
+    const existingBySubject = new Map(plan.rows.map((row: any) => [String(row.subject_id), row]));
+    const payload = plan.names.map(name => {
+      const subject = subjectByName.get(name.toLocaleLowerCase());
+      if (!subject) throw new Error(`Subject ${name} could not be resolved in this school.`);
+      const previous: any = existingBySubject.get(subject.id);
+      if (!previous || previous.is_active === false) curriculumAdded += 1;
+      return {
+        id: previous?.id || randomUUID(), school_id: school.id, class_id: plan.klass.id,
+        subject_id: subject.id, periods_per_week: getDefaultSubjectPeriods(name, periods),
+        teacher_id: previous?.teacher_id || null,
+        small_exam_enabled: previous?.small_exam_enabled ?? false,
+        big_exam_enabled: previous?.big_exam_enabled ?? false, is_active: true
+      };
+    });
+    if (payload.length) {
+      const { error } = await client.from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
+      if (error) throw error;
+    }
+    if (plan.removed.length) {
+      const removedIds = plan.removed.map((row: any) => String(row.subject_id));
+      const { error: assignmentError } = await client.from('teacher_class_subject_assignments')
+        .delete().eq('school_id', school.id).eq('class_id', plan.klass.id).in('subject_id', removedIds);
+      if (assignmentError) throw assignmentError;
+      const { error: deactivateError } = await client.from('class_subjects')
+        .update({ is_active: false, teacher_id: null })
+        .eq('school_id', school.id).eq('class_id', plan.klass.id).in('id', plan.removed.map((row: any) => row.id));
+      if (deactivateError) throw deactivateError;
+      subjectsRemoved += plan.removed.length;
+    }
+  }
+  return { updatedClasses: plans.length, subjectsAdded, subjectsRemoved, added: curriculumAdded, weeklyCapacity: capacity.weeklyCapacity };
+}
+
 function primarySubjectBandForGrade(gradeLevel: number): PrimarySubjectGradeBand | null {
   if (gradeLevel >= 1 && gradeLevel <= 4) return '1-4';
   if (gradeLevel >= 5 && gradeLevel <= 6) return '5-6';
@@ -3243,10 +3359,16 @@ async function applyPrimarySubjectTemplate(school: School, klass: SchoolClass) {
   const existingRows = await readClassCurriculumRows(school.id, klass.id);
   const existingSubjectIds = new Set(existingRows.map((row: any) => String(row.subject_id)));
   const capacity = await getClassCurriculumCapacity(school.id);
-  const periodsPerWeek = Math.max(1, Math.min(2, Math.floor(Math.max(names.length, capacity.weeklyCapacity) / Math.max(1, names.length))));
-  const selectedSubjects = names.map(name => subjectByName.get(name.trim().toLocaleLowerCase())).filter(Boolean) as Array<{ id: string }>;
+  const periods = school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS;
+  const selectedSubjects = names.map(name => subjectByName.get(name.trim().toLocaleLowerCase())).filter(Boolean) as Array<{ id: string; name: string }>;
+  const totalPeriods = selectedSubjects.reduce((sum, subject) => sum + getDefaultSubjectPeriods(subject.name, periods), 0);
+  if (totalPeriods > capacity.weeklyCapacity) {
+    const error = new Error(`The Grade ${klass.gradeLevel} Ethiopia template contains ${totalPeriods} weekly periods, exceeding this school's ${capacity.weeklyCapacity}-period capacity. Reduce the template periods or remove optional subjects before applying it.`) as Error & { status: number };
+    error.status = 422;
+    throw error;
+  }
   const payload = selectedSubjects.filter(subject => !existingSubjectIds.has(subject.id))
-    .map(subject => ({ id: randomUUID(), school_id: school.id, class_id: klass.id, subject_id: subject.id, periods_per_week: periodsPerWeek, teacher_id: null, small_exam_enabled: false, big_exam_enabled: false, is_active: true }));
+    .map(subject => ({ id: randomUUID(), school_id: school.id, class_id: klass.id, subject_id: subject.id, periods_per_week: getDefaultSubjectPeriods(subject.name, periods), teacher_id: null, small_exam_enabled: false, big_exam_enabled: false, is_active: true }));
   if (payload.length) {
     const { error } = await classGroupsClient().from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
     if (error) throw error;
@@ -3292,18 +3414,18 @@ apiRouter.put('/curriculum/classes/:classId', requireAuth, requireSchoolContext,
   const klass = await db.getClassById(classId, school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Fasalkan lagama helin dugsigan.' }); return; }
   const input = req.body?.subjects;
-  if (!Array.isArray(input) || input.length > 500) { res.status(400).json({ error: 'Dooro maaddooyinka fasalka si sax ah.' }); return; }
+  if (!Array.isArray(input) || input.length > 500) { res.status(422).json({ error: 'Dooro maaddooyinka fasalka si sax ah.' }); return; }
   const normalized: CurriculumInput[] = input.map((item: any) => ({
     subjectId: String(item?.subjectId || ''),
     periodsPerWeek: Number(item?.periodsPerWeek)
   }));
   if (new Set(normalized.map(item => item.subjectId)).size !== normalized.length ||
-      normalized.some(item => !item.subjectId || !Number.isInteger(item.periodsPerWeek) || item.periodsPerWeek < 1 || item.periodsPerWeek > 12)) {
-    res.status(400).json({ error: 'Xiisadaha maaddo kasta waa inay ahaadaan tiro dhan oo u dhexeysa 1 ilaa 12.' }); return;
+      normalized.some(item => !item.subjectId || !Number.isInteger(item.periodsPerWeek) || item.periodsPerWeek < 1 || item.periodsPerWeek > 10)) {
+    res.status(422).json({ error: 'Xiisadaha maaddo kasta waa inay ahaadaan tiro dhan oo u dhexeysa 1 ilaa 10.' }); return;
   }
   const subjects = await db.getSubjects(school.id);
   const validSubjectIds = new Set(subjects.map(subject => subject.id));
-  if (normalized.some(item => !validSubjectIds.has(item.subjectId))) { res.status(400).json({ error: 'Maaddo aan dugsigan ka tirsanayn ayaa la doortay.' }); return; }
+  if (normalized.some(item => !validSubjectIds.has(item.subjectId))) { res.status(422).json({ error: 'Maaddo aan dugsigan ka tirsanayn ayaa la doortay.' }); return; }
   try {
     const [capacity, existing] = await Promise.all([
       getClassCurriculumCapacity(school.id),
@@ -3311,7 +3433,7 @@ apiRouter.put('/curriculum/classes/:classId', requireAuth, requireSchoolContext,
     ]);
     const total = normalized.reduce((sum, item) => sum + item.periodsPerWeek, 0);
     if (total > capacity.weeklyCapacity) {
-      res.status(400).json({ error: `Wadarta xiisaduhu waa ${total}, balse awoodda fasalku waa ${capacity.weeklyCapacity} xiisad toddobaadkii. Yaree xiisadaha.` }); return;
+      res.status(422).json({ error: `Wadarta xiisaduhu waa ${total}, balse awoodda fasalku waa ${capacity.weeklyCapacity} xiisad toddobaadkii. Yaree xiisadaha.` }); return;
     }
     const selectedIds = new Set(normalized.map(item => item.subjectId));
     const removed = existing.filter((row: any) => row.is_active !== false && !selectedIds.has(row.subject_id));
@@ -3338,7 +3460,12 @@ apiRouter.put('/curriculum/classes/:classId', requireAuth, requireSchoolContext,
       if (error) throw error;
     }
     if (removed.length) {
-      const { error } = await client.from('class_subjects').delete().eq('school_id', school.id).in('id', removed.map((row: any) => row.id));
+      const removedIds = removed.map((row: any) => String(row.subject_id));
+      const { error: assignmentError } = await client.from('teacher_class_subject_assignments')
+        .delete().eq('school_id', school.id).eq('class_id', classId).in('subject_id', removedIds);
+      if (assignmentError) throw assignmentError;
+      const { error } = await client.from('class_subjects').update({ is_active: false, teacher_id: null })
+        .eq('school_id', school.id).eq('class_id', classId).in('id', removed.map((row: any) => row.id));
       if (error) throw error;
     }
     db.logAudit({ action: 'CLASS_CURRICULUM_SAVED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Saved curriculum for class ${klass.name}: ${payload.length} subjects, ${total} weekly periods.`, severity: 'info' });
@@ -3358,7 +3485,10 @@ apiRouter.delete('/curriculum/classes/:classId/subjects/:subjectId', requireAuth
   try {
     const dependency = await findCurriculumDependency(school.id, classId, subjectId);
     if (dependency) { res.status(409).json({ error: `Maaddadan lagama saari karo manhajka: waxaa hore ugu xiran ${dependency}. Marka hore ka saar xiriirkaas.` }); return; }
-    const { error } = await classGroupsClient().from('class_subjects').delete().eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId);
+    const client = classGroupsClient();
+    const { error: assignmentError } = await client.from('teacher_class_subject_assignments').delete().eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId);
+    if (assignmentError) throw assignmentError;
+    const { error } = await client.from('class_subjects').update({ is_active: false, teacher_id: null }).eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId);
     if (error) throw error;
     res.json({ success: true });
   } catch (error: any) {
@@ -3373,9 +3503,14 @@ apiRouter.post('/curriculum/classes/:classId/apply-template', requireAuth, requi
   const klass = await db.getClassById(String(req.params.classId || ''), school.id);
   if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found in this school.' }); return; }
   try {
-    const result = await applyPrimarySubjectTemplate(school, klass);
-    if (!result.applied) { res.status(400).json({ error: 'Primary subject templates are available for Grades 1–8 only.' }); return; }
-    res.json({ success: true, ...result });
+    const band = primarySubjectBandForGrade(Number(klass.gradeLevel || 0));
+    if (!band) { res.status(422).json({ error: 'Primary subject templates are available for Grades 1–8 only.' }); return; }
+    const result = await syncPrimarySubjectTemplates(
+      school, getPrimarySubjectTemplates(school),
+      school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS,
+      [band], [klass.id]
+    );
+    res.json({ success: true, applied: true, gradeBand: band, ...result });
   } catch (error) {
     res.status(503).json({ error: error instanceof Error ? error.message : 'The subject template could not be applied.' });
   }
@@ -3388,26 +3523,42 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
   const sourceId = String(req.params.classId || '');
   const targetIds = Array.isArray(req.body?.targetClassIds) ? req.body.targetClassIds.map((id: unknown) => String(id || '')).filter(Boolean) : [];
   if (!targetIds.length || targetIds.length > 100 || new Set(targetIds).size !== targetIds.length || targetIds.includes(sourceId)) {
-    res.status(400).json({ error: 'Dooro fasallo kale oo koobi-ga lagu shubayo.' }); return;
+    res.status(422).json({ error: 'Dooro fasallo kale oo koobi-ga lagu shubayo.' }); return;
   }
   const [source, allClasses] = await Promise.all([db.getClassById(sourceId, school.id), db.getClasses(school.id)]);
   if (!source || source.isArchived) { res.status(404).json({ error: 'Fasalka laga koobiyeeynayo lama helin.' }); return; }
   const targetSet = new Set(targetIds);
   const targets = allClasses.filter(klass => targetSet.has(klass.id) && !klass.isArchived);
-  if (targets.length !== targetIds.length) { res.status(400).json({ error: 'Mid ama ka badan fasallada la doortay kama tirsana dugsigan.' }); return; }
+  if (targets.length !== targetIds.length) { res.status(403).json({ error: 'Mid ama ka badan fasallada la doortay kama tirsana dugsigan.' }); return; }
+  if (targets.some(target =>
+    Number(target.gradeLevel) !== Number(source.gradeLevel) ||
+    String(target.academicYear || '') !== String(source.academicYear || '')
+  )) {
+    res.status(422).json({ error: 'Curriculum can only be copied to sections in the same grade and academic year.' }); return;
+  }
   try {
     const [capacity, sourceRows] = await Promise.all([
       getClassCurriculumCapacity(school.id),
       readClassCurriculumRows(school.id, sourceId)
     ]);
     const activeSource = sourceRows.filter((row: any) => row.is_active !== false);
-    if (!activeSource.length) { res.status(400).json({ error: 'Fasalkaan weli ma laha manhaj la koobiyeeyo.' }); return; }
+    if (!activeSource.length) { res.status(422).json({ error: 'Fasalkaan weli ma laha manhaj la koobiyeeyo.' }); return; }
     const total = activeSource.reduce((sum: number, row: any) => sum + Number(row.periods_per_week || 0), 0);
-    if (total > capacity.weeklyCapacity) { res.status(400).json({ error: `Manhajka asalka ahi wuxuu ka badan yahay awoodda toddobaadlaha ah ee ${capacity.weeklyCapacity} xiisad.` }); return; }
+    if (total > capacity.weeklyCapacity) { res.status(422).json({ error: `Manhajka asalka ahi wuxuu ka badan yahay awoodda toddobaadlaha ah ee ${capacity.weeklyCapacity} xiisad.` }); return; }
     const client = classGroupsClient();
     const { data: existingRows, error: existingError } = await client.from('class_subjects').select('*').eq('school_id', school.id).in('class_id', targetIds);
     if (existingError) throw existingError;
     const existingMap = new Map((existingRows || []).map((row: any) => [`${row.class_id}:${row.subject_id}`, row]));
+    const sourceSubjectIds = new Set(activeSource.map((row: any) => String(row.subject_id)));
+    const removedByClass = new Map<string, any[]>();
+    for (const target of targets) {
+      const removed = (existingRows || []).filter((row: any) => row.class_id === target.id && row.is_active !== false && !sourceSubjectIds.has(String(row.subject_id)));
+      for (const row of removed) {
+        const dependency = await findCurriculumDependency(school.id, target.id, String(row.subject_id));
+        if (dependency) { res.status(409).json({ error: `Cannot replace the curriculum while a target subject is linked to ${dependency}.` }); return; }
+      }
+      removedByClass.set(target.id, removed);
+    }
     const payload = targets.flatMap(target => activeSource.map((row: any) => {
       const previous: any = existingMap.get(`${target.id}:${row.subject_id}`);
       return {
@@ -3420,6 +3571,17 @@ apiRouter.post('/curriculum/classes/:classId/copy', requireAuth, requireSchoolCo
     }));
     const { error } = await client.from('class_subjects').upsert(payload, { onConflict: 'school_id,class_id,subject_id' });
     if (error) throw error;
+    for (const target of targets) {
+      const removed = removedByClass.get(target.id) || [];
+      if (!removed.length) continue;
+      const removedIds = removed.map((row: any) => String(row.subject_id));
+      const { error: assignmentError } = await client.from('teacher_class_subject_assignments')
+        .delete().eq('school_id', school.id).eq('class_id', target.id).in('subject_id', removedIds);
+      if (assignmentError) throw assignmentError;
+      const { error: deactivateError } = await client.from('class_subjects').update({ is_active: false, teacher_id: null })
+        .eq('school_id', school.id).eq('class_id', target.id).in('id', removed.map((row: any) => row.id));
+      if (deactivateError) throw deactivateError;
+    }
     db.logAudit({ action: 'CLASS_CURRICULUM_COPIED', category: 'school', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Copied curriculum from ${source.name} to ${targets.length} class(es).`, severity: 'info' });
     res.json({ success: true, copiedClasses: targets.length, subjectsPerClass: activeSource.length });
   } catch (error: any) {
@@ -3682,12 +3844,98 @@ apiRouter.put('/teacher/form-teacher-comments', requireAuth, requireSchoolContex
   res.json({ success: true, comment: { id: data.id, studentId: data.student_id, semester: data.semester, comment: data.comment, teacherUserId: data.teacher_user_id, updatedAt: data.updated_at } });
 });
 
+apiRouter.get('/subjects/ethiopia-defaults', requireAuth, requireSchoolContext, async (req, res) => {
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view Ethiopia primary defaults.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({ templates: PRIMARY_SUBJECT_TEMPLATE_DEFAULTS, periods: PRIMARY_SUBJECT_TEMPLATE_PERIODS });
+});
+
 apiRouter.get('/subjects/templates', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const role = normalizeRole((req as any).user.role);
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view subject templates.' }); return; }
   res.setHeader('Cache-Control', 'private, no-store');
   res.json(getPrimarySubjectTemplates(school));
+});
+
+apiRouter.get('/subjects/template-periods', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const role = normalizeRole((req as any).user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can view subject periods.' }); return; }
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({ ...PRIMARY_SUBJECT_TEMPLATE_PERIODS, ...(school.setupData?.subjectTemplatePeriods || {}) });
+});
+
+apiRouter.put('/subjects/template-periods', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can edit subject periods.' }); return; }
+  const input = req.body?.periods;
+  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length > 100) {
+    res.status(422).json({ error: 'Subject periods must be a map of subject names to weekly period counts.' }); return;
+  }
+  const periods: Record<string, number> = {};
+  for (const [rawName, rawValue] of Object.entries(input)) {
+    const name = normalizeSubjectName(rawName), value = Number(rawValue);
+    if (!name || !Number.isInteger(value) || value < 1 || value > 10) {
+      res.status(422).json({ error: 'Each subject must have between 1 and 10 periods per week.' }); return;
+    }
+    periods[name] = value;
+  }
+  const templates = getPrimarySubjectTemplates(school);
+  try {
+    const sync = await syncPrimarySubjectTemplates(school, templates, periods);
+    const setupData = { ...(school.setupData || {}), subjectTemplatePeriods: periods } as NonNullable<School['setupData']>;
+    if (!db.updateSchool(school.id, { setupData })) { res.status(404).json({ error: 'School not found.' }); return; }
+    await db.flush();
+    res.json({ success: true, periods, ...sync });
+  } catch (error: any) {
+    res.status(Number(error?.status) || 503).json({ error: error?.message || 'Subject periods could not be saved.' });
+  }
+});
+
+apiRouter.put('/subjects/templates', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
+  if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Only school administrators can edit subject templates.' }); return; }
+  const input = req.body?.templates;
+  const bands: PrimarySubjectGradeBand[] = ['1-4', '5-6', '7-8'];
+  if (!input || typeof input !== 'object' || bands.some(band => !Array.isArray(input[band]) || input[band].length > 30)) {
+    res.status(422).json({ error: 'Each grade band must contain a list of up to 30 subjects.' }); return;
+  }
+  const templates = {} as PrimarySubjectTemplates;
+  for (const band of bands) {
+    const names = (input[band] as unknown[]).map(normalizeSubjectName);
+    if (names.some(name => !name || name.length > 150) || new Set(names.map(name => name.toLocaleLowerCase())).size !== names.length) {
+      res.status(422).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return;
+    }
+    templates[band] = names;
+  }
+  const requestedBands = req.body?.bands === undefined ? bands : req.body.bands;
+  if (!Array.isArray(requestedBands) || !requestedBands.length || requestedBands.some((band: unknown) => !bands.includes(band as PrimarySubjectGradeBand)) || new Set(requestedBands).size !== requestedBands.length) {
+    res.status(422).json({ error: 'Choose one or more valid grade bands to synchronize.' }); return;
+  }
+  const periodInput = req.body?.periods || school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS;
+  const periods: Record<string, number> = {};
+  if (!periodInput || typeof periodInput !== 'object' || Array.isArray(periodInput)) { res.status(422).json({ error: 'Invalid subject period map.' }); return; }
+  for (const [rawName, rawValue] of Object.entries(periodInput)) {
+    const name = normalizeSubjectName(rawName), value = Number(rawValue);
+    if (!name || !Number.isInteger(value) || value < 1 || value > 10) { res.status(422).json({ error: 'Each subject must have between 1 and 10 periods per week.' }); return; }
+    periods[name] = value;
+  }
+  try {
+    const sync = await syncPrimarySubjectTemplates(school, templates, periods, requestedBands as PrimarySubjectGradeBand[]);
+    const setupData = { ...(school.setupData || {}), subjectTemplates: templates, subjectTemplatePeriods: periods } as NonNullable<School['setupData']>;
+    if (!db.updateSchool(school.id, { setupData })) { res.status(404).json({ error: 'School not found.' }); return; }
+    await db.flush();
+    db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATES_SYNCED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: 'Updated Ethiopia primary subjects and synchronized active class curricula.', severity: 'info' });
+    res.json({ success: true, templates, periods, ...sync });
+  } catch (error: any) {
+    res.status(Number(error?.status) || 503).json({ error: error?.message || 'Subject templates could not be synchronized.' });
+  }
 });
 
 apiRouter.put('/subjects/templates/:gradeBand', requireAuth, requireSchoolContext, async (req, res) => {
@@ -3701,12 +3949,17 @@ apiRouter.put('/subjects/templates/:gradeBand', requireAuth, requireSchoolContex
   const subjects: string[] = (req.body.subjects as unknown[]).map((value: unknown) => normalizeSubjectName(value));
   if (subjects.some(name => !name || name.length > 150) || new Set(subjects.map(name => name.toLocaleLowerCase())).size !== subjects.length) { res.status(400).json({ error: 'Subject names must be non-empty, unique, and at most 150 characters.' }); return; }
   const templates = { ...getPrimarySubjectTemplates(school), [band]: subjects } as PrimarySubjectTemplates;
-  const setupData = { ...(school.setupData || {}), subjectTemplates: templates } as NonNullable<School['setupData']>;
-  const updated = db.updateSchool(school.id, { setupData });
-  if (!updated) { res.status(404).json({ error: 'School not found.' }); return; }
-  await db.flush();
-  db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATE_UPDATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated primary subject template for grades ${band}.`, severity: 'info' });
-  res.json({ gradeBand: band, subjects, templates });
+  try {
+    const sync = await syncPrimarySubjectTemplates(school, templates, school.setupData?.subjectTemplatePeriods || PRIMARY_SUBJECT_TEMPLATE_PERIODS, [band]);
+    const setupData = { ...(school.setupData || {}), subjectTemplates: templates } as NonNullable<School['setupData']>;
+    const updated = db.updateSchool(school.id, { setupData });
+    if (!updated) { res.status(404).json({ error: 'School not found.' }); return; }
+    await db.flush();
+    db.logAudit({ action: 'PRIMARY_SUBJECT_TEMPLATE_UPDATED', category: 'academics', schoolId: school.id, schoolName: school.name, userId: user.id, userName: user.fullName, userRole: user.role, details: `Updated and synchronized primary subject template for grades ${band}.`, severity: 'info' });
+    res.json({ gradeBand: band, subjects, templates, ...sync });
+  } catch (error: any) {
+    res.status(Number(error?.status) || 503).json({ error: error?.message || 'Subject template could not be synchronized.' });
+  }
 });
 apiRouter.post('/subjects/defaults', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
@@ -3768,7 +4021,7 @@ apiRouter.delete('/subjects/:id', requireAuth, requireSchoolContext, async (req,
   const subject = (await db.getSubjects(school.id)).find(item => item.id === String(req.params.id));
   if (!subject) { res.status(404).json({ error: 'Maaddada lagama helin dugsigan.' }); return; }
   const dependencies = await Promise.all([
-    db.queryPage('class_subjects', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
+    db.queryPage('class_subjects', { school_id: school.id, subject_id: subject.id, is_active: 'true' }, 1, 1, undefined, 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
     db.queryPage('student_marks', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
     db.queryPage('exam_schedules', { school_id: school.id, subject_id: subject.id }, 1, 1, undefined, 'id'),
@@ -10858,39 +11111,69 @@ async function syncTeacherAssignmentLegacy(client: any, schoolId: string, yearId
     .eq('school_id', schoolId).eq('class_id', classId).eq('subject_id', subjectId);
   if (updateError) throw new Error('Qoondeynta waa la beddelay, balse macallinka manhajka lama waafajin karin.');
 }
-async function checkTeacherAssignment(client: any, school: School, body: any) {
+async function checkTeacherAssignment(client: any, school: School, body: any, excludeAssignmentId?: string) {
   const yearId = String(body?.academicYearId || ''), termId = body?.termId ? String(body.termId) : null;
   const classId = String(body?.classId || ''), sectionId = body?.sectionId ? String(body.sectionId) : null;
   const subjectId = String(body?.subjectId || ''), teacherId = String(body?.teacherId || '');
-  if (!yearId || !classId || !subjectId || !teacherId) throw new Error('Dooro sannad-dugsiyeed, fasal, maaddo iyo macallin.');
+  if (!yearId || !classId || !subjectId || !teacherId) { const error = new Error('Dooro sannad-dugsiyeed, fasal, maaddo iyo macallin.') as Error & { status: number }; error.status = 422; throw error; }
   const [year, klass, subject, teacher, curriculum] = await Promise.all([
     client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).eq('id', yearId).maybeSingle(),
     client.from('classes').select('id,academic_year,is_archived').eq('school_id', school.id).eq('id', classId).maybeSingle(),
     client.from('subjects').select('id').eq('school_id', school.id).eq('id', subjectId).maybeSingle(),
-    client.from('teachers').select('id,status').eq('school_id', school.id).eq('id', teacherId).maybeSingle(),
+    client.from('teachers').select('id,status,max_periods_per_week').eq('school_id', school.id).eq('id', teacherId).maybeSingle(),
     client.from('class_subjects').select('id,periods_per_week').eq('school_id', school.id).eq('class_id', classId).eq('subject_id', subjectId).eq('is_active', true).maybeSingle()
   ]);
-  if (year.error || !year.data) throw new Error('Sannadka waxbarasho lagama helin dugsigan.');
+  if (year.error || !year.data) { const error = new Error('Sannadka waxbarasho lagama helin dugsigan.') as Error & { status: number }; error.status = 422; throw error; }
   if (termId) {
     const { data: term } = await client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('id', termId).maybeSingle();
-    if (!term || term.academic_year_id !== yearId) throw new Error('Term-ka la doortay kuma jiro sannad-dugsiyeedkan.');
+    if (!term || term.academic_year_id !== yearId) { const error = new Error('Term-ka la doortay kuma jiro sannad-dugsiyeedkan.') as Error & { status: number }; error.status = 422; throw error; }
   }
-  if (klass.error || !klass.data || klass.data.is_archived) throw new Error('Fasalkan lagama helin dugsigan.');
+  if (klass.error || !klass.data) { const error = new Error('Fasalkan lagama helin dugsigan.') as Error & { status: number }; error.status = 403; throw error; }
+  if (klass.data.is_archived) { const error = new Error('Fasalkan waa la archive-gareeyey.') as Error & { status: number }; error.status = 422; throw error; }
   const yearKey = String(year.data.name || '').replace(/[^0-9]/g, '');
   const classYearKey = String(klass.data.academic_year || '').replace(/[^0-9]/g, '');
-  if (yearKey && classYearKey && yearKey !== classYearKey) throw new Error('Fasalkan kuma jiro sannad-dugsiyeedka la doortay.');
-  if (subject.error || !subject.data) throw new Error('Maaddadani kama tirsana dugsigan.');
+  if (yearKey && classYearKey && yearKey !== classYearKey) { const error = new Error('Fasalkan kuma jiro sannad-dugsiyeedka la doortay.') as Error & { status: number }; error.status = 422; throw error; }
+  if (subject.error || !subject.data) { const error = new Error('Maaddadani kama tirsana dugsigan.') as Error & { status: number }; error.status = 422; throw error; }
   if (curriculum.error) throw new Error('Manhajka lama xaqiijin karin.');
-  if (!curriculum.data) throw new Error('Maaddadan kuma jirto manhajka fasalkan. Marka hore ku dar Manhajka (Tallaabada 4).');
-  if (teacher.error || !teacher.data || String(teacher.data.status).toLowerCase() !== 'active') throw new Error('Macallinka lagama helin dugsigan ama ma aha mid shaqaynaya.');
+  if (!curriculum.data) { const error = new Error('Maaddadan kuma jirto manhajka fasalkan. Marka hore ku dar Manhajka (Tallaabada 4).') as Error & { status: number }; error.status = 422; throw error; }
+  if (teacher.error || !teacher.data || String(teacher.data.status).toLowerCase() !== 'active') { const error = new Error('Macallinka lagama helin dugsigan ama ma aha mid shaqaynaya.') as Error & { status: number }; error.status = 422; throw error; }
   if (sectionId) {
     const { data: section } = await client.from('class_sections').select('id,legacy_class_id').eq('school_id', school.id).eq('id', sectionId).maybeSingle();
-    if (!section || section.legacy_class_id !== classId) throw new Error('Qaybtani kuma jirto fasalkan.');
+    if (!section || section.legacy_class_id !== classId) { const error = new Error('Qaybtani kuma jirto fasalkan.') as Error & { status: number }; error.status = 422; throw error; }
   }
   const { data: qualified, error: qError } = await client.from('teacher_subjects').select('id')
     .eq('school_id', school.id).eq('teacher_id', teacherId).eq('subject_id', subjectId).eq('is_active', true).maybeSingle();
   if (qError) throw new Error('Aqoonta macallinka lama xaqiijin karin.');
-  if (!qualified && body?.override !== true) throw new Error('Macallinkan kuma xirna maaddadan. Dooro ka-reebis cad haddii aad rabto inaad sii waddo.');
+  if (!qualified && body?.override !== true) { const error = new Error('Macallinkan kuma xirna maaddadan. Dooro ka-reebis cad haddii aad rabto inaad sii waddo.') as Error & { status: number }; error.status = 422; throw error; }
+
+  const [assignmentRows, curriculumRows] = await Promise.all([
+    client.from('teacher_class_subject_assignments').select('id,class_id,subject_id,term_id')
+      .eq('school_id', school.id).eq('academic_year_id', yearId).eq('teacher_id', teacherId),
+    client.from('class_subjects').select('class_id,subject_id,periods_per_week')
+      .eq('school_id', school.id).eq('is_active', true)
+  ]);
+  if (assignmentRows.error || curriculumRows.error) throw new Error('Culayska macallinka lama xaqiijin karin.');
+  const relevant = (assignmentRows.data || []).filter((row: any) =>
+    row.id !== excludeAssignmentId && (termId ? (!row.term_id || row.term_id === termId) : !row.term_id)
+  );
+  const byClassSubject = new Map<string, any>();
+  for (const row of relevant) {
+    const key = `${row.class_id}:${row.subject_id}`;
+    const previous = byClassSubject.get(key);
+    if (!previous || (termId && row.term_id === termId)) byClassSubject.set(key, row);
+  }
+  const periodsByClassSubject = new Map<string, number>((curriculumRows.data || []).map((row: any) => [
+    `${row.class_id}:${row.subject_id}`, Number(row.periods_per_week || 0)
+  ] as [string, number]));
+  const usedPeriods = [...byClassSubject.keys()].reduce((sum, key) => sum + (periodsByClassSubject.get(key) || 0), 0);
+  const currentKey = `${classId}:${subjectId}`;
+  const requestedPeriods = byClassSubject.has(currentKey) ? 0 : Number(curriculum.data.periods_per_week || 0);
+  const teacherLimit = Math.min(30, teacher.data.max_periods_per_week == null ? 30 : Math.max(1, Number(teacher.data.max_periods_per_week)));
+  if (usedPeriods + requestedPeriods > teacherLimit) {
+    const error = new Error(`Macallinku wuxuu gaari lahaa ${usedPeriods + requestedPeriods}/${teacherLimit} xiisadood toddobaadkii; xadka ugu sarreeya waa 30.`) as Error & { status: number };
+    error.status = 422;
+    throw error;
+  }
   return {
     school_id: school.id, academic_year_id: yearId, term_id: termId, class_id: classId,
     section_id: sectionId, subject_id: subjectId, teacher_id: teacherId,
@@ -10898,11 +11181,12 @@ async function checkTeacherAssignment(client: any, school: School, body: any) {
   };
 }
 async function upsertTeacherAssignment(client: any, school: School, user: User, body: any, id?: string) {
-  const payload = await checkTeacherAssignment(client, school, body);
+  const payload = await checkTeacherAssignment(client, school, body, id);
   let query = client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id)
     .eq('academic_year_id', payload.academic_year_id).eq('class_id', payload.class_id).eq('subject_id', payload.subject_id);
   query = payload.term_id ? query.eq('term_id', payload.term_id) : query.is('term_id', null);
-  query = payload.section_id ? query.eq('section_id', payload.section_id) : query.is('section_id', null);
+  // Class rows already represent Grade + Section. Assignment uniqueness is class + subject;
+  // legacy section_id is retained as metadata but must not create parallel assignments.
   const found = id
     ? await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('id', id).maybeSingle()
     : await query.maybeSingle();
@@ -10921,7 +11205,7 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
   const saved = old
     ? await client.from('teacher_class_subject_assignments').update({ ...payload, updated_at: new Date().toISOString() }).eq('school_id', school.id).eq('id', old.id).select('*').single()
     : await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
-  if (saved.error || !saved.data) throw new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.');
+  if (saved.error || !saved.data) { const error = new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.') as Error & { status: number }; error.status = saved.error?.code === '23505' ? 409 : 503; throw error; }
   await syncTeacherAssignmentLegacy(client, school.id, payload.academic_year_id, payload.class_id, payload.subject_id, payload.section_id);
   await teacherAssignmentAudit(client, school.id, user.id, old ? 'updated' : 'created', old, saved.data);
   return { assignment: saved.data, warning: payload.qualification_override ? 'Digniin: macallinku kuma xirna maaddadan.' : null };
@@ -11000,8 +11284,8 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
         const row: any = cur.find((c: any) => c.class_id === a.class_id && c.subject_id === a.subject_id);
         return sum + Number(row?.periods_per_week || 0);
       }, 0);
-      const max = t.max_periods_per_week == null ? null : Number(t.max_periods_per_week);
-      return { teacherId: t.id, periodsPerWeek: periods, maxPeriodsPerWeek: max, overloaded: max != null && periods > max };
+      const max = Math.min(30, t.max_periods_per_week == null ? 30 : Math.max(1, Number(t.max_periods_per_week)));
+      return { teacherId: t.id, periodsPerWeek: periods, maxPeriodsPerWeek: max, overloaded: periods > max };
     });
     res.setHeader('Cache-Control', 'private, no-store');
     res.json({
@@ -11016,11 +11300,11 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
 });
 apiRouter.post('/teacher-assignments', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   try { res.status(201).json({ success: true, ...await upsertTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, req.body) }); }
-  catch (error: any) { res.status(error?.message?.includes('jadwal') ? 409 : 400).json({ error: error?.message || 'Qoondeynta lama kaydin karin.' }); }
+  catch (error: any) { res.status(Number(error?.status) || (error?.message?.includes('jadwal') ? 409 : 400)).json({ error: error?.message || 'Qoondeynta lama kaydin karin.' }); }
 });
 apiRouter.put('/teacher-assignments/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   try { res.json({ success: true, ...await upsertTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, req.body, String(req.params.id)) }); }
-  catch (error: any) { res.status(error?.message?.includes('jadwal') ? 409 : 400).json({ error: error?.message || 'Qoondeynta lama beddeli karin.' }); }
+  catch (error: any) { res.status(Number(error?.status) || (error?.message?.includes('jadwal') ? 409 : 400)).json({ error: error?.message || 'Qoondeynta lama beddeli karin.' }); }
 });
 apiRouter.delete('/teacher-assignments/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   try { await removeTeacherAssignment(teacherAssignmentClient(), (req as any).school, (req as any).user, String(req.params.id), req.body?.clearDependentEntries === true); res.json({ success: true }); }
@@ -11075,7 +11359,7 @@ apiRouter.put('/teacher-assignments/teachers/:teacherId/workload-limit', require
   const school = (req as any).school as School, user = (req as any).user as User;
   const raw = req.body?.maxPeriodsPerWeek;
   const value = raw === null || raw === '' ? null : Number(raw);
-  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 60)) { res.status(400).json({ error: 'Xadka xiisadaha waa inuu noqdaa tiro dhan oo u dhexeysa 1 ilaa 60, ama bannaan.' }); return; }
+  if (value !== null && (!Number.isInteger(value) || value < 1 || value > 30)) { res.status(422).json({ error: 'Xadka xiisadaha waa inuu noqdaa tiro dhan oo u dhexeysa 1 ilaa 30, ama bannaan.' }); return; }
   const client = teacherAssignmentClient();
   const { data: teacher, error } = await client.from('teachers').select('id,max_periods_per_week').eq('school_id', school.id).eq('id', String(req.params.teacherId)).maybeSingle();
   if (error || !teacher) { res.status(404).json({ error: 'Macallinka lagama helin dugsigan.' }); return; }
