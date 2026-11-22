@@ -83,7 +83,7 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /attendanceCounts/);
   assert.match(teacher, /Teaching schedule/);
   assert.match(teacher, /lessons/);
-  assert.match(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
+  assert.doesNotMatch(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
   assert.match(teacher, /Your lesson/);
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
@@ -387,4 +387,13 @@ test('teacher subject directory is restricted to active class-subject assignment
   assert.match(route, /'teachers\.school_id': school\.id/);
   assert.match(route, /is_active: 'true'/);
   assert.match(route, /assignedSubjectIds\.has\(subject\.id\)/);
+});
+
+test('teacher timetable scope cannot be widened to the whole school by a query parameter', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf("apiRouter.get('/timetable'");
+  const end = api.indexOf("\napiRouter.", start + 1);
+  const route = api.slice(start, end);
+  assert.match(route, /teacherId = String\(own\.items\[0\]\.id\)/);
+  assert.doesNotMatch(route, /scope.*school|teacherId = ''/);
 });
