@@ -147,4 +147,4 @@ END;
 $function$;
 
 REVOKE ALL ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, boolean, varchar) TO service_role;
+GRANT EXECUTE ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar) TO service_role;
