@@ -10234,7 +10234,7 @@ apiRouter.put('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
     res.status(404).json({ error: 'School was not found. No setup progress was saved.' });
     return;
   }
-  const updated = db.updateSchool(school.id, { setupProgress: progress });
+  const updated = db.updateSchool(school.id, { setupProgress: progress, setupCompletedAt: progress.completedAt || loadedSchool.setupCompletedAt || null });
   if (!updated) {
     res.status(404).json({ error: 'School was not found. No setup progress was saved.' });
     return;
