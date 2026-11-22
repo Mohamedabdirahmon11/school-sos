@@ -28,7 +28,7 @@ CREATE TABLE public.teacher_assignment_audit (
 );
 CREATE TABLE public.timetable_slots (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), school_id varchar NOT NULL,
-  class_id varchar NOT NULL, subject_id varchar NOT NULL, teacher_id varchar
+  class_id varchar NOT NULL, subject_id varchar NOT NULL, teacher_id varchar, is_active boolean NOT NULL DEFAULT true
 );
 CREATE TABLE public.schools (id text PRIMARY KEY, setup_progress jsonb);
 ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
@@ -67,7 +67,7 @@ VALUES ('00000000-0000-0000-0000-000000000011','school-a','00000000-0000-0000-00
 INSERT INTO public.timetable_slots(school_id,class_id,subject_id,teacher_id) VALUES ('school-a','class-a','math','t-old');
 CREATE FUNCTION public.fail_timetable_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'simulated timetable cleanup failure'; END $$;
-CREATE TRIGGER fail_timetable_cleanup BEFORE DELETE ON public.timetable_slots
+CREATE TRIGGER fail_timetable_cleanup BEFORE UPDATE ON public.timetable_slots
 FOR EACH ROW EXECUTE FUNCTION public.fail_timetable_cleanup();
 DO $$
 BEGIN
@@ -99,8 +99,8 @@ SELECT public.upsert_teacher_assignment_atomic(
 );
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.timetable_slots WHERE school_id='school-a' AND class_id='class-a' AND subject_id='math') THEN
-    RAISE EXCEPTION 'dependent timetable slot was not cleaned';
+  IF EXISTS (SELECT 1 FROM public.timetable_slots WHERE school_id='school-a' AND class_id='class-a' AND subject_id='math' AND is_active = true) THEN
+    RAISE EXCEPTION 'dependent timetable slot was not deactivated';
   END IF;
   IF (SELECT count(*) FROM public.teacher_assignment_audit WHERE school_id='school-a') <> 1 THEN
     RAISE EXCEPTION 'assignment audit was not committed atomically';
