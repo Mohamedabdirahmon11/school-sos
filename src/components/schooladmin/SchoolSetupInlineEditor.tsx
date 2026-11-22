@@ -46,7 +46,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
         setRows(data.assignments || []);
         setFormTeacher(value => ({ ...value, classId: value.classId || data.classes?.[0]?.id || '' }));
       } else {
-        const [slots, termRows] = await Promise.all([ApiClient.getTimetable({ scope: 'school' }), ApiClient.getTimetableTerms()]);
+        const [slots, termRows] = await Promise.all([ApiClient.getTimetable({ scope: 'school', setupWizard: true }), ApiClient.getTimetableTerms()]);
         setRows(slots || []);
         setTerms(termRows || []);
       }
@@ -82,7 +82,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
       } else if (step === 'students') {
         await ApiClient.createStudent({ firstName: form.firstName, middleName: form.middleName, lastName: form.lastName, gender: form.gender as any, classId: form.classId, guardianName: form.guardianName, guardianPhone: form.guardianPhone });
       } else {
-        await ApiClient.setTimetableSlot({ classId: form.classId, subjectId: form.subjectId, teacherId: form.teacherId, dayOfWeek: form.dayOfWeek, periodNumber: Number(form.periodNumber), startTime: form.startTime, endTime: form.endTime, termId: terms.find(term => term.isCurrent)?.id });
+        await ApiClient.setTimetableSlot({ classId: form.classId, subjectId: form.subjectId, teacherId: form.teacherId, dayOfWeek: form.dayOfWeek, periodNumber: Number(form.periodNumber), startTime: form.startTime, endTime: form.endTime, termId: terms.find(term => term.isCurrent)?.id }, true);
       }
       setForm({});
       await load();
@@ -104,7 +104,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
       else if (step === 'teachers') await ApiClient.deleteTeacher(row.id);
       else if (step === 'students') await ApiClient.deleteStudent(row.id);
       else if (step === 'assign') await ApiClient.request(`/teacher-assignments/${encodeURIComponent(row.id)}?clearDependentEntries=false`, { method: 'DELETE' });
-      else await ApiClient.request(`/timetable/${encodeURIComponent(row.classId)}/${encodeURIComponent(row.dayOfWeek)}/${encodeURIComponent(row.periodNumber)}?termId=${encodeURIComponent(row.termId)}${row.sectionId ? `&sectionId=${encodeURIComponent(row.sectionId)}` : ''}`, { method: 'DELETE' });
+      else await ApiClient.request(`/timetable/${encodeURIComponent(row.classId)}/${encodeURIComponent(row.dayOfWeek)}/${encodeURIComponent(row.periodNumber)}?termId=${encodeURIComponent(row.termId)}&setupWizard=true${row.sectionId ? `&sectionId=${encodeURIComponent(row.sectionId)}` : ''}`, { method: 'DELETE' });
       await load();
       await onChanged();
     } catch (e) {
