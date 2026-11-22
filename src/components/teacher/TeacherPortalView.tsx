@@ -96,12 +96,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
   const [timetableDay, setTimetableDay] = useState<'all' | TimetableSlot['dayOfWeek']>('all');
   const [studentSearch, setStudentSearch] = useState('');
-  const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
   const timetableRows = timetable;
   const visibleTimetable = timetableRows
     .filter(slot => timetableDay === 'all' || slot.dayOfWeek === timetableDay)
     .slice()
     .sort((a, b) => timetableDays.indexOf(a.dayOfWeek) - timetableDays.indexOf(b.dayOfWeek) || a.periodNumber - b.periodNumber);
+  const timetablePeriods = [...new Map(timetable.map(slot => [slot.periodNumber, slot])).values()]
+    .sort((a, b) => a.periodNumber - b.periodNumber);
+  const timetableMatrixDays = timetableDay === 'all' ? timetableDays : [timetableDay];
   const visibleStudents = students.filter(student =>
     `${student.firstName} ${student.middleName || ''} ${student.lastName} ${student.studentId} ${student.rollNumber || ''}`.toLowerCase().includes(studentSearch.trim().toLowerCase())
   ).sort((a, b) =>
@@ -109,14 +112,27 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     (a.rollNumber || '').localeCompare(b.rollNumber || '', undefined, { numeric: true })
   );
   const [assignedClassStudentTotal, setAssignedClassStudentTotal] = useState(0);
+  const [dashboardSummary, setDashboardSummary] = useState<any>(null);
   useEffect(() => {
     let cancelled = false;
-    if (activeTab !== 'dashboard' || !classes.length) { setAssignedClassStudentTotal(0); return; }
-    // The teacher dashboard endpoint returns SQL-side, school-scoped aggregates.
+    if (activeTab !== 'dashboard' || !classes.length) {
+      setAssignedClassStudentTotal(0);
+      setDashboardSummary(null);
+      return;
+    }
+    // The database RPC returns tenant-scoped student, class and attendance aggregates.
     // Do not download every student row merely to calculate dashboard counts.
     ApiClient.getSchoolDashboard()
-      .then(summary => { if (!cancelled) setAssignedClassStudentTotal(Number(summary?.stats?.totalStudents || 0)); })
-      .catch(() => { if (!cancelled) setAssignedClassStudentTotal(0); });
+      .then(summary => {
+        if (cancelled) return;
+        setDashboardSummary(summary || null);
+        setAssignedClassStudentTotal(Number(summary?.stats?.totalStudents || 0));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDashboardSummary(null);
+        setAssignedClassStudentTotal(0);
+      });
     return () => { cancelled = true; };
   }, [activeTab, classes.length, school?.id]);
   const notices: SchoolNotice[] = Array.isArray(noticesState.data) ? noticesState.data : [];
@@ -659,9 +675,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <article className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">Ardayda fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{assignedClassStudentTotal}</p><p className="mt-1 text-[10px] text-slate-500">Wadarta ardayda fasalladaada</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{new Set([...teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => assignment.classId), ...formTeacherClasses.map(klass => klass.id)]).size}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Maaddooyinka aad dhigto</p><p className="mt-2 text-2xl font-black text-slate-900">{subjects.length}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Casharrada laguu qoondeeyay</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.length}</p><p className="mt-1 text-[10px] text-slate-500">Casharrada toddobaadka</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{Number(dashboardSummary?.totalClasses ?? new Set([...teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => assignment.classId), ...formTeacherClasses.map(klass => klass.id)]).size)}</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Attendance maanta</p><p className="mt-2 text-2xl font-black text-slate-900">{Number(dashboardSummary?.stats?.attendanceRate ?? 0)}%</p><p className="mt-1 text-[10px] text-slate-500">{Number(dashboardSummary?.attendanceRecordedToday ?? 0)} / {assignedClassStudentTotal} la diiwaangeliyey</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Casharrada laguu qoondeeyay</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.length}</p><p className="mt-1 text-[10px] text-slate-500">Xogta timetable-ka dugsiga</p></article>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <a href="#attendance" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Daily Attendance</strong><span className="mt-1 block text-xs text-slate-500">{Number(dashboardSummary?.attendanceRecordedToday ?? 0)} of {assignedClassStudentTotal} student records today</span></a>
+            <a href="#grades" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Exam Marks</strong><span className="mt-1 block text-xs text-slate-500">{subjects.length} assigned subjects ready for mark entry</span></a>
+            <a href="#assignments" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Homework</strong><span className="mt-1 block text-xs text-slate-500">{homework.length} current assignments</span></a>
+            <a href="#notices" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Notice Board</strong><span className="mt-1 block text-xs text-slate-500">{notices.length} published notices</span></a>
           </div>
         </section>
       )}
@@ -695,24 +717,43 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                   : 'No schedule slots have been published yet. Contact school administration to set your timetable.'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-              {visibleTimetable.map(slot => {
-                const c = classes.find(cls => cls.id === slot.classId);
-                const mySlot = true;
-                const s = subjects.find(sub => sub.id === slot.subjectId);
-                return (
-                  <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-[#132A29]">{slot.dayOfWeek}</span>
-                      <span className="font-mono text-[11px] font-bold text-[#0F766E]">Period {slot.periodNumber}</span>
-                    </div>
-                    <p className="font-semibold text-teal-900">{(slot as any).subjectName || s?.name || 'Subject'}</p>
-                    <p className="text-[11px] text-[#64748B]">{(slot as any).className || c?.name || 'Class'} · Room {slot.roomNumber || 'TBA'}</p>
-                    {mySlot && <span className="inline-flex rounded-full bg-teal-700 px-2 py-1 text-[10px] font-bold text-white">Your lesson</span>}
-                    <p className="font-mono text-[10px] text-[#94A3B8]">{slot.startTime} - {slot.endTime}</p>
-                  </div>
-                );
-              })}
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="sticky left-0 bg-slate-50 px-3 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">Day</th>
+                    {timetablePeriods.map(period => (
+                      <th key={period.periodNumber} className="min-w-28 px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                        <span className="block">Period {period.periodNumber}</span>
+                        <span className="mt-1 block font-mono font-normal normal-case">{String(period.startTime).slice(0,5)}–{String(period.endTime).slice(0,5)}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {timetableMatrixDays.map(day => (
+                    <tr key={day}>
+                      <th className="sticky left-0 bg-white px-3 py-3 text-xs font-semibold text-slate-700">{day}</th>
+                      {timetablePeriods.map(period => {
+                        const slot = timetable.find(item => item.dayOfWeek === day && item.periodNumber === period.periodNumber);
+                        const klass = slot ? classes.find(item => item.id === slot.classId) : null;
+                        const subject = slot ? subjects.find(item => item.id === slot.subjectId) : null;
+                        return (
+                          <td key={period.periodNumber} className="p-2 align-top">
+                            {slot ? (
+                              <div className="min-h-16 rounded-lg border border-teal-200 bg-teal-50 p-2">
+                                <p className="font-semibold text-teal-900">{(slot as any).subjectName || subject?.name || 'Subject'}</p>
+                                <p className="mt-1 text-[10px] text-slate-600">{(slot as any).className || klass?.name || 'Class'}{klass?.section ? ` · ${klass.section}` : ''}</p>
+                                <p className="mt-1 text-[10px] text-slate-500">Room {slot.roomNumber || 'TBA'}</p>
+                              </div>
+                            ) : <div className="flex min-h-16 items-center justify-center rounded-lg border border-dashed border-slate-200 text-slate-400">—</div>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -740,13 +781,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 {visibleStudents.map((student, index) => <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-slate-400">#{index + 1}</span><span className="rounded-lg bg-white px-2 py-1 font-mono text-[11px] text-slate-600">{student.rollNumber || student.studentId}</span></div>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p>
+                  <p className="mt-1 text-xs text-slate-500">Parent phone: {student.fatherPhone || student.motherPhone || '—'}</p>
+                  <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">{student.status || 'Active'}</span>
                 </article>)}
                 {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}
               </div>
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[620px] text-left text-xs">
-                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Student ID</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">{visibleStudents.map((student, index) => <tr key={student.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-400">{index + 1}</td><td className="px-4 py-3 font-semibold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</td><td className="px-4 py-3 font-mono text-slate-500">{student.studentId}</td></tr>)}</tbody>
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Student ID</th><th className="px-4 py-3">Parent phone</th><th className="px-4 py-3">Status</th></tr></thead>
+                  <tbody className="divide-y divide-slate-100">{visibleStudents.length ? visibleStudents.map((student, index) => <tr key={student.id} className="hover:bg-slate-50"><td className="px-4 py-3 text-slate-400">{index + 1}</td><td className="px-4 py-3 font-semibold text-slate-800">{student.firstName} {student.middleName} {student.lastName}</td><td className="px-4 py-3 font-mono text-slate-500">{student.studentId}</td><td className="px-4 py-3 font-mono text-slate-600">{student.fatherPhone || student.motherPhone || '—'}</td><td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">{student.status || 'Active'}</span></td></tr>) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No students match your search.</td></tr>}</tbody>
                 </table>
               </div>
               </>
