@@ -67,10 +67,17 @@ test('Assignment page is reachable from the School Admin app and sidebar', () =>
   assert.match(sidebar, /sch_teacher_assignments/);
 });
 
-test('Step 6 syncs the persisted Setup Wizard academic year and semesters before loading assignments', () => {
+test('Step 6 keeps GET read-only and syncs Setup Wizard academic records only when steps 2/3 are saved', () => {
   assert.match(api, /async function syncWizardAcademicRecords/);
-  assert.match(api, /from\('schools'\)[\s\S]*select\('academic_year,terms'\)/);
-  assert.match(api, /startDate: savedTerms\.semester1Start/);
-  assert.match(api, /endDate: savedTerms\.semester2End/);
-  assert.match(api, /await syncWizardAcademicRecords\(client, school\.id/);
+  const routeStart = api.indexOf("apiRouter.get('\/teacher-assignments'");
+  const routeEnd = api.indexOf("apiRouter.post('\/teacher-assignments'", routeStart);
+  const getRoute = api.slice(routeStart, routeEnd);
+  assert.doesNotMatch(getRoute, /syncWizardAcademicRecords|\.from\('schools'\)[\s\S]*\.update\(/);
+  const setupStart = api.indexOf("apiRouter.put('\/school\/setup-data'");
+  const setupEnd = api.indexOf("apiRouter.get('\/school\/setup-progress'", setupStart);
+  const setupRoute = api.slice(setupStart, setupEnd);
+  assert.match(setupRoute, /if \(step === 2 \|\| step === 3\)/);
+  assert.match(setupRoute, /await syncWizardAcademicRecords\(teacherAssignmentClient\(\), school\.id/);
+  assert.match(setupRoute, /startDate: savedTerms\.semester1Start/);
+  assert.match(setupRoute, /endDate: savedTerms\.semester2End/);
 });

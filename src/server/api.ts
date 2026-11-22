@@ -10174,6 +10174,26 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   }
   if (!updated) { res.status(404).json({ error: 'School was not found.' }); return; }
   try { await db.flush(); } catch { res.status(503).json({ error: 'Setup step could not be saved. Please retry.' }); return; }
+  if (step === 2 || step === 3) {
+    const savedTerms: Partial<NonNullable<School['terms']>> = updated.terms || {};
+    try {
+      await syncWizardAcademicRecords(teacherAssignmentClient(), school.id, {
+        academicYear: {
+          name: updated.academicYear,
+          startDate: savedTerms.semester1Start || '',
+          endDate: savedTerms.semester2End || '',
+          isCurrent: true
+        },
+        terms: [
+          { name: 'Semester 1', startDate: savedTerms.semester1Start, endDate: savedTerms.semester1End },
+          { name: 'Semester 2', startDate: savedTerms.semester2Start, endDate: savedTerms.semester2End }
+        ]
+      });
+    } catch (error: any) {
+      res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin. Dib u keydi qaybta sannadka iyo terms-ka.' });
+      return;
+    }
+  }
   res.json({ data: nextData, progress, completed: isSchoolSetupProgressComplete(progress), coreSetupCompleted });
 });
 
@@ -11445,28 +11465,8 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
   const role = normalizeRole(user.role);
   if (role !== 'school_admin' && role !== 'super_admin') { res.status(403).json({ error: 'Kaliya maamulka dugsiga ayaa maamuli kara qoondeyntan.' }); return; }
   const client = teacherAssignmentClient();
-  try {
-    // Setup Wizard persists these fields directly on schools; create/update normalized records before loading Step 6.
-    const { data: setupRow, error: setupReadError } = await client.from('schools')
-      .select('academic_year,terms').eq('id', school.id).maybeSingle();
-    if (setupReadError || !setupRow) throw new Error('Dejinta sannadka dugsiga lama akhrin karin. Dib u cusboonaysii bogga.');
-    const savedTerms = setupRow.terms || {};
-    await syncWizardAcademicRecords(client, school.id, {
-      academicYear: {
-        name: setupRow.academic_year,
-        startDate: savedTerms.semester1Start || '',
-        endDate: savedTerms.semester2End || '',
-        isCurrent: true
-      },
-      terms: [
-        { name: 'Semester 1', startDate: savedTerms.semester1Start, endDate: savedTerms.semester1End },
-        { name: 'Semester 2', startDate: savedTerms.semester2Start, endDate: savedTerms.semester2End }
-      ]
-    });
-  } catch (error: any) {
-    res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin.' });
-    return;
-  }
+  // This endpoint is read-only: Setup Wizard academic records are synchronized
+  // when the administrator saves steps 2/3, never during every page load.
   try {
     const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
       client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).order('start_date', { ascending: false }),
