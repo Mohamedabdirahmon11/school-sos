@@ -15,6 +15,8 @@ for (const width of viewports) {
       const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: theme as 'light' | 'dark' });
       const reference = await context.newPage();
       const live = await context.newPage();
+      live.on('pageerror', error => console.log('[teacher-portal visual pageerror]', error.stack || error.message));
+      live.on('console', message => { if (message.type() === 'error') console.log('[teacher-portal visual console]', message.text()); });
       const folder = path.join(root, 'artifacts', 'teacher-portal', theme, String(width));
       fs.mkdirSync(path.join(folder, 'reference'), { recursive: true });
       fs.mkdirSync(path.join(folder, 'schoolos'), { recursive: true });
@@ -27,7 +29,7 @@ for (const width of viewports) {
         await reference.screenshot({ path: path.join(folder, 'reference', `${section}.png`), fullPage: true });
 
         await live.goto(`http://127.0.0.1:4173/teacher-portal-visual.html?section=${section}&theme=${theme}`);
-        await expect(live.locator('#root')).toBeVisible();
+        await expect(live.locator('#root > *').first()).toBeVisible();
         await expect(live.locator('h1, h2').first()).toBeVisible();
         await live.screenshot({ path: path.join(folder, 'schoolos', `${section}.png`), fullPage: true });
       }
