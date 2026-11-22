@@ -25,6 +25,7 @@ test('School Setup UI exposes the ten requested steps in order and the responsiv
   assert.ok(source.includes('prefers-color-scheme:dark'));
   assert.match(source, /\{ id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8,/);
   assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'attendance'\]/);
+  assert.ok(source.includes('Dashboard-ku ma furmayo ilaa attendance rules iyo exam configuration la xaqiijiyo.'));
 });
 
 test('setup readiness is shared by API reads and writes and protects attendance, marks, and timetable routes', () => {
