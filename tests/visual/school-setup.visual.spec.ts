@@ -32,7 +32,21 @@ for (const width of widths) {
         await page.screenshot({ path: path.join(folder, imageName), fullPage: true });
         pageLinks.push(`<li><a href="${imageName}">${steps[index]}</a></li>`);
       }
-      fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>School Setup ${width}px ${theme}</title><h1>School Setup · ${width}px · ${theme}</h1><ol>${pageLinks.join('')}</ol>`);
+      const referenceHtml = fs.readFileSync(path.join(root, 'tests', 'visual', 'reference-setup-profile.html'), 'utf8')
+        .replace('data-theme="light"', 'data-theme="' + theme + '"');
+      const referencePage = await context.newPage();
+      await referencePage.setContent(referenceHtml);
+      await referencePage.screenshot({ path: path.join(folder, 'reference-profile.png'), fullPage: true });
+      const comparisonHtml = '<!doctype html><meta charset="utf-8"><title>Reference comparison</title>' +
+        '<style>body{font:14px system-ui;margin:16px;background:#eee;color:#222}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}figure{margin:0;background:white;padding:8px;border:1px solid #bbb}img{display:block;width:100%;height:auto}figcaption{font-weight:700;margin:0 0 8px}</style>' +
+        '<h1>Reference HTML vs SchoolOS · ' + width + 'px · ' + theme + '</h1><main>' +
+        '<figure><figcaption>Uploaded reference HTML</figcaption><img src="reference-profile.png"></figure>' +
+        '<figure><figcaption>SchoolOS · Profile step</figcaption><img src="step-1.png"></figure></main>';
+      fs.writeFileSync(path.join(folder, 'comparison.html'), comparisonHtml);
+      await referencePage.setContent(comparisonHtml);
+      await referencePage.screenshot({ path: path.join(folder, 'comparison.png'), fullPage: true });
+      await referencePage.close();
+      fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>School Setup ${width}px ${theme}</title><h1>School Setup · ${width}px · ${theme}</h1><ol><li><a href="reference-profile.png">Uploaded reference HTML · Profile</a></li><li><a href="comparison.png">Reference vs SchoolOS comparison</a></li>${pageLinks.join('')}</ol>`);
       await context.close();
     });
   }
