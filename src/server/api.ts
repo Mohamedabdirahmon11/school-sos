@@ -9971,8 +9971,10 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   if (role !== 'school_admin' && role !== 'teacher' && role !== 'super_admin') {
     res.status(403).json({ error: 'Your role cannot access school setup operations.' }); return;
   }
-  // Existing completed schools are grandfathered and never relocked.
-  if (normalizeSchoolSetupProgress(school.setupProgress).completedAt) { next(); return; }
+  // Legacy schools without a setup-progress record are grandfathered. New schools
+  // initialize this record when the setup wizard first loads and are gated from then on.
+  if (!school.setupProgress || typeof school.setupProgress !== 'object'
+    || normalizeSchoolSetupProgress(school.setupProgress).completedAt) { next(); return; }
   try {
     const state = await evaluateReadiness(school.id);
     const requiredIds = [1, 2, 3, 4, 5, 0, 6];
