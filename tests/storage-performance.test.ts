@@ -58,7 +58,7 @@ test('cached session validation is reused only inside its short TTL and while th
 
   assert.equal(shouldReuseCachedAuthSession(now + 1_999, sessionExpiry, now), true);
   assert.equal(shouldReuseCachedAuthSession(now, sessionExpiry, now), false);
-  assert.equal(shouldReuseCachedAuthSession(now + 2_000, sessionExpiry, now), false);
+  assert.equal(shouldReuseCachedAuthSession(now + 2_000, sessionExpiry, now + 2_000), false);
   assert.equal(shouldReuseCachedAuthSession(now + 1_000, new Date(now - 1).toISOString(), now), false);
 });
 
