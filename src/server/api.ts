@@ -167,16 +167,28 @@ apiRouter.use((req, res, next) => {
     }
   });
   if (typeof storage.prepareRequestContext !== 'function') { next(); return; }
-  const requestStarted = process.env.NODE_ENV === 'development' ? performance.now() : 0;
-  res.once('finish', () => {
-    if (process.env.NODE_ENV !== 'development') return;
-    const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
-    console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
-  });
+  const requestId = randomUUID();
+  const requestStarted = performance.now();
+  res.setHeader('X-Request-Id', requestId);
   void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
-    storage.runWithRequestContext(context, next);
-  }).catch(() => {
-    if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });
+    storage.runWithRequestContext(context, () => {
+      // Register inside the request's AsyncLocalStorage scope so finish-time
+      // metrics are attributed to this request rather than the global context.
+      res.once('finish', () => {
+        const metrics = storage.getRequestQueryMetrics?.(context) || { count: 0, durationMs: 0 };
+        const schoolId = String((req as any).school?.id || (req as any).user?.schoolId || (req as any).user?.school_id || 'none');
+        console.info(`[api-perf] request_id=${requestId} route=${req.method} ${req.path} status=${res.statusCode} duration_ms=${Math.round(performance.now() - requestStarted)} db_queries=${metrics.count} db_ms=${metrics.durationMs} school_id=${schoolId}`);
+      });
+      next();
+    });
+  }).catch((error: unknown) => {
+    const detail = error instanceof Error ? error.message : 'unknown storage context error';
+    console.error(`[api-context-error] request_id=${requestId} route=${req.method} ${req.path} error=${detail}`);
+    if (!res.headersSent) res.status(503).json({
+      error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.',
+      code: 'STORAGE_CONTEXT_UNAVAILABLE',
+      requestId
+    });
   });
 });
 
