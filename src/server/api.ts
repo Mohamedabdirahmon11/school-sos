@@ -10178,7 +10178,7 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   if (!updated) { res.status(404).json({ error: 'School was not found.' }); return; }
   try { await db.flush(); } catch { res.status(503).json({ error: 'Setup step could not be saved. Please retry.' }); return; }
   if (step === 2 || step === 3) {
-    const savedTerms = updated.terms || {};
+    const savedTerms: Partial<NonNullable<School['terms']>> = updated.terms || {};
     try {
       await syncWizardAcademicRecords(teacherAssignmentClient(), school.id, {
         academicYear: {
