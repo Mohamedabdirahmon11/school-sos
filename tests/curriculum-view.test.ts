@@ -16,12 +16,12 @@ test('Curriculum screen provides reset, same-grade copy, and weekly period meter
   assert.match(view, /ApiClient\.applyPrimarySubjectTemplate/);
   assert.match(view, /ApiClient\.copyClassCurriculum/);
   assert.match(view, /Number\(row\.gradeLevel\) === Number\(selectedClass\.gradeLevel\)/);
-  assert.match(view, /\\{totalPeriods\\}\\/\\{capacity\\.weeklyCapacity\\}/);
+  assert.ok(view.includes('{totalPeriods}/{capacity.weeklyCapacity}'));
 });
 
 test('Curriculum period inputs are limited to 1–10 and total is checked before save', () => {
   assert.match(view, /min=\{1\} max=\{10\}/);
-  assert.match(view, /\\{totalPeriods\\}\\/\\{capacity\\.weeklyCapacity\\}/);
+  assert.ok(view.includes('{totalPeriods}/{capacity.weeklyCapacity}'));
   assert.match(view, /ApiClient\.saveClassCurriculum/);
 });
 
