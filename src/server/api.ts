@@ -6446,7 +6446,6 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
   }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view attendance.' }); return; }
   if (!await canAccessFormTeacherClass(req, res, classId as string)) return;
-  if (user.role === 'teacher' && !await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   res.json(await db.getAttendance(school.id, classId as string, date as string));
 });
 
@@ -6463,7 +6462,6 @@ apiRouter.get('/attendance/month', requireAuth, requireSchoolContext, requireSch
     res.status(403).json({ error:'Akoonka shaqaalaha ma laha rukhsadda xaadirinta.' }); return;
   }
   if (!await canAccessFormTeacherClass(req, res, classId)) return;
-  if (user.role === 'teacher' && !await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
   const endDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0,10);
   const client = documentServiceClient(res);
@@ -6581,7 +6579,6 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Submit attendance for every student in the selected class in one operation.' });
     return;
   }
-  if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const previous = await db.getAttendance(school.id, normalizedClassId, date);
   const previousByStudent = new Map((previous || []).map((record:any)=>[String(record.studentId),record.status]));
   const changes = normalizedRecords.map((record:any)=>({studentId:record.studentId,oldStatus:previousByStudent.get(record.studentId)||null,newStatus:record.status}))
