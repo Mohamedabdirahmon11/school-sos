@@ -183,6 +183,12 @@ export class InMemorySupabase {
       }, 0);
       const nextNumber = maxNumber + 1;
       const staffId = 'T' + (nextNumber < 1000 ? String(nextNumber).padStart(3, '0') : String(nextNumber));
+      const formTeacherClass = args?.p_form_teacher_class_id
+        ? this.rows('classes').find(row => String(row.id) === String(args.p_form_teacher_class_id) && String(row.school_id ?? row.schoolId) === schoolId && (row.is_archived ?? row.isArchived) !== true)
+        : null;
+      if (args?.p_form_teacher_class_id && !formTeacherClass) {
+        return { data: null, error: { message: 'Form Teacher class must belong to this school and be active.', code: '23503' } };
+      }
       user.staff_id = staffId;
       teacher.staff_id = staffId;
       this.rows('users').push(user);
@@ -190,11 +196,7 @@ export class InMemorySupabase {
       for (const subjectId of [...new Set((args?.p_subject_ids || []).map((id: unknown) => String(id)))]) {
         this.rows('teacher_subjects').push({ school_id: schoolId, teacher_id: teacher.id, subject_id: subjectId, is_active: true });
       }
-      if (args?.p_form_teacher_class_id) {
-        const klass = this.rows('classes').find(row => String(row.id) === String(args.p_form_teacher_class_id) && String(row.school_id ?? row.schoolId) === schoolId && (row.is_archived ?? row.isArchived) !== true);
-        if (!klass) return { data: null, error: { message: 'Form Teacher class must belong to this school and be active.', code: '23503' } };
-        klass.class_teacher_id = user.id;
-      }
+      if (formTeacherClass) formTeacherClass.class_teacher_id = user.id;
       return { data: { user_id: user.id, teacher_id: teacher.id, staff_id: staffId }, error: null };
     }
     if (name === 'schoolos_sync_student_guardian') {
