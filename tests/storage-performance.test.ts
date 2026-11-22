@@ -100,3 +100,20 @@ test('class report-card PDF student records are fetched in one school-scoped fie
   assert.match(route, /db\.getStudentsByIds\(cards\.map/);
   assert.doesNotMatch(route, /Promise\.all\(cards\.map[\s\S]*?db\.getStudentById/);
 });
+
+
+test('bulk document generation resolves up to 100 student identifiers with two school-scoped batch queries', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const methodStart = storage.indexOf('public async getStudentsByIdentifiers(');
+  const methodEnd = storage.indexOf('public async getStudentById(', methodStart);
+  const method = storage.slice(methodStart, methodEnd);
+  assert.match(method, /Promise\.all\(/);
+  assert.match(method, /school_id: schoolId, id: uniqueIdentifiers/);
+  assert.match(method, /school_id: schoolId, student_id: uniqueIdentifiers/);
+  const routeStart = api.indexOf("apiRouter.post('/documents/generate'");
+  const routeEnd = api.indexOf("apiRouter.", routeStart + 30);
+  const route = api.slice(routeStart, routeEnd < 0 ? api.length : routeEnd);
+  assert.match(route, /db\.getStudentsByIdentifiers\(identifiers, school\.id\)/);
+  assert.doesNotMatch(route, /for \(const rawId of body\.studentIds\)[\s\S]*?await db\.getStudentById/);
+});
