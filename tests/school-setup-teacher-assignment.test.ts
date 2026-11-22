@@ -122,3 +122,29 @@ test('teacher-only routes preserve HTTP 403 for parent, student and non-Form-Tea
   assert.match(attendanceWrite, /attendanceClass\.classTeacherId !== user\.id[\s\S]*?res\.status\(403\)/);
   assert.ok(attendanceWrite.indexOf('res.status(403)') < attendanceWrite.indexOf('ensureTeacherAssignmentReadyForTeacher'));
 });
+
+
+test('a Form Teacher cannot be assigned to two active classes', () => {
+  const result = evaluateTeacherAssignmentReadiness('school-1',
+    [
+      { id: 'class-1', schoolId: 'school-1', name: 'Grade 5', section: 'A', classTeacherId: 'user-1' },
+      { id: 'class-2', schoolId: 'school-1', name: 'Grade 6', section: 'A', classTeacherId: 'user-1' }
+    ],
+    [{ id: 'teacher-1', schoolId: 'school-1', userId: 'user-1', fullName: 'Amina', status: 'active' }],
+    [],
+    []
+  );
+  assert.equal(result.ready, false);
+  assert.ok(result.issues.some(issue => issue.includes('Form Teacher ayuu uga yahay laba fasal')));
+});
+
+test('every active class must have at least one curriculum subject', () => {
+  const result = evaluateTeacherAssignmentReadiness('school-1',
+    [{ id: 'class-1', schoolId: 'school-1', name: 'Grade 5', section: 'A', classTeacherId: 'user-1' }],
+    [{ id: 'teacher-1', schoolId: 'school-1', userId: 'user-1', fullName: 'Amina', status: 'active' }],
+    [],
+    []
+  );
+  assert.equal(result.ready, false);
+  assert.ok(result.issues.some(issue => issue.includes('ugu yaraan hal maaddo ma leh')));
+});
