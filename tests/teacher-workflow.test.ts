@@ -231,7 +231,7 @@ test('Form Teacher exam register reviews every active class subject while edits 
 
 test('teacher dashboard matches the reference four stats, today lessons and task shortcuts', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
-  assert.match(teacher, /EMPTY_TEACHER_DATA/);
+  assert.match(teacher, /const teacherAssignments = Array\.isArray\(teacherAssignmentsState\.data\)/);
   assert.match(teacher, /useMemo\(\(\) => \[\.\.\.new Map/);
   assert.match(teacher, /assignedClassStudentTotal/);
   assert.match(teacher, /<small>Fasallo<\/small>/);
@@ -447,7 +447,9 @@ test('teacher profile offers theme/language preferences and verified self-servic
 
 test('teacher portal refreshes assignments and timetable after administrator changes', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
-  assert.match(teacher, /initialData\.retry\(\)/);
+  assert.match(teacher, /formTeacherClassesState\.retry\(\)/);
+  assert.match(teacher, /teacherAssignmentsState\.retry\(\)/);
+  assert.match(teacher, /timetableState\.retry\(\)/);
   assert.match(teacher, /addEventListener\('focus', refreshWhenVisible\)/);
   assert.match(teacher, /addEventListener\('visibilitychange', refreshWhenVisible\)/);
   assert.match(teacher, /setInterval\(refreshWhenVisible, 60_000\)/);

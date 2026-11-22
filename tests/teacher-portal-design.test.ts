@@ -37,12 +37,14 @@ test('teacher portal continues to load school-scoped live assignments, timetable
   }
 });
 
-test('teacher portal timetable failures do not block the main teacher workspace', () => {
+test('teacher portal loads its Form Teacher class bootstrap independently from optional workflows', () => {
   const portal = read('../src/components/teacher/TeacherPortalView.tsx');
-  const bootstrap = portal.match(/const initialData = useApi\(async \(\) => Promise\.all\(\[([\s\S]*?)\]\)/);
-  assert.ok(bootstrap, 'expected a teacher portal bootstrap request');
-  assert.doesNotMatch(bootstrap[1], /getTimetable/, 'timetable must not be part of the all-or-nothing bootstrap');
+  const bootstrap = portal.match(/const formTeacherClassesState = useApi\(([\s\S]*?)\);/);
+  assert.ok(bootstrap, 'expected a dedicated Form Teacher class bootstrap');
+  assert.match(bootstrap[1], /getMyFormTeacherClasses/);
+  assert.doesNotMatch(bootstrap[1], /getTeacherSubjectAssignments|getExamConfig|getTimetable/);
   assert.match(portal, /const timetableState = useApi\([\s\S]*?ApiClient\.getTimetable\(\)/);
   assert.match(portal, /timetableState\.error \? \(/, 'timetable errors should be shown inside the timetable panel');
   assert.match(portal, /onRetry=\{timetableState\.retry\}/, 'the timetable panel should offer its own retry');
+  assert.match(portal, /teacherBootstrapLoading = formTeacherClassesState\.loading/);
 });

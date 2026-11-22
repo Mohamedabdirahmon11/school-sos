@@ -3739,12 +3739,18 @@ apiRouter.get('/subjects', requireAuth, requireSchoolContext, async (req, res) =
   await sendDatabasePage(req, res, 'subjects', { school_id: school.id });
 });
 
-apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
+apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
-  const classes = await db.getClasses(school.id);
-  res.json(classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived));
+  // Attendance bootstrap needs only this teacher's own class labels; avoid
+  // loading the school's entire class directory and unrelated class fields.
+  const classes = await queryAllRows('classes', {
+    school_id: school.id,
+    class_teacher_id: user.id,
+    is_archived: 'false'
+  }, 'id,school_id,name,section,class_teacher_id,is_archived');
+  res.json(classes);
 });
 apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school as School;
@@ -5334,13 +5340,14 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     }, 'id,student_id,class_id,section_id,roll_number')
     : [];
   const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
-  const classRows = await db.getClasses(school.id);
-  const classById = new Map<string, SchoolClass>(classRows.map(klass => [klass.id, klass] as const));
+  const enrollmentClassIds = [...new Set(currentEnrollments.map((row: any) => String(row.classId || '')).filter(Boolean))];
   const sectionIds = [...new Set(currentEnrollments.map((row: any) => String(row.sectionId || '')).filter(Boolean))];
-  const sectionRows = sectionIds.length
-    ? await queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name')
-    : [];
-  const sectionById = new Map<string, string>(sectionRows.map((row: any) => [String(row.id), String(row.name || '')]));
+  let classById = new Map<string, SchoolClass>();
+  let sectionById = new Map<string, string>();
+  const setRosterLabels = (classes: any[], sections: any[]) => {
+    classById = new Map<string, SchoolClass>(classes.map((klass: any) => [String(klass.id), klass] as const));
+    sectionById = new Map<string, string>(sections.map((row: any) => [String(row.id), String(row.name || '')]));
+  };
   const decorateWithCurrentEnrollment = (rows: any[]) => rows.map(student => {
     if (!currentYearId) {
       const legacyClass = classById.get(String(student.classId || ''));
@@ -5370,9 +5377,27 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     filters.id = enrolledStudentIds;
   }
 
+  // Class labels, sections and the student page are independent once the
+  // current-year enrollment scope has been resolved. Select only referenced
+  // classes to avoid downloading every class record for a single-class roster.
+  const classRowsPromise = currentYearId
+    ? enrollmentClassIds.length
+      ? queryAllRows('classes', { school_id: school.id, id: enrollmentClassIds }, 'id,name,section')
+      : Promise.resolve([] as any[])
+    : db.getClasses(school.id);
+  const sectionRowsPromise = sectionIds.length
+    ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name')
+    : Promise.resolve([] as any[]);
+
   // One class selected: return the whole class at once (A-Z), so numbering 1, 2, 3 is stable.
   if (classId && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
-    const classStudents = (await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students))
+    const [rawClassStudents, classRows, sectionRows] = await Promise.all([
+      queryAllRows('students', filters, LIST_QUERY_COLUMNS.students),
+      classRowsPromise,
+      sectionRowsPromise
+    ]);
+    setRosterLabels(classRows, sectionRows);
+    const classStudents = rawClassStudents
       .filter((student: any) => !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
       .sort(compareStudentsByName);
@@ -5384,7 +5409,12 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   }
 
   if (feeStatus !== 'all') {
-    const allStudents = await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students);
+    const [allStudents, classRows, sectionRows] = await Promise.all([
+      queryAllRows('students', filters, LIST_QUERY_COLUMNS.students),
+      classRowsPromise,
+      sectionRowsPromise
+    ]);
+    setRosterLabels(classRows, sectionRows);
     const statusMap = await getStudentFeeStatusMap(school.id, undefined, school.academicYear);
     const filtered = allStudents.filter((student: any) => {
       const matchesSearch = !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
@@ -5400,7 +5430,12 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     return;
   }
 
-  const result = await db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'student_id');
+  const [result, classRows, sectionRows] = await Promise.all([
+    db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'student_id'),
+    classRowsPromise,
+    sectionRowsPromise
+  ]);
+  setRosterLabels(classRows, sectionRows);
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
   const canDecorateFeeStatus = canViewFeeStatus;
   if (!canDecorateFeeStatus) {

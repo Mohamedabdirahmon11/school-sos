@@ -47,7 +47,7 @@ import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.
 import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
-import { hashPassword, hashPin, verifyPassword, verifyPin } from './auth-security.ts';
+import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 interface DatabaseSchema {
@@ -119,6 +119,45 @@ interface CachedAuthContext {
 }
 
 const AUTH_CONTEXT_TTL_MS = 60_000;
+// Reuse a successful session-row check briefly across bursty API requests.
+// Local logout/revocation invalidates this immediately; remote revocations
+// become visible within this short bounded window.
+const AUTH_SESSION_VALIDATION_TTL_MS = 2_000;
+const authSessionValidationCache = new Map<string, {
+  userId: string;
+  schoolId: string | null;
+  session: UserSession;
+  expiresAt: number;
+}>();
+const authContextLoadPromises = new Map<string, Promise<{ session: UserSession; user: User; school?: School | null } | null>>();
+
+export function shouldReuseCachedAuthSession(
+  cacheExpiresAt: number,
+  sessionExpiresAt: string,
+  now = Date.now()
+): boolean {
+  return cacheExpiresAt > now && isSessionExpiryValid(sessionExpiresAt, now);
+}
+
+function storeAuthSessionValidation(sessionId: string, userId: string, session: UserSession): void {
+  const now = Date.now();
+  if (authSessionValidationCache.size >= 1_000) {
+    for (const [id, entry] of authSessionValidationCache) {
+      if (entry.expiresAt <= now) authSessionValidationCache.delete(id);
+    }
+    while (authSessionValidationCache.size >= 1_000) {
+      const oldest = authSessionValidationCache.keys().next().value;
+      if (!oldest) break;
+      authSessionValidationCache.delete(oldest);
+    }
+  }
+  authSessionValidationCache.set(sessionId, {
+    userId,
+    schoolId: session.schoolId || null,
+    session,
+    expiresAt: now + AUTH_SESSION_VALIDATION_TTL_MS
+  });
+}
 const BRANCH_LIST_TTL_MS = 60_000;
 const NOTICE_COUNT_TTL_MS = 15_000;
 const authContextCache = new Map<string, CachedAuthContext>();
@@ -1567,6 +1606,7 @@ class StorageEngine {
 
   // Sessions
   public async createSession(session: UserSession): Promise<void> {
+    authSessionValidationCache.delete(session.id);
     this.data.sessions.push(session);
     this.save();
     // Do not issue a cookie until its backing database session is durable.
@@ -1581,6 +1621,20 @@ class StorageEngine {
   }
 
   public async getSessionAndUserById(sessionId: string, userId: string, schoolId?: string): Promise<{ session: UserSession; user: User; school?: School | null } | null> {
+    if (this.testClient) return this.loadSessionAndUserById(sessionId, userId, schoolId);
+    const key = JSON.stringify([sessionId, userId, schoolId || null]);
+    const pending = authContextLoadPromises.get(key);
+    if (pending) return pending;
+    const load = this.loadSessionAndUserById(sessionId, userId, schoolId);
+    authContextLoadPromises.set(key, load);
+    try {
+      return await load;
+    } finally {
+      if (authContextLoadPromises.get(key) === load) authContextLoadPromises.delete(key);
+    }
+  }
+
+  private async loadSessionAndUserById(sessionId: string, userId: string, schoolId?: string): Promise<{ session: UserSession; user: User; school?: School | null } | null> {
     const client = this.testClient || supabase;
     if (!client) return null;
     if (this.testClient?.supportsSeparateAuthQueries === true) {
@@ -1594,6 +1648,16 @@ class StorageEngine {
     }
     const cachedAuth = authContextCache.get(userId);
     if (cachedAuth && cachedAuth.expiresAt > Date.now() && (!schoolId || cachedAuth.user.schoolId === schoolId)) {
+      const cachedSession = authSessionValidationCache.get(sessionId);
+      if (cachedSession
+        && cachedSession.userId === userId
+        && (!schoolId || cachedSession.schoolId === schoolId)
+        && shouldReuseCachedAuthSession(cachedSession.expiresAt, cachedSession.session.expiresAt)) {
+        this.cacheQueryRows('user_sessions', [cachedSession.session]);
+        this.cacheQueryRows('users', [cachedAuth.user]);
+        return { session: cachedSession.session, user: cachedAuth.user, school: cachedAuth.school };
+      }
+      if (cachedSession) authSessionValidationCache.delete(sessionId);
       let sessionQuery = client.from('user_sessions').select('id,user_id,user_role,school_id,expires_at,created_at,last_activity_at').eq('id', sessionId).eq('user_id', userId);
       if (schoolId) sessionQuery = sessionQuery.eq('school_id', schoolId);
       const startedAt = performance.now();
@@ -1603,6 +1667,7 @@ class StorageEngine {
       if (!data) return null;
       const session = fromSupabaseRow(data) as UserSession;
       if (session.userId !== userId || schoolId && session.schoolId !== schoolId) return null;
+      storeAuthSessionValidation(sessionId, userId, session);
       this.cacheQueryRows('user_sessions', [session]);
       this.cacheQueryRows('users', [cachedAuth.user]);
       return { session, user: cachedAuth.user, school: cachedAuth.school };
@@ -1638,6 +1703,7 @@ class StorageEngine {
       school: normalizedSchoolContext,
       expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS
     });
+    storeAuthSessionValidation(sessionId, userId, normalizedSession);
     return { session: normalizedSession, user: normalizedUser, school: normalizedSchoolContext };
   }
 
@@ -1648,6 +1714,8 @@ class StorageEngine {
   public async touchSession(id: string, expiresAt: string): Promise<void> {
     const session = await this.getSessionById(id);
     if (!session || !shouldTouchSession(session.expiresAt, expiresAt)) return;
+    // Keep a valid cache entry when the throttled refresh does not write.
+    authSessionValidationCache.delete(id);
     session.expiresAt = expiresAt;
     session.lastActivityAt = new Date().toISOString();
     this.save();
@@ -1655,6 +1723,7 @@ class StorageEngine {
   }
 
   public async revokeSession(id: string): Promise<boolean> {
+    authSessionValidationCache.delete(id);
     await this.getSessionById(id);
     const previous = this.data.sessions.length;
     this.data.sessions = this.data.sessions.filter(session => session.id !== id);
@@ -1669,6 +1738,7 @@ class StorageEngine {
   }
 
   public deleteSession(id: string): void {
+    authSessionValidationCache.delete(id);
     this.data.sessions = this.data.sessions.filter(s => s.id !== id);
     this.save();
   }
@@ -2357,7 +2427,28 @@ class StorageEngine {
   // ATTENDANCE: Strictly ONCE PER DAY per class per student
   // -------------------------------------------------------------
   public async getAttendance(schoolId: string, classId: string, date: string): Promise<AttendanceRecord[]> {
-    return this.queryRows<AttendanceRecord>('attendance_records', { school_id: schoolId, class_id: classId, date });
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Attendance storage is unavailable.');
+    const rows: AttendanceRecord[] = [];
+    // Attendance is a read-only class/date register. Avoid an exact COUNT(*) on
+    // every open; fetch only the columns the register displays in bounded pages.
+    for (let offset = 0;; offset += 1_000) {
+      const startedAt = performance.now();
+      const { data, error } = await client.from('attendance_records')
+        .select('id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at')
+        .eq('school_id', schoolId)
+        .eq('class_id', classId)
+        .eq('date', date)
+        .order('student_id', { ascending: true })
+        .range(offset, offset + 999);
+      this.recordQuery('attendance_records', 'select-class-date-register', startedAt);
+      if (error) throw new Error(error.message || 'Unable to load class attendance.');
+      const batch = (data || []).map((row: any) => fromSupabaseRow(row, 'attendance_records') as AttendanceRecord);
+      rows.push(...batch);
+      if (batch.length < 1_000) break;
+    }
+    this.cacheQueryRows('attendance_records', rows);
+    return rows;
   }
 
   public async getSchoolAttendance(schoolId: string): Promise<AttendanceRecord[]> {

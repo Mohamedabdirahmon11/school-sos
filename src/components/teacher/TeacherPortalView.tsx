@@ -67,8 +67,6 @@ interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices' | 'profile';
 }
 
-const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, SchoolClass[]] = [[], null, []];
-
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
   const { user, school, isReadOnly, language, setLanguage } = useAuth();
   const [portalTheme, setPortalTheme] = useState<'system' | 'light' | 'dark'>(() => {
@@ -86,27 +84,49 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     window.localStorage.setItem('schoolos-teacher-theme', portalTheme);
   }, [portalTheme]);
 
-  // Keep the essential teacher assignment/profile bootstrap independent from
-  // the timetable endpoint. A 423 from timetable means scheduling prerequisites
-  // are incomplete; it must not prevent the teacher from opening the rest of the portal.
-  const initialData = useApi(async () => Promise.all([
-    ApiClient.getTeacherSubjectAssignments(),
-    ApiClient.getExamConfig(),
-    ApiClient.getMyFormTeacherClasses()
-  ]), [school?.id, user?.id], Boolean(school));
-  const timetableState = useApi(
-    () => ApiClient.getTimetable(),
+  // Attendance needs only the teacher's own Form Teacher classes. Do not block
+  // that workflow on the broader subject/teacher directory or exam configuration.
+  const formTeacherClassesState = useApi(
+    () => ApiClient.getMyFormTeacherClasses(),
     [school?.id, user?.id],
     Boolean(school && user?.role === 'teacher')
   );
-  // Revalidate assignments and timetable when an administrator changes the teacher's
-  // scope in another session. Focus/visibility refresh is immediate; the interval
-  // also covers a teacher who keeps the portal open while the admin is working.
+  const needsTeachingAssignments = !['attendance', 'notices', 'profile'].includes(activeTab);
+  const needsExamConfig = activeTab === 'grades' || activeTab === 'exam_results';
+  const teacherAssignmentsState = useApi(
+    () => ApiClient.getTeacherSubjectAssignments(),
+    [school?.id, user?.id],
+    Boolean(school && user?.role === 'teacher' && needsTeachingAssignments)
+  );
+  const examConfigState = useApi(
+    () => ApiClient.getExamConfig(),
+    [school?.id, user?.id],
+    Boolean(school && needsExamConfig)
+  );
+  const timetableState = useApi(
+    () => ApiClient.getTimetable(),
+    [school?.id, user?.id],
+    Boolean(school && user?.role === 'teacher' && ['dashboard', 'timetable'].includes(activeTab))
+  );
+  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user && activeTab === 'notices'));
+  const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school && activeTab === 'timetable'));
+  const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
+  const examInvigilationState = useApi(() => ApiClient.getTeacherExamInvigilation(), [school?.id, user?.id], Boolean(school && user?.role === 'teacher' && activeTab === 'timetable'));
+  const examInvigilationRows = Array.isArray(examInvigilationState.data) ? examInvigilationState.data : [];
+  const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user && activeTab === 'assignments'));
+  // Revalidate the active teacher workflow when an administrator changes scope.
   useEffect(() => {
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') {
-        initialData.retry();
-        timetableState.retry();
+      if (document.visibilityState !== 'visible') return;
+      formTeacherClassesState.retry();
+      if (needsTeachingAssignments) teacherAssignmentsState.retry();
+      if (needsExamConfig) examConfigState.retry();
+      if (['dashboard', 'timetable'].includes(activeTab)) timetableState.retry();
+      if (activeTab === 'notices') noticesState.retry();
+      if (activeTab === 'assignments') assignmentsState.retry();
+      if (activeTab === 'timetable') {
+        publishedExamSchedulesState.retry();
+        examInvigilationState.retry();
       }
     };
     window.addEventListener('focus', refreshWhenVisible);
@@ -117,20 +137,27 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.clearInterval(refreshInterval);
     };
-  }, [initialData.retry, timetableState.retry]);
-  const [assignmentsData, examConfigData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
-  // Notices are independent from core teacher data: a notices API outage must
-  // not prevent teachers from opening lessons, attendance, marks or homework.
-  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user));
-
-  const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school));
-  const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
-  const examInvigilationState = useApi(() => ApiClient.getTeacherExamInvigilation(), [school?.id, user?.id], Boolean(school && user?.role === 'teacher'));
-  const examInvigilationRows = Array.isArray(examInvigilationState.data) ? examInvigilationState.data : [];
+  }, [
+    activeTab, needsTeachingAssignments, needsExamConfig,
+    formTeacherClassesState.retry, teacherAssignmentsState.retry, examConfigState.retry,
+    timetableState.retry, noticesState.retry, assignmentsState.retry,
+    publishedExamSchedulesState.retry, examInvigilationState.retry
+  ]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const teacherAssignments = Array.isArray(assignmentsData) ? assignmentsData : [];
-  const formTeacherClasses: SchoolClass[] = Array.isArray(formTeacherClassesData) ? formTeacherClassesData : [];
+  const teacherAssignments = Array.isArray(teacherAssignmentsState.data) ? teacherAssignmentsState.data : [];
+  const formTeacherClasses: SchoolClass[] = Array.isArray(formTeacherClassesState.data) ? formTeacherClassesState.data : [];
+  const teacherBootstrapLoading = formTeacherClassesState.loading
+    || needsTeachingAssignments && teacherAssignmentsState.loading
+    || needsExamConfig && examConfigState.loading;
+  const teacherBootstrapError = formTeacherClassesState.error
+    || (needsTeachingAssignments ? teacherAssignmentsState.error : null)
+    || (needsExamConfig ? examConfigState.error : null);
+  const retryTeacherBootstrap = () => {
+    formTeacherClassesState.retry();
+    if (needsTeachingAssignments) teacherAssignmentsState.retry();
+    if (needsExamConfig) examConfigState.retry();
+  };
   const classes: SchoolClass[] = useMemo(() => [...new Map([
     ...teacherAssignments.map((assignment: any) => [assignment.class.id, assignment.class] as [string, SchoolClass]),
     ...formTeacherClasses.map(klass => [klass.id, klass] as [string, SchoolClass])
@@ -146,7 +173,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   const classSubjects: Subject[] = editableClassSubjects;
   const gradeSubjects: Subject[] = isFormTeacher ? allClassSubjects : editableClassSubjects;
   const [students, setStudents] = useState<Student[]>([]);
-  const examConfig = examConfigData as ExamConfig | null;
+  const examConfig = examConfigState.data as ExamConfig | null;
   // The teacher-scoped endpoint already resolves the signed-in user's teacher
   // record on the server. Do not re-filter those trusted rows against a second
   // client-side assignment payload (which can differ in shape/cache timing).
@@ -191,11 +218,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
         setAssignedClassStudentTotal(0);
       });
     return () => { cancelled = true; };
-  }, [activeTab, classes.length, initialData.data, school?.id]);
+  }, [activeTab, classes.length, teacherAssignments, formTeacherClasses, school?.id]);
   const notices: SchoolNotice[] = Array.isArray(noticesState.data)
     ? [...noticesState.data].sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || String(b.publishDate || '').localeCompare(String(a.publishDate || '')))
     : [];
-  const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
   const schoolWeekday = new Intl.DateTimeFormat('en-US', {
     weekday: 'long', timeZone: school?.timezone || 'Africa/Addis_Ababa'
@@ -704,8 +730,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     }
   };
 
-  if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
-  if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
+  if (teacherBootstrapLoading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
+  if (teacherBootstrapError) return <ErrorState error={teacherBootstrapError} onRetry={retryTeacherBootstrap} />;
 
   return (
     <div className="teacher-portal-design mx-auto w-full max-w-[1140px] space-y-5 p-3 sm:p-5 lg:p-7" data-theme={portalTheme === "system" ? undefined : portalTheme} style={{ "--school-brand-color": school?.brandColor || "#0e6a62" } as React.CSSProperties}>

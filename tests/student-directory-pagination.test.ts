@@ -56,3 +56,13 @@ test('school roster lookup indexes cover current academic year and Form Teacher 
   assert.match(migration, /academic_years_current_school_idx[\s\S]*?ON public\.academic_years \(school_id, id\)[\s\S]*?WHERE is_current = true/);
   assert.match(migration, /classes_form_teacher_school_active_idx[\s\S]*?ON public\.classes \(school_id, class_teacher_id\)[\s\S]*?WHERE is_archived = false/);
 });
+
+test('student roster overlaps class and section labels with student reads after enrollment scope is known', () => {
+  const start = api.indexOf("apiRouter.get('/students'");
+  const end = api.indexOf("apiRouter.get('/students/export'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /const \[result, classRows, sectionRows\] = await Promise\.all\(\[/);
+  assert.match(route, /classRowsPromise = currentYearId[\s\S]*?queryAllRows\('classes',[\s\S]*?'id,name,section'/);
+  assert.match(route, /sectionRowsPromise = sectionIds\.length[\s\S]*?queryAllRows\('class_sections'/);
+  assert.match(route, /setRosterLabels\(classRows, sectionRows\)/);
+});
