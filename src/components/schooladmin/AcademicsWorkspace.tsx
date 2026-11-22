@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, ClipboardList } from 'lucide-react';
+import { CalendarDays, ClipboardList, FileSpreadsheet } from 'lucide-react';
+import { ApiClient } from '../../services/api.ts';
+import { useAuth } from '../../context/AuthContext.tsx';
+import { TermMarksWorkspace } from './TermMarksWorkspace.tsx';
+import { SchoolClass } from '../../types/index.ts';
 import { TimetableView } from './TimetableView.tsx';
 import { ExamsResultsView } from './ExamsResultsView.tsx';
 
-type AcademicSection = 'timetable' | 'marks';
+type AcademicSection = 'timetable' | 'marks' | 'term_marks';
 
 const SECTIONS: Array<{ id: AcademicSection; title: string; subtitle: string; icon: React.ElementType; view: string }> = [
   { id: 'timetable', title: 'Timetable', subtitle: 'Jadwalka fasallada iyo xiisadaha', icon: CalendarDays, view: 'sch_timetable' },
-  { id: 'marks', title: 'Marks Entry', subtitle: 'Gelinta iyo hubinta dhibcaha', icon: ClipboardList, view: 'sch_marks' }
+  { id: 'marks', title: 'Marks Entry', subtitle: 'Gelinta iyo hubinta dhibcaha', icon: ClipboardList, view: 'sch_marks' },
+  { id: 'term_marks', title: 'Term Marks & Report Cards', subtitle: 'Qaabka dhibcaha, xiritaanka term-ka iyo report cards', icon: FileSpreadsheet, view: 'sch_marks' }
 ];
 
 function sectionFromView(view: string): AcademicSection {
@@ -17,7 +22,16 @@ function sectionFromView(view: string): AcademicSection {
 }
 
 export const AcademicsWorkspace: React.FC<{ activeView: string; onNavigate: (view: string) => void }> = ({ activeView, onNavigate }) => {
+  const { school } = useAuth();
+  const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [activeSection, setActiveSection] = useState<AcademicSection>(() => sectionFromView(activeView));
+
+  useEffect(() => {
+    let active = true;
+    setClasses([]);
+    void ApiClient.getClasses().then(rows => { if (active) setClasses(Array.isArray(rows) ? rows : []); }).catch(() => { if (active) setClasses([]); });
+    return () => { active = false; };
+  }, [school?.id]);
 
   useEffect(() => {
     setActiveSection(sectionFromView(activeView));
@@ -31,7 +45,7 @@ export const AcademicsWorkspace: React.FC<{ activeView: string; onNavigate: (vie
         <p className="text-sm text-slate-500 dark:text-slate-400">Maamul jadwalka iyo gelinta dhibcaha.</p>
       </header>
 
-      <nav aria-label="Academic sections" className="grid grid-cols-1 gap-2 rounded-2xl border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] p-2 sm:grid-cols-2">
+      <nav aria-label="Academic sections" className="grid grid-cols-1 gap-2 rounded-2xl border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] p-2 sm:grid-cols-3">
         {SECTIONS.map(section => {
           const Icon = section.icon;
           const selected = activeSection === section.id;
@@ -40,7 +54,7 @@ export const AcademicsWorkspace: React.FC<{ activeView: string; onNavigate: (vie
               key={section.id}
               type="button"
               aria-current={selected ? 'page' : undefined}
-              onClick={() => { setActiveSection(section.id); onNavigate(section.view); }}
+              onClick={() => { setActiveSection(section.id); if (section.id !== 'term_marks') onNavigate(section.view); }}
               className={`flex min-h-[66px] items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--schoolos-accent)] ${selected ? 'border-[var(--schoolos-accent)] bg-[var(--schoolos-accent)] text-white shadow-sm' : 'border-transparent text-[var(--schoolos-text)] hover:border-[var(--schoolos-line)] hover:bg-slate-50 dark:hover:bg-slate-800'}`}
             >
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${selected ? 'bg-white/15' : 'bg-[var(--schoolos-accent-soft)] text-[var(--schoolos-accent)]'}`}>
@@ -58,6 +72,7 @@ export const AcademicsWorkspace: React.FC<{ activeView: string; onNavigate: (vie
       <section className="min-w-0" aria-label={SECTIONS.find(section => section.id === activeSection)?.title}>
         {activeSection === 'timetable' && <TimetableView />}
         {activeSection === 'marks' && <ExamsResultsView initialTab="marks" />}
+        {activeSection === 'term_marks' && <TermMarksWorkspace classes={classes} />}
       </section>
     </main>
   );
