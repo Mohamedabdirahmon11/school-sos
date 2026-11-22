@@ -24,7 +24,7 @@ test('teacher creation persists account, profile, subjects and Form Teacher link
   const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
   const routeStart = api.indexOf("apiRouter.post('/teachers',");
-  const routeEnd = api.indexOf('\\n\\nconst staffPermissions', routeStart);
+  const routeEnd = api.indexOf('const staffPermissions', routeStart);
   const route = api.slice(routeStart, routeEnd);
   assert.ok(route.includes('createTeacherAtomically'));
   assert.ok(!route.includes('db.createUser('));
@@ -38,7 +38,7 @@ test('teacher creation persists account, profile, subjects and Form Teacher link
 test('teacher creation avoids full-table scans for IDs and duplicate phone checks', () => {
   const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   const helperStart = api.indexOf('async function nextSchoolTeacherId');
-  const helperEnd = api.indexOf('\\n}', helperStart);
+  const helperEnd = api.indexOf('const timetableMinutes', helperStart);
   const helper = api.slice(helperStart, helperEnd);
   assert.ok(helper.includes('randomUUID'));
   assert.ok(!helper.includes('queryAllRows'));
