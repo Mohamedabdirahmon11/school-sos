@@ -635,13 +635,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
         <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div aria-hidden="true" className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-full bg-[#0e6a62] font-semibold text-white">
+              {(user?.fullName || 'T').split(/\\s+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('')}
+            </div>
+            <div className="min-w-0">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-teal-100">
               <GraduationCap className="h-3.5 w-3.5" /> Faculty workspace
             </div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Good day, {user?.fullName || 'Teacher'}</h1>
-            <p className="mt-1 text-sm text-teal-100/90">{school?.name || 'Your school'} · Your classes, lessons and student progress in one place.</p>
+            <p className="mt-1 text-xs text-teal-100/90">
+              Teacher · {(user as any)?.teacherCode || user?.staffId || '—'} · {(school as any)?.schoolCode || school?.id || '—'} · Form Teacher of {formTeacherClasses.length ? formTeacherClasses.map(klass => `${klass.name}${klass.section ? ` · ${klass.section}` : ''}`).join(', ') : '—'}
+            </p>
+          </div>
           </div>
           <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
             <div className="rounded-xl bg-white/10 p-2.5"><CalendarDays className="h-5 w-5 text-teal-100" /></div>
