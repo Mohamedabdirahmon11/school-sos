@@ -172,3 +172,15 @@ test('setup progress rejects a step that is both completed and skipped', () => {
     normalizeSchoolSetupProgress(null), input, checklist, '2026-11-07T00:00:00.000Z'
   ), /both completed and skipped/);
 });
+
+
+test('previously completed schools stay complete when the newer assignment audit reports a gap', () => {
+  const legacyComplete = normalizeSchoolSetupProgress({
+    currentStep: 10,
+    completedSteps: [1, 2, 3, 4, 5, 6, 8, 10],
+    skippedSteps: [7, 9],
+    completedAt: '2026-11-20T12:00:00.000Z'
+  });
+  assert.equal(legacyComplete.completedAt, '2026-11-20T12:00:00.000Z');
+  assert.equal(isSchoolSetupProgressComplete(legacyComplete), true);
+});
