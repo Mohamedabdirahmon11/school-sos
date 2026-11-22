@@ -388,25 +388,19 @@ async function getStudentCurrentClassId(schoolId: string, studentId: string, fal
 }
 
 async function getTeacherAssignedClassIds(schoolId: string, userId: string): Promise<string[]> {
-  // Resolve both subject-teaching and Form Teacher scopes through school-bound
-  // joins. This avoids a separate teachers lookup and avoids loading every class.
-  const [assignments, formTeacherClasses] = await Promise.all([
+  // Resolve subject teaching and Form Teacher scopes in parallel. Reuse the
+  // unpaginated Form Teacher helper so large schools do not silently lose classes
+  // after the first 100 rows.
+  const [assignments, formTeacherClassIds] = await Promise.all([
     db.queryPage('class_subjects', {
       school_id: schoolId,
       is_active: 'true',
       'teachers.user_id': userId,
       'teachers.school_id': schoolId
     }, 1, 100, undefined, 'class_id,teachers!class_subjects_teacher_id_fkey!inner(user_id)'),
-    db.queryPage('classes', {
-      school_id: schoolId,
-      class_teacher_id: userId,
-      is_archived: 'false',
-      'users.role': 'teacher',
-      'users.school_id': schoolId
-    }, 1, 100, undefined, 'id,users!classes_class_teacher_id_fkey!inner(id)')
+    getTeacherFormTeacherClassIds(schoolId, userId)
   ]);
   const subjectClassIds = assignments.items.map((assignment: any) => assignment.classId);
-  const formTeacherClassIds = formTeacherClasses.items.map((klass: any) => klass.id);
   return [...new Set([...subjectClassIds, ...formTeacherClassIds])];
 }
 
