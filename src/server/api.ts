@@ -9931,6 +9931,8 @@ async function getSchoolSetupState(school: School) {
     classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
     teacherAssignmentReady: assignmentReadiness.ready,
     teacherAssignmentIssues: assignmentReadiness.issues,
+    curriculumClassCoverageReady: !assignmentReadiness.issues.some(issue => issue.includes('ugu yaraan hal maaddo ma leh')),
+    curriculumClassCoverageIssues: assignmentReadiness.issues.filter(issue => issue.includes('ugu yaraan hal maaddo ma leh')),
     subjectCount: subjects.total,
     teachers: teachers.map((teacher: any) => {
       const account = accountsById.get(String(teacher.userId || '')) as any;
