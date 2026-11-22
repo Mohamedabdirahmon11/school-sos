@@ -67,7 +67,7 @@ interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices' | 'profile';
 }
 
-const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolClass[]] = [[], null, [], []];
+const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, SchoolClass[]] = [[], null, []];
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
   const { user, school, isReadOnly, language, setLanguage } = useAuth();
@@ -86,18 +86,28 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     window.localStorage.setItem('schoolos-teacher-theme', portalTheme);
   }, [portalTheme]);
 
+  // Keep the essential teacher assignment/profile bootstrap independent from
+  // the timetable endpoint. A 423 from timetable means scheduling prerequisites
+  // are incomplete; it must not prevent the teacher from opening the rest of the portal.
   const initialData = useApi(async () => Promise.all([
     ApiClient.getTeacherSubjectAssignments(),
     ApiClient.getExamConfig(),
-    ApiClient.getTimetable(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
+  const timetableState = useApi(
+    () => ApiClient.getTimetable(),
+    [school?.id, user?.id],
+    Boolean(school && user?.role === 'teacher')
+  );
   // Revalidate assignments and timetable when an administrator changes the teacher's
   // scope in another session. Focus/visibility refresh is immediate; the interval
   // also covers a teacher who keeps the portal open while the admin is working.
   useEffect(() => {
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') initialData.retry();
+      if (document.visibilityState === 'visible') {
+        initialData.retry();
+        timetableState.retry();
+      }
     };
     window.addEventListener('focus', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
@@ -107,8 +117,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.clearInterval(refreshInterval);
     };
-  }, [initialData.retry]);
-  const [assignmentsData, examConfigData, timetableData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
+  }, [initialData.retry, timetableState.retry]);
+  const [assignmentsData, examConfigData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
   // Notices are independent from core teacher data: a notices API outage must
   // not prevent teachers from opening lessons, attendance, marks or homework.
   const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user));
@@ -140,7 +150,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // The teacher-scoped endpoint already resolves the signed-in user's teacher
   // record on the server. Do not re-filter those trusted rows against a second
   // client-side assignment payload (which can differ in shape/cache timing).
-  const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
+  const timetable: TimetableSlot[] = Array.isArray(timetableState.data) ? timetableState.data : [];
   const [timetableDay, setTimetableDay] = useState<'all' | TimetableSlot['dayOfWeek']>('all');
   const [studentSearch, setStudentSearch] = useState('');
   const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -802,7 +812,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <span aria-label={`${visibleTimetable.length} periods shown`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} lessons</span>
             </div>
           </div>
-          {visibleTimetable.length === 0 ? (
+          {timetableState.loading ? (
+            <div className="rounded-2xl bg-slate-50 p-6 text-center text-xs text-slate-500" role="status">Loading your timetable…</div>
+          ) : timetableState.error ? (
+            <ErrorState error={timetableState.error} onRetry={timetableState.retry} />
+          ) : visibleTimetable.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-[#64748B]">
               {timetableDay !== 'all'
                 ? `No lessons scheduled for ${timetableDay} in this view. Choose another day or All days.`

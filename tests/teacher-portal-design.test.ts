@@ -36,3 +36,13 @@ test('teacher portal continues to load school-scoped live assignments, timetable
     assert.ok(portal.includes(api), `expected live API call ${api}`);
   }
 });
+
+test('teacher portal timetable failures do not block the main teacher workspace', () => {
+  const portal = read('../src/components/teacher/TeacherPortalView.tsx');
+  const bootstrap = portal.match(/const initialData = useApi\(async \(\) => Promise\.all\(\[([\s\S]*?)\]\)/);
+  assert.ok(bootstrap, 'expected a teacher portal bootstrap request');
+  assert.doesNotMatch(bootstrap[1], /getTimetable/, 'timetable must not be part of the all-or-nothing bootstrap');
+  assert.match(portal, /const timetableState = useApi\([\s\S]*?ApiClient\.getTimetable\(\)/);
+  assert.match(portal, /timetableState\.error \? \(/, 'timetable errors should be shown inside the timetable panel');
+  assert.match(portal, /onRetry=\{timetableState\.retry\}/, 'the timetable panel should offer its own retry');
+});
