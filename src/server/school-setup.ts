@@ -6,6 +6,47 @@ import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts
 export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 0, 6, 8] as const;
 export const OPTIONAL_SCHOOL_SETUP_STEPS = [7, 9] as const;
 
+export interface TeacherAssignmentReadiness {
+  ready: boolean;
+  issues: string[];
+}
+
+export function evaluateTeacherAssignmentReadiness(
+  schoolId: string,
+  classes: Array<{ id: string; schoolId?: string; name?: string; section?: string; classTeacherId?: string | null; isArchived?: boolean }>,
+  teachers: Array<{ id: string; schoolId?: string; userId?: string; fullName?: string; status?: string }>,
+  curriculum: Array<{ schoolId?: string; classId: string; subjectId: string; teacherId?: string | null; periodsPerWeek?: number; isActive?: boolean }>,
+  subjects: Array<{ id: string; schoolId?: string; name?: string }>
+): TeacherAssignmentReadiness {
+  const activeClasses = classes.filter(row => row.schoolId === schoolId && row.isArchived !== true);
+  const activeTeachers = teachers.filter(row => row.schoolId === schoolId && String(row.status || 'active').toLowerCase() === 'active');
+  const teacherById = new Map(activeTeachers.map(row => [String(row.id), row]));
+  const teacherByUserId = new Map(activeTeachers.filter(row => row.userId).map(row => [String(row.userId), row]));
+  const classById = new Map(activeClasses.map(row => [String(row.id), row]));
+  const subjectById = new Map(subjects.filter(row => row.schoolId === schoolId).map(row => [String(row.id), row]));
+  const issues: string[] = [];
+  if (!activeClasses.length) issues.push('Marka hore ku dar Classes');
+  for (const klass of activeClasses) {
+    const formTeacher = klass.classTeacherId ? teacherByUserId.get(String(klass.classTeacherId)) : null;
+    if (!formTeacher) issues.push(`${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}: Form Teacher la'aan`);
+  }
+  const periodsByTeacher = new Map<string, number>();
+  for (const row of curriculum) {
+    if (row.schoolId !== schoolId || row.isActive === false) continue;
+    const klass = classById.get(String(row.classId));
+    if (!klass) continue;
+    const subjectName = String(subjectById.get(String(row.subjectId))?.name || 'Maaddo');
+    const teacher = row.teacherId ? teacherById.get(String(row.teacherId)) : null;
+    const classLabel = `${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}`;
+    if (!teacher) issues.push(`${classLabel}: ${subjectName} macallin la'aan`);
+    else periodsByTeacher.set(String(teacher.id), (periodsByTeacher.get(String(teacher.id)) || 0) + Number(row.periodsPerWeek || 0));
+  }
+  for (const [teacherId, periods] of periodsByTeacher) {
+    if (periods > 30) issues.push(`${teacherById.get(teacherId)?.fullName || 'Macallin'}: ${periods}/30 xiisadood toddobaadkii`);
+  }
+  return { ready: activeClasses.length > 0 && issues.length === 0, issues };
+}
+
 export interface SchoolSetupEvidence {
   classNames: string[];
   subjectCount: number;
