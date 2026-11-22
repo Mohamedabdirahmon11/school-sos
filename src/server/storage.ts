@@ -747,10 +747,10 @@ class StorageEngine {
     return { items: (data || []).map((row: any) => fromSupabaseRow(row, table)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
   }
 
-  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>): Promise<T[]> {
+  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>, columns = '*'): Promise<T[]> {
     const rows: T[] = [];
     for (let page = 1;; page += 1) {
-      const result = await this.queryPage<T>(table, filters, page, 100);
+      const result = await this.queryPage<T>(table, filters, page, 100, undefined, columns);
       rows.push(...result.items);
       if (rows.length >= result.total || result.items.length === 0) break;
     }
@@ -1749,6 +1749,16 @@ class StorageEngine {
   // -------------------------------------------------------------
   public async getStudents(schoolId: string, classId?: string, branchId?: string): Promise<Student[]> {
     return this.queryRows<Student>('students', { school_id: schoolId, class_id: classId, branch_id: branchId });
+  }
+
+  public async getStudentsByIds(ids: string[], schoolId: string): Promise<Array<Pick<Student, 'id' | 'studentId' | 'firstName' | 'middleName' | 'lastName'>>> {
+    const uniqueIds = [...new Set(ids.filter(id => typeof id === 'string' && id.length > 0))];
+    if (!uniqueIds.length) return [];
+    return this.queryRows<Pick<Student, 'id' | 'studentId' | 'firstName' | 'middleName' | 'lastName'>>(
+      'students',
+      { id: uniqueIds, school_id: schoolId },
+      'id,school_id,student_id,first_name,middle_name,last_name'
+    );
   }
 
   public async getStudentById(id: string, schoolId?: string): Promise<Student | null> {
