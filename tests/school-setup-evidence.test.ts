@@ -25,10 +25,11 @@ test('school settings are flushed before the onboarding form receives success', 
 });
 
 
-test('both frontend routing and backend dashboard endpoint require full ten-step setup completion', () => {
-  assert.ok(app.includes('!isSchoolSetupProgressComplete(school?.setupProgress)'));
-  assert.ok(api.includes('!isSchoolSetupProgressComplete(school.setupProgress)'));
+test('both frontend routing and backend dashboard endpoint require teacher assignment readiness', () => {
+  assert.ok(app.includes('!isSchoolSetupProgressCompleteWithTeacherAssignment(school?.setupProgress)'));
+  assert.ok(api.includes("!(await getSchoolSetupState(school)).canFinish"));
   assert.ok(setupNavigation.includes('const required = [1, 2, 3, 4, 5, 6, 8, 10]'));
+  assert.ok(setupNavigation.includes('return completed.has(0)'));
   assert.ok(setupNavigation.includes('[7, 9].every(step => completed.has(step) || skipped.has(step))'));
 });
 
