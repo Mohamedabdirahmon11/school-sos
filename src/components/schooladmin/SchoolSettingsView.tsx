@@ -188,6 +188,8 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           logoUrl,
           address,
           city,
+          phone,
+          email,
           whatsappPhone: normalizeWhatsAppNumber(whatsappPhone) || '',
 
           currency,
