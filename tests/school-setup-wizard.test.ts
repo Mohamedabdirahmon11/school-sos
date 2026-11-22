@@ -184,3 +184,14 @@ test('previously completed schools stay complete when the newer assignment audit
   assert.equal(legacyComplete.completedAt, '2026-11-20T12:00:00.000Z');
   assert.equal(isSchoolSetupProgressComplete(legacyComplete), true);
 });
+
+test('curriculum setup requires at least one subject in every active class', () => {
+  const checklist = buildSchoolSetupChecklist(school, {
+    ...completeEvidence,
+    subjectCount: 2,
+    curriculumClassCoverageReady: false,
+    curriculumClassCoverageIssues: ['Grade 1: ugu yaraan hal maaddo ma leh']
+  });
+  assert.equal(checklist[4].ready, false);
+  assert.match(checklist[4].reason, /ugu yaraan hal maaddo ma leh/);
+});
