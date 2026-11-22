@@ -94,32 +94,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   // record on the server. Do not re-filter those trusted rows against a second
   // client-side assignment payload (which can differ in shape/cache timing).
   const timetable: TimetableSlot[] = Array.isArray(timetableData) ? timetableData : [];
-  const [timetableScope, setTimetableScope] = useState<'mine' | 'school'>('mine');
-  const [schoolTimetable, setSchoolTimetable] = useState<TimetableSlot[]>([]);
-  const [schoolTimetableLoading, setSchoolTimetableLoading] = useState(false);
-  const [schoolTimetableError, setSchoolTimetableError] = useState<string | null>(null);
   const [timetableDay, setTimetableDay] = useState<'all' | TimetableSlot['dayOfWeek']>('all');
   const [studentSearch, setStudentSearch] = useState('');
-  const isMyTimetableSlot = (slot: TimetableSlot) =>
-    Boolean(slot.teacherId) && teacherAssignments.some((assignment: any) =>
-      !assignment.isFormTeacher &&
-      assignment.teacherId === slot.teacherId &&
-      assignment.classId === slot.classId &&
-      assignment.subjectId === slot.subjectId
-    );
-  useEffect(() => {
-    if (timetableScope !== 'school') return;
-    let cancelled = false;
-    setSchoolTimetableLoading(true);
-    setSchoolTimetableError(null);
-    ApiClient.getTimetable({ scope: 'school' })
-      .then(rows => { if (!cancelled) setSchoolTimetable(Array.isArray(rows) ? rows : []); })
-      .catch(error => { if (!cancelled) setSchoolTimetableError(error instanceof Error ? error.message : 'Unable to load the school timetable.'); })
-      .finally(() => { if (!cancelled) setSchoolTimetableLoading(false); });
-    return () => { cancelled = true; };
-  }, [timetableScope, school?.id]);
   const timetableDays: TimetableSlot['dayOfWeek'][] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const timetableRows = timetableScope === 'mine' ? timetable : schoolTimetable;
+  const timetableRows = timetable;
   const visibleTimetable = timetableRows
     .filter(slot => timetableDay === 'all' || slot.dayOfWeek === timetableDay)
     .slice()
@@ -696,29 +674,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-teal-700">Teaching schedule</p>
               <h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-900">
                 <CalendarDays className="h-5 w-5 text-teal-700" />
-                {timetableScope === 'mine' ? 'My teaching timetable' : 'Full school timetable'}
+                My teaching timetable
               </h2>
-              <p className="mt-1 text-xs text-slate-500">Start with your own lessons; switch to the school view when needed.</p>
+              <p className="mt-1 text-xs text-slate-500">Your assigned lessons only.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1" role="group" aria-label="Timetable scope">
-                  <button type="button" aria-pressed={timetableScope === 'mine'} onClick={() => { setTimetableScope('mine'); setTimetableDay('all'); }} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'mine' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>My lessons</button>
-                  <button type="button" aria-pressed={timetableScope === 'school'} onClick={() => { setTimetableScope('school'); setTimetableDay('all'); }} className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${timetableScope === 'school' ? 'bg-teal-700 text-white shadow-sm' : 'text-slate-600'}`}>School</button>
-                </div>
-                <select aria-label="Filter timetable by day" value={timetableDay} onChange={event => setTimetableDay(event.target.value as typeof timetableDay)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
-                  <option value="all">All days</option>
-                  {timetableDays.map(day => <option key={day} value={day}>{day}</option>)}
-                </select>
-              </div>
+              <select aria-label="Filter timetable by day" value={timetableDay} onChange={event => setTimetableDay(event.target.value as typeof timetableDay)} className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                <option value="all">All days</option>
+                {timetableDays.map(day => <option key={day} value={day}>{day}</option>)}
+              </select>
               <span aria-label={`${visibleTimetable.length} periods shown`} className="rounded-full border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{visibleTimetable.length} lessons</span>
             </div>
           </div>
-          {(schoolTimetableLoading && timetableScope === 'school') ? <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Loading school timetable…</div> : schoolTimetableError && timetableScope === 'school' ? <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{schoolTimetableError}</div> : visibleTimetable.length === 0 ? (
+          {visibleTimetable.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-xs text-[#64748B]">
               {timetableDay !== 'all'
                 ? `No lessons scheduled for ${timetableDay} in this view. Choose another day or All days.`
-                : timetableScope === 'mine' && timetable.length === 0
+                : timetable.length === 0
                   ? 'Your personal timetable has no published lessons yet. Ask the administrator to assign your teacher profile to the class timetable.'
                   : 'No schedule slots have been published yet. Contact school administration to set your timetable.'}
             </div>
@@ -726,7 +698,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {visibleTimetable.map(slot => {
                 const c = classes.find(cls => cls.id === slot.classId);
-                const mySlot = timetableScope === 'mine' || isMyTimetableSlot(slot);
+                const mySlot = true;
                 const s = subjects.find(sub => sub.id === slot.subjectId);
                 return (
                   <div key={slot.id} className={`group rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md space-y-2 text-xs ${mySlot ? 'border-teal-400 bg-teal-50 ring-2 ring-teal-200 shadow-teal-100' : 'border-slate-200 bg-gradient-to-br from-white to-slate-50'}`}>
