@@ -69,6 +69,8 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /examRegisterRows/);
   assert.match(teacher, /rankExamStudentResults/);
   assert.match(teacher, /allClassMarksSubmitted/);
+  assert.match(teacher, /rollNumber \|\| student\.studentId/);
+  assert.match(teacher, /visibleStudents = students\.filter[\s\S]*?\.sort/);
   assert.match(teacher, /rankByStudent/);
   assert.match(teacher, /Enter individual assessment components/);
   assert.match(teacher, /activeTab === 'exam_results'/);
