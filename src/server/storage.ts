@@ -137,6 +137,26 @@ export function shouldReuseCachedAuthSession(
 ): boolean {
   return cacheExpiresAt > now && isSessionExpiryValid(sessionExpiresAt, now);
 }
+
+function storeAuthSessionValidation(sessionId: string, userId: string, session: UserSession): void {
+  const now = Date.now();
+  if (authSessionValidationCache.size >= 1_000) {
+    for (const [id, entry] of authSessionValidationCache) {
+      if (entry.expiresAt <= now) authSessionValidationCache.delete(id);
+    }
+    while (authSessionValidationCache.size >= 1_000) {
+      const oldest = authSessionValidationCache.keys().next().value;
+      if (!oldest) break;
+      authSessionValidationCache.delete(oldest);
+    }
+  }
+  authSessionValidationCache.set(sessionId, {
+    userId,
+    schoolId: session.schoolId || null,
+    session,
+    expiresAt: now + AUTH_SESSION_VALIDATION_TTL_MS
+  });
+}
 const BRANCH_LIST_TTL_MS = 60_000;
 const NOTICE_COUNT_TTL_MS = 15_000;
 const authContextCache = new Map<string, CachedAuthContext>();
@@ -1632,12 +1652,7 @@ class StorageEngine {
       if (!data) return null;
       const session = fromSupabaseRow(data) as UserSession;
       if (session.userId !== userId || schoolId && session.schoolId !== schoolId) return null;
-      authSessionValidationCache.set(sessionId, {
-        userId,
-        schoolId: session.schoolId || null,
-        session,
-        expiresAt: Date.now() + AUTH_SESSION_VALIDATION_TTL_MS
-      });
+      storeAuthSessionValidation(sessionId, userId, session);
       this.cacheQueryRows('user_sessions', [session]);
       this.cacheQueryRows('users', [cachedAuth.user]);
       return { session, user: cachedAuth.user, school: cachedAuth.school };
@@ -1673,12 +1688,7 @@ class StorageEngine {
       school: normalizedSchoolContext,
       expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS
     });
-    authSessionValidationCache.set(sessionId, {
-      userId,
-      schoolId: normalizedSession.schoolId || null,
-      session: normalizedSession,
-      expiresAt: Date.now() + AUTH_SESSION_VALIDATION_TTL_MS
-    });
+    storeAuthSessionValidation(sessionId, userId, normalizedSession);
     return { session: normalizedSession, user: normalizedUser, school: normalizedSchoolContext };
   }
 
@@ -1687,9 +1697,10 @@ class StorageEngine {
   }
 
   public async touchSession(id: string, expiresAt: string): Promise<void> {
-    authSessionValidationCache.delete(id);
     const session = await this.getSessionById(id);
     if (!session || !shouldTouchSession(session.expiresAt, expiresAt)) return;
+    // Keep a valid cache entry when the throttled refresh does not write.
+    authSessionValidationCache.delete(id);
     session.expiresAt = expiresAt;
     session.lastActivityAt = new Date().toISOString();
     this.save();
