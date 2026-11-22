@@ -193,7 +193,7 @@ export const TeachersView: React.FC = () => {
   if (teacherLoad.loading) return <LoadingState label="Loading teachers…" />;
   if (teacherLoad.error) return <ErrorState error={teacherLoad.error} onRetry={teacherLoad.retry} />;
   return (
-    <div className="mx-auto max-w-[1680px] space-y-6 p-3 sm:p-5 lg:p-7">
+    <div className="school-teachers-page mx-auto max-w-[1600px] space-y-6 p-4 md:p-6">
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-6 text-white shadow-lg sm:p-8">
         <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[34px] border-white/5" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
