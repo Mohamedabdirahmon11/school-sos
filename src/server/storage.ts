@@ -611,8 +611,9 @@ class StorageEngine {
     return this.contexts.run(context, callback);
   }
 
-  public getRequestQueryMetrics(): { count: number; durationMs: number } {
-    return { count: this.state.queryCount, durationMs: Math.round(this.state.queryDurationMs * 100) / 100 };
+  public getRequestQueryMetrics(context?: StorageContext): { count: number; durationMs: number } {
+    const state = context || this.state;
+    return { count: state.queryCount, durationMs: Math.round(state.queryDurationMs * 100) / 100 };
   }
 
   public async checkSupabaseHealth(): Promise<{ ok: boolean; roundTripMs: number }> {
