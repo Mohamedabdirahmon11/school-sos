@@ -680,7 +680,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   };
 
   const handleChangeTeacherPin = async () => {
-    if (!/^\\d{4,6}$/.test(newPin)) { setNotice('PIN-ka cusub waa inuu ka koobnaadaa 4 ilaa 6 lambar.'); return; }
+    if (!/^\d{4,6}$/.test(newPin)) { setNotice('PIN-ka cusub waa inuu ka koobnaadaa 4 ilaa 6 lambar.'); return; }
     if (newPin !== confirmPin) { setNotice('Xaqiijinta PIN-ku isma laha.'); return; }
     setIsChangingPin(true);
     try {
@@ -1439,9 +1439,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <h3 className="text-sm font-semibold">Change sign-in PIN</h3>
               <p className="mt-1 text-xs text-slate-500">Enter your current PIN, then choose and confirm a new 4–6 digit PIN.</p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <input aria-label="Current PIN" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={currentPin} onChange={event => setCurrentPin(event.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Current PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
-                <input aria-label="New PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={newPin} onChange={event => setNewPin(event.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="New PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
-                <input aria-label="Confirm new PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={confirmPin} onChange={event => setConfirmPin(event.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input aria-label="Current PIN" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={currentPin} onChange={event => setCurrentPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Current PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input aria-label="New PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={newPin} onChange={event => setNewPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="New PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input aria-label="Confirm new PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={confirmPin} onChange={event => setConfirmPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
               </div>
               <button type="button" onClick={() => void handleChangeTeacherPin()} disabled={isReadOnly || isChangingPin || !currentPin || !newPin || !confirmPin} className="mt-3 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isChangingPin ? 'Updating…' : 'Update PIN'}</button>
             </div>

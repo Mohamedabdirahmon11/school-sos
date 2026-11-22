@@ -1553,7 +1553,7 @@ apiRouter.post('/auth/change-teacher-pin', requireAuth, async (req, res) => {
     res.status(401).json({ error: 'Current PIN is incorrect.' });
     return;
   }
-  if (!/^\\d{4,6}$/.test(newPin)) {
+  if (!/^\d{4,6}$/.test(newPin)) {
     res.status(422).json({ error: 'New PIN must contain 4 to 6 digits.' });
     return;
   }
