@@ -92,6 +92,7 @@ export interface SchoolSetupProgress {
   completedSteps: number[];
   skippedSteps: number[];
   completedAt: string | null;
+  startedAt?: string | null;
 }
 
 export interface SchoolSetupChecklistItem {
