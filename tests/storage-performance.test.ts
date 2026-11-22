@@ -90,6 +90,10 @@ test('class report-card PDF student records are fetched in one school-scoped fie
   const method = storage.slice(methodStart, methodEnd);
   assert.match(method, /id: uniqueIds, school_id: schoolId/);
   assert.match(method, /id,school_id,student_id,first_name,middle_name,last_name/);
+  const queryRowsStart = storage.indexOf('private async queryRows<');
+  const queryRowsEnd = storage.indexOf('private cacheQueryRows(', queryRowsStart);
+  const queryRows = storage.slice(queryRowsStart, queryRowsEnd);
+  assert.match(queryRows, /if \(columns === '\*'\) this\.cacheQueryRows\(table, rows\)/);
   const routeStart = api.indexOf("apiRouter.get('/term-marks/report-cards/classes/:classId/pdf'");
   const routeEnd = api.indexOf("forwardAsyncErrors(apiRouter)", routeStart);
   const route = api.slice(routeStart, routeEnd);
