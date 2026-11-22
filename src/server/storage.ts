@@ -3240,7 +3240,7 @@ class StorageEngine {
             total: (config.smallExamMax || 0) + (config.bigExamMax || 0)
           }
         };
-      });
+      }).filter(sr => sr.sem1Percentage !== null || sr.sem2Percentage !== null);
 
       const annualComplete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
         s1.some(mark => mark.subjectId === subjectId) && s2.some(mark => mark.subjectId === subjectId)
