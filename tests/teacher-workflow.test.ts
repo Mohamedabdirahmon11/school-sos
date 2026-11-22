@@ -392,3 +392,30 @@ test('teacher timetable scope cannot be widened to the whole school by a query p
   assert.match(route, /teacherId = String\(own\.items\[0\]\.id\)/);
   assert.doesNotMatch(route, /scope.*school|teacherId = ''/);
 });
+
+
+test('teacher timetable is a weekday period matrix backed by the authenticated teacher timetable slots', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /const timetableDays: TimetableSlot\['dayOfWeek'\]\[\] = \['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'\]/);
+  assert.match(teacher, /const timetablePeriods = \[\.\.\.new Map\(timetable\.map/);
+  assert.match(teacher, /timetableMatrixDays\.map\(day/);
+  assert.match(teacher, /slot\.dayOfWeek === day && item\.periodNumber === period\.periodNumber/);
+  assert.match(teacher, /slot\.startTime/);
+  assert.match(teacher, /slot\.endTime/);
+});
+
+test('teacher student register includes parent phone and explicit mobile and desktop empty states', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /Parent phone: \{student\.fatherPhone \|\| student\.motherPhone \|\| '—'\}/);
+  assert.match(teacher, /student\.fatherPhone \|\| student\.motherPhone \|\| '—'/);
+  assert.match(teacher, /No students match your search\./);
+  assert.match(teacher, /No students found in this assigned class\./);
+});
+
+test('teacher portal refreshes assignments and timetable after administrator changes', () => {
+  const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
+  assert.match(teacher, /initialData\.retry\(\)/);
+  assert.match(teacher, /addEventListener\('focus', refreshWhenVisible\)/);
+  assert.match(teacher, /addEventListener\('visibilitychange', refreshWhenVisible\)/);
+  assert.match(teacher, /setInterval\(refreshWhenVisible, 60_000\)/);
+});
