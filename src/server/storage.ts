@@ -2427,7 +2427,28 @@ class StorageEngine {
   // ATTENDANCE: Strictly ONCE PER DAY per class per student
   // -------------------------------------------------------------
   public async getAttendance(schoolId: string, classId: string, date: string): Promise<AttendanceRecord[]> {
-    return this.queryRows<AttendanceRecord>('attendance_records', { school_id: schoolId, class_id: classId, date });
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Attendance storage is unavailable.');
+    const rows: AttendanceRecord[] = [];
+    // Attendance is a read-only class/date register. Avoid an exact COUNT(*) on
+    // every open; fetch only the columns the register displays in bounded pages.
+    for (let offset = 0;; offset += 1_000) {
+      const startedAt = performance.now();
+      const { data, error } = await client.from('attendance_records')
+        .select('id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at')
+        .eq('school_id', schoolId)
+        .eq('class_id', classId)
+        .eq('date', date)
+        .order('student_id', { ascending: true })
+        .range(offset, offset + 999);
+      this.recordQuery('attendance_records', 'select-class-date-register', startedAt);
+      if (error) throw new Error(error.message || 'Unable to load class attendance.');
+      const batch = (data || []).map((row: any) => fromSupabaseRow(row, 'attendance_records') as AttendanceRecord);
+      rows.push(...batch);
+      if (batch.length < 1_000) break;
+    }
+    this.cacheQueryRows('attendance_records', rows);
+    return rows;
   }
 
   public async getSchoolAttendance(schoolId: string): Promise<AttendanceRecord[]> {
