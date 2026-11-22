@@ -43,15 +43,15 @@ const otherTeacher = db.createTeacher({ schoolId: school.id, userId: otherTeache
 const emptyTeacher = db.createTeacher({ schoolId: school.id, userId: emptyTeacherUser.id, staffId: 'T-EMPTY', fullName: emptyTeacherUser.fullName, email: emptyTeacherUser.email!, phone: '', gender: 'female', qualification: 'B.Ed', department: 'General', assignedClasses: [], assignedSubjects: [], status: 'active', joinedDate: today, monthlySalary: 1000 });
 
 const klass = db.createClass({ schoolId: school.id, name: 'Grade 7', gradeLevel: 7, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0, classTeacherId: formTeacherUser.id } as any);
-const otherClass = db.createClass({ schoolId: school.id, name: 'Grade 8', gradeLevel: 8, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 } as any);
+const otherClass = db.createClass({ schoolId: school.id, name: 'Grade 8', gradeLevel: 8, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0, classTeacherId: otherTeacherUser.id } as any);
 const tenantClass = db.createClass({ schoolId: otherSchool.id, name: 'Tenant Grade', gradeLevel: 1, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 } as any);
 const subject = db.createSubject({ schoolId: school.id, name: 'Mathematics', code: 'MATH', category: 'core', isActive: true } as any);
 const otherSubject = db.createSubject({ schoolId: school.id, name: 'Science', code: 'SCI', category: 'core', isActive: true } as any);
 const student = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-001', firstName: 'Test', middleName: '', lastName: 'Student', gender: 'female', admissionDate: today, fatherPhone: '+251900000001', classId: klass.id, status: 'active' } as any);
 const otherStudent = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-002', firstName: 'Other', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: otherClass.id, status: 'active' } as any);
 await memory.from('class_subjects').insert([
-  { id: 'ta-cs-math', school_id: school.id, class_id: klass.id, subject_id: subject.id, teacher_id: subjectTeacher.id, periods_per_week: 3, is_active: true },
-  { id: 'ta-cs-other-class', school_id: school.id, class_id: otherClass.id, subject_id: subject.id, teacher_id: otherTeacher.id, periods_per_week: 2, is_active: true }
+  { id: 'ta-cs-math', school_id: school.id, class_id: klass.id, subject_id: subject.id, teacher_id: subjectTeacher.id, 'teachers.user_id': subjectTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 3, is_active: true },
+  { id: 'ta-cs-other-class', school_id: school.id, class_id: otherClass.id, subject_id: subject.id, teacher_id: otherTeacher.id, 'teachers.user_id': otherTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 2, is_active: true }
 ]);
 await db.flush();
 
@@ -137,7 +137,9 @@ test('15.8 parents cannot see submitted marks until the admin publishes them', a
   const hidden = await request(`/exams/marks?studentId=${encodeURIComponent(student.id)}`, cookies.parent);
   assert.equal(hidden.status, 200);
   assert.equal((await hidden.json() as any[]).some(row => row.id === saved.id), false);
-  await db.approveMarks(school.id, [saved.id], schoolAdmin.id);
+  await db.forwardClassMarks(school.id, klass.id, 'Semester 1', formTeacherUser.id, formTeacherUser.fullName);
+  await db.approveMarks(school.id, [saved.id], schoolAdmin.id, schoolAdmin.fullName, schoolAdmin.role);
+  await db.publishClassSemesterResults(school.id, klass.id, 'Semester 1', schoolAdmin.id, schoolAdmin.fullName, schoolAdmin.role);
   await db.flush();
   const published = await request(`/exams/marks?studentId=${encodeURIComponent(student.id)}`, cookies.parent);
   assert.equal(published.status, 200);
