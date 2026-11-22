@@ -8,5 +8,5 @@ UPDATE public.schools
 SET setup_completed_at = (setup_progress ->> 'completedAt')::timestamptz
 WHERE setup_completed_at IS NULL
   AND jsonb_typeof(setup_progress -> 'completedAt') = 'string'
-  AND (setup_progress ->> 'completedAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})
+  AND (setup_progress ->> 'completedAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$';
 ;
