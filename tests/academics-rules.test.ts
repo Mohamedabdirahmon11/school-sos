@@ -21,6 +21,7 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   const source = db.createClass({ schoolId: school.id, name: 'Grade 1', gradeLevel: 1, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
   const target = db.createClass({ schoolId: school.id, name: 'Grade 2', gradeLevel: 2, section: 'A', roomNumber: '', capacity: 30, monthlyFee: 0 });
   const subject = db.createSubject({ schoolId: school.id, name: 'Mathematics', code: 'MATH', category: 'core', isActive: true } as any);
+  const inactiveSubject = db.createSubject({ schoolId: school.id, name: 'Science', code: 'SCI', category: 'core', isActive: true } as any);
   const students = [90, 70, 60, 40].map((score, index) => db.createStudent({
     schoolId: school.id, studentId: `ACAD-${index + 1}`, firstName: `Pupil${index + 1}`, middleName: '', lastName: 'Test', gender: 'female',
     admissionDate: '2026-01-01', fatherPhone: '', classId: source.id, status: 'active'
@@ -33,6 +34,10 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
     id: 'class-subject-math', school_id: school.id, class_id: source.id,
     subject_id: subject.id, teacher_id: 'teacher-profile-1', periods_per_week: 3,
     small_exam_enabled: true, big_exam_enabled: true, is_active: true
+  }, {
+    id: 'class-subject-sci-inactive', school_id: school.id, class_id: source.id,
+    subject_id: inactiveSubject.id, teacher_id: 'teacher-profile-2', periods_per_week: 2,
+    small_exam_enabled: true, big_exam_enabled: true, is_active: false
   }]);
   await assert.rejects(() => db.forwardClassMarks(school.id, source.id, 'Semester 1', 'fomester-1'), /Cannot forward results yet/);
 
@@ -61,6 +66,11 @@ test('exam limits and top-N pass-mark promotions are enforced and archived', asy
   assert.deepEqual(rankings.map(row => row.yearlyRank), [1, 2, 3, 4]);
   assert.deepEqual(rankings.map(row => row.isPass), [true, true, true, false]);
   assert.equal(rankings.every(row => row.annualComplete), true);
+  const inactiveRow = rankings[0].subjectResults.find(row => row.subject.id === inactiveSubject.id);
+  assert.equal(inactiveRow?.isActive, false, 'inactive subjects remain as blank report-card rows');
+  assert.equal(inactiveRow?.sem1Marks, null);
+  assert.equal(inactiveRow?.yearlyMarks, null);
+  assert.equal(rankings[0].yearlyTotal, 90, 'inactive subjects do not affect yearly totals');
   const undersizedTarget = db.createClass({ schoolId: school.id, name: 'Small Grade 2', gradeLevel: 2, section: 'B', roomNumber: '', capacity: 2, monthlyFee: 0 });
   const payload = rankings.map((row, index) => ({
     studentId: row.student.id, classFromId: source.id, classToId: index < 3 ? target.id : source.id,

@@ -71,13 +71,19 @@ interface ReportCardResult {
     subject: { name: string; code?: string };
     sem1Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string; maxMarks?: { small: number; big: number; total: number } } | null;
     sem2Marks?: { smallExamMarks: number; bigExamMarks: number; totalMarks: number; percentage: number; teacherRemarks?: string; maxMarks?: { small: number; big: number; total: number } } | null;
+    isActive?: boolean;
     sem1Percentage: number | null;
     sem2Percentage: number | null;
+    yearlyMarks: number | null;
     yearlyPercentage: number | null;
     maxMarks: { small: number; big: number; total: number };
   }>;
   attendanceSummary?: { totalDays: number; present: number; absent: number; late: number; excused: number; attendancePercentage: number } | null;
   annualComplete: boolean;
+  annualPublished: boolean;
+  semester1Rank: number;
+  semester2Rank: number;
+  yearlyTotal: number;
   yearlyPercentage: number;
   yearlyRank: number;
   isPass: boolean;
@@ -97,7 +103,7 @@ function imageAsset(dataUrl: string | undefined, x: number, y: number, width: nu
 }
 
 export function buildReportCardPdfPage({ school, design, className, result, totalStudents }: ReportCardPdfContext): PdfPage {
-  if (!result.annualComplete) throw new Error('Annual report cards require approved marks for every assigned subject in both semesters.');
+  if (!result.annualComplete || !result.annualPublished) throw new Error('Annual report cards are available only after both complete terms are published by School Admin.');
   const blocks = design.visibleBlocks || { rank: true, teacherRemarks: true, adminRemarks: true, percentage: true, signatures: true, stamp: true };
   const lines = [
     school.name,
@@ -108,9 +114,9 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
     `Student: ${result.student.firstName} ${result.student.middleName || ''} ${result.student.lastName} (${result.student.studentId})`,
     `Class: ${className}`
   ];
-  if (blocks.rank) lines.push(`Class rank: #${result.yearlyRank} of ${totalStudents}`);
+  if (blocks.rank) lines.push(`Term 1 rank: ${result.semester1Rank > 0 ? `#${result.semester1Rank}` : 'Pending'} of ${totalStudents}`, `Term 2 rank: ${result.semester2Rank > 0 ? `#${result.semester2Rank}` : 'Pending'} of ${totalStudents}`, `Final class rank: ${result.yearlyRank > 0 ? `#${result.yearlyRank}` : 'Pending'} of ${totalStudents}`);
   if (result.attendanceSummary) lines.push(`Attendance: ${result.attendanceSummary.attendancePercentage}% (excused days excluded; ${result.attendanceSummary.present} present, ${result.attendanceSummary.absent} absent, ${result.attendanceSummary.late} late, ${result.attendanceSummary.excused} excused; ${result.attendanceSummary.totalDays} recorded days)`);
-  lines.push('', 'SUBJECT | SEMESTER 1 MARKS | SEMESTER 1 % | SEMESTER 2 MARKS | SEMESTER 2 % | YEARLY % | GRADE');
+  lines.push('', 'SUBJECT | TERM 1 MARKS | TERM 1 % | TERM 2 MARKS | TERM 2 % | FINAL MARKS | FINAL % | GRADE');
   for (const row of result.subjectResults) {
     lines.push([
       `${row.subject.name}${row.subject.code ? ` (${row.subject.code})` : ''}`,
@@ -118,15 +124,22 @@ export function buildReportCardPdfPage({ school, design, className, result, tota
       row.sem1Percentage === null ? '-' : `${row.sem1Percentage}%`,
       formatReportCardMark(row.sem2Marks, row.sem2Marks?.maxMarks || row.maxMarks),
       row.sem2Percentage === null ? '-' : `${row.sem2Percentage}%`,
+      row.yearlyMarks === null ? '-' : String(row.yearlyMarks),
       row.yearlyPercentage === null ? '-' : `${row.yearlyPercentage}%`,
       gradeLabelForPercentage(row.yearlyPercentage, school.gradingScale)
     ].join(' | '));
   }
-  const savedTeacherRemarks = result.subjectResults.flatMap(row => [
-    row.sem1Marks?.teacherRemarks?.trim() ? `${row.subject.name} · Semester 1: ${row.sem1Marks.teacherRemarks.trim().slice(0, 500)}` : '',
-    row.sem2Marks?.teacherRemarks?.trim() ? `${row.subject.name} · Semester 2: ${row.sem2Marks.teacherRemarks.trim().slice(0, 500)}` : ''
-  ].filter(Boolean));
-  if (blocks.teacherRemarks && savedTeacherRemarks.length) lines.push('', 'TEACHER REMARKS', ...savedTeacherRemarks);
+  const activeRows = result.subjectResults.filter(row => row.isActive !== false);
+  const term1Total = activeRows.reduce((sum, row) => sum + (row.sem1Marks?.totalMarks || 0), 0);
+  const term2Total = activeRows.reduce((sum, row) => sum + (row.sem2Marks?.totalMarks || 0), 0);
+  const finalTotal = activeRows.reduce((sum, row) => sum + (row.yearlyMarks || 0), 0);
+  const term1Average = activeRows.length ? term1Total / activeRows.length : 0;
+  const term2Average = activeRows.length ? term2Total / activeRows.length : 0;
+  lines.push('', `Term 1 total: ${term1Total} | average: ${term1Average}`, `Term 2 total: ${term2Total} | average: ${term2Average}`, `Final total: ${finalTotal} | average: ${result.yearlyPercentage}`);
+  const term1Comments = activeRows.filter(row => row.sem1Marks?.teacherRemarks?.trim()).map(row => `${row.subject.name} · Semester 1: ${row.sem1Marks?.teacherRemarks}`);
+  const term2Comments = activeRows.filter(row => row.sem2Marks?.teacherRemarks?.trim()).map(row => `${row.subject.name} · Semester 2: ${row.sem2Marks?.teacherRemarks}`);
+  const savedTeacherRemarks = [...term1Comments, ...term2Comments];
+  if (blocks.teacherRemarks) lines.push('', 'TEACHER REMARKS', `Term 1 teacher comments: ${term1Comments.join(' | ') || teacherRemark(result.yearlyPercentage)}`, `Term 2 teacher comments: ${term2Comments.join(' | ') || teacherRemark(result.yearlyPercentage)}`);
   const firstSubject = result.subjectResults[0];
   const semesterOneMaximum = firstSubject?.sem1Marks?.maxMarks || firstSubject?.maxMarks;
   const semesterTwoMaximum = firstSubject?.sem2Marks?.maxMarks || firstSubject?.maxMarks;

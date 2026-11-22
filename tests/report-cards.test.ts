@@ -49,24 +49,32 @@ const result = {
   subjectResults: [
     {
       subject: { id: 'subject-math', name: 'Mathematics', code: 'MATH' },
+      isActive: true,
       sem1Marks: { smallExamMarks: 10, bigExamMarks: 40, totalMarks: 50, percentage: 100 },
       sem2Marks: { smallExamMarks: 8, bigExamMarks: 32, totalMarks: 40, percentage: 80 },
       sem1Percentage: 100,
       sem2Percentage: 80,
+      yearlyMarks: 45,
       yearlyPercentage: 90,
       maxMarks: { small: 10, big: 40, total: 50 }
     },
     {
       subject: { id: 'subject-bio', name: 'Biology', code: 'BIO' },
+      isActive: true,
       sem1Marks: null,
       sem2Marks: null,
       sem1Percentage: null,
       sem2Percentage: null,
+      yearlyMarks: null,
       yearlyPercentage: null,
       maxMarks: { small: 10, big: 40, total: 50 }
     }
   ],
   annualComplete: true,
+  annualPublished: true,
+  semester1Rank: 1,
+  semester2Rank: 2,
+  yearlyTotal: 45,
   yearlyPercentage: 90,
   yearlyRank: 1,
   isPass: true
@@ -78,7 +86,10 @@ test('report card page includes student, subject marks, percentages, max marks, 
   assert.ok(text.includes('Ahmed Hassan Ali'));
   assert.ok(text.includes('A-001'));
   assert.ok(text.includes('Grade 10 A'));
-  assert.ok(text.includes('Class rank: #1 of 24'));
+  assert.ok(text.includes('Final class rank: #1 of 24'));
+  assert.ok(text.includes('Term 1 rank: #1 of 24'));
+  assert.ok(text.includes('Term 2 rank: #2 of 24'));
+  assert.ok(text.includes('Final total: 45 | average: 90'));
   assert.ok(text.includes('Mathematics (MATH)'));
   assert.ok(text.includes('10 + 40 = 50/50'));
   assert.ok(text.includes('100%'));
@@ -88,7 +99,9 @@ test('report card page includes student, subject marks, percentages, max marks, 
   assert.ok(text.includes('Exam maximum marks: Small 10 + Big 40 = 50'));
   assert.ok(text.includes('Yearly average: 90%'));
   assert.ok(text.includes('Result: PASS'));
-  assert.ok(text.includes('Teacher remarks:'));
+  assert.ok(text.includes('TEACHER REMARKS'));
+  assert.ok(text.includes('Term 1 teacher comments:'));
+  assert.ok(text.includes('Term 2 teacher comments:'));
   assert.ok(text.includes('Administrator remarks:'));
   assert.ok(text.includes('Class Teacher'));
   assert.ok(text.includes('Principal'));
