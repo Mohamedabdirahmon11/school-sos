@@ -436,10 +436,10 @@ BEGIN
   END IF;
 
   INSERT INTO public.users (
-    id, school_id, role, full_name, email, phone, staff_id, password_hash, pin_hash,
+    id, school_id, branch_id, role, full_name, email, phone, staff_id, password_hash, pin_hash,
     must_change_password, is_blocked, failed_login_attempts, assigned_class_ids, assigned_subject_ids
   ) VALUES (
-    v_user_id, p_school_id, 'teacher', p_user->>'full_name', NULLIF(p_user->>'email', ''),
+    v_user_id, p_school_id, NULLIF(p_user->>'branch_id', ''), 'teacher', p_user->>'full_name', NULLIF(p_user->>'email', ''),
     NULLIF(p_user->>'phone', ''), p_user->>'staff_id', p_user->>'password_hash', p_user->>'pin_hash',
     COALESCE((p_user->>'must_change_password')::BOOLEAN, FALSE),
     COALESCE((p_user->>'is_blocked')::BOOLEAN, FALSE),
@@ -449,10 +449,10 @@ BEGIN
   );
 
   INSERT INTO public.teachers (
-    id, school_id, branch_id, user_id, full_name, email, phone, address, staff_id,
+    id, school_id, user_id, full_name, email, phone, address, staff_id,
     gender, qualification, department, assigned_classes, assigned_subjects, status, joined_date, monthly_salary
   ) VALUES (
-    v_teacher_id, p_school_id, NULLIF(p_teacher->>'branch_id', ''), v_user_id,
+    v_teacher_id, p_school_id, v_user_id,
     p_teacher->>'full_name', COALESCE(p_teacher->>'email', ''), NULLIF(p_teacher->>'phone', ''),
     COALESCE(p_teacher->>'address', ''), p_teacher->>'staff_id', p_teacher->>'gender',
     NULLIF(p_teacher->>'qualification', ''), NULLIF(p_teacher->>'department', ''),
