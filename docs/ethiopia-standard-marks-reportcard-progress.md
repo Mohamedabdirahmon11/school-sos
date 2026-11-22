@@ -66,4 +66,4 @@ PR #242 and #220 both touch the same critical exam/reporting server and UI files
 - Arabic and Islamic Studies/Quraan are optional school additions, not automatic compulsory subjects.
 - Conduct is a separate report-card item, never a normal subject.
 - The subject list is a proposed template only and requires official curriculum confirmation from the Federal Ministry of Education and Somali Regional Education Bureau.
-- The remaining 16 BLOCKED items must be resumed after PR #242 and PR #220 are reconciled; this branch deliberately does not overwrite those files.
+- The remaining 15 BLOCKED items must be resumed after PR #242 and PR #220 are reconciled; this branch deliberately does not overwrite those files.
