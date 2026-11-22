@@ -6483,6 +6483,11 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Attendance date must be a real date in YYYY-MM-DD format.' });
     return;
   }
+  const schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  if (date > schoolToday) {
+    res.status(422).json({ error: 'Attendance cannot be recorded for a future school date.' });
+    return;
+  }
   const attendanceClass = await db.getClassById(normalizedClassId, school.id);
   if (!attendanceClass) { res.status(404).json({ error: 'Class not found in this school.' }); return; }
   if (attendanceClass.classTeacherId !== user.id) {
@@ -7517,7 +7522,16 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     const saved = await db.saveStudentMarks(school.id, classId, subjectId, semester, marks, user.id, user.fullName, user.role);
     res.json({ success: true, count: saved.length, marks: saved });
   } catch (error) {
-    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid marks.' });
+    const message = error instanceof Error ? error.message : 'Invalid marks.';
+    if (/locked by the School Admin/i.test(message)) {
+      res.status(403).json({ error: message });
+      return;
+    }
+    if (/must be between 0 and|configured maximums|assessment components are not configured|maximum/i.test(message)) {
+      res.status(422).json({ error: message });
+      return;
+    }
+    res.status(400).json({ error: message });
   }
 });
 
