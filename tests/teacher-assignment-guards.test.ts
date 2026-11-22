@@ -43,3 +43,12 @@ test('Teacher assignment update preserves HTTP 409 and 422 validation statuses',
   assert.match(putRoute, /Number\(error\?\.status\)/);
   assert.match(putRoute, /409/);
 });
+test('Assignment uniqueness is per school, year, term, class and subject—not section metadata', () => {
+  const unique = migration.slice(migration.indexOf('CREATE UNIQUE INDEX IF NOT EXISTS teacher_class_subject_assignment_unique'));
+  assert.match(unique, /school_id, academic_year_id,[\s\S]*class_id,[\s\S]*subject_id/);
+  assert.doesNotMatch(unique.split(';')[0], /section_id/);
+  const upsert = api.slice(api.indexOf('async function upsertTeacherAssignment'), api.indexOf("apiRouter.get('/teacher-assignments'"));
+  assert.doesNotMatch(upsert, /query\.is\('section_id'/);
+  assert.doesNotMatch(upsert, /query\.eq\('section_id'/);
+});
+

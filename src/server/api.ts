@@ -11105,7 +11105,8 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
   let query = client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id)
     .eq('academic_year_id', payload.academic_year_id).eq('class_id', payload.class_id).eq('subject_id', payload.subject_id);
   query = payload.term_id ? query.eq('term_id', payload.term_id) : query.is('term_id', null);
-  query = payload.section_id ? query.eq('section_id', payload.section_id) : query.is('section_id', null);
+  // Class rows already represent Grade + Section. Assignment uniqueness is class + subject;
+  // legacy section_id is retained as metadata but must not create parallel assignments.
   const found = id
     ? await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('id', id).maybeSingle()
     : await query.maybeSingle();
