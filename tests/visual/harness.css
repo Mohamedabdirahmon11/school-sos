@@ -1,0 +1,4 @@
+@import '../../src/index.css';
+html,body,#root{min-height:100%;margin:0}
+body{background:#f2f5f8}
+html[data-theme="dark"] body{background:#0d141b}
