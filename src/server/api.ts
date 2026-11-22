@@ -2896,7 +2896,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
   }
   try {
     const school = (req as any).school as School;
-    if (role === 'school_admin' && !isSchoolSetupProgressComplete(school.setupProgress)) {
+    if (role === 'school_admin' && !(await getSchoolSetupState(school)).canFinish) {
       res.status(423).json({
         error: 'Complete the first-time school setup before opening the dashboard.',
         code: 'SCHOOL_SETUP_REQUIRED'
@@ -9860,7 +9860,12 @@ async function getSchoolSetupState(school: School) {
     hasExamConfig: examConfigs.total > 0,
     feeStructureCount: feeStructures.total
   });
-  const progress = normalizeSchoolSetupProgress(school.setupProgress);
+  let progress = normalizeSchoolSetupProgress(school.setupProgress);
+  if (progress.completedAt && !progress.completedSteps.includes(0)) {
+    progress = assignmentReadiness.ready
+      ? { ...progress, completedSteps: [...progress.completedSteps, 0].sort((a, b) => a - b) }
+      : { ...progress, currentStep: 0, completedSteps: progress.completedSteps.filter(step => step !== 10), completedAt: null };
+  }
   return { progress, checklist, canFinish: canFinishSchoolSetup(progress, checklist) };
 }
 
@@ -10025,7 +10030,13 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
 apiRouter.get('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   try {
-    res.json(await getSchoolSetupState(school));
+    const state = await getSchoolSetupState(school);
+    const saved = normalizeSchoolSetupProgress(school.setupProgress);
+    if (state.progress.completedAt && state.progress.completedSteps.includes(0) && !saved.completedSteps.includes(0)) {
+      const updated = db.updateSchool(school.id, { setupProgress: state.progress });
+      if (updated) await db.flush();
+    }
+    res.json(state);
   } catch {
     res.status(503).json({ error: 'School setup progress could not be loaded. Please retry.' });
   }
