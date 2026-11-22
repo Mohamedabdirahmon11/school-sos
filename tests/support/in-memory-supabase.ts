@@ -79,7 +79,7 @@ class MemoryQuery implements PromiseLike<any> {
       const values = raw.replace(/^\(|\)$/g, '').split(',');
       return values.includes(actual);
     }
-    const pattern = raw.replace(/^\*|\*$/g, '').replaceAll('.', '\\.').replaceAll('+', '\\+').replaceAll('*', '.*');
+    const pattern = [...raw].map(character => '.+?^${}()|[]\\'.includes(character) ? '\\' + character : character).join('').replaceAll('\\*', '.*');
     return new RegExp(pattern, 'i').test(actual);
   }
   private project(row: Record<string, any>) {
