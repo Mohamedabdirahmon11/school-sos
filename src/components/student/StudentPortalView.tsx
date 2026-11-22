@@ -17,7 +17,7 @@ const percentage = (v:number) => Math.round(v)+'%';
 
 function PortalError({error,retry}:{error:any;retry:()=>void}) {
  const status=Number(error?.status||error?.statusCode||0);
- if(status===423) return <div className="sp-state sp-warning" role="alert"><CircleAlert/><div><b>Dejinta dugsiga weli ma dhammaystirna</b><p>{error?.message||'Maamulka dugsiga waa inuu dhammaystiraa dejinta ka hor inta aan xogtan la heli karin.'}</p>{Array.isArray(error?.missing)&&error.missing.length>0&&<ul>{error.missing.map((item:string,index:number)=><li key={index}>{item}</li>)}</ul>}</div><button onClick={retry}>Dib u tijaabi</button></div>;
+ if(status===423) return <div className="sp-state sp-warning" role="alert"><CircleAlert/><div><b>Dejinta dugsiga weli ma dhammaystirna</b><p>{error?.message||'Maamulka dugsiga waa inuu dhammaystiraa dejinta ka hor inta aan xogtan la heli karin.'}</p>{Array.isArray((error?.missing||error?.data?.missing))&&error.missing.length>0&&<ul>{error.missing.map((item:string,index:number)=><li key={index}>{item}</li>)}</ul>}</div><button onClick={retry}>Dib u tijaabi</button></div>;
  return <ErrorState error={error} onRetry={retry}/>;
 }
 
