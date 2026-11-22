@@ -8,8 +8,8 @@ const fields: Record<Props['step'], Field[]> = {
   classes: [{ name: 'name', label: 'Magaca fasalka', required: true }, { name: 'gradeLevel', label: 'Grade / Heerka', type: 'number', required: true }, { name: 'section', label: 'Section' }],
   subjects: [{ name: 'name', label: 'Magaca maaddada', required: true }, { name: 'code', label: 'Subject code' }, { name: 'classId', label: 'Fasalka', required: true }, { name: 'periodsPerWeek', label: 'Periods toddobaadkii', type: 'number', required: true }],
   teachers: [{ name: 'fullName', label: 'Magaca macallinka', required: true }, { name: 'gender', label: 'Jinsiga', required: true, options: [{ value: 'male', label: 'Lab' }, { value: 'female', label: 'Dhedig' }] }, { name: 'phone', label: 'Telefoonka', required: true }, { name: 'pin', label: 'PIN (4–6 lambar)', type: 'password', required: true }, { name: 'subjectId', label: 'Maaddada uu ku takhasusay' }],
-  assign: [{ name: 'classId', label: 'Fasalka', required: true }, { name: 'subjectId', label: 'Maaddada', required: true }, { name: 'teacherId', label: 'Macallinka maaddada', required: true }],
-  students: [{ name: 'firstName', label: 'Magaca koowaad', required: true }, { name: 'middleName', label: 'Magaca dhexe' }, { name: 'lastName', label: 'Magaca dambe' }, { name: 'classId', label: 'Fasalka', required: true }, { name: 'guardianName', label: 'Magaca waalidka/masuulka', required: true }, { name: 'guardianPhone', label: 'Telefoonka waalidka', required: true }, { name: 'gender', label: 'Jinsiga', required: true, options: [{ value: 'male', label: 'Lab' }, { value: 'female', label: 'Dhedig' }] }],
+  assign: [{ name: 'classId', label: 'Fasalka', required: true }, { name: 'subjectId', label: 'Maaddada', required: true }, { name: 'teacherId', label: 'Macallinka maaddada', required: true }, { name: 'override', label: 'Oggolow ka-reebis aqoon (haddii loo baahdo)', type: 'checkbox' }],
+  students: [{ name: 'firstName', label: 'Magaca koowaad', required: true }, { name: 'middleName', label: 'Magaca dhexe', required: true }, { name: 'lastName', label: 'Magaca dambe', required: true }, { name: 'classId', label: 'Fasalka', required: true }, { name: 'guardianName', label: 'Magaca waalidka/masuulka', required: true }, { name: 'guardianPhone', label: 'Telefoonka waalidka', required: true }, { name: 'gender', label: 'Jinsiga', required: true, options: [{ value: 'male', label: 'Lab' }, { value: 'female', label: 'Dhedig' }] }],
   timetable: [{ name: 'classId', label: 'Fasalka', required: true }, { name: 'subjectId', label: 'Maaddada', required: true }, { name: 'teacherId', label: 'Macallinka', required: true }, { name: 'dayOfWeek', label: 'Maalinta', required: true, options: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(value => ({ value, label: value })) }, { name: 'periodNumber', label: 'Period', type: 'number', required: true }, { name: 'startTime', label: 'Bilow', type: 'time', required: true }, { name: 'endTime', label: 'Dhammaad', type: 'time', required: true }]
 };
 
@@ -77,7 +77,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
         await ApiClient.request('/teacher-assignments', { method: 'POST', body: JSON.stringify({
           academicYearId: assignmentData?.selectedAcademicYearId, termId: assignmentData?.selectedTermId || undefined,
           classId: form.classId, subjectId: form.subjectId, teacherId: form.teacherId,
-          clearDependentEntries: false
+          override: form.override === 'true', clearDependentEntries: false
         }) });
       } else if (step === 'students') {
         await ApiClient.createStudent({ firstName: form.firstName, middleName: form.middleName, lastName: form.lastName, gender: form.gender as any, classId: form.classId, guardianName: form.guardianName, guardianPhone: form.guardianPhone });
@@ -124,7 +124,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
     <form onSubmit={submit} className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
       {fields[step].map(field => <label key={field.name} className="block space-y-1 text-sm font-semibold">
         <span>{field.label}</span>
-        {['classId','subjectId','teacherId'].includes(field.name) || field.options
+        {field.type === 'checkbox' ? <input type="checkbox" checked={form[field.name] === 'true'} onChange={event => setForm(value => ({ ...value, [field.name]: event.target.checked ? 'true' : 'false' }))} className="mr-2" /> : ['classId','subjectId','teacherId'].includes(field.name) || field.options
           ? <select required={field.required} value={form[field.name] || ''} onChange={event => setForm(value => ({ ...value, [field.name]: event.target.value }))} className="w-full rounded-lg border px-3 py-2 bg-transparent">
               <option value="">Dooro…</option>{selectOptions(field).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
