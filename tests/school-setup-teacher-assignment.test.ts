@@ -109,3 +109,16 @@ test('Timetable and teacher attendance/marks are gated after the existing author
   assert.match(api, /apiRouter\.post\('\/term-marks\/entry', requireAuth, requireSchoolContext, requireSchoolStaff,/);
   assert.match(api, /if \(!await ensureTeacherAssignmentReadyForTeacher\(school, res\)\) return;/);
 });
+
+test('teacher-only routes preserve HTTP 403 for parent, student and non-Form-Teacher access', () => {
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const marksRead = api.slice(api.indexOf("apiRouter.get('/exams/marks'"), api.indexOf("apiRouter.post('/exams/marks'"));
+  assert.match(marksRead, /user\.role === 'parent' \|\| user\.role === 'student'[\s\S]*?res\.status\(403\)/);
+  const marksWrite = api.slice(api.indexOf("apiRouter.post('/exams/marks'"), api.indexOf("apiRouter.post('/exams/reopen-subject'"));
+  assert.match(marksWrite, /requireSchoolStaff/);
+  assert.match(marksWrite, /if \(!assignment\.total\)[\s\S]*?res\.status\(403\)/);
+  const attendanceWrite = api.slice(api.indexOf("apiRouter.post('/attendance'"), api.indexOf('// ==============================================================================', api.indexOf("apiRouter.post('/attendance'")));
+  assert.match(attendanceWrite, /requireSchoolStaff/);
+  assert.match(attendanceWrite, /attendanceClass\.classTeacherId !== user\.id[\s\S]*?res\.status\(403\)/);
+  assert.ok(attendanceWrite.indexOf('res.status(403)') < attendanceWrite.indexOf('ensureTeacherAssignmentReadyForTeacher'));
+});
