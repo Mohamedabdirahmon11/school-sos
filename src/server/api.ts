@@ -47,7 +47,7 @@ import { isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfig
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
-import { buildSchoolSetupChecklist, canFinishSchoolSetup, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
+import { buildSchoolSetupChecklist, canFinishSchoolSetup, evaluateTeacherAssignmentReadiness, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
@@ -2896,7 +2896,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, async (req
   }
   try {
     const school = (req as any).school as School;
-    if (role === 'school_admin' && !isSchoolSetupProgressComplete(school.setupProgress)) {
+    if (role === 'school_admin' && !(await getSchoolSetupState(school)).canFinish) {
       res.status(423).json({
         error: 'Complete the first-time school setup before opening the dashboard.',
         code: 'SCHOOL_SETUP_REQUIRED'
@@ -4213,7 +4213,7 @@ apiRouter.get('/timetable/terms', requireAuth, requireSchoolContext, async (req,
   res.json(terms);
 });
 
-apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const classId = String(req.params.classId || '');
   const termId = String(req.query.termId || '');
@@ -4233,7 +4233,7 @@ apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminO
   }
 });
 
-apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const sourceTermId = String(req.body?.sourceTermId || '');
   const targetTermId = String(req.body?.targetTermId || '');
@@ -4293,7 +4293,7 @@ apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdm
   res.json({ success: true, copiedClasses, skipped, copiedSlots: copiedClasses.reduce((total, id) => total + (sourceByClass.get(id)?.length || 0), 0) });
 });
 
-apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
@@ -4617,7 +4617,7 @@ apiRouter.post('/timetable/substitutions', requireAuth, requireSchoolAdminOrSupe
   } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Macallinka beddelka ah lama kaydin karin.' }); }
 });
 
-apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   try {
@@ -4626,7 +4626,7 @@ apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdmin
     res.json({ success: true });
   } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Beddelka lama tirtiri karin.' }); }
 });
-apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
   const termId = String(req.body?.termId || '');
@@ -4683,7 +4683,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   res.status(201).json(slot);
 });
 
-apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const termId = String(req.body?.termId || req.query.termId || '');
   const sectionId = (typeof req.body?.sectionId === 'string' ? req.body.sectionId : (typeof req.query.sectionId === 'string' ? req.query.sectionId : '')) || null;
@@ -4698,7 +4698,7 @@ apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, re
   res.json({ success: true });
 });
 
-apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const slotId = String(req.params.slotId || '');
@@ -4717,7 +4717,7 @@ apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSupe
     res.status(404).json({ error: error instanceof Error ? error.message : 'Timetable lesson was not found.' });
   }
 });
-apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const firstId = String(req.body?.firstSlotId || '');
   const secondId = String(req.body?.secondSlotId || '');
@@ -4733,7 +4733,7 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.json({ success: true });
 });
 
-apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const classId = String(req.body?.classId || '');
   const termId = String(req.body?.termId || '');
@@ -6396,6 +6396,7 @@ apiRouter.get('/attendance', requireAuth, requireSchoolContext, requireSchoolSta
   }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'attendance_manage')) { res.status(403).json({ error: 'Your staff account does not have permission to view attendance.' }); return; }
   if (!await canAccessFormTeacherClass(req, res, classId as string)) return;
+  if (user.role === 'teacher' && !await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   res.json(await db.getAttendance(school.id, classId as string, date as string));
 });
 
@@ -6412,6 +6413,7 @@ apiRouter.get('/attendance/month', requireAuth, requireSchoolContext, requireSch
     res.status(403).json({ error:'Akoonka shaqaalaha ma laha rukhsadda xaadirinta.' }); return;
   }
   if (!await canAccessFormTeacherClass(req, res, classId)) return;
+  if (user.role === 'teacher' && !await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
   const endDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0,10);
   const client = documentServiceClient(res);
@@ -6524,6 +6526,7 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Submit attendance for every student in the selected class in one operation.' });
     return;
   }
+  if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const previous = await db.getAttendance(school.id, normalizedClassId, date);
   const previousByStudent = new Map((previous || []).map((record:any)=>[String(record.studentId),record.status]));
   const changes = normalizedRecords.map((record:any)=>({studentId:record.studentId,oldStatus:previousByStudent.get(record.studentId)||null,newStatus:record.status}))
@@ -7398,6 +7401,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
       const teacher = teacherPage.items[0] as any;
       if (!teacher) { res.status(403).json({ error: 'Teacher profile is required to access results.' }); return; }
+      if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
       const assigned = await db.queryPage('class_subjects', { school_id: school.id, teacher_id: teacher.id, is_active: 'true' }, 1, 100, undefined, 'class_id,subject_id');
       const student = await db.getStudentById(studentId as string, school.id);
       const klass = student ? await db.getClassById(student.classId, school.id) : null;
@@ -7435,6 +7439,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
       res.status(403).json({ error: 'You may only access subjects assigned to you.' });
       return;
     }
+    if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
     const classMarks = await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any);
     res.json(isFormTeacher
       ? classMarks
@@ -7487,6 +7492,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
       res.status(403).json({ error: 'You may enter marks only for a subject explicitly assigned to your teacher profile. Form Teacher access is review-only.' });
       return;
     }
+    if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   }
   const seenStudentIds = new Set<string>();
   for (const mark of marks) {
@@ -9810,15 +9816,19 @@ async function getSchoolSetupState(school: School) {
     classes,
     subjects,
     teachers,
+    classSubjects,
+    allSubjects,
     students,
     guardianStudents,
     timetable,
     examConfigs,
     feeStructures
   ] = await Promise.all([
-    queryAllRows('classes', { school_id: school.id }, 'id,name,is_archived'),
+    queryAllRows('classes', { school_id: school.id }, 'id,name,section,class_teacher_id,is_archived'),
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
     queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,staff_id,user_id'),
+    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,class_id,subject_id,teacher_id,periods_per_week'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,name'),
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, undefined, 'id'),
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
@@ -9830,8 +9840,17 @@ async function getSchoolSetupState(school: School) {
     ? await queryAllRows('users', { school_id: school.id, id: teacherUserIds }, 'id,role,password_hash,pin_hash')
     : [];
   const accountsById = new Map<string, any>(teacherAccounts.map((account: any) => [String(account.id), account] as [string, any]));
+  const assignmentReadiness = evaluateTeacherAssignmentReadiness(
+    school.id,
+    classes.map((item: any) => ({ id: String(item.id), name: item.name, section: item.section, classTeacherId: item.classTeacherId, isArchived: item.isArchived })),
+    teachers.map((teacher: any) => ({ id: String(teacher.id), userId: teacher.userId, fullName: teacher.fullName, status: 'active' })),
+    classSubjects.map((row: any) => ({ classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
+    allSubjects.map((subject: any) => ({ id: String(subject.id), name: subject.name }))
+  );
   const checklist = buildSchoolSetupChecklist(school, {
     classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
+    teacherAssignmentReady: assignmentReadiness.ready,
+    teacherAssignmentIssues: assignmentReadiness.issues,
     subjectCount: subjects.total,
     teachers: teachers.map((teacher: any) => {
       const account = accountsById.get(String(teacher.userId || '')) as any;
@@ -9847,10 +9866,70 @@ async function getSchoolSetupState(school: School) {
     hasExamConfig: examConfigs.total > 0,
     feeStructureCount: feeStructures.total
   });
-  const progress = normalizeSchoolSetupProgress(school.setupProgress);
+  let progress = normalizeSchoolSetupProgress(school.setupProgress);
+  if (progress.completedAt && !progress.completedSteps.includes(0)) {
+    progress = {
+      ...progress,
+      currentStep: assignmentReadiness.ready ? 10 : 0,
+      completedSteps: [...progress.completedSteps.filter(step => step !== 10), ...(assignmentReadiness.ready ? [0] : [])].sort((a, b) => a - b),
+      completedAt: null
+    };
+  }
   return { progress, checklist, canFinish: canFinishSchoolSetup(progress, checklist) };
 }
 
+
+async function getTeacherAssignmentReadinessForSchool(school: School) {
+  const [classes, teachers, curriculum, subjects] = await Promise.all([
+    queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
+    queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,school_id,user_id,full_name,status'),
+    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
+    queryAllRows('subjects', { school_id: school.id }, 'id,school_id,name')
+  ]);
+  return evaluateTeacherAssignmentReadiness(
+    school.id,
+    classes.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name, section: row.section, classTeacherId: row.classTeacherId, isArchived: row.isArchived })),
+    teachers.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, userId: row.userId, fullName: row.fullName, status: row.status })),
+    curriculum.map((row: any) => ({ schoolId: row.schoolId, classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
+    subjects.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name }))
+  );
+}
+
+async function ensureTeacherAssignmentReadyForTeacher(school: School, res: any): Promise<boolean> {
+  try {
+    const readiness = await getTeacherAssignmentReadinessForSchool(school);
+    if (readiness.ready) return true;
+    res.status(423).json({
+      error: 'Marka hore qoondee macallimiinta ka hor xaadirinta ama gelinta dhibcaha.',
+      code: 'TEACHER_ASSIGNMENT_REQUIRED',
+      missing: readiness.issues.join(' · ')
+    });
+    return false;
+  } catch {
+    res.status(503).json({ error: 'Teacher assignment readiness could not be verified. No changes were made.' });
+    return false;
+  }
+}
+
+
+async function requireTeacherAssignmentsReady(req: any, res: any, next: (error?: unknown) => void) {
+  const role = normalizeRole(req.user?.role);
+  if (role !== 'school_admin' && role !== 'teacher') { next(); return; }
+  try {
+    const readiness = await getTeacherAssignmentReadinessForSchool(req.school as School);
+    if (!readiness.ready) {
+      res.status(423).json({
+        error: 'Marka hore qoondee macallimiinta ka hor inta aan la bilaabin jadwalka ama gelinta natiijooyinka.',
+        code: 'TEACHER_ASSIGNMENT_REQUIRED',
+        missing: readiness.issues.join(' · ') || 'Teacher assignments are incomplete.'
+      });
+      return;
+    }
+    next();
+  } catch {
+    res.status(503).json({ error: 'Teacher assignment readiness could not be verified. No changes were made.' });
+  }
+}
 
 apiRouter.post('/school/logo', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext,
   express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: '1572864' }),
@@ -9987,7 +10066,13 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
 apiRouter.get('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   try {
-    res.json(await getSchoolSetupState(school));
+    const state = await getSchoolSetupState(school);
+    const saved = normalizeSchoolSetupProgress(school.setupProgress);
+    if (state.progress.completedAt && state.progress.completedSteps.includes(0) && !saved.completedSteps.includes(0)) {
+      const updated = db.updateSchool(school.id, { setupProgress: state.progress });
+      if (updated) await db.flush();
+    }
+    res.json(state);
   } catch {
     res.status(503).json({ error: 'School setup progress could not be loaded. Please retry.' });
   }
@@ -11569,6 +11654,7 @@ apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSch
     .eq('academic_year_id',term.academic_year_id).eq('class_id',classId).eq('subject_id',subjectId)
     .or(`term_id.is.null,term_id.eq.${termId}`);
   if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
+  if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const { data: component } = await client.from('mark_components').select('id,structure_id,max_marks')
     .eq('school_id',school.id).eq('id',componentId).maybeSingle();
   if (!component) { res.status(404).json({ error: 'Qaybtan dhibcaha lama helin.' }); return; }
@@ -11598,6 +11684,19 @@ apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireSc
     res.status(400).json({ error: 'Dooro qaybta, fasalka, maaddada iyo liiska ardayda.' }); return;
   }
   const client = termMarksServiceClient(res); if (!client) return;
+  const { data: teacher } = await client.from('teachers').select('id').eq('school_id', school.id).eq('user_id', user.id).maybeSingle();
+  if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
+  const { data: component } = await client.from('mark_components').select('structure_id').eq('school_id', school.id).eq('id', componentId).maybeSingle();
+  if (!component) { res.status(404).json({ error: 'Qaybtan dhibcaha lama helin.' }); return; }
+  const { data: structure } = await client.from('mark_structures').select('term_id').eq('school_id', school.id).eq('id', component.structure_id).maybeSingle();
+  if (!structure) { res.status(404).json({ error: 'Qaab-dhismeedka dhibcaha lama helin.' }); return; }
+  const { data: term } = await client.from('terms').select('academic_year_id').eq('school_id', school.id).eq('id', structure.term_id).maybeSingle();
+  if (!term) { res.status(404).json({ error: 'Term-kan lama helin.' }); return; }
+  const { data: assignments } = await client.from('teacher_class_subject_assignments').select('id')
+    .eq('school_id', school.id).eq('teacher_id', teacher.id).eq('academic_year_id', term.academic_year_id)
+    .eq('class_id', classId).eq('subject_id', subjectId).or(`term_id.is.null,term_id.eq.${structure.term_id}`).limit(1);
+  if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
+  if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const { data, error } = await client.rpc('schoolos_save_component_marks', {
     p_school_id: school.id, p_actor_id: user.id, p_component_id: componentId,
     p_class_id: classId, p_subject_id: subjectId, p_marks: marks

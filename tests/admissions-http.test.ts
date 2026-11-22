@@ -404,7 +404,7 @@ test('student profile updates validate phones and keep parent/student login link
   assert.ok(newFather?.pin && verifyPin(first.initialPin, newFather.pin));
 });
 
-test('concurrent attendance submissions converge on one daily row without automatic parent SMS', async () => {
+test('teacher attendance is blocked until all school assignments are ready without automatic parent SMS', async () => {
   const created = await fetch(`${baseUrl}/students`, {
     method: 'POST', headers,
     body: JSON.stringify({
@@ -462,15 +462,16 @@ test('concurrent attendance submissions converge on one daily row without automa
   });
   assert.equal(invalidNote.status, 400);
   const [first, retry] = await Promise.all([submit(), submit()]);
-  assert.equal(first.status, 200, await first.clone().text());
-  assert.equal(retry.status, 200, await retry.clone().text());
+  assert.equal(first.status, 423, await first.clone().text());
+  assert.equal(retry.status, 423, await retry.clone().text());
+  const firstBody = await first.json();
+  assert.equal(firstBody.code, 'TEACHER_ASSIGNMENT_REQUIRED');
 
   const rows = memory.rows('attendance_records').filter(row =>
     row.school_id === school.id && row.class_id === klass.id &&
     row.student_id === student.id && row.date === date
   );
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].status, 'absent');
+  assert.equal(rows.length, 0);
 
   const examHistory = {
     id: 'attendance-class-exam-history', school_id: school.id, class_id: klass.id,
@@ -484,7 +485,7 @@ test('concurrent attendance submissions converge on one daily row without automa
   unassignedClassRow.class_teacher_id = null;
   unassignedClassRow.classTeacherId = null;
   assert.equal((await storage.db.getClassById(klass.id, school.id))?.classTeacherId, null);
-  assert.equal(memory.rows('attendance_records').filter(row => row.class_id === klass.id && row.student_id === student.id && row.date === date).length, 1, 'removing the Form Teacher must preserve attendance history');
+  assert.equal(memory.rows('attendance_records').filter(row => row.class_id === klass.id && row.student_id === student.id && row.date === date).length, 0, 'attendance must not be written while school-wide teacher assignments are incomplete');
   assert.deepEqual(memory.rows('marks').find(row => row.id === examHistory.id), examHistory, 'changing the Form Teacher must preserve exam history');
   const formerTeacherRetry = await submit();
   assert.equal(formerTeacherRetry.status, 403, 'a former Form Teacher cannot submit attendance after reassignment/removal');

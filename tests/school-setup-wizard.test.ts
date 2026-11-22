@@ -58,12 +58,14 @@ const completeEvidence = {
   guardianContactCount: 12,
   timetableSlotCount: 30,
   hasExamConfig: true,
-  feeStructureCount: 1
+  feeStructureCount: 1,
+  teacherAssignmentReady: true,
+  teacherAssignmentIssues: []
 };
 
 test('school setup checklist validates academic dates, WhatsApp, class setup, teacher login, and school records', () => {
   const checklist = buildSchoolSetupChecklist(school, completeEvidence);
-  for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9]) assert.equal(checklist[id].ready, true, 'step ' + id);
+  for (const id of [1, 2, 3, 4, 5, 0, 6, 7, 8, 9]) assert.equal(checklist[id].ready, true, 'step ' + id);
 });
 
 
@@ -132,7 +134,7 @@ test('required steps cannot be skipped and cannot be marked complete before thei
   assert.throws(() => sanitizeSchoolSetupProgressUpdate({ currentStep: 2, completedSteps: [], skippedSteps: [1] }), /Only timetable and fees/);
 });
 
-test('finalization requires steps 1–6 and 8; timetable and fees may be completed or skipped', () => {
+test('finalization requires steps 1–6, Teacher Assignment and 8; timetable and fees may be completed or skipped', () => {
   const checklist = buildSchoolSetupChecklist(school, completeEvidence);
   const initial = normalizeSchoolSetupProgress(null);
   const requiredWithoutEight = {
@@ -143,7 +145,7 @@ test('finalization requires steps 1–6 and 8; timetable and fees may be complet
   assert.equal(canFinishSchoolSetup(requiredWithoutEight, checklist), false);
   const readyToFinish = sanitizeSchoolSetupProgressUpdate({
     currentStep: 10,
-    completedSteps: [1, 2, 3, 4, 5, 6, 8],
+    completedSteps: [1, 2, 3, 4, 5, 0, 6, 8],
     skippedSteps: [7, 9]
   });
   assert.equal(canFinishSchoolSetup({
@@ -156,7 +158,7 @@ test('finalization requires steps 1–6 and 8; timetable and fees may be complet
     complete: true
   }, checklist, '2026-11-07T12:00:00.000Z');
   assert.equal(finished.completedAt, '2026-11-07T12:00:00.000Z');
-  assert.deepEqual(finished.completedSteps, [1, 2, 3, 4, 5, 6, 8, 10]);
+  assert.deepEqual(finished.completedSteps, [0, 1, 2, 3, 4, 5, 6, 8, 10]);
 });
 
 test('setup progress rejects a step that is both completed and skipped', () => {

@@ -37,6 +37,7 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 3, title: 'Classes & Grades', description: 'Create the school classes and sections. KG 1 and KG 2 are supported.', views: [{ label: 'Open Classes', view: 'sch_classes' }] },
   { id: 4, title: 'Subjects', description: 'Add school subjects and edit Ethiopian primary templates for Grades 1–4, 5–6 and 7–8. New Grade 1–8 classes receive their matching template automatically.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Primary Templates & Curriculum', view: 'sch_curriculum' }] },
   { id: 5, title: 'Teachers & Teacher IDs', description: 'Create teachers with school-specific IDs and PIN/password login.', views: [{ label: 'Open Teachers', view: 'sch_teachers' }] },
+  { id: 0, title: 'Teacher Assignment & Form Teachers', description: 'Assign a Form Teacher to every active class and a teacher to every active curriculum subject. Workload must not exceed 30 periods per week.', views: [{ label: 'Open Teacher Assignments', view: 'sch_teacher_assignments' }] },
   { id: 6, title: 'Students & Parents', description: 'Register students, bulk import records and PINs, and add parent contacts.', views: [{ label: 'Open Students', view: 'sch_students' }, { label: 'Open Parents', view: 'sch_parents' }] },
   { id: 7, title: 'Timetable', description: 'Review the school calendar and working hours, then create the timetable or skip timetable setup for now.', optional: true, coreSteps: [4, 5], views: [{ label: 'Open Timetable', view: 'sch_timetable' }] },
   { id: 8, title: 'Attendance & Exams', description: 'Review attendance rules and configure examinations.', views: [{ label: 'Open Attendance', view: 'sch_attendance' }, { label: 'Open Exams', view: 'sch_exams' }] },
@@ -66,11 +67,10 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         setSetupState(current);
         return;
       }
+      const order = [1, 2, 3, 4, 5, 0, 6, 7, 8, 9];
       const skippedSteps = current.progress.skippedSteps.filter(id => !current.checklist[id]?.ready);
-      const completedSteps = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        .filter(id => current.checklist[id]?.ready && !skippedSteps.includes(id));
-      const currentStep = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        .find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) || 10;
+      const completedSteps = order.filter(id => current.checklist[id]?.ready && !skippedSteps.includes(id)).sort((a, b) => a - b);
+      const currentStep = order.find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) ?? 10;
       const unchanged = current.progress.currentStep === currentStep
         && JSON.stringify(current.progress.completedSteps) === JSON.stringify(completedSteps)
         && JSON.stringify(current.progress.skippedSteps) === JSON.stringify(skippedSteps);
@@ -90,8 +90,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     try {
       const skippedSteps = [...new Set([...setupState.progress.skippedSteps, stepId])].sort((a, b) => a - b);
       const completedSteps = setupState.progress.completedSteps.filter(id => id !== stepId);
-      const currentStep = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        .find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) || 10;
+      const currentStep = [1, 2, 3, 4, 5, 0, 6, 7, 8, 9].find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) ?? 10;
       const next = await ApiClient.updateSchoolSetupProgress({ currentStep, completedSteps, skippedSteps });
       setSetupState(next);
     } catch (err) {
@@ -215,7 +214,8 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       <p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · FIRST-TIME SETUP</p>
       <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Complete your school setup</h1>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Your progress is saved in this school. Open each section, then return here to refresh its readiness check. The Dashboard stays locked until the required steps are verified.</p>
-      <div className="mt-5 text-sm font-semibold">{setupState?.progress.completedSteps.length || 0} of 10 steps verified · {setupState?.progress.skippedSteps.length || 0} optional steps skipped</div>
+      <div className="mt-5 rounded-xl border border-white/20 bg-white/10 p-4 text-sm leading-6"><strong>START HERE · Kala horreynta</strong><ol className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">{['Academic Year & Semesters','School Information','Classes & Grades','Subjects & Curriculum','Teachers','Teacher Assignment & Form Teachers','Students & Parents','Timetable (optional)','Attendance & Exams','Fees & Extra (optional)','Final review'].map((label, index) => <li key={label}>{index + 1}. {label}{!setupState?.progress.completedAt && index === [1, 2, 3, 4, 5, 0, 6, 7, 8, 9, 10].indexOf(setupState?.progress.currentStep ?? -1) ? ' · Next' : ''}</li>)}</ol></div>
+      <div className="mt-5 text-sm font-semibold">{setupState?.progress.completedSteps.filter(id => id !== 10).length || 0} of 10 steps verified · {setupState?.progress.skippedSteps.length || 0} optional steps skipped</div>
     </header>
 
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
@@ -230,7 +230,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-800">{item.id}</span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-800">{item.id === 0 ? 6 : item.id > 5 ? item.id + 1 : item.id}</span>
                 <h2 className="font-bold text-slate-900">{item.title}</h2>
                 {completed && <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Verified</span>}
                 {skipped && <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Skipped</span>}
@@ -241,7 +241,9 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
             </div>
             <div className="flex flex-wrap gap-2">
               {item.coreSteps?.map(coreStep => <button key={coreStep} type="button" onClick={() => { setReturnToChecklist(true); setShowChecklist(false); setStep(coreStep); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">{coreStep === 1 ? 'School profile' : coreStep === 2 ? 'Academic year' : coreStep === 3 ? 'Semesters' : coreStep === 4 ? 'Academic calendar' : 'Working hours'}</button>)}
-              {item.views?.map(target => <button key={target.view} type="button" onClick={() => onNavigate(target.view)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">{target.label}</button>)}
+              {item.views?.map(target => <button key={target.view} type="button" disabled={target.view === 'sch_timetable' && !setupState?.checklist[0]?.ready} onClick={() => onNavigate(target.view)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">{target.label}</button>)}
+              {item.id === 7 && !setupState?.checklist[0]?.ready && <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Marka hore qoondee macallimiinta. <button type="button" onClick={() => onNavigate('sch_teacher_assignments')} className="ml-1 font-bold underline">Open Teacher Assignments</button></div>}
+              {item.id === 0 && [3, 4, 5].some(id => !setupState?.checklist[id]?.ready) && <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><strong>Marka hore: ku dar</strong><div className="mt-2 flex flex-wrap gap-2">{!setupState?.checklist[3]?.ready && <button type="button" onClick={() => onNavigate('sch_classes')} className="underline">Classes</button>}{!setupState?.checklist[4]?.ready && <button type="button" onClick={() => onNavigate('sch_subjects')} className="underline">Subjects & Curriculum</button>}{!setupState?.checklist[5]?.ready && <button type="button" onClick={() => onNavigate('sch_teachers')} className="underline">Teachers</button>}</div></div>}
               {item.optional && !completed && !skipped && <button type="button" disabled={saving} onClick={() => void skipOptionalStep(item.id)} className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Skip for now</button>}
             </div>
           </div>
@@ -250,7 +252,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     </section>
 
     <section className="rounded-2xl border border-teal-200 bg-teal-50/50 p-5">
-      <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">10. Final review</h2>{setupState?.progress.currentStep === 10 && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}</div>
+      <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">11. Final review</h2>{setupState?.progress.currentStep === 10 && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}</div>
       <p className="mt-1 text-sm text-slate-600">{setupState?.canFinish ? 'All required setup checks are ready. You can now open the School Admin Dashboard.' : 'Complete the required steps above. Timetable and Fees may be completed now or explicitly skipped.'}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" disabled={checklistLoading || saving} onClick={() => void refreshSetupProgress()} className="rounded-xl border border-teal-300 bg-white px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{checklistLoading ? 'Checking…' : 'Refresh setup checks'}</button>
