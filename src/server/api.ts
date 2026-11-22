@@ -495,7 +495,8 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
   const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
   const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
-  const allowedCredentialRoutes = user.role === 'school_admin' ? schoolAdminCredentialRoutes : superAdminCredentialRoutes;
+  const teacherCredentialRoutes = ['/auth/me', '/auth/change-teacher-pin', '/auth/logout'];
+  const allowedCredentialRoutes = user.role === 'school_admin' ? schoolAdminCredentialRoutes : user.role === 'teacher' ? teacherCredentialRoutes : superAdminCredentialRoutes;
   if (isBootstrap) {
     if (!user.mustChangePassword || !allowedCredentialRoutes.includes(req.path)
       || !['super_admin', 'school_admin'].includes(user.role)) {
@@ -1533,6 +1534,53 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   await db.flush();
   await issueSessionCookie(res, updated, req);
   res.json({ success: true, message: 'PIN set successfully.' });
+});
+
+// Teacher self-service PIN change. The current PIN is verified before a new hash is stored.
+apiRouter.post('/auth/change-teacher-pin', requireAuth, async (req, res) => {
+  const user = (req as any).user as User;
+  if (user.role !== 'teacher') {
+    res.status(403).json({ error: 'Only teachers can change a teacher sign-in PIN.' });
+    return;
+  }
+  const currentPin = typeof req.body?.currentPin === 'string' ? req.body.currentPin.trim() : '';
+  const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
+  if (!currentPin || !newPin) {
+    res.status(400).json({ error: 'Current PIN and new PIN are required.' });
+    return;
+  }
+  if (!verifyPin(currentPin, String(user.pin || ''))) {
+    res.status(401).json({ error: 'Current PIN is incorrect.' });
+    return;
+  }
+  if (!/^\\d{4,6}$/.test(newPin)) {
+    res.status(422).json({ error: 'New PIN must contain 4 to 6 digits.' });
+    return;
+  }
+  if (verifyPin(newPin, String(user.pin || ''))) {
+    res.status(422).json({ error: 'Choose a PIN different from your current PIN.' });
+    return;
+  }
+  const updated = db.updateUser(user.id, { pin: hashPin(newPin), failedLoginAttempts: 0, lockedUntil: null });
+  if (!updated) {
+    res.status(404).json({ error: 'Teacher account was not found; PIN was not changed.' });
+    return;
+  }
+  invalidateAuthenticatedSnapshot(user.id);
+  await db.flush();
+  db.logAudit({
+    action: 'TEACHER_PIN_CHANGED',
+    category: 'auth',
+    schoolId: user.schoolId,
+    userId: user.id,
+    userName: user.fullName,
+    userRole: 'teacher',
+    details: 'Teacher changed their own sign-in PIN after verifying the current PIN.',
+    severity: 'info'
+  });
+  await db.flush();
+  await issueSessionCookie(res, updated, req);
+  res.json({ success: true, message: 'Teacher PIN updated successfully.' });
 });
 
 // Current User Profile (Sanitized)

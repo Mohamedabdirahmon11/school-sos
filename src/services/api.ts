@@ -275,6 +275,13 @@ export class ApiClient {
     });
   }
 
+  public static async changeTeacherPin(currentPin: string, newPin: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/change-teacher-pin', {
+      method: 'POST',
+      body: JSON.stringify({ currentPin, newPin })
+    });
+  }
+
   public static async getMe() {
     return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number }>('/auth/me');
   }

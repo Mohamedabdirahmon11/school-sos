@@ -70,9 +70,22 @@ interface TeacherPortalViewProps {
 const EMPTY_TEACHER_DATA: [any[], ExamConfig | null, TimetableSlot[], SchoolClass[]] = [[], null, [], []];
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab = 'dashboard' }) => {
-  const { user, school, isReadOnly } = useAuth();
+  const { user, school, isReadOnly, language, setLanguage } = useAuth();
+  const [portalTheme, setPortalTheme] = useState<'system' | 'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'system';
+    const saved = window.localStorage.getItem('schoolos-teacher-theme');
+    return saved === 'light' || saved === 'dark' ? saved : 'system';
+  });
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [isChangingPin, setIsChangingPin] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
   useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
+  useEffect(() => {
+    window.localStorage.setItem('schoolos-teacher-theme', portalTheme);
+  }, [portalTheme]);
+
   const initialData = useApi(async () => Promise.all([
     ApiClient.getTeacherSubjectAssignments(),
     ApiClient.getExamConfig(),
@@ -666,11 +679,26 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     nextRow?.querySelector<HTMLInputElement>('[data-mark-component="' + componentId + '"]')?.focus();
   };
 
+  const handleChangeTeacherPin = async () => {
+    if (!/^\\d{4,6}$/.test(newPin)) { setNotice('PIN-ka cusub waa inuu ka koobnaadaa 4 ilaa 6 lambar.'); return; }
+    if (newPin !== confirmPin) { setNotice('Xaqiijinta PIN-ku isma laha.'); return; }
+    setIsChangingPin(true);
+    try {
+      await ApiClient.changeTeacherPin(currentPin, newPin);
+      setCurrentPin(''); setNewPin(''); setConfirmPin('');
+      setNotice('PIN-kaaga si guul leh ayaa loo beddelay.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'PIN-ka lama beddeli karin.');
+    } finally {
+      setIsChangingPin(false);
+    }
+  };
+
   if (initialData.loading) return <div className="p-6 space-y-4" aria-label="Loading teacher dashboard"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="grid gap-4 sm:grid-cols-2"><div className="h-32 animate-pulse rounded-2xl bg-white" /><div className="h-32 animate-pulse rounded-2xl bg-white" /></div></div>;
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="teacher-portal-design mx-auto w-full max-w-[1140px] space-y-5 p-3 sm:p-5 lg:p-7" style={{ "--school-brand-color": school?.brandColor || "#0e6a62" } as React.CSSProperties}>
+    <div className="teacher-portal-design mx-auto w-full max-w-[1140px] space-y-5 p-3 sm:p-5 lg:p-7" data-theme={portalTheme === "system" ? undefined : portalTheme} style={{ "--school-brand-color": school?.brandColor || "#0e6a62" } as React.CSSProperties}>
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
         <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
@@ -1393,6 +1421,31 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               ) : <p className="text-sm text-slate-500" role="status">Weli ma jiro maaddo laguu qoondeeyay. Weydii maamulka dugsiga.</p>}
             </article>
           </div>
+          <article className="rounded-xl border border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold">Display preferences</h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">Theme
+                <select value={portalTheme} onChange={event => setPortalTheme(event.target.value as typeof portalTheme)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="system">Follow device</option><option value="light">Light</option><option value="dark">Dark</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium">Language
+                <select value={language} onChange={event => setLanguage(event.target.value as typeof language)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="en">English</option><option value="so">Somali</option><option value="am">Amharic</option><option value="ar">Arabic</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <h3 className="text-sm font-semibold">Change sign-in PIN</h3>
+              <p className="mt-1 text-xs text-slate-500">Enter your current PIN, then choose and confirm a new 4–6 digit PIN.</p>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <input aria-label="Current PIN" type="password" inputMode="numeric" autoComplete="current-password" maxLength={6} value={currentPin} onChange={event => setCurrentPin(event.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Current PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input aria-label="New PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={newPin} onChange={event => setNewPin(event.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="New PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+                <input aria-label="Confirm new PIN" type="password" inputMode="numeric" autoComplete="new-password" maxLength={6} value={confirmPin} onChange={event => setConfirmPin(event.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" className="w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </div>
+              <button type="button" onClick={() => void handleChangeTeacherPin()} disabled={isReadOnly || isChangingPin || !currentPin || !newPin || !confirmPin} className="mt-3 rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isChangingPin ? 'Updating…' : 'Update PIN'}</button>
+            </div>
+          </article>
         </section>
       )}
 

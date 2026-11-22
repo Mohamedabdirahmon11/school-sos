@@ -427,6 +427,19 @@ test('teacher payslips are read-only, show ETB breakdown and offer copy instead 
   assert.match(payroll, /: <button type="button" onClick=\{\(\) => void downloadPayslip/);
 });
 
+test('teacher profile offers theme/language preferences and verified self-service PIN change', () => {
+  const portal = read('../src/components/teacher/TeacherPortalView.tsx');
+  const api = read('../src/server/api.ts');
+  const client = read('../src/services/api.ts');
+  assert.match(portal, /Follow device/);
+  assert.match(portal, /value={language}/);
+  assert.match(portal, /ApiClient\.changeTeacherPin\(currentPin, newPin\)/);
+  assert.match(api, /apiRouter\.post\('\/auth\/change-teacher-pin'/);
+  assert.match(api, /verifyPin\(currentPin, String\(user\.pin \|\| ''\)\)/);
+  assert.match(api, /pin: hashPin\(newPin\)/);
+  assert.match(client, /changeTeacherPin\(currentPin: string, newPin: string\)/);
+});
+
 test('teacher portal refreshes assignments and timetable after administrator changes', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /initialData\.retry\(\)/);
