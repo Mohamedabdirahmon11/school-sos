@@ -38,3 +38,19 @@
 @media(max-width:860px){.teacher-portal-design{padding-inline:12px!important}.teacher-portal-design nav{max-width:100%;overflow-x:auto}}
 
 .teacher-portal-design>header [class*="bg-white/10"],.teacher-portal-design>header [class*="border-white/15"]{background:var(--tp-soft)!important;border-color:var(--tp-line)!important;color:var(--tp-brand)!important}
+/* Follow the operating-system theme unless the user selected Light or Dark. */
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .teacher-portal-design{
+    --tp-bg:#0d141b;--tp-surface:#151e28;--tp-fg:#e5ebf1;--tp-muted:#92a0b1;--tp-line:#263342;
+    --tp-brand:#4cc3b5;--tp-brand-fg:#06201d;--tp-soft:#16332f;
+    --tp-bad:#ff8c82;--tp-bad-bg:#3b1d1b;--tp-ok:#6fd49b;--tp-ok-bg:#16301f;--tp-warn:#f2c14e;--tp-warn-bg:#3a2e12;
+  }
+}
+:root[data-theme="dark"] .teacher-portal-design,.dark .teacher-portal-design{
+  --tp-bg:#0d141b;--tp-surface:#151e28;--tp-fg:#e5ebf1;--tp-muted:#92a0b1;--tp-line:#263342;
+  --tp-brand:#4cc3b5;--tp-brand-fg:#06201d;--tp-soft:#16332f;
+  --tp-bad:#ff8c82;--tp-bad-bg:#3b1d1b;--tp-ok:#6fd49b;--tp-ok-bg:#16301f;--tp-warn:#f2c14e;--tp-warn-bg:#3a2e12;
+}
+.teacher-portal-design button[class*="bg-teal-700"],.teacher-portal-design button[class*="bg-[#0F766E]"]{
+  background:var(--tp-brand)!important;border-color:var(--tp-brand)!important;color:var(--tp-brand-fg)!important;
+}
