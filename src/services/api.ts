@@ -179,11 +179,12 @@ export class ApiClient {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`;
+      const errorMsg = typeof data.error === 'string' ? data.error : data.error?.message || `HTTP ${response.status}: ${response.statusText}`;
       const err = new Error(errorMsg);
       (err as any).status = response.status;
-      (err as any).code = data.code;
+      (err as any).code = data.code || data.error?.code;
       (err as any).data = data;
+      (err as any).missing = data.missing || data.error?.missing;
       if (typeof window !== 'undefined' && ['MUST_CHANGE_PASSWORD', 'MUST_CHANGE_PIN'].includes(data.code)) {
         window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
       }
