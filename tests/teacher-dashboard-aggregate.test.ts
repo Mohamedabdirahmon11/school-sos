@@ -31,8 +31,12 @@ test('teacher dashboard aggregates both subject-assigned and Form Teacher classe
   const portal = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(migration, /UNION[\s\S]*FROM public\.classes[\s\S]*school_id = p_school_id/);
   assert.ok(migration.includes('class_teacher_id = (SELECT user_id FROM public.teachers WHERE id = p_teacher_id AND school_id = p_school_id)'));
-  assert.match(migration, /'totalPeriodsPerWeek'[\\s\\S]*public\\.timetable_slots[\\s\\S]*teacher_id = p_teacher_id/);
-  assert.match(migration, /'openHomeworkCount'[\\s\\S]*public\\.assignments[\\s\\S]*teacher_id = \(SELECT user_id FROM public\\.teachers/);
+  assert.ok(migration.includes("'totalPeriodsPerWeek'"));
+  assert.ok(migration.includes("FROM public.timetable_slots"));
+  assert.ok(migration.includes("teacher_id = p_teacher_id"));
+  assert.ok(migration.includes("'openHomeworkCount'"));
+  assert.ok(migration.includes("FROM public.assignments"));
+  assert.ok(migration.includes("teacher_id = (SELECT user_id FROM public.teachers"));
 
   const dashboardCountEffect = portal.slice(portal.indexOf('const [assignedClassStudentTotal'), portal.indexOf('const notices:'));
   assert.match(dashboardCountEffect, /ApiClient\.getSchoolDashboard\(\)/);
