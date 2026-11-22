@@ -131,9 +131,9 @@ test('teacher messages and personal payslips remain available through role navig
   const messages = read('../src/components/schooladmin/MessagesView.tsx');
   const payroll = read('../src/components/accountant/AccountantPayrollView.tsx');
   assert.match(sidebar, /item\('t_students'/);
-  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.doesNotMatch(sidebar, /item\('t_exam_results'/);
   assert.match(sidebar, /item\('t_messages'/);
-  assert.match(sidebar, /item\('t_payslips'/);
+  assert.match(sidebar, /item\('t_payslips'/);\n  assert.match(sidebar, /item\('t_profile'/);
   assert.match(app, /activeView === 't_messages' && <MessagesView \/>/);
   assert.match(app, /activeView === 't_payslips' && <StaffPayslipsView \/>/);
   assert.match(messages, /const isTeacher = user\?\.role === 'teacher'/);
