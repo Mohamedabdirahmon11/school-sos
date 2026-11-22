@@ -7,8 +7,8 @@ const header = readFileSync(new URL('../src/components/schooladmin/AcademicSetup
 const css = readFileSync(new URL('../src/components/schooladmin/academic-setup.css', import.meta.url), 'utf8');
 
 test('Classes & Sections uses live school classes and real active teachers', () => {
-  assert.match(view, /ApiClient\.getClasses\(\)/);
-  assert.match(view, /ApiClient\.getTeachers/);
+  assert.ok(view.includes("fetchAllPages<SchoolClass>('/classes')"));
+  assert.ok(view.includes("fetchAllPages<Teacher>('/teachers')"));
   assert.match(view, /teacher\.status === 'active'/);
   assert.doesNotMatch(view, /const TEACH\s*=|localStorage|demo data/i);
 });
