@@ -1,6 +1,8 @@
 /**
  * Server entry point for SchoolOS Multi-School SaaS
- * Mounts Express API routes on /api and delegates UI requests to Vite middlewares
+ * Mounts Express API routes on /api and delegates UI requests to Vite middlewares.
+ * The HTTP listener starts before database initialization so transient Supabase
+ * outages do not make the whole application unreachable.
  */
 
 import 'dotenv/config';
@@ -16,6 +18,8 @@ import path from 'node:path';
 
 if (process.argv.includes('--production')) process.env.NODE_ENV = 'production';
 
+const sleep = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
+
 async function startServer() {
   const requiredEnv = ['SESSION_SECRET', 'SUPER_ADMIN_EMAIL', 'SUPER_ADMIN_PASSWORD', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
   const missingEnv = requiredEnv.filter(name => !process.env[name]?.trim());
@@ -27,44 +31,9 @@ async function startServer() {
   const distPath = path.resolve(process.cwd(), 'dist');
   if (isProduction) assertProductionAssets(distPath);
 
-  await initializeStorage();
-  const supabaseRoundTrip = await db.checkSupabaseHealth();
-  if (!supabaseRoundTrip.ok) throw new Error('Supabase health check failed during startup. Verify Supabase connectivity and schema access.');
-  console.info(`[supabase-startup] connectivity=ok roundTrip=${supabaseRoundTrip.roundTripMs}ms`);
-
-  const runDailySubscriptionCheck = async () => {
-    const context = await db.prepareRequestContext();
-    await db.runWithRequestContext(context, () => db.runSubscriptionDailyCheck());
-  };
-  await runDailySubscriptionCheck();
-  const subscriptionTimer = setInterval(() => {
-    void runDailySubscriptionCheck().catch(() => console.error('Daily subscription check failed.'));
-  }, 24 * 60 * 60 * 1000);
-  subscriptionTimer.unref();
-
-  // Publish scheduled platform broadcasts shortly after their due time.
-  // The database update is conditional on draft/scheduled status, so multiple
-  // application instances can safely run this check without duplicate sends.
-  let broadcastCheckInFlight = false;
-  const runDueBroadcastCheck = async () => {
-    if (broadcastCheckInFlight) return;
-    broadcastCheckInFlight = true;
-    try {
-      const context = await db.prepareRequestContext(false, 'broadcast-scheduler', false);
-      const published = await db.runWithRequestContext(context, () => db.publishDueBroadcasts());
-      if (published > 0) console.info(`[broadcast-scheduler] published=${published}`);
-    } finally {
-      broadcastCheckInFlight = false;
-    }
-  };
-  void runDueBroadcastCheck().catch(() => console.error('Scheduled broadcast check failed.'));
-  const broadcastTimer = setInterval(() => {
-    void runDueBroadcastCheck().catch(() => console.error('Scheduled broadcast check failed.'));
-  }, 60 * 1000);
-  broadcastTimer.unref();
-
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  let isReady = false;
 
   app.disable('x-powered-by');
   app.set('trust proxy', getTrustProxyHops(process.env.NODE_ENV, process.env.TRUST_PROXY_HOPS));
@@ -74,39 +43,122 @@ async function startServer() {
   app.use(cookieParser());
   app.use('/api/auth/login', createLoginRateLimiter({ windowMs: 60_000, max: 30 }));
 
-  // Mount API endpoints
+  // Liveness stays healthy while Supabase is starting or temporarily unavailable.
+  // Readiness is separate so orchestrators can distinguish a live process from
+  // an application that is not yet safe to serve database-backed requests.
+  app.get('/api/health', (_req, res) => {
+    res.status(200).json({
+      status: isReady ? 'ok' : 'starting',
+      server: 'ok',
+      database: isReady ? 'connected' : 'initializing',
+      ready: isReady,
+      time: new Date().toISOString()
+    });
+  });
+  app.get('/api/ready', (_req, res) => {
+    res.status(isReady ? 200 : 503).json({
+      status: isReady ? 'ready' : 'not_ready',
+      ready: isReady,
+      time: new Date().toISOString()
+    });
+  });
+
+  app.use('/api', (_req, res, next) => {
+    if (!isReady) {
+      res.setHeader('Retry-After', '5');
+      res.status(503).json({ error: 'SchoolOS is starting or reconnecting to its database. Please retry shortly.', code: 'SERVICE_STARTING' });
+      return;
+    }
+    next();
+  });
+
   app.use('/api', apiRouter);
   app.use(apiErrorHandler);
-
-  // Health check endpoint
-  app.get('/api/health', async (_req, res) => {
-    try {
-      const health = await db.checkSupabaseHealth();
-      res.status(health.ok ? 200 : 503).json({ status: health.ok ? 'ok' : 'unavailable', supabase: health.ok ? 'connected' : 'unavailable', roundTripMs: health.roundTripMs, time: new Date().toISOString() });
-    } catch {
-      res.status(503).json({ status: 'unavailable', supabase: 'unavailable', time: new Date().toISOString() });
-    }
-  });
   app.use('/api', apiNotFound);
 
   if (!isProduction) {
-    // Development mode: Vite middleware
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'
     });
     app.use(vite.middlewares);
   } else {
-    // Production mode: the complete frontend build was validated before database initialization.
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 SchoolOS Full-Stack Server running at http://0.0.0.0:${PORT}`);
+  // Start accepting HTTP traffic first. This keeps the UI and health endpoints
+  // reachable even if Supabase has a temporary outage during deployment.
+  await new Promise<void>((resolve, reject) => {
+    const server = app.listen(PORT, '0.0.0.0', () => resolve());
+    server.once('error', reject);
   });
+  console.log(`🚀 SchoolOS Full-Stack Server running at http://0.0.0.0:${PORT}`);
+
+  const runDailySubscriptionCheck = async () => {
+    const context = await db.prepareRequestContext();
+    await db.runWithRequestContext(context, () => db.runSubscriptionDailyCheck());
+  };
+
+  const runDueBroadcastCheck = async () => {
+    const context = await db.prepareRequestContext(false, 'broadcast-scheduler', false);
+    const published = await db.runWithRequestContext(context, () => db.publishDueBroadcasts());
+    if (published > 0) console.info(`[broadcast-scheduler] published=${published}`);
+  };
+
+  // Retry transient startup/database failures with bounded exponential backoff.
+  // A schema/configuration problem remains visible in /api/ready and server logs,
+  // but no longer causes the HTTP process to exit and become unreachable.
+  let attempt = 0;
+  while (!isReady) {
+    try {
+      await initializeStorage();
+      const health = await db.checkSupabaseHealth();
+      if (!health.ok) throw new Error('Supabase health check failed.');
+      isReady = true;
+      console.info(`[supabase-startup] connectivity=ok roundTrip=${health.roundTripMs}ms`);
+    } catch (error) {
+      attempt += 1;
+      const delay = Math.min(30_000, 1_000 * (2 ** Math.min(attempt - 1, 5)));
+      const message = error instanceof Error ? error.message : 'unknown startup error';
+      console.error(`[startup] database initialization attempt ${attempt} failed: ${message}; retrying in ${delay}ms`);
+      await sleep(delay);
+    }
+  }
+
+  // Background maintenance must never take down the HTTP server or prevent it
+  // from serving normal requests after the database has become ready.
+  void runDailySubscriptionCheck().catch(error => {
+    console.error(`[subscription-scheduler] initial check failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+  });
+  const subscriptionTimer = setInterval(() => {
+    void runDailySubscriptionCheck().catch(error => {
+      console.error(`[subscription-scheduler] daily check failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    });
+  }, 24 * 60 * 60 * 1000);
+  subscriptionTimer.unref();
+
+  let broadcastCheckInFlight = false;
+  const runBroadcastCheckSafely = async () => {
+    if (broadcastCheckInFlight) return;
+    broadcastCheckInFlight = true;
+    try {
+      await runDueBroadcastCheck();
+    } finally {
+      broadcastCheckInFlight = false;
+    }
+  };
+  void runBroadcastCheckSafely().catch(error => {
+    console.error(`[broadcast-scheduler] initial check failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+  });
+  const broadcastTimer = setInterval(() => {
+    void runBroadcastCheckSafely().catch(error => {
+      console.error(`[broadcast-scheduler] scheduled check failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    });
+  }, 60 * 1000);
+  broadcastTimer.unref();
 }
 
 process.on('unhandledRejection', reason => {
