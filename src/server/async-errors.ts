@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response, Router } from 'express';
+import { randomUUID } from 'node:crypto';
 
 type Next = (error?: unknown) => void;
 
@@ -35,6 +36,13 @@ export function apiErrorHandler(error: unknown, req: Request, res: Response, nex
     return;
   }
   const message = error instanceof Error ? error.message : 'Unknown server error';
-  console.error(`[api-error] ${req.method} ${req.originalUrl || req.path}: ${message}`);
-  res.status(500).json({ error: 'An unexpected server error occurred. Please try again.' });
+  const requestId = String(res.getHeader('X-Request-Id') || randomUUID());
+  res.setHeader('X-Request-Id', requestId);
+  const schoolId = String((req as any).school?.id || (req as any).user?.schoolId || (req as any).user?.school_id || 'none');
+  console.error(`[api-error] request_id=${requestId} route=${req.method} ${req.originalUrl || req.path} school_id=${schoolId} status=500 error=${message}`);
+  res.status(500).json({
+    error: 'An unexpected server error occurred. Please try again.',
+    code: 'INTERNAL_SERVER_ERROR',
+    requestId
+  });
 }
