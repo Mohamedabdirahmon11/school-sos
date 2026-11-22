@@ -166,17 +166,27 @@ apiRouter.use((req, res, next) => {
       if (/^\/teachers(?:\/|$)/.test(req.path)) invalidateListCache('teachers');
     }
   });
+  const requestId = randomUUID();
+  (req as any).requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
   if (typeof storage.prepareRequestContext !== 'function') { next(); return; }
-  const requestStarted = process.env.NODE_ENV === 'development' ? performance.now() : 0;
+  const requestStarted = performance.now();
   res.once('finish', () => {
-    if (process.env.NODE_ENV !== 'development') return;
     const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
-    console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
+    const user = (req as any).user;
+    const schoolId = user?.schoolId || user?.school_id || (req as any).schoolId || 'unresolved';
+    console.info(`[api-perf] request_id=${requestId} route=${req.method} ${req.path} status=${res.statusCode} duration_ms=${Math.round(performance.now() - requestStarted)} db_queries=${metrics.count} db_ms=${metrics.durationMs} school_id=${schoolId}`);
   });
   void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
     storage.runWithRequestContext(context, next);
-  }).catch(() => {
-    if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : 'unknown storage context error';
+    console.error(`[api-context-error] request_id=${requestId} route=${req.method} ${req.path} school_id=unresolved error=${message}`);
+    if (!res.headersSent) res.status(503).json({
+      error: 'Unable to load SchoolOS data from Supabase. Please retry shortly.',
+      code: 'STORAGE_CONTEXT_UNAVAILABLE',
+      requestId
+    });
   });
 });
 
