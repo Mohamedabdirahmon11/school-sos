@@ -1098,7 +1098,7 @@ export class ApiClient {
   }
 
   public static async getStudentAttendance(studentId: string) {
-    return this.request<AttendanceRecord[]>(`/attendance/student?studentId=${encodeURIComponent(studentId)}`);
+    return this.request<AttendanceRecord[]>(`/attendance/student?studentId=${encodeURIComponent(studentId)}&page=1&pageSize=100`);
   }
 
   public static async getAssignments() {
