@@ -130,9 +130,19 @@ test('student and teacher messages are limited to current assignment classes',as
  assert.ok(studentContacts.some(row=>row.id===subjectUser.id));assert.ok(studentContacts.some(row=>row.id===formUser.id));
  assert.equal(studentContacts.some(row=>row.id===otherTeacherUser.id),false);
  assert.equal((await post('/messages',cookies.student,{recipientId:otherTeacherUser.id,content:'Cross-class message'})).status,403);
- assert.equal((await post('/messages',cookies.student,{recipientId:subjectUser.id,content:'Question for my teacher'})).status,201);
+ const firstMessage=await post('/messages',cookies.student,{recipientId:subjectUser.id,content:'Question for my teacher'});assert.equal(firstMessage.status,201);
  assert.equal((await post('/messages',cookies.teacher,{recipientId:sameClassStudentUser.id,content:'Your homework'})).status,201);
- assert.equal((await post('/messages',cookies.teacher,{recipientId:otherTeacherUser.id,content:'No self message'})).status,403);
+ assert.equal((await post('/messages',cookies.teacher,{recipientId:otherTeacherUser.id,content:'Wrong role pairing'})).status,403);
+ await memory.from('class_subjects').update({teacher_id:otherTeacher.id,'teachers.user_id':otherTeacherUser.id}).eq('id','sp-cs-math');
+ await db.flush();
+ const refreshed=await request('/messages/contacts',cookies.student);const refreshedContacts=await refreshed.json() as any[];
+ assert.equal(refreshedContacts.some(row=>row.id===subjectUser.id),false);
+ assert.ok(refreshedContacts.some(row=>row.id===otherTeacherUser.id));
+ assert.equal((await post('/messages',cookies.student,{recipientId:subjectUser.id,content:'Old assignment'})).status,403);
+ const history=await request('/messages?contactId='+encodeURIComponent(subjectUser.id),cookies.student);
+ assert.equal(history.status,200);assert.ok((await history.json() as any[]).some(row=>row.content==='Question for my teacher'));
+ const newTeacherContacts=await request('/messages/contacts',cookies.otherTeacher);
+ assert.ok((await newTeacherContacts.json() as any[]).some(row=>row.id===studentUser.id));
 });
 
 test('teacher attendance is visible in the student attendance endpoint and other student IDs are forbidden',async()=>{
@@ -142,6 +152,39 @@ test('teacher attendance is visible in the student attendance endpoint and other
  assert.equal(own.status,200,await own.clone().text());assert.ok((await own.json() as any[]).some(row=>row.studentId===student.id||row.student_id===student.id));
  const other=await request('/attendance/student?studentId='+encodeURIComponent(sameClassStudent.id),cookies.student);
  assert.equal(other.status,403);
+});
+
+test('submitted marks stay hidden from the student until the admin publishes them',async()=>{
+ const config=await db.getExamConfig(school.id,'2026-2027');
+ const assessmentScores=Object.fromEntries(config.assessmentComponents.map((component:any)=>[component.id,Math.min(5,component.maxMarks)]));
+ const [saved]=await db.saveStudentMarks(school.id,klass.id,subject.id,'Semester 1',[{studentId:student.id,assessmentScores,status:'submitted'}],subjectUser.id);
+ await db.flush();
+ const hidden=await request('/exams/marks?studentId='+encodeURIComponent(student.id),cookies.student);
+ assert.equal(hidden.status,200,await hidden.clone().text());
+ assert.equal((await hidden.json() as any[]).some(row=>row.id===saved.id),false);
+ await db.forwardClassMarks(school.id,klass.id,'Semester 1',formUser.id,formUser.fullName);
+ await db.approveMarks(school.id,[saved.id],adminUser.id,adminUser.fullName,adminUser.role);
+ await db.flush();
+ await db.publishClassSemesterResults(school.id,klass.id,'Semester 1',adminUser.id,adminUser.fullName,adminUser.role);
+ await db.flush();
+ const published=await request('/exams/marks?studentId='+encodeURIComponent(student.id),cookies.student);
+ assert.equal(published.status,200,await published.clone().text());
+ assert.equal((await published.json() as any[]).some(row=>row.id===saved.id),true);
+});
+
+test('class transfer changes student homework and timetable scope to the new enrollment class',async()=>{
+ const moved=db.createAssignment({schoolId:school.id,classId:otherClass.id,subjectId:otherSubject.id,teacherId:otherTeacherUser.id,title:'New class task',description:'Current class only',dueDate:today,maxPoints:10} as any);
+ await db.flush();
+ await memory.from('students').update({class_id:otherClass.id}).eq('id',student.id);
+ await db.flush();
+ const assignments=await request('/assignments',cookies.student);
+ assert.equal(assignments.status,200);const rows=await assignments.json() as any[];
+ assert.ok(rows.some(row=>row.id===moved.id));assert.equal(rows.some(row=>row.classId===klass.id),false);
+ const slots=await request('/timetable',cookies.student);assert.equal(slots.status,200);
+ assert.equal((await slots.json() as any[]).some(row=>row.id==='sp-slot-own'),false);
+ const contacts=await request('/messages/contacts',cookies.student);assert.ok((await contacts.json() as any[]).some(row=>row.id===otherTeacherUser.id));
+ await memory.from('students').update({class_id:klass.id}).eq('id',student.id);
+ await db.flush();
 });
 
 test('incomplete setup returns HTTP 423 and the missing checklist to student timetable',async()=>{
