@@ -156,7 +156,9 @@ export class ApiClient {
       });
     } catch (error) {
       if (typeof window !== 'undefined' && endpoint !== '/auth/login') {
-        window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: 500, message: 'The server could not be reached.' } }));
+        window.dispatchEvent(new CustomEvent('schoolos:api-error', {
+          detail: { status: 0, code: 'NETWORK_UNREACHABLE', message: 'The server could not be reached.' }
+        }));
       }
       throw error;
     }
@@ -176,8 +178,6 @@ export class ApiClient {
       (err as any).data = data;
       if (typeof window !== 'undefined' && ['MUST_CHANGE_PASSWORD', 'MUST_CHANGE_PIN'].includes(data.code)) {
         window.dispatchEvent(new CustomEvent('schoolos:must-change-password'));
-      } else if (typeof window !== 'undefined' && !suppressGlobalApiError && endpoint !== '/auth/login' && endpoint !== '/auth/change-password' && endpoint !== '/auth/change-pin' && [401, 403, 500].includes(response.status)) {
-        window.dispatchEvent(new CustomEvent('schoolos:api-error', { detail: { status: response.status, message: errorMsg, code: data.code } }));
       }
       throw err;
     }

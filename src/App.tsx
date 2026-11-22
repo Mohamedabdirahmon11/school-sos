@@ -72,7 +72,7 @@ const AppContent: React.FC = () => {
   React.useEffect(() => {
     const onApiError = (event: Event) => {
       const detail = (event as CustomEvent<{ status: number; message: string; code?: string }>).detail;
-      if (detail?.status === 403 || detail?.status === 500) setApiFailure(detail);
+      if (detail?.code === 'NETWORK_UNREACHABLE') setApiFailure(detail);
     };
     window.addEventListener('schoolos:api-error', onApiError);
     return () => window.removeEventListener('schoolos:api-error', onApiError);

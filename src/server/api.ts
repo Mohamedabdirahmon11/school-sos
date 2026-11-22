@@ -7499,8 +7499,18 @@ apiRouter.post('/promotions/confirm', requireAuth, requireSchoolAdminOrSuperAdmi
 // 7. CASH-ONLY FEES & CLASS-RANGE LEDGER
 // ==============================================================================
 
-apiRouter.get('/fees/structures', requireAuth, requireSchoolContext, requireAccountantOrSuperAdmin('fees_manage'), async (req, res) => {
-  const school = (req as any).school;
+apiRouter.get('/fees/structures', requireAuth, requireSchoolContext, async (req, res) => {
+  const user = (req as any).user as User;
+  const school = (req as any).school as School;
+  if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'School staff access required to view fee structures.' });
+    return;
+  }
+  if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'fees_manage')) {
+    res.status(403).json({ error: 'Your staff account does not have permission to view fee structures.' });
+    return;
+  }
+  res.setHeader('Cache-Control', 'private, no-store');
   res.json(await db.getFeeStructures(school.id));
 });
 
@@ -8741,6 +8751,9 @@ apiRouter.get('/notices/unread-count', requireAuth, requireSchoolContext, async 
   const user = (req as any).user as User;
   const schoolId = (req as any).school.id;
   const classIds = user.role === 'teacher' ? await getTeacherAssignedClassIds(schoolId, user.id) : [];
+  // This count is user-specific and changes as notices are read; never let
+  // browser/proxy conditional caching turn it into an unusable 304 response.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   res.json({ count: await db.getNoticeUnreadCount(schoolId, user.id, user.role, classIds, user) });
 });
 

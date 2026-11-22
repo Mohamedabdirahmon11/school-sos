@@ -67,3 +67,25 @@ test('school dashboard schema supplies real weekly attendance trend and absent s
   assert.match(dashboard, /active_student\.status = 'active'/);
   assert.match(dashboard, /school_id = p_school_id/);
 });
+
+
+test('only genuine network failures trigger the app-wide unreachable screen', () => {
+  const api = source('../src/services/api.ts');
+  const app = source('../src/App.tsx');
+  assert.match(api, /code: 'NETWORK_UNREACHABLE'/);
+  assert.doesNotMatch(api, /status: response\.status, message: errorMsg/);
+  assert.match(app, /detail\?\.code === 'NETWORK_UNREACHABLE'/);
+  assert.doesNotMatch(app, /detail\?\.status === 403 \|\| detail\?\.status === 500/);
+});
+
+test('school admin can read school fee structures and unread count is not cacheable', () => {
+  const api = source('../src/server/api.ts');
+  const feeStart = api.indexOf("apiRouter.get('/fees/structures'");
+  const feeRoute = api.slice(feeStart, feeStart + 1100);
+  assert.match(feeRoute, /'school_admin', 'accountant', 'super_admin'/);
+  assert.match(feeRoute, /user\.role === 'accountant'.*fees_manage/s);
+  assert.match(feeRoute, /Cache-Control', 'private, no-store'/);
+  const unreadStart = api.indexOf("apiRouter.get('/notices/unread-count'");
+  const unreadRoute = api.slice(unreadStart, unreadStart + 700);
+  assert.match(unreadRoute, /Cache-Control', 'private, no-store, max-age=0'/);
+});
