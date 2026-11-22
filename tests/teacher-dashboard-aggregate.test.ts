@@ -29,7 +29,7 @@ test('teacher dashboard aggregation is school-scoped and uses only the authentic
 test('teacher dashboard aggregates both subject-assigned and Form Teacher classes without browser-wide student fetches', () => {
   const migration = read('../supabase/migrations/20261122110000_teacher_dashboard_form_teacher_aggregate.sql');
   const portal = read('../src/components/teacher/TeacherPortalView.tsx');
-  assert.match(migration, /UNION[\s\S]*FROM public\.classes[\s\S]*school_id = p_school_id[\s\S]*class_teacher_id = p_teacher_id/);
+  assert.match(migration, /UNION[\s\S]*FROM public\.classes[\s\S]*school_id = p_school_id[\s\S]*class_teacher_id = \\(SELECT user_id FROM public\\.teachers/);
   const dashboardCountEffect = portal.slice(portal.indexOf('const [assignedClassStudentTotal'), portal.indexOf('const notices:'));
   assert.match(dashboardCountEffect, /ApiClient\.getSchoolDashboard\(\)/);
   assert.doesNotMatch(dashboardCountEffect, /getAllStudents/);
