@@ -61,6 +61,22 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     ApiClient.getTimetable(),
     ApiClient.getMyFormTeacherClasses()
   ]), [school?.id, user?.id], Boolean(school));
+  // Revalidate assignments and timetable when an administrator changes the teacher's
+  // scope in another session. Focus/visibility refresh is immediate; the interval
+  // also covers a teacher who keeps the portal open while the admin is working.
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') initialData.retry();
+    };
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    const refreshInterval = window.setInterval(refreshWhenVisible, 60_000);
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.clearInterval(refreshInterval);
+    };
+  }, [initialData.retry]);
   const [assignmentsData, examConfigData, timetableData, formTeacherClassesData] = initialData.data || EMPTY_TEACHER_DATA;
   // Notices are independent from core teacher data: a notices API outage must
   // not prevent teachers from opening lessons, attendance, marks or homework.
@@ -835,6 +851,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
               <input
                 type="date"
                 value={attendanceDate}
+                max={getSchoolLocalDate(school?.timezone)}
                 onChange={e => setAttendanceDate(e.target.value)}
                 className="w-full text-xs py-2 px-3 border border-[#CBD5E1] rounded-xl"
               />
