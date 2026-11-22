@@ -11278,16 +11278,23 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
   const annualDocument = /annual|sanad-dugsiyeedka/i.test(titleTemplate + ' ' + templateHtml);
   const selectedSemester = annualDocument ? undefined : school.currentSemester;
   const classRows = [...classesById.values()];
+  const teacherIds = [...new Set(classRows.map(klass=>klass.classTeacherId).filter((id): id is string => Boolean(id)))];
+  const teacherPagePromise = teacherIds.length
+    ? db.queryPage<any>('teachers',{school_id:school.id,id:teacherIds},1,100,undefined,'id,full_name,staff_id')
+    : Promise.resolve({items:[] as any[]});
   if (classRecord) {
-    marksByClass.set(classRecord.id,await db.getMarks(school.id,classRecord.id,undefined,selectedSemester));
+    const [classMarks, teacherPage] = await Promise.all([
+      db.getMarks(school.id,classRecord.id,undefined,selectedSemester),
+      teacherPagePromise
+    ]);
+    marksByClass.set(classRecord.id,classMarks);
+    const teacher = teacherPage.items[0];
+    if (classRecord.classTeacherId) teacherByClass.set(classRecord.id,{name:teacher?.fullName || '',staffId:teacher?.staffId || ''});
   } else if (classRows.length) {
     const studentIds = [...new Set(students.map(student=>student.id))];
-    const teacherIds = [...new Set(classRows.map(klass=>klass.classTeacherId).filter((id): id is string => Boolean(id)))];
     const [marks, teacherPage] = await Promise.all([
       db.getMarksForStudents(school.id,studentIds,classRows.map(klass=>klass.id),selectedSemester),
-      teacherIds.length
-        ? db.queryPage<any>('teachers',{school_id:school.id,id:teacherIds},1,100,undefined,'id,full_name,staff_id')
-        : Promise.resolve({items:[] as any[]})
+      teacherPagePromise
     ]);
     const teachersById = new Map(teacherPage.items.map((teacher:any)=>[teacher.id,teacher]));
     for (const klass of classRows) {
