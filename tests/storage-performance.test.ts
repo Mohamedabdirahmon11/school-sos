@@ -136,5 +136,6 @@ test('bulk document generation batches class, marks, and form-teacher lookups fo
   assert.match(route, /id:teacherIds/);
   assert.doesNotMatch(route, /for \(const klass of classesById\.values\(\)\)[\s\S]*?await db\.getMarks/);
   assert.doesNotMatch(route, /for \(const klass of classesById\.values\(\)\)[\s\S]*?db\.queryPage<any>\('teachers'/);
-  assert.match(route, /const teacherPagePromise = teacherIds\.length/);\n  assert.match(route, /if \(classRecord\)[\s\S]*?Promise\.all\(\[[\s\S]*?teacherPagePromise/);
+  assert.match(route, /const teacherPagePromise = teacherIds\.length/);
+  assert.match(route, /if \(classRecord\)[\s\S]*?Promise\.all\(\[[\s\S]*?teacherPagePromise/);
 });
