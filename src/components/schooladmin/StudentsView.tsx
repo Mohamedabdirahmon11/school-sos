@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
-import { Student, SchoolClass, SchoolBranch } from '../../types/index.ts';
+import { Student, SchoolClass, SchoolBranch, FeeStructureItem } from '../../types/index.ts';
 import { BulkImportWizard } from './BulkImportWizard.tsx';
 import { BulkStudentPinResetWizard } from './BulkStudentPinResetWizard.tsx';
 import { getPendingPinSlips } from '../../lib/bulk-pin-results.ts';
@@ -96,13 +96,23 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const studentLoad = useApi(async signal => Promise.all([
     ApiClient.getSchoolStudents({ search: debouncedSearch, classId: classFilter, branchId: branchFilter, paymentStatus: feeFilter, gender: genderFilter, status: studentStatusFilter, schoolId: school?.id, page, pageSize: 50, allClass: showAllClass, signal }),
-    ApiClient.getClasses(), ApiClient.getBranches()
+    ApiClient.getClasses(), ApiClient.getBranches(), ApiClient.getFeeStructures().catch(() => [] as FeeStructureItem[])
   ]), [school?.id, debouncedSearch, classFilter, branchFilter, feeFilter, genderFilter, studentStatusFilter, page, showAllClass], Boolean(school));
-  const [studentRows, classRows, branchRows] = studentLoad.data || [[], [], []];
+  const [studentRows, classRows, branchRows, feeStructureRows] = studentLoad.data || [[], [], [], []];
   const students: any[] = Array.isArray(studentRows) ? studentRows : [];
   const visibleStudents = students;
   const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
   const branches: SchoolBranch[] = Array.isArray(branchRows) ? branchRows : [];
+  const feeStructures: FeeStructureItem[] = Array.isArray(feeStructureRows) ? feeStructureRows : [];
+  const feeStructureForStudent = (student: any): FeeStructureItem | undefined => {
+    const studentClass = classes.find(item => item.id === student.classId);
+    if (!studentClass) return undefined;
+    return feeStructures
+      .filter(item => item.isActive && item.feeType === 'monthly_tuition' && (
+        item.classId ? item.classId === studentClass.id : item.minGrade !== undefined && item.maxGrade !== undefined && studentClass.gradeLevel >= item.minGrade && studentClass.gradeLevel <= item.maxGrade
+      ))
+      .sort((a, b) => Number(Boolean(b.classId)) - Number(Boolean(a.classId)))[0];
+  };
   const isLoading = studentLoad.loading;
 
   const fetchStudents = studentLoad.retry;
@@ -490,17 +500,19 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 <button type="button" key={student.id} onClick={()=>void loadStudentDetails(student)} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
                   <div className="flex items-start justify-between gap-2"><span className="font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</span><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
                   <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{student.className || 'Not assigned'}</span><span>{student.fatherPhone || '—'}</span></div>
+                  <div className="mt-2 text-xs"><span className="font-semibold text-slate-500">Fee structure: </span><span className="font-medium text-[#0F766E]">{feeStructureForStudent(student)?.name || 'Not configured'}</span>{feeStructureForStudent(student) && <span className="ml-1 text-slate-500">· {formatMoney(feeStructureForStudent(student)!.amount, school?.currency)} / {feeStructureForStudent(student)!.cadence}</span>}</div>
                 </button>
               ))}
           </div>
           <div className="hidden overflow-x-auto md:block" role="region" aria-label="Student directory table. Scroll horizontally to view all columns." tabIndex={0}>
-            <table className="w-full min-w-[820px] text-left text-sm">
+            <table className="w-full min-w-[1040px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
                   <th className="px-5 py-4 w-14">No.</th>
                   <th className="px-5 py-4">Student ID</th>
                   <th className="px-5 py-4">Name</th>
                   <th className="px-5 py-4">Class</th>
+                  <th className="px-5 py-4">Fee structure</th>
                   <th className="px-5 py-4">Gender</th><th className="px-5 py-4">Parent phone</th>
                   <th className="px-5 py-4">Status</th>
                   <th className="px-5 py-4">Actions</th>
@@ -509,7 +521,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               <tbody className="divide-y divide-[#E2E8F0]">
                 {visibleStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={9} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
@@ -529,6 +541,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 font-mono font-medium text-[#18312d]">{s.studentId}</td>
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
                         <td className="px-5 py-4 text-[#334155]">{s.className || 'Not assigned'}</td>
+                        <td className="px-5 py-4"><div className="font-medium text-[#18312d]">{feeStructureForStudent(s)?.name || <span className="text-slate-400">Not configured</span>}</div>{feeStructureForStudent(s) && <div className="mt-1 text-xs text-slate-500">{formatMoney(feeStructureForStudent(s)!.amount, school?.currency)} / {feeStructureForStudent(s)!.cadence}</div>}</td>
                         <td className="px-5 py-4 capitalize text-[#334155]">{s.gender || '—'}</td>
                         <td className="px-5 py-4 font-mono text-xs text-[#334155]">{s.fatherPhone || s.motherPhone || '—'}</td>
                         <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
