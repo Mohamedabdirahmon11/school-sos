@@ -34,7 +34,7 @@ export function evaluateTeacherAssignmentReadiness(
     const formTeacherUserId = klass.classTeacherId ? String(klass.classTeacherId) : '';
     const formTeacher = formTeacherUserId ? teacherByUserId.get(formTeacherUserId) : null;
     if (!formTeacher) {
-      issues.push(`${classLabel}: Form Teacher ma leh`);
+      issues.push(`${classLabel}: Form Teacher la'aan`);
     } else {
       const previousClass = formTeacherClassByUser.get(formTeacherUserId);
       if (previousClass) issues.push(`${formTeacher.fullName || 'Macallin'}: Form Teacher ayuu uga yahay laba fasal (${previousClass} iyo ${classLabel})`);
@@ -50,7 +50,7 @@ export function evaluateTeacherAssignmentReadiness(
     const subjectName = String(subjectById.get(String(row.subjectId))?.name || 'Maaddo');
     const teacher = row.teacherId ? teacherById.get(String(row.teacherId)) : null;
     const classLabel = classLabelFor(klass);
-    if (!teacher) issues.push(`${classLabel}: ${subjectName} macallin ma leh`);
+    if (!teacher) issues.push(`${classLabel}: ${subjectName} macallin la'aan`);
     else periodsByTeacher.set(String(teacher.id), (periodsByTeacher.get(String(teacher.id)) || 0) + Number(row.periodsPerWeek || 0));
   }
   for (const klass of activeClasses) {
