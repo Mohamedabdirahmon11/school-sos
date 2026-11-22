@@ -123,7 +123,10 @@ const AppContent: React.FC = () => {
     return 'sch_dashboard';
   };
 
-  const setupRequired = user.role === 'school_admin' && !isSchoolSetupProgressCompleteWithTeacherAssignment(school?.setupProgress);
+  // Only schools onboarded after the first-time setup rollout should be forced through the wizard.
+  // Existing tenants must retain direct dashboard access even if their legacy setupProgress is incomplete.
+  const setupWizardEligible = Boolean(school?.createdAt && Date.parse(school.createdAt) >= Date.parse('2026-11-22T00:00:00.000Z'));
+  const setupRequired = user.role === 'school_admin' && setupWizardEligible && !isSchoolSetupProgressCompleteWithTeacherAssignment(school?.setupProgress);
   const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
   const activeView = setupRequired
     ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
