@@ -6619,7 +6619,14 @@ apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (r
     res.status(403).json({ error: 'You do not have access to this student attendance record.' });
     return;
   }
-  await sendDatabasePage(req, res, 'attendance_records', { school_id: school.id, student_id: studentId });
+  const filters: Record<string, string | string[]> = { school_id: school.id, student_id: studentId };
+  if (normalizeRole(user.role) === 'student') {
+    const ownStudent = await db.getStudentById(studentId, school.id);
+    const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
+    if (!currentClassId) { res.json([]); return; }
+    filters.class_id = currentClassId;
+  }
+  await sendDatabasePage(req, res, 'attendance_records', filters);
 });
 
 apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolStaff, requireSchoolSetupReady, async (req, res) => {
@@ -7574,6 +7581,11 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     let marks = await db.getStudentMarks(school.id, studentId as string);
     if (['parent', 'student'].includes(normalizeRole(user.role) || '')) {
       marks = marks.filter(mark => Boolean(mark.publishedAt));
+    }
+    if (normalizeRole(user.role) === 'student') {
+      const ownStudent = await db.getStudentById(studentId as string, school.id);
+      const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
+      marks = currentClassId ? marks.filter(mark => mark.classId === currentClassId) : [];
     }
     if (normalizeRole(user.role) === 'teacher') {
       const teacherPage = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
