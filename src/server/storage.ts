@@ -572,8 +572,12 @@ class StorageEngine {
     return this.contexts.run(context, callback);
   }
 
-  public getRequestQueryMetrics(): { count: number; durationMs: number } {
-    return { count: this.state.queryCount, durationMs: Math.round(this.state.queryDurationMs * 100) / 100 };
+  public getRequestQueryMetrics(context?: StorageContext): { count: number; durationMs: number } {
+    // The response "finish" listener is registered before AsyncLocalStorage.run(),
+    // so reading this.state there can accidentally report the global context (0).
+    // Use the exact context created for this request to report its real DB work.
+    const measured = context || this.state;
+    return { count: measured.queryCount, durationMs: Math.round(measured.queryDurationMs * 100) / 100 };
   }
 
   public async checkSupabaseHealth(): Promise<{ ok: boolean; roundTripMs: number }> {
