@@ -37,8 +37,8 @@ function makeReferenceHtml(source: string, theme: string, index: number) {
     '<button class="st ' + (i === index ? 'cur' : '') + '"' + (i === index ? ' aria-current="step"' : '') + '><span class="dot ' + (i < index ? 'ok' : '') + '">' + (i < index ? '✓' : i + 1) + '</span>' + step.title + '<span class="tag">' + (step.id === 'timetable' ? 'optional' : 'khasab') + '</span></button>'
   ).join('') + '</nav>';
   return source.replace('data-theme="light"', 'data-theme="' + theme + '"')
-    .replace(/<nav class="steps" id="nav" aria-label="Talaabooyinka">[\s\S]*?<\\/nav>/, nav)
-    .replace(/<main>[\s\S]*?<\\/main>/, referenceCard(steps[index].id, steps[index].title, steps[index].description));
+    .replace(/<nav class="steps" id="nav" aria-label="Talaabooyinka">[\s\S]*?<\/nav>/, nav)
+    .replace(/<main>[\s\S]*?<\/main>/, referenceCard(steps[index].id, steps[index].title, steps[index].description));
 }
 
 for (const width of widths) {
