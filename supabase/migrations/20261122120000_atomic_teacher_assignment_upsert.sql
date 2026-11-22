@@ -10,7 +10,6 @@ CREATE OR REPLACE FUNCTION public.upsert_teacher_assignment_atomic(
   p_subject_id varchar,
   p_teacher_id varchar,
   p_qualification_override boolean,
-  p_clear_dependent_entries boolean,
   p_changed_by varchar
 )
 RETURNS jsonb
@@ -25,7 +24,6 @@ DECLARE
   current_term_id uuid;
   effective_teacher_id varchar;
   teacher_limit integer;
-  dependent_slots integer;
   used_periods integer;
   requested_periods integer;
 BEGIN
@@ -50,24 +48,6 @@ BEGIN
     FOR UPDATE;
   END IF;
   IF old_row.id IS NOT NULL THEN old_json := to_jsonb(old_row); END IF;
-
-  IF old_row.id IS NOT NULL AND (
-    old_row.teacher_id IS DISTINCT FROM p_teacher_id
-    OR old_row.class_id IS DISTINCT FROM p_class_id
-    OR old_row.subject_id IS DISTINCT FROM p_subject_id
-    OR old_row.section_id IS DISTINCT FROM p_section_id
-  ) THEN
-    SELECT count(*)::integer INTO dependent_slots
-    FROM public.timetable_slots
-    WHERE school_id = p_school_id AND class_id = old_row.class_id AND subject_id = old_row.subject_id;
-    IF dependent_slots > 0 AND NOT p_clear_dependent_entries THEN
-      RAISE EXCEPTION 'This assignment has timetable slots; confirm dependent timetable cleanup before changing it.' USING ERRCODE = '23514';
-    END IF;
-    IF dependent_slots > 0 THEN
-      DELETE FROM public.timetable_slots
-      WHERE school_id = p_school_id AND class_id = old_row.class_id AND subject_id = old_row.subject_id;
-    END IF;
-  END IF;
 
   SELECT COALESCE(max_periods_per_week, 30) INTO teacher_limit
   FROM public.teachers
@@ -166,5 +146,5 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, boolean, varchar) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, varchar) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.upsert_teacher_assignment_atomic(uuid, varchar, uuid, uuid, varchar, uuid, varchar, varchar, boolean, boolean, varchar) TO service_role;
