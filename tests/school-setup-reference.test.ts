@@ -96,7 +96,8 @@ test('dedicated setup_completed_at is additive, idempotent, backfilled, and pres
   assert.match(migration, /ADD COLUMN IF NOT EXISTS setup_completed_at timestamptz/);
   assert.match(migration, /setup_progress ->> 'completedAt'/);
   assert.match(migration, /WHERE setup_completed_at IS NULL/);
-  assert.match(storage, /setup_progress,setup_completed_at,setup_data/);
+  assert.match(storage, /setup_progress,setup_data/);
+  assert.doesNotMatch(storage, /setup_progress,setup_completed_at,setup_data/);
   assert.match(api, /setupCompletedAt: progress\.completedAt \|\| loadedSchool\.setupCompletedAt \|\| null/);
   assert.match(types, /setupCompletedAt\?: string \| null/);
   assert.doesNotMatch(migration, /DELETE FROM public\.schools/i);
