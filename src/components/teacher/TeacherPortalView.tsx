@@ -108,6 +108,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     [school?.id, user?.id],
     Boolean(school && user?.role === 'teacher' && ['dashboard', 'timetable'].includes(activeTab))
   );
+  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user && activeTab === 'notices'));
+  const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school && activeTab === 'timetable'));
+  const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
+  const examInvigilationState = useApi(() => ApiClient.getTeacherExamInvigilation(), [school?.id, user?.id], Boolean(school && user?.role === 'teacher' && activeTab === 'timetable'));
+  const examInvigilationRows = Array.isArray(examInvigilationState.data) ? examInvigilationState.data : [];
+  const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user && activeTab === 'assignments'));
   // Revalidate the active teacher workflow when an administrator changes scope.
   useEffect(() => {
     const refreshWhenVisible = () => {
@@ -137,12 +143,6 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     timetableState.retry, noticesState.retry, assignmentsState.retry,
     publishedExamSchedulesState.retry, examInvigilationState.retry
   ]);
-  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user && activeTab === 'notices'));
-  const publishedExamSchedulesState = useApi(() => ApiClient.getPublishedExamSchedules(), [school?.id, user?.id], Boolean(school && activeTab === 'timetable'));
-  const publishedExamSchedules = Array.isArray(publishedExamSchedulesState.data) ? publishedExamSchedulesState.data : [];
-  const examInvigilationState = useApi(() => ApiClient.getTeacherExamInvigilation(), [school?.id, user?.id], Boolean(school && user?.role === 'teacher' && activeTab === 'timetable'));
-  const examInvigilationRows = Array.isArray(examInvigilationState.data) ? examInvigilationState.data : [];
-  const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user && activeTab === 'assignments'));
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const teacherAssignments = Array.isArray(teacherAssignmentsState.data) ? teacherAssignmentsState.data : [];
