@@ -9947,15 +9947,13 @@ async function getSchoolSetupState(school: School) {
     feeStructureCount: feeStructures.total
   });
   let progress = normalizeSchoolSetupProgress(school.setupProgress);
-  if (progress.completedAt && !progress.completedSteps.includes(0)) {
-    progress = {
-      ...progress,
-      currentStep: assignmentReadiness.ready ? 10 : 0,
-      completedSteps: [...progress.completedSteps.filter(step => step !== 10), ...(assignmentReadiness.ready ? [0] : [])].sort((a, b) => a - b),
-      completedAt: null
-    };
-  }
-  return { progress, checklist, canFinish: canFinishSchoolSetup(progress, checklist) };
+  // Existing completed schools remain unlocked even if the newer assignment audit finds gaps.
+  // The UI surfaces those gaps as a warning; it never rewrites a completed timestamp.
+  return {
+    progress,
+    checklist,
+    canFinish: Boolean(progress.completedAt) || canFinishSchoolSetup(progress, checklist)
+  };
 }
 
 
