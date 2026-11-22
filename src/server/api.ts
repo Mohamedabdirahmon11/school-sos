@@ -4151,12 +4151,6 @@ async function nextSchoolStaffId(school: School): Promise<string> {
   return id;
 }
 
-async function nextSchoolTeacherId(_school: School): Promise<string> {
-  // IDs are unique without scanning every user and teacher row on each create.
-  // The database unique indexes remain the final collision guard.
-  return 'T' + randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase();
-}
-
 const timetableMinutes = (value: string) => { const [hours, minutes] = value.split(':').map(Number); return hours * 60 + minutes; };
 const timetableClock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], academicYear?: string): Promise<Map<string, 'paid' | 'partial' | 'unpaid'>> {
@@ -6209,7 +6203,6 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!Number.isFinite(monthlySalary) || monthlySalary < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   // Normalized school-scoped unique index on teachers.phone is the authoritative
   // duplicate check; avoid loading every teacher just to compare phone numbers.
-  const staffId = await nextSchoolTeacherId(school);
   const branchId = typeof body.branchId === 'string' && body.branchId.trim() ? body.branchId.trim() : undefined;
   if (branchId && !(await db.getBranches(school.id)).some(branch => branch.id === branchId)) { res.status(400).json({ error: 'Branch does not belong to this school.' }); return; }
   if (body.assignedClasses !== undefined && (!Array.isArray(body.assignedClasses) || body.assignedClasses.length > 100 || body.assignedClasses.some((id: unknown) => typeof id !== 'string' || !id.trim()))) {
@@ -6236,19 +6229,20 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   const userId = `usr-${randomUUID()}`;
   const teacherId = `tch-${randomUUID()}`;
   const userRow = {
-    id: userId, school_id: school.id, branch_id: branchId || null, role: 'teacher', full_name: fullName, phone, staff_id: staffId,
+    id: userId, school_id: school.id, branch_id: branchId || null, role: 'teacher', full_name: fullName, phone,
     password_hash: hashPassword(randomBytes(32).toString('base64url')), pin_hash: hashPin(initialPin),
     must_change_password: false, is_blocked: false, failed_login_attempts: 0,
     assigned_class_ids: assignedClasses, assigned_subject_ids: assignedSubjects
   };
   const teacherRow = {
-    id: teacherId, school_id: school.id, user_id: userId, staff_id: staffId,
+    id: teacherId, school_id: school.id, user_id: userId,
     full_name: fullName, email: '', phone, address, gender, qualification: qualification.trim(),
     department: department.trim(), assigned_classes: assignedClasses, assigned_subjects: assignedSubjects,
     status: 'active', joined_date: joinedDate, monthly_salary: monthlySalary
   };
+  let staffId = '';
   try {
-    await db.createTeacherAtomically({
+    staffId = await db.createTeacherAtomically({
       schoolId: school.id, user: userRow, teacher: teacherRow,
       subjectIds: assignedSubjects, formTeacherClassId: formTeacherClassId || null
     });
