@@ -10174,7 +10174,7 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   // still enforces the exact class_teacher_id match before returning any records.
   // Writes remain gated by setup readiness.
   if (role === 'teacher' && req.method === 'GET' && req.path === '/attendance' && typeof req.query.classId === 'string' && req.query.classId.trim()) { next(); return; }
-  const studentReadOnly = role === 'student' && req.method === 'GET' && ['/timetable', '/term-marks/report-cards'].includes(req.path);
+  const studentReadOnly = role === 'student' && req.method === 'GET' && req.path === '/timetable';
   if (role !== 'school_admin' && role !== 'teacher' && role !== 'super_admin' && !studentReadOnly) {
     res.status(403).json({ error: 'Your role cannot access school setup operations.' }); return;
   }
