@@ -80,3 +80,19 @@ test('request query metrics read the originating AsyncLocalStorage context', asy
   requestContext.queryDurationMs = 123.45;
   assert.deepEqual(db.getRequestQueryMetrics(requestContext), { count: 7, durationMs: 123.45 });
 });
+
+
+test('class report-card PDF student records are fetched in one school-scoped field-limited batch', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const methodStart = storage.indexOf('public async getStudentsByIds(');
+  const methodEnd = storage.indexOf('public async getStudentById(', methodStart);
+  const method = storage.slice(methodStart, methodEnd);
+  assert.match(method, /id: uniqueIds, school_id: schoolId/);
+  assert.match(method, /id,school_id,student_id,first_name,middle_name,last_name/);
+  const routeStart = api.indexOf("apiRouter.get('/term-marks/report-cards/classes/:classId/pdf'");
+  const routeEnd = api.indexOf("forwardAsyncErrors(apiRouter)", routeStart);
+  const route = api.slice(routeStart, routeEnd);
+  assert.match(route, /db\.getStudentsByIds\(cards\.map/);
+  assert.doesNotMatch(route, /Promise\.all\(cards\.map[\s\S]*?db\.getStudentById/);
+});
