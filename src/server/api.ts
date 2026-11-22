@@ -4213,7 +4213,7 @@ apiRouter.get('/timetable/terms', requireAuth, requireSchoolContext, async (req,
   res.json(terms);
 });
 
-apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const classId = String(req.params.classId || '');
   const termId = String(req.query.termId || '');
@@ -4233,7 +4233,7 @@ apiRouter.delete('/timetable/classes/:classId', requireAuth, requireSchoolAdminO
   }
 });
 
-apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const sourceTermId = String(req.body?.sourceTermId || '');
   const targetTermId = String(req.body?.targetTermId || '');
@@ -4617,7 +4617,7 @@ apiRouter.post('/timetable/substitutions', requireAuth, requireSchoolAdminOrSupe
   } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Macallinka beddelka ah lama kaydin karin.' }); }
 });
 
-apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   try {
@@ -4683,7 +4683,7 @@ apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requir
   res.status(201).json(slot);
 });
 
-apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const termId = String(req.body?.termId || req.query.termId || '');
   const sectionId = (typeof req.body?.sectionId === 'string' ? req.body.sectionId : (typeof req.query.sectionId === 'string' ? req.query.sectionId : '')) || null;
@@ -4698,7 +4698,7 @@ apiRouter.delete('/timetable/:classId/:dayOfWeek/:periodNumber', requireAuth, re
   res.json({ success: true });
 });
 
-apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const slotId = String(req.params.slotId || '');
