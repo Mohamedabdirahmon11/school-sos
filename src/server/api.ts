@@ -1497,8 +1497,7 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
   if (user.role !== 'school_admin' || !user.mustChangePassword) {
-    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });    return;
-  }
+    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });    return;  }
   const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
   if (!/^\d{4,6}$/.test(newPin)) {
     res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' });
@@ -2997,8 +2996,7 @@ apiRouter.get('/school/reports/finance/export', requireAuth, requireSchoolContex
       'receipt_number,reference_number,student_id,academic_year,month,fee_type,amount_due,amount_paid,remaining_amount,payment_method,status,date,voided_at'))
       .filter((payment: any) => !payment.voidedAt);
     const cell = (value: unknown) => {      const raw = String(value ?? '');
-      const safe = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
-      return `"${safe.replace(/"/g, '""')}"`;
+      const safe = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;      return `"${safe.replace(/"/g, '""')}"`;
     };
     const rows = [
       ['Receipt Number', 'Reference', 'Student ID', 'Academic Year', 'Month', 'Fee Type', 'Amount Due', 'Amount Paid', 'Remaining Arrears', 'Method', 'Status', 'Date'],
@@ -4291,7 +4289,7 @@ apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdm
   res.json({ success: true, copiedClasses, skipped, copiedSlots: copiedClasses.reduce((total, id) => total + (sourceByClass.get(id)?.length || 0), 0) });
 });
 
-apiRouter.get('/timetable', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
@@ -4497,8 +4495,7 @@ apiRouter.put('/timetable/settings', requireAuth, requireSchoolAdminOrSuperAdmin
     if (shiftTwoClasses.total > 0) {
       res.status(409).json({ error: 'Move all classes assigned to Shift 2 back to Shift 1 before disabling the second shift.' });      return;
     }
-  }
-  if (settings.shiftCount === 2) {
+  }  if (settings.shiftCount === 2) {
     const periodsPerDay = Number(school.setupData?.workingHours?.periodsPerDay || 6);
     const closingTime = school.setupData?.workingHours?.closingTime;
     if (!isShiftWithinSchoolClosingTime(settings, periodsPerDay, closingTime)) {
@@ -4623,7 +4620,7 @@ apiRouter.delete('/timetable/substitutions/:id', requireAuth, requireSchoolAdmin
     res.json({ success: true });
   } catch (error) { res.status(409).json({ error: error instanceof Error ? error.message : 'Beddelka lama tirtiri karin.' }); }
 });
-apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const { classId, dayOfWeek, periodNumber, subjectId, teacherId, roomNumber } = req.body || {};
   const termId = String(req.body?.termId || '');
@@ -4714,7 +4711,7 @@ apiRouter.patch('/timetable/:slotId/lock', requireAuth, requireSchoolAdminOrSupe
     res.status(404).json({ error: error instanceof Error ? error.message : 'Timetable lesson was not found.' });
   }
 });
-apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const firstId = String(req.body?.firstSlotId || '');
   const secondId = String(req.body?.secondSlotId || '');
@@ -4730,7 +4727,7 @@ apiRouter.post('/timetable/swap', requireAuth, requireSchoolAdminOrSuperAdmin, r
   res.json({ success: true });
 });
 
-apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+apiRouter.post('/timetable/generate', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, requireTeacherAssignmentsReady, async (req, res) => {
   const school = (req as any).school;
   const classId = String(req.body?.classId || '');
   const termId = String(req.body?.termId || '');
@@ -5998,7 +5995,6 @@ apiRouter.put('/teachers/:id/subjects', requireAuth, requireSchoolContext, requi
   await db.saveTeacherSubjects(school.id, teacherId, ids);
   res.json({ success: true, subjectIds: ids });
 });
-
 apiRouter.delete('/teachers/:id', requireAuth, requireSchoolContext, requireSchoolAdminOrSuperAdmin, async (req, res) => {
   const school = (req as any).school as School;
   const teacherId = String(req.params.id || '');
@@ -7377,7 +7373,7 @@ apiRouter.post('/exams/term-periods/:periodId/publish', requireAuth, requireScho
   }
 });
 
-apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, requireTeacherAssignmentsReadyForTeacher, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { classId, subjectId, semester, studentId } = req.query;
@@ -7444,7 +7440,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
   res.json(await db.getMarks(school.id, String(classId), subjectId ? String(subjectId) : undefined, semester as any));
 });
 
-apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireTeacherAssignmentsReadyForTeacher, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') {
@@ -7497,8 +7493,7 @@ apiRouter.post('/exams/marks', requireAuth, requireSchoolContext, requireSchoolS
     if (seenStudentIds.has(mark.studentId)) {
       res.status(400).json({ error: 'Duplicate students are not allowed in one marks submission.' });
       return;
-    }
-    seenStudentIds.add(mark.studentId);
+    }    seenStudentIds.add(mark.studentId);
   }
   const classStudents = await queryAllRows('students', { school_id: school.id, class_id: classId }, 'id');
   const classStudentIds = new Set(classStudents.map((student: any) => student.id));
@@ -8997,8 +8992,7 @@ apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) =>
     const terms = ['audience.eq.all', 'audience.eq.school', `audience.eq.${audience}`];
     if (classIds.length) terms.push(`and(audience.eq.class,class_id.in.(${[...new Set(classIds)].join(',')}))`);
     let schoolToday: string;
-    try {
-      schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+    try {      schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
     } catch {
       schoolToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Addis_Ababa' }).format(new Date());
     }
@@ -9879,6 +9873,31 @@ async function getSchoolSetupState(school: School) {
 }
 
 
+async function requireTeacherAssignmentsReady(req: any, res: any, next: (error?: unknown) => void) {
+  const role = normalizeRole(req.user?.role);
+  if (role !== 'school_admin' && role !== 'teacher') { next(); return; }
+  try {
+    const state = await getSchoolSetupState(req.school as School);
+    if (!state.checklist[0]?.ready) {
+      res.status(423).json({
+        error: 'Marka hore qoondee macallimiinta ka hor inta aan la bilaabin jadwalka ama gelinta natiijooyinka.',
+        code: 'TEACHER_ASSIGNMENT_REQUIRED',
+        missing: state.checklist[0]?.reason || 'Teacher assignments are incomplete.'
+      });
+      return;
+    }
+    next();
+  } catch {
+    res.status(503).json({ error: 'Teacher assignment readiness could not be verified. No changes were made.' });
+  }
+}
+
+async function requireTeacherAssignmentsReadyForTeacher(req: any, res: any, next: (error?: unknown) => void) {
+  if (normalizeRole(req.user?.role) !== 'teacher') { next(); return; }
+  await requireTeacherAssignmentsReady(req, res, next);
+}
+
+
 apiRouter.post('/school/logo', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext,
   express.raw({ type: ['image/png', 'image/jpeg', 'image/webp'], limit: '1572864' }),
   async (req, res) => {
@@ -10497,8 +10516,7 @@ apiRouter.post('/documents/:id/download-audit', requireAuth, requireSchoolContex
   const client=documentServiceClient(res);if(!client)return;
   const {data:document}=await client.from('school_documents').select('id,title,serial_number,student_id,status').eq('school_id',school.id).eq('id',req.params.id).is('deleted_at',null).maybeSingle();
   if(!document||!await familyDocumentAllowed(school.id,user,document)){res.status(404).json({error:'Dukumentiga lama helin.'});return;}
-  if(!await hasDocumentGrant(client,school.id,user,document.id,'download')){res.status(403).json({error:'Ma lihid ogolaanshaha soo dejinta dukumentigan.'});return;}
-  const {error}=await client.from('school_document_audit_events').insert({school_id:school.id,document_id:document.id,actor_user_id:user.id,action:'document_download_requested',details:{serialNumber:document.serial_number||null,title:document.title}});
+  if(!await hasDocumentGrant(client,school.id,user,document.id,'download')){res.status(403).json({error:'Ma lihid ogolaanshaha soo dejinta dukumentigan.'});return;}  const {error}=await client.from('school_document_audit_events').insert({school_id:school.id,document_id:document.id,actor_user_id:user.id,action:'document_download_requested',details:{serialNumber:document.serial_number||null,title:document.title}});
   if(error){res.status(503).json({error:'Diiwaanka download-ka lama kaydin karin.'});return;}
   res.json({success:true});
 });
@@ -11576,7 +11594,7 @@ apiRouter.get('/term-marks/assignments', requireAuth, requireSchoolContext, requ
   })).filter((row:any)=>row.class&&row.subject));
 });
 
-apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireTeacherAssignmentsReadyForTeacher, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   if (user.role !== 'teacher') { res.status(403).json({ error: 'Macallimiinta oo keliya ayaa arki kara gelinta dhibcaha.' }); return; }
@@ -11615,7 +11633,7 @@ apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSch
   res.json({ allowedStudentIds, marks: marks||[], maxMarks: component.max_marks, termStatus: status?.status||'open' });
 });
 
-apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireSchoolStaff, async (req, res) => {
+apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireTeacherAssignmentsReadyForTeacher, requireSchoolStaff, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   if (user.role !== 'teacher') { res.status(403).json({ error: 'Macallinka loo qoondeeyey oo keliya ayaa geli kara dhibcaha.' }); return; }
