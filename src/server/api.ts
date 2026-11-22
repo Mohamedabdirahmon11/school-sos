@@ -3215,7 +3215,10 @@ async function getClassCurriculumCapacity(schoolId: string) {
   if (days.error || periods.error) throw new Error('Awoodda xiisadaha lama akhrin karin.');
   const workingDays = Number(days.count || 0);
   const lessonPeriodsPerDay = Number(periods.count || 0);
-  return { workingDays, lessonPeriodsPerDay, weeklyCapacity: workingDays * lessonPeriodsPerDay };
+  // The school may configure fewer available periods, but the academic setup
+  // contract caps a normal week at five days × six lessons = 30.
+  const weeklyCapacity = Math.min(30, workingDays * lessonPeriodsPerDay);
+  return { workingDays, lessonPeriodsPerDay, weeklyCapacity };
 }
 async function findCurriculumDependency(schoolId: string, classId: string, subjectId: string): Promise<string | null> {
   const client = classGroupsClient();

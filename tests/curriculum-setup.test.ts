@@ -34,3 +34,8 @@ test('Copy curriculum is restricted to same-grade sections and preserves removed
   assert.match(route, /removedByClass/);
   assert.match(route, /teacher_class_subject_assignments'[\s\S]*?\.delete\(\)/);
 });
+test('Configured school periods can reduce weekly curriculum capacity but never raise it above 30', () => {
+  const helper = api.slice(api.indexOf('async function getClassCurriculumCapacity'), api.indexOf('async function findCurriculumDependency'));
+  assert.match(helper, /Math\.min\(30, workingDays \* lessonPeriodsPerDay\)/);
+});
+
