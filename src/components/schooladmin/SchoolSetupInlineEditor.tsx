@@ -18,6 +18,9 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
   const [classes, setClasses] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [assignmentData, setAssignmentData] = useState<any>(null);
+  const [terms, setTerms] = useState<any[]>([]);
+  const [formTeacher, setFormTeacher] = useState({ classId: '', teacherId: '' });
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,8 +40,16 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
       else if (step === 'subjects') setRows(subjectRows || []);
       else if (step === 'teachers') setRows(teacherRows || []);
       else if (step === 'students') setRows(await ApiClient.getStudents(undefined, undefined, 1, 50));
-      else if (step === 'assign') setRows(await ApiClient.request<any[]>('/teacher-assignments'));
-      else setRows(await ApiClient.getTimetable({ scope: 'school' }));
+      else if (step === 'assign') {
+        const data = await ApiClient.request<any>('/teacher-assignments');
+        setAssignmentData(data);
+        setRows(data.assignments || []);
+        setFormTeacher(value => ({ ...value, classId: value.classId || data.classes?.[0]?.id || '' }));
+      } else {
+        const [slots, termRows] = await Promise.all([ApiClient.getTimetable({ scope: 'school' }), ApiClient.getTimetableTerms()]);
+        setRows(slots || []);
+        setTerms(termRows || []);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Xogta lama soo qaadi karin.');
     } finally {
@@ -64,13 +75,14 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
         await ApiClient.createTeacher({ fullName: form.fullName, staffId: form.staffId, phone: form.phone || undefined });
       } else if (step === 'assign') {
         await ApiClient.request('/teacher-assignments', { method: 'POST', body: JSON.stringify({
+          academicYearId: assignmentData?.selectedAcademicYearId, termId: assignmentData?.selectedTermId || undefined,
           classId: form.classId, subjectId: form.subjectId, teacherId: form.teacherId,
           clearDependentEntries: false
         }) });
       } else if (step === 'students') {
         await ApiClient.createStudent({ firstName: form.firstName, middleName: form.middleName || undefined, lastName: form.lastName || undefined, classId: form.classId, guardianPhone: form.guardianPhone || undefined });
       } else {
-        await ApiClient.setTimetableSlot({ classId: form.classId, subjectId: form.subjectId, teacherId: form.teacherId, dayOfWeek: form.dayOfWeek, periodNumber: Number(form.periodNumber), startTime: form.startTime, endTime: form.endTime });
+        await ApiClient.setTimetableSlot({ classId: form.classId, subjectId: form.subjectId, teacherId: form.teacherId, dayOfWeek: form.dayOfWeek, periodNumber: Number(form.periodNumber), startTime: form.startTime, endTime: form.endTime, termId: terms.find(term => term.isCurrent)?.id });
       }
       setForm({});
       await load();
@@ -92,7 +104,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
       else if (step === 'teachers') await ApiClient.deleteTeacher(row.id);
       else if (step === 'students') await ApiClient.deleteStudent(row.id);
       else if (step === 'assign') await ApiClient.request(`/teacher-assignments/${encodeURIComponent(row.id)}?clearDependentEntries=false`, { method: 'DELETE' });
-      else throw new Error('Timetable slot-ka waxaa laga nadiifiyaa jadwalka fasalka si loo ilaaliyo isku-xirnaanta.');
+      else throw new Error('Timetable slot-kan si gaar ah looma tirtiri karo; isticmaal maamulka jadwalka fasalka.');
       await load();
       await onChanged();
     } catch (e) {
@@ -102,6 +114,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
     }
   };
 
+  const saveFormTeacher = async () => { setSaving(true); setError(''); try { await ApiClient.updateClass(formTeacher.classId, { classTeacherId: formTeacher.teacherId } as any); await load(); await onChanged(); } catch (e) { setError(e instanceof Error ? e.message : 'Form Teacher lama kaydin karin.'); } finally { setSaving(false); } };
   const title = ({ classes: 'Classes & Sections', subjects: 'Subjects & Class Curriculum', teachers: 'Teachers', assign: 'Teacher Assignment', students: 'Students', timetable: 'Timetable' } as const)[step];
   const nameOf = (row: any) => row.fullName || row.name || [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' ') || row.subjectName || row.title || 'Record';
   const selectOptions = (field: Field) => field.name === 'classId' ? classes.map(row => ({ value: row.id, label: row.name })) : field.name === 'subjectId' ? subjects.map(row => ({ value: row.id, label: row.name })) : field.name === 'teacherId' ? teachers.map(row => ({ value: row.id, label: row.fullName })) : field.options || [];
@@ -120,6 +133,15 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
       <div className="sm:col-span-2"><button className="sw-btn" type="submit" disabled={saving || loading}>{saving ? 'Kaydinaya…' : 'Ku dar'}</button></div>
     </form>
     {error && <p role="alert" className="sw-miss">{error}</p>}
+    {step === 'assign' && <div className="rounded-lg border p-3 mb-4" style={{borderColor:'var(--sw-line)'}}>
+      <h4 className="font-semibold mb-2">Form Teacher — hal macallin fasal kasta</h4>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <select value={formTeacher.classId} onChange={e => setFormTeacher(value => ({...value,classId:e.target.value}))} className="rounded-lg border px-3 py-2 bg-transparent"><option value="">Fasal</option>{classes.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select>
+        <select value={formTeacher.teacherId} onChange={e => setFormTeacher(value => ({...value,teacherId:e.target.value}))} className="rounded-lg border px-3 py-2 bg-transparent"><option value="">Form Teacher</option>{teachers.map(row=><option key={row.id} value={row.id}>{row.fullName}</option>)}</select>
+        <button type="button" className="sw-btn" disabled={saving || !formTeacher.classId || !formTeacher.teacherId} onClick={() => void saveFormTeacher()}>Kaydi Form Teacher</button>
+      </div>
+    </div>}
+    {step === 'assign' && assignmentData?.unassigned?.length > 0 && <p className="sw-sub">{assignmentData.unassigned.length} class-subject assignment ayaa wali maqan. Culayska macallin kasta kama badnaan karo 30 periods.</p>}
     {loading ? <p className="sw-sub">Xogta waa la soo qaadaya…</p> : rows.length === 0
       ? <div className="rounded-lg border border-dashed p-5 text-center text-sm" style={{borderColor:'var(--sw-line)',color:'var(--sw-muted)'}}>Weli xog lama diiwaangelin. Isticmaal foomka kore si aad u bilowdo.</div>
       : <ul className="divide-y" style={{borderColor:'var(--sw-line)'}}>{rows.map((row,index) => <li key={row.id || index} className="flex items-center justify-between gap-3 py-2 text-sm"><div className="min-w-0"><strong>{nameOf(row)}</strong><p style={{color:'var(--sw-muted)'}}>{row.code || row.staffId || row.studentId || row.className || row.subjectId || ''}</p></div><button type="button" className="sw-btn secondary" disabled={saving} onClick={() => void remove(row)} aria-label={`Tirtir ${nameOf(row)}`}>Tirtir</button></li>)}</ul>}
