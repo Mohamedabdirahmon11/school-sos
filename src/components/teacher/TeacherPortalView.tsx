@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import './teacher-portal-design.css';
 import { ApiClient } from '../../services/api.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
 import { getSchoolCalendarStatus } from '../../lib/school-calendar.ts';
@@ -630,7 +631,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
   if (initialData.error) return <ErrorState error={initialData.error} onRetry={initialData.retry} />;
 
   return (
-    <div className="mx-auto max-w-[1680px] space-y-5 p-3 sm:p-5 lg:p-7">
+    <div className="teacher-portal-design mx-auto w-full max-w-[1140px] space-y-5 p-3 sm:p-5 lg:p-7">
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#102f2d] via-[#164b46] to-[#0f766e] p-5 text-white shadow-lg sm:p-7">
         <div className="pointer-events-none absolute -right-10 -top-16 h-56 w-56 rounded-full border-[28px] border-white/5" />
         <div className="pointer-events-none absolute -bottom-24 right-1/4 h-48 w-48 rounded-full bg-teal-300/10 blur-2xl" />
