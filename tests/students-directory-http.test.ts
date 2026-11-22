@@ -72,6 +72,12 @@ const noGuardian = storage.db.createStudent({
   gender: 'male', admissionDate: today, fatherPhone: '',
   motherPhone: '', classId: otherClass.id, section: 'B', status: 'active'
 } as any);
+const legacyUnenrolled = storage.db.createStudent({
+  schoolId: school.id, studentId: 'STROW-LEGACY',
+  firstName: 'Legacy', middleName: '', lastName: 'Unenrolled',
+  gender: 'female', admissionDate: today, fatherPhone: '+251922222222',
+  motherPhone: '', classId: ownClass.id, section: 'A', status: 'active'
+} as any);
 const formTeacherStudent = storage.db.createStudent({
   schoolId: school.id, studentId: 'STROW-FORM',
   firstName: 'Form', middleName: '', lastName: 'Student',
@@ -169,6 +175,13 @@ test('students without a guardian remain readable and another school stays isola
   assert.ok(rows.some((row: any) => row.id === noGuardian.id));
   assert.ok(!rows.some((row: any) => row.id === otherTenantStudent.id));
   assert.equal(rows.find((row: any) => row.id === noGuardian.id).fatherPhone, '');
+
+  const directory = await fetch(`${baseUrl}/students`, { headers: adminHeaders });
+  assert.equal(directory.status, 200);
+  const directoryRows = await directory.json();
+  const legacyRow = directoryRows.find((row: any) => row.id === legacyUnenrolled.id);
+  assert.ok(legacyRow);
+  assert.equal(legacyRow.className, 'Not assigned');
 });
 
 test('Form Teacher reads only the homeroom class and receives 403 for another class', async () => {
