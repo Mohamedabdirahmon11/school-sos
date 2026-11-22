@@ -261,6 +261,8 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         .sw-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.sw-stats div{background:var(--sw-soft);border-radius:10px;padding:10px}.sw-stats b{font-size:22px;display:block}
         .school-setup-reference button:focus-visible,.school-setup-reference input:focus-visible,.school-setup-reference select:focus-visible{outline:3px solid var(--sw-accent);outline-offset:1px}
         @media(prefers-color-scheme:dark){.school-setup-reference:not([data-theme=light]){--sw-bg:#121a17;--sw-card:#1a2420;--sw-ink:#e6efe9;--sw-muted:#9db0a7;--sw-line:#2d3b35;--sw-side:#0d2a21;--sw-sideink:#d5e6dd;--sw-ok:#4cc58a;--sw-warn:#e8a042;--sw-bad:#f2867f;--sw-accent:#4cc58a;--sw-soft:#1f2f28;color-scheme:dark}}
+        html[data-theme=dark] .school-setup-reference{--sw-bg:#121a17;--sw-card:#1a2420;--sw-ink:#e6efe9;--sw-muted:#9db0a7;--sw-line:#2d3b35;--sw-side:#0d2a21;--sw-sideink:#d5e6dd;--sw-ok:#4cc58a;--sw-warn:#e8a042;--sw-bad:#f2867f;--sw-accent:#4cc58a;--sw-soft:#1f2f28;color-scheme:dark}
+        html[data-theme=light] .school-setup-reference{--sw-bg:#f6f4ee;--sw-card:#fff;--sw-ink:#1c2b26;--sw-muted:#5f6f68;--sw-line:#d9d6cb;--sw-side:#1f4d3f;--sw-sideink:#e8f1ec;--sw-ok:#1b7f4b;--sw-warn:#a65b00;--sw-bad:#b3261e;--sw-accent:#1f4d3f;--sw-soft:#eaf2ed;color-scheme:light}
         @media(max-width:760px){.school-setup-reference{grid-template-columns:1fr}.sw-side{padding:12px}.sw-side p{display:none}.sw-steps{display:flex;overflow-x:auto;gap:4px;scrollbar-width:thin}.sw-step{width:auto;white-space:nowrap;flex:none}.sw-main{padding:20px 16px}}
       `}</style>
       <aside className="sw-side"><h1>Setup Wizard</h1><p>Dugsi cusub: dhammaystir tallaabooyinka si Dashboard-ku u furmo.</p>
@@ -275,7 +277,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         </nav>
       </aside>
       <main className="sw-main">
-        {!setupState?.progress.completedAt && completedCount === 0 && <div className="sw-start"><strong>START HERE:</strong> Dugsigaagu wuxuu u baahan yahay dejin. Ka bilow macluumaadka dugsiga, kadib raac tallaabooyinka kala horreeya.</div>}
+        {!setupState?.progress.completedAt && !setupState?.checklist[2]?.ready && <div className="sw-start"><strong>START HERE:</strong> Dugsigaagu wuxuu u baahan yahay dejin. Ka bilow macluumaadka dugsiga, kadib raac tallaabooyinka kala horreeya.</div>}
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2>{current.title}</h2><p className="sw-sub">{current.required ? 'Tallaabo khasab ah' : 'Tallaabo optional ah'} · Tallaabada {referenceStep + 1} ee 9</p></div><div className="text-sm font-semibold">{completedCount}/9 diyaar</div></div>
         {error && <div role="alert" className="sw-miss"><strong>Cilad:</strong> {error}</div>}
         {current.id !== 'finish' && current.id !== 'timetable' && currentEvidence && <div className={'sw-miss' + (currentEvidence.ready ? ' sw-good' : '')} role="status"><strong>{currentEvidence.ready ? 'Tallaabadani waa diyaar ✓' : 'Wax ka maqan:'}</strong>{!currentEvidence.ready && <p className="mt-1">{currentEvidence.reason}</p>}</div>}
