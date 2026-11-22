@@ -49,6 +49,14 @@ CREATE POLICY classes_school_scope ON public.classes
 
 \i supabase/migrations/20261122120000_atomic_teacher_assignment_upsert.sql
 \i supabase/migrations/20261122121000_one_active_form_teacher_per_school.sql
+\i supabase/migrations/20261122122000_school_setup_completed_at.sql
+DO $
+BEGIN
+  IF (SELECT setup_completed_at FROM public.schools WHERE id='school-complete') IS NULL THEN RAISE EXCEPTION 'legacy completion timestamp was not backfilled'; END IF;
+  IF (SELECT setup_completed_at FROM public.schools WHERE id='school-incomplete') IS NOT NULL THEN RAISE EXCEPTION 'incomplete existing school must remain NULL'; END IF;
+  INSERT INTO public.schools(id,setup_progress) VALUES ('school-new','{}'::jsonb);
+  IF (SELECT setup_completed_at FROM public.schools WHERE id='school-new') IS NOT NULL THEN RAISE EXCEPTION 'new school must remain NULL'; END IF;
+END $;
 
 -- Atomic rollback: a failed timetable cleanup must roll back the assignment update too.
 INSERT INTO public.teachers(id,school_id,status,max_periods_per_week) VALUES ('t-old','school-a','active',30),('t-new','school-a','active',30);
