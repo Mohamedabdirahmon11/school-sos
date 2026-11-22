@@ -183,7 +183,10 @@ test('class transfer changes student homework and timetable scope to the new enr
  assert.equal(assignments.status,200);const rows=await assignments.json() as any[];
  assert.ok(rows.some(row=>row.id===moved.id));assert.equal(rows.some(row=>row.classId===klass.id),false);
  const slots=await request('/timetable',cookies.student);assert.equal(slots.status,200);
- assert.equal((await slots.json() as any[]).some(row=>row.id==='sp-slot-own'),false);
+ const currentSlots=await slots.json() as any[];assert.equal(currentSlots.some(row=>row.id==='sp-slot-own'),false);assert.ok(currentSlots.some(row=>row.id==='sp-slot-other'));
+ const profile=await request('/student/me',cookies.student);assert.equal((await profile.json() as any).data.classId,otherClass.id);
+ const oldMarks=await request('/exams/marks?studentId='+encodeURIComponent(student.id),cookies.student);assert.deepEqual(await oldMarks.json(),[]);
+ const oldAttendance=await request('/attendance/student?studentId='+encodeURIComponent(student.id),cookies.student);assert.deepEqual(await oldAttendance.json(),[]);
  const contacts=await request('/messages/contacts',cookies.student);assert.ok((await contacts.json() as any[]).some(row=>row.id===otherTeacherUser.id));
  await memory.from('students').update({class_id:klass.id}).eq('id',student.id);
  await db.flush();
