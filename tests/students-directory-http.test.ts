@@ -75,7 +75,7 @@ const noGuardian = storage.db.createStudent({
 const legacyUnenrolled = storage.db.createStudent({
   schoolId: school.id, studentId: 'STROW-LEGACY',
   firstName: 'Legacy', middleName: '', lastName: 'Unenrolled',
-  gender: 'female', admissionDate: today, fatherPhone: '+251922222222',
+  gender: 'male', admissionDate: today, fatherPhone: '+251922222222',
   motherPhone: '', classId: ownClass.id, section: 'A', status: 'active'
 } as any);
 const formTeacherStudent = storage.db.createStudent({
