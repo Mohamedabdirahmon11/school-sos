@@ -9,9 +9,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
-      { find: /(?:^|\\/)context\\/AuthContext(?:\\.tsx)?$/, replacement: path.resolve(root, 'tests/visual/mock-auth.ts') },
-      { find: /(?:^|\\/)services\\/api(?:\\.ts)?$/, replacement: path.resolve(root, 'tests/visual/mock-api.ts') },
-      { find: /(?:^|\\/)hooks\\/useApi(?:\\.ts)?$/, replacement: path.resolve(root, 'tests/visual/mock-use-api.ts') },
+      { find: /(?:^|\/)context\/AuthContext(?:\.tsx)?$/, replacement: path.resolve(root, 'tests/visual/mock-auth.ts') },
+      { find: /(?:^|\/)services\/api(?:\.ts)?$/, replacement: path.resolve(root, 'tests/visual/mock-api.ts') },
+      { find: /(?:^|\/)hooks\/useApi(?:\.ts)?$/, replacement: path.resolve(root, 'tests/visual/mock-use-api.ts') },
       { find: '@', replacement: root }
     ]
   },
