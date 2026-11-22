@@ -370,7 +370,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   if (isLoading) return <><LoadingState label="Loading students…" />{pinResetWizard}</>;
   if (studentLoad.error) return <><ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />{pinResetWizard}</>;
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 p-5 md:p-8">
+    <div className="school-students-page mx-auto max-w-[1600px] space-y-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
