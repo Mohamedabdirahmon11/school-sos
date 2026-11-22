@@ -30,11 +30,19 @@ CREATE TABLE public.timetable_slots (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), school_id varchar NOT NULL,
   class_id varchar NOT NULL, subject_id varchar NOT NULL, teacher_id varchar
 );
+CREATE TABLE public.schools (id text PRIMARY KEY, setup_progress jsonb);
+ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
+CREATE POLICY schools_tenant_scope ON public.schools FOR SELECT TO authenticated USING (id = current_setting('app.school_id', true));
+INSERT INTO public.schools(id,setup_progress) VALUES
+  ('school-complete','{"completedAt":"2026-11-22T12:34:56.000Z"}'::jsonb),
+  ('school-incomplete','{"currentStep":1,"completedSteps":[]}'::jsonb);
+
 CREATE TABLE public.classes (
   id text PRIMARY KEY, school_id varchar NOT NULL, class_teacher_id varchar,
   is_archived boolean DEFAULT false
 );
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
+GRANT SELECT ON public.classes TO authenticated;
 CREATE POLICY classes_school_scope ON public.classes
   FOR SELECT TO authenticated
   USING (school_id = current_setting('app.school_id', true));
