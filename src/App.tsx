@@ -361,7 +361,7 @@ const AppContent: React.FC = () => {
             )}
 
             {/* STUDENT ROUTING */}
-            {activeView === 'st_messages' ? <MessagesView /> : activeView.startsWith('st_') && (
+            {activeView.startsWith('st_') && (
               <StudentPortalView />
             )}
             </React.Suspense>
