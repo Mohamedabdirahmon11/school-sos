@@ -118,8 +118,11 @@ test('student homework is current-class-only and submissions always bind to the 
  assert.equal(created.status,201,await created.clone().text());const ownAssignment=await created.json() as any;
  const otherCreated=await post('/assignments',cookies.otherTeacher,{classId:otherClass.id,subjectId:otherSubject.id,title:'Other class task',description:'Not visible',dueDate:today,maxPoints:20});
  assert.equal(otherCreated.status,201,await otherCreated.clone().text());
+ await db.saveAssignmentSubmission({schoolId:school.id,assignmentId:ownAssignment.id,studentId:sameClassStudent.id,studentName:'Other Student',content:'Their private work'});
+ await db.flush();
  const list=await request('/assignments',cookies.student);assert.equal(list.status,200);
  const rows=await list.json() as any[];assert.ok(rows.some(row=>row.id===ownAssignment.id));assert.equal(rows.some(row=>row.title==='Other class task'),false);
+ assert.equal(rows.find(row=>row.id===ownAssignment.id).submission,undefined,'a student must not see another student submission');
  const submit=await post('/assignments/'+ownAssignment.id+'/submissions',cookies.student,{content:'My work',studentId:sameClassStudent.id});
  assert.equal(submit.status,201,await submit.clone().text());
  await db.flush();
