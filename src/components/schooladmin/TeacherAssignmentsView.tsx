@@ -241,7 +241,7 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
   const workloadByTeacher = new Map(data.workload.map(w => [w.teacherId, w]));
   const replacementSubjectIds = [...new Set(data.assignments.filter(a => a.teacher_id === replaceFrom).map(a => a.subject_id))];
   const qualifiedForReplacement = (teacherId: string) => !replacementSubjectIds.length || replacementSubjectIds.every(subjectId => qualified(subjectId, teacherId));
-  return <div className="academic-setup"><div className="wrap schoolos-assignment-page">
+  return <div className="academic-setup"><main className="wrap schoolos-assignment-page" aria-label="Qoondeynta Macallimiinta">
     <AcademicSetupHeader active="sch_teacher_assignments" onNavigate={onNavigate} />
     <h2>Teacher Assignment</h2>
     <p className="lead">Maaddo kasta ee fasalka waxaa leh hal macallin. Form Teacher-ku waa macallinka masuulka ah fasalka.</p>
@@ -291,5 +291,5 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     </section>}
     {!!data.unassigned.length && <Card className="p-4"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 text-amber-600" />Maaddooyinka aan weli macallin loo qoondeyn</div><p className="mt-1 text-xs text-slate-500">{data.unassigned.length} maaddo/fasal ayaa sugaya qoondeyn.</p><div className="mt-3 flex flex-wrap gap-2">{data.unassigned.map((r,i) => <Pill key={i}>{className(r.classId)} · {subjectName(r.subjectId)} ({r.periodsPerWeek})</Pill>)}</div></Card>}
     {!data.teachers.length && <Card><EmptyState><Users className="mx-auto h-8 w-8 text-teal-700" /><p>Macallimiin lama helin.</p><Button onClick={() => onNavigate('sch_teachers')}>Tag Macallimiinta (Tallaabada 5)</Button></EmptyState></Card>}
-  </div></div>;
+  </main></div>;
 };
