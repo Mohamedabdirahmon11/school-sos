@@ -11251,14 +11251,13 @@ apiRouter.post('/documents/generate', requireAuth, requireSchoolContext, require
       throw error;
     }
   } else if (Array.isArray(body.studentIds) && body.studentIds.length > 0 && body.studentIds.length <= 100) {
-    for (const rawId of body.studentIds) {
-      if (typeof rawId !== 'string') continue;
-      const byPk = await db.getStudentById(rawId,school.id);
-      if (byPk) students.push(byPk);
-      else {
-        const match = await db.queryPage<Student>('students',{school_id:school.id,student_id:rawId},1,1,undefined,'*');
-        if (match.items[0]) students.push(match.items[0]);
-      }
+    const identifiers = body.studentIds.filter((rawId: unknown): rawId is string => typeof rawId === 'string');
+    const foundStudents = await db.getStudentsByIdentifiers(identifiers, school.id);
+    const byPrimaryKey = new Map(foundStudents.map(student => [student.id, student]));
+    const byStudentId = new Map(foundStudents.map(student => [student.studentId, student]));
+    for (const rawId of identifiers) {
+      const student = byPrimaryKey.get(rawId) || byStudentId.get(rawId);
+      if (student) students.push(student);
     }
   } else {
     res.status(400).json({ error: 'Dooro hal arday ama fasal.' }); return;
