@@ -277,15 +277,20 @@ test('Form Teacher attendance authorization loads its class once without subject
   assert.ok(!route.includes('canAccessTeachingClass'));
 });
 
-test('teacher class scope uses school-bound joins instead of separate teacher and full class reads', () => {
+test('teacher class scope reuses the school-scoped Form Teacher lookup and subject join', () => {
   const api = read('../src/server/api.ts');
   const start = api.indexOf('async function getTeacherAssignedClassIds(');
   const end = api.indexOf('async function getNoticeClassIds', start);
   const helper = api.slice(start, end);
+  const formTeacherStart = api.indexOf('async function getTeacherFormTeacherClassIds(');
+  const formTeacherEnd = api.indexOf('async function getStudentCurrentClassId', formTeacherStart);
+  const formTeacherHelper = api.slice(formTeacherStart, formTeacherEnd);
   assert.ok(helper.includes("'teachers.user_id': userId"));
   assert.ok(helper.includes("'teachers.school_id': schoolId"));
-  assert.ok(helper.includes("'users.role': 'teacher'"));
-  assert.ok(helper.includes("'users.school_id': schoolId"));
+  assert.ok(helper.includes('getTeacherFormTeacherClassIds(schoolId, userId)'));
+  assert.ok(formTeacherHelper.includes("queryAllRows('classes'"));
+  assert.ok(formTeacherHelper.includes('school_id: schoolId'));
+  assert.ok(formTeacherHelper.includes('class_teacher_id: userId'));
   assert.ok(!helper.includes("queryPage('teachers'"));
   assert.ok(!helper.includes('db.getClasses('));
 });
