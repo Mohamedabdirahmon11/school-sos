@@ -1987,6 +1987,22 @@ class StorageEngine {
     return this.data.teachers[index];
   }
 
+  public async createTeacherAtomically(payload: { schoolId: string; user: Record<string, unknown>; teacher: Record<string, unknown>; subjectIds: string[]; formTeacherClassId: string | null }): Promise<void> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error('Teacher creation storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.rpc('schoolos_create_teacher', {
+      p_school_id: payload.schoolId,
+      p_user: payload.user,
+      p_teacher: payload.teacher,
+      p_subject_ids: [...new Set(payload.subjectIds)],
+      p_form_teacher_class_id: payload.formTeacherClassId
+    });
+    this.recordQuery('rpc:schoolos_create_teacher', 'call', startedAt);
+    if (error) throw new Error(error.message || 'Teacher creation transaction failed.');
+    this.invalidateAuthContextsForSchool(payload.schoolId);
+  }
+
   public createTeacher(teacherData: Omit<Teacher, 'id' | 'createdAt'>): Teacher {
     const id = `tch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const teacher: Teacher = {
