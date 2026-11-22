@@ -67,23 +67,21 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
   ].filter(item => (item.view !== 'sch_fees' || canViewFinance) && (item.view !== 'sch_students' || canManageStudents));
 
   return <div className="school-dashboard-page mx-auto w-full max-w-[1600px] space-y-5 p-4 md:p-6">
-    <section className="school-dashboard-hero relative overflow-hidden rounded-2xl p-5 text-white md:p-7">
+    <section className="school-dashboard-hero relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 text-slate-800 md:p-6">
       <div className="relative z-10 flex flex-col justify-between gap-5 md:flex-row md:items-center">
         <div className="flex min-w-0 items-center gap-4">
-          {school?.logoUrl ? <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white p-2 shadow-lg"><img src={school.logoUrl} alt="" className="h-full w-full object-contain" /></div>
-            : <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/20 bg-white/10 text-xl font-extrabold">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</div>}
-          <div className="min-w-0"><p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-blue-100">School overview</p>
-            <h1 className="truncate text-2xl font-bold tracking-tight text-white md:text-[28px]">Dashboard</h1>
-            <p className="mt-1 truncate text-sm text-blue-100">{school?.name || 'Your school'}{school?.academicYear ? ' · ' + school.academicYear : ''}{school?.currentSemester ? ' · ' + school.currentSemester : ''}</p>
+          {school?.logoUrl ? <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white p-2"><img src={school.logoUrl} alt="" className="h-full w-full object-contain" /></div>
+            : <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-slate-100 text-xl font-bold text-slate-700">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</div>}
+          <div className="min-w-0"><p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">School overview</p>
+            <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 md:text-2xl">Dashboard</h1>
+            <p className="mt-1 truncate text-sm text-slate-500">{school?.name || 'Your school'}{school?.academicYear ? ' · ' + school.academicYear : ''}{school?.currentSemester ? ' · ' + school.currentSemester : ''}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canViewFinance && <button type="button" onClick={() => onNavigate('sch_fees')} className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"><CreditCard size={16} /> Record payment</button>}
-          {canManageStudents && <button type="button" onClick={onOpenAddStudent} disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[#17345f] shadow-sm transition hover:bg-blue-50 disabled:opacity-50"><UserPlus size={16} /> Add student</button>}
+          {canViewFinance && <button type="button" onClick={() => onNavigate('sch_fees')} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><CreditCard size={16} /> Record payment</button>}
+          {canManageStudents && <button type="button" onClick={onOpenAddStudent} disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#0D655E] disabled:opacity-50"><UserPlus size={16} /> Add student</button>}
         </div>
       </div>
-      <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-24 h-64 w-64 rounded-full border-[34px] border-white/[.055]" />
-      <div aria-hidden="true" className="pointer-events-none absolute -bottom-36 right-1/4 h-64 w-64 rounded-full bg-blue-400/10 blur-2xl" />
     </section>
 
     <section aria-label="School statistics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -95,7 +93,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
 
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)]">
       <div className="school-dashboard-panel min-w-0 p-5 md:p-6">
-        <div className="mb-5 flex items-center justify-between gap-3"><div><div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400"><Activity size={14} /> Attendance</div><h2 className="text-base font-bold text-[#17264a]">Weekly attendance trend</h2></div>
+        <div className="mb-5 flex items-center justify-between gap-3"><div><div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400"><Activity size={14} /> Attendance</div><h2 className="text-base font-semibold text-slate-900">Weekly attendance trend</h2></div>
           <button type="button" onClick={() => onNavigate('sch_attendance')} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Open register <ArrowUpRight size={14} /></button>
         </div>
         {result.attendanceTrend.length ? <div className="flex h-52 items-end gap-2 border-b border-slate-100 px-1 sm:gap-4">
@@ -104,7 +102,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
             const height = Math.max(4, rate / maxTrend * 100);
             return <div key={item.date ?? item.day ?? index} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2">
               <span className="text-[10px] font-bold tabular-nums text-slate-500">{rate}%</span>
-              <div className="flex h-full w-full max-w-[68px] items-end overflow-hidden rounded-t-lg bg-slate-50"><div className="w-full rounded-t-lg bg-gradient-to-t from-blue-700 to-blue-400 transition-all" style={{ height: String(height) + '%' }} /></div>
+              <div className="flex h-full w-full max-w-[68px] items-end overflow-hidden rounded-t-md bg-slate-100"><div className="w-full rounded-t-md bg-[#0F766E] transition-all" style={{ height: String(height) + '%' }} /></div>
               <span className="max-w-full truncate text-[10px] text-slate-400">{item.day ?? (typeof item.date === 'string' ? item.date.slice(0, 3) : 'Day ' + (index + 1))}</span>
             </div>;
           })}
@@ -112,7 +110,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
       </div>
 
       {canViewFinance && <div className="school-dashboard-panel p-5 md:p-6">
-        <div className="mb-5 flex items-center gap-2"><Wallet size={17} className="text-blue-600" /><div><h2 className="text-base font-bold text-[#17264a]">Fee collection</h2><p className="mt-0.5 text-xs text-slate-500">Collected vs outstanding</p></div></div>
+        <div className="mb-5 flex items-center gap-2"><Wallet size={17} className="text-blue-600" /><div><h2 className="text-base font-semibold text-slate-900">Fee collection</h2><p className="mt-0.5 text-xs text-slate-500">Collected vs outstanding</p></div></div>
         {totalFees > 0 ? <div className="flex flex-col items-center gap-5 sm:flex-row xl:flex-col 2xl:flex-row">
           <div className="relative grid h-36 w-36 shrink-0 place-items-center rounded-full" style={{ background: 'conic-gradient(var(--brand-color) ' + collectedPercent + '%, #f5c24d 0)' }}>
             <div className="grid h-28 w-28 place-items-center rounded-full bg-white shadow-inner"><div className="text-center"><div className="text-2xl font-extrabold text-[#17264a]">{collectedPercent}%</div><div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">collected</div></div></div>
@@ -128,17 +126,17 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
 
     <section className="grid gap-4 lg:grid-cols-3">
       <div className="school-dashboard-panel min-w-0 p-5">
-        <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600"><AlertCircle size={17} /></span><div><h2 className="text-sm font-bold text-[#17264a]">Needs attention</h2><p className="text-[11px] text-slate-400">Absence alerts</p></div></div>
+        <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600"><AlertCircle size={17} /></span><div><h2 className="text-sm font-semibold text-slate-900">Needs attention</h2><p className="text-[11px] text-slate-400">Absence alerts</p></div></div>
         {result.absentStudents.length ? result.absentStudents.slice(0, 4).map((student: DashboardRecord, index: number) => <div key={student.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{student.name ?? student.studentName ?? 'Student absent'}</p><p className="mt-1 text-xs text-slate-400">{student.className ?? student.class ?? 'Class not provided'} · {student.daysAbsent ? student.daysAbsent + ' days absent' : 'Absent today'}</p></div>) : <EmptyState title="No absence alerts today" description="There are no absence records to review for today." className="min-h-28 border-0 bg-transparent" />}
       </div>
 
       <div className="school-dashboard-panel min-w-0 p-5">
-        <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600"><BookOpen size={17} /></span><div><h2 className="text-sm font-bold text-[#17264a]">Quick actions</h2><p className="text-[11px] text-slate-400">Common school tasks</p></div></div>
+        <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600"><BookOpen size={17} /></span><div><h2 className="text-sm font-semibold text-slate-900">Quick actions</h2><p className="text-[11px] text-slate-400">Common school tasks</p></div></div>
         <div className="grid grid-cols-2 gap-2">{actions.map(item => <button key={item.view} type="button" onClick={() => item.view === 'sch_students' ? onOpenAddStudent() : onNavigate(item.view)} disabled={item.view === 'sch_students' && isReadOnly} className="group flex min-h-[88px] flex-col items-start justify-between rounded-xl border border-slate-200 p-3 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60 disabled:opacity-50"><item.icon size={18} className="text-blue-600" /><span><span className="block text-xs font-bold text-slate-700">{item.label}</span><span className="mt-1 block text-[10px] text-slate-400">{item.detail}</span></span></button>)}</div>
       </div>
 
       <div className="school-dashboard-panel min-w-0 p-5">
-        <div className="mb-3 flex items-center justify-between gap-2"><div><h2 className="text-sm font-bold text-[#17264a]">Recent activity</h2><p className="text-[11px] text-slate-400">Latest school updates</p></div><button type="button" onClick={() => onNavigate('sch_notices')} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">View all</button></div>
+        <div className="mb-3 flex items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-slate-900">Recent activity</h2><p className="text-[11px] text-slate-400">Latest school updates</p></div><button type="button" onClick={() => onNavigate('sch_notices')} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">View all</button></div>
         {result.recentActivity.length ? result.recentActivity.slice(0, 4).map((item: DashboardRecord, index: number) => <div key={item.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{item.title ?? item.description ?? item.type ?? 'Activity'}</p><p className="mt-1 text-xs text-slate-400">{item.detail ?? item.name ?? item.date ?? ''}</p></div>)
           : result.notices.slice(0, 4).map((notice: DashboardRecord, index: number) => <div key={notice.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{notice.title ?? 'School notice'}</p><p className="mt-1 line-clamp-2 text-xs text-slate-400">{notice.content ?? ''}</p></div>)}
         {!result.recentActivity.length && !result.notices.length && <p className="py-8 text-center text-sm text-slate-400">No recent activity available.</p>}
