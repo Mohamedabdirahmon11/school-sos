@@ -119,6 +119,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       ))
       .sort((a, b) => Number(Boolean(b.classId)) - Number(Boolean(a.classId)))[0];
   };
+  const feeStatusPresentation = (student: any) => {
+    const status = String(student?.feeStatus || '').toLowerCase();
+    if (status === 'paid') return { label: 'PAID', className: 'bg-emerald-100 text-emerald-800' };
+    if (status === 'partial') return { label: 'PARTIAL', className: 'bg-amber-100 text-amber-800' };
+    if (status === 'unpaid') return { label: 'UNPAID', className: 'bg-rose-100 text-rose-800' };
+    return { label: 'NOT AVAILABLE', className: 'bg-slate-100 text-slate-500' };
+  };
   const isLoading = studentLoad.loading;
 
   const fetchStudents = studentLoad.retry;
@@ -550,7 +557,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   <div className="flex items-start justify-between gap-2"><button type="button" onClick={() => void loadStudentDetails(student)} className="text-left font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</button><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
                   <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{resolveStudentClassName(student, classes)}</span><span>{guardianPhoneLookupErrors[student.id] && !(student.fatherPhone || student.father_phone || student.motherPhone || student.mother_phone) ? <button type="button" onClick={event => { event.stopPropagation(); void loadGuardianPhone(student.id); }} className="text-rose-700 underline">Phone unavailable · Try again</button> : resolveStudentParentPhone(student, guardianPhoneByStudent[student.id])}</span></div>
                   {resolveStudentClassName(student, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(student); }} className="mt-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}
-                  <div className="mt-2 flex items-center justify-between gap-2 text-xs"><span className="text-slate-500">{resolveStudentGender(student.gender)}</span><span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{resolveStudentStatus(student.status).toUpperCase()}</span></div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-slate-500">{resolveStudentGender(student.gender)}</span><div className="flex flex-wrap items-center gap-1.5"><span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{resolveStudentStatus(student.status).toUpperCase()}</span><span className={`rounded-full px-2 py-0.5 font-semibold ${feeStatusPresentation(student).className}`}>Fee: {feeStatusPresentation(student).label}</span></div></div>
                   <div className="mt-2 text-xs"><span className="font-semibold text-slate-500">Fee structure: </span>{feeStructureForStudent(student) ? <><span className="font-medium text-[#0F766E]">{feeStructureForStudent(student)!.name}</span><span className="ml-1 text-slate-500">· {formatMoney(feeStructureForStudent(student)!.amount, school?.currency)} / {feeStructureForStudent(student)!.cadence}</span></> : <><span className="font-medium text-slate-400">Not configured</span><button type="button" onClick={event => { event.stopPropagation(); openFeesSetup(); }} className="ml-2 font-semibold text-[#0F766E] underline">Set up fees</button></>}</div>
                 </div>
               ))}
@@ -564,6 +571,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   <th className="px-5 py-4">Name</th>
                   <th className="px-5 py-4">Class</th>
                   <th className="px-5 py-4">Fee structure</th>
+                  <th className="px-5 py-4">Fee payment</th>
                   <th className="px-5 py-4">Gender</th><th className="px-5 py-4">Parent phone</th>
                   <th className="px-5 py-4">Status</th>
                   <th className="px-5 py-4">Actions</th>
@@ -572,7 +580,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
               <tbody className="divide-y divide-[#E2E8F0]">
                 {visibleStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-[#64748B]">
+                    <td colSpan={10} className="p-8 text-center text-[#64748B]">
                       No students enrolled matching criteria. Click "Admit Student" to enroll your first student.
                     </td>
                   </tr>
@@ -593,6 +601,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 font-medium text-[#132A29]">{[s.firstName, s.middleName, s.lastName].filter(Boolean).join(" ")}</td>
                         <td className="px-5 py-4 text-[#334155]">{resolveStudentClassName(s, classes)}{resolveStudentClassName(s, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(s); }} className="ml-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}</td>
                         <td className="px-5 py-4"><div className="font-medium text-[#18312d]">{feeStructureForStudent(s)?.name || <span className="text-slate-400">Not configured</span>}</div>{feeStructureForStudent(s) ? <div className="mt-1 text-xs text-slate-500">{formatMoney(feeStructureForStudent(s)!.amount, school?.currency)} / {feeStructureForStudent(s)!.cadence}</div> : <button type="button" onClick={event => { event.stopPropagation(); openFeesSetup(); }} className="mt-1 text-xs font-semibold text-[#0F766E] underline">Set up fees</button>}</td>
+                        <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${feeStatusPresentation(s).className}`}>{feeStatusPresentation(s).label}</span></td>
                         <td className="px-5 py-4 capitalize text-[#334155]">{resolveStudentGender(s.gender)}</td>
                         <td className="px-5 py-4 font-mono text-xs text-[#334155]">{guardianPhoneLookupErrors[s.id] && !(s.fatherPhone || s.father_phone || s.motherPhone || s.mother_phone) ? <button type="button" onClick={event => { event.stopPropagation(); void loadGuardianPhone(s.id); }} className="text-rose-700 underline">Phone unavailable · Try again</button> : resolveStudentParentPhone(s, guardianPhoneByStudent[s.id])}</td>
                         <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
