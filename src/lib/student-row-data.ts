@@ -22,7 +22,7 @@ export function normalizeStudentPhone(value: unknown): string {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
   const digits = raw.replace(/\D/g, '');
-  if (!digits) return '';
+  if (digits.length < 7 || digits.length > 15) return '';
   if (digits.startsWith('00251')) return `+251${digits.slice(5)}`;
   if (digits.startsWith('251')) return `+${digits}`;
   if (digits.length === 10 && digits.startsWith('0')) return `+251${digits.slice(1)}`;
@@ -36,10 +36,16 @@ export function resolveStudentParentPhone(
   student: StudentRowLike,
   primaryGuardianPhone?: unknown
 ): string {
-  const value = student.fatherPhone || student.father_phone
-    || student.motherPhone || student.mother_phone
-    || primaryGuardianPhone;
-  return normalizeStudentPhone(value) || 'Phone not provided';
+  const candidates = [
+    student.fatherPhone, student.father_phone,
+    student.motherPhone, student.mother_phone,
+    primaryGuardianPhone
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeStudentPhone(candidate);
+    if (normalized) return normalized;
+  }
+  return 'Phone not provided';
 }
 
 export function resolveStudentGender(value: unknown): 'Male' | 'Female' | '—' {
