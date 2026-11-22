@@ -58,6 +58,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   const [returnToChecklist, setReturnToChecklist] = useState(false);
   const [setupState, setSetupState] = useState<SchoolSetupState | null>(null);
   const [checklistLoading, setChecklistLoading] = useState(false);
+  const [referenceStep, setReferenceStep] = useState(0);
 
   const refreshSetupProgress = async () => {
     setChecklistLoading(true);
@@ -209,58 +210,95 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
 
   if (loading) return <div className="mx-auto max-w-4xl p-8 text-sm text-slate-500">Loading school setup…</div>;
 
-  if (showChecklist) return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-    <header className="rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
-      <p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · FIRST-TIME SETUP</p>
-      <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Complete your school setup</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Your progress is saved in this school. Open each section, then return here to refresh its readiness check. The Dashboard stays locked until the required steps are verified.</p>
-      <div className="mt-5 rounded-xl border border-white/20 bg-white/10 p-4 text-sm leading-6"><strong>START HERE · Kala horreynta</strong><ol className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">{['Academic Year & Semesters','School Information','Classes & Grades','Subjects & Curriculum','Teachers','Teacher Assignment & Form Teachers','Students & Parents','Timetable (optional)','Attendance & Exams','Fees & Extra (optional)','Final review'].map((label, index) => <li key={label}>{index + 1}. {label}{!setupState?.progress.completedAt && index === [1, 2, 3, 4, 5, 0, 6, 7, 8, 9, 10].indexOf(setupState?.progress.currentStep ?? -1) ? ' · Next' : ''}</li>)}</ol></div>
-      <div className="mt-5 text-sm font-semibold">{setupState?.progress.completedSteps.filter(id => id !== 10).length || 0} of 10 steps verified · {setupState?.progress.skippedSteps.length || 0} optional steps skipped</div>
-    </header>
-
-    {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
-
-    {checklistLoading && !setupState && <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading school readiness checks…</div>}
-    <section className="space-y-3">
-      {CHECKLIST_STEPS.map(item => {
-        const evidence = setupState?.checklist[item.id];
-        const completed = Boolean(setupState?.progress.completedSteps.includes(item.id));
-        const skipped = Boolean(setupState?.progress.skippedSteps.includes(item.id));
-        return <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-800">{item.id === 0 ? 6 : item.id > 5 ? item.id + 1 : item.id}</span>
-                <h2 className="font-bold text-slate-900">{item.title}</h2>
-                {completed && <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Verified</span>}
-                {skipped && <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Skipped</span>}
-                {!completed && !skipped && setupState?.progress.currentStep === item.id && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}
-              </div>
-              <p className="mt-2 text-sm text-slate-600">{item.description}</p>
-              {!completed && !skipped && evidence?.reason && <p className="mt-2 text-xs text-amber-700">{evidence.reason}</p>}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {item.coreSteps?.map(coreStep => <button key={coreStep} type="button" onClick={() => { setReturnToChecklist(true); setShowChecklist(false); setStep(coreStep); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">{coreStep === 1 ? 'School profile' : coreStep === 2 ? 'Academic year' : coreStep === 3 ? 'Semesters' : coreStep === 4 ? 'Academic calendar' : 'Working hours'}</button>)}
-              {item.views?.map(target => <button key={target.view} type="button" disabled={target.view === 'sch_timetable' && !setupState?.checklist[0]?.ready} onClick={() => onNavigate(target.view)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">{target.label}</button>)}
-              {item.id === 7 && !setupState?.checklist[0]?.ready && <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Marka hore qoondee macallimiinta. <button type="button" onClick={() => onNavigate('sch_teacher_assignments')} className="ml-1 font-bold underline">Open Teacher Assignments</button></div>}
-              {item.id === 0 && [3, 4, 5].some(id => !setupState?.checklist[id]?.ready) && <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><strong>Marka hore: ku dar</strong><div className="mt-2 flex flex-wrap gap-2">{!setupState?.checklist[3]?.ready && <button type="button" onClick={() => onNavigate('sch_classes')} className="underline">Classes</button>}{!setupState?.checklist[4]?.ready && <button type="button" onClick={() => onNavigate('sch_subjects')} className="underline">Subjects & Curriculum</button>}{!setupState?.checklist[5]?.ready && <button type="button" onClick={() => onNavigate('sch_teachers')} className="underline">Teachers</button>}</div></div>}
-              {item.optional && !completed && !skipped && <button type="button" disabled={saving} onClick={() => void skipOptionalStep(item.id)} className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Skip for now</button>}
-            </div>
-          </div>
-        </article>;
-      })}
-    </section>
-
-    <section className="rounded-2xl border border-teal-200 bg-teal-50/50 p-5">
-      <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">11. Final review</h2>{setupState?.progress.currentStep === 10 && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}</div>
-      <p className="mt-1 text-sm text-slate-600">{setupState?.canFinish ? 'All required setup checks are ready. You can now open the School Admin Dashboard.' : 'Complete the required steps above. Timetable and Fees may be completed now or explicitly skipped.'}</p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" disabled={checklistLoading || saving} onClick={() => void refreshSetupProgress()} className="rounded-xl border border-teal-300 bg-white px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{checklistLoading ? 'Checking…' : 'Refresh setup checks'}</button>
-        <button type="button" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? 'Finishing…' : 'Finish setup and open Dashboard'}</button>
-        <button type="button" onClick={() => { setReturnToChecklist(false); setShowChecklist(false); setStep(1); }} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Open all school settings</button>
-      </div>
-    </section>
-  </main>;
+  if (showChecklist) {
+    const wizardSteps = [
+      { id: 'profile', title: 'Macluumaadka dugsiga', required: true, evidence: 2, needs: [], target: 'profile' },
+      { id: 'year', title: 'Sanad dugsiyeed & Terms', required: true, evidence: 1, needs: ['profile'], target: 'year' },
+      { id: 'classes', title: 'Fasallada', required: true, evidence: 3, needs: ['year'], view: 'sch_classes' },
+      { id: 'subjects', title: 'Maaddooyinka (Curriculum)', required: true, evidence: 4, needs: ['classes'], view: 'sch_subjects' },
+      { id: 'teachers', title: 'Macallimiinta', required: true, evidence: 5, needs: ['profile'], view: 'sch_teachers' },
+      { id: 'assign', title: 'Teacher Assignment', required: true, evidence: 0, needs: ['classes', 'subjects', 'teachers'], view: 'sch_teacher_assignments' },
+      { id: 'students', title: 'Ardayda', required: true, evidence: 6, needs: ['assign'], view: 'sch_students' },
+      { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['assign'], view: 'sch_timetable' },
+      { id: 'finish', title: 'Dhammee & Fur Dashboard', required: true, evidence: -1, needs: ['profile', 'year', 'classes', 'subjects', 'teachers', 'assign', 'students'] }
+    ] as const;
+    const readyFor = (id: string) => {
+      const item = wizardSteps.find(candidate => candidate.id === id);
+      if (!item || !setupState) return false;
+      if (id === 'finish') return Boolean(setupState.canFinish);
+      if (id === 'timetable') return Boolean(setupState.checklist[7]?.ready || setupState.progress.skippedSteps.includes(7));
+      return Boolean(setupState.checklist[item.evidence]?.ready);
+    };
+    const unlockedFor = (id: string) => {
+      const item = wizardSteps.find(candidate => candidate.id === id);
+      return Boolean(item && item.needs.every(readyFor));
+    };
+    const current = wizardSteps[referenceStep] || wizardSteps[0];
+    const currentEvidence = current.evidence >= 0 ? setupState?.checklist[current.evidence] : undefined;
+    const requiredReady = wizardSteps.filter(item => item.required && item.id !== 'finish').every(item => readyFor(item.id));
+    const completedCount = wizardSteps.filter(item => readyFor(item.id)).length;
+    const openTarget = (id: string) => {
+      const item = wizardSteps.find(candidate => candidate.id === id);
+      if (!item || !unlockedFor(id)) return;
+      setError(null);
+      if (item.target === 'profile') {
+        setReturnToChecklist(true); setShowChecklist(false); setStep(1);
+      } else if (item.target === 'year') {
+        setReturnToChecklist(true); setShowChecklist(false); setStep(2);
+      } else if (item.view) onNavigate(item.view);
+      else setReferenceStep(wizardSteps.findIndex(candidate => candidate.id === id));
+    };
+    return <div className="school-setup-reference">
+      <style>{`
+        .school-setup-reference{--sw-bg:#f6f4ee;--sw-card:#fff;--sw-ink:#1c2b26;--sw-muted:#5f6f68;--sw-line:#d9d6cb;--sw-side:#1f4d3f;--sw-sideink:#e8f1ec;--sw-ok:#1b7f4b;--sw-warn:#a65b00;--sw-bad:#b3261e;--sw-accent:#1f4d3f;--sw-soft:#eaf2ed;display:grid;grid-template-columns:290px minmax(0,1fr);min-height:calc(100vh - 2rem);background:var(--sw-bg);color:var(--sw-ink);margin:-1rem;border-radius:12px;overflow:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);font:16px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+        .school-setup-reference *{box-sizing:border-box}.school-setup-reference h1,.school-setup-reference h2,.school-setup-reference h3{font-family:Georgia,"Iowan Old Style",serif}
+        .sw-side{background:var(--sw-side);color:var(--sw-sideink);padding:20px 14px}.sw-side h1{font-size:20px;margin:0 8px 4px}.sw-side p{margin:0 8px 14px;font-size:13px;opacity:.8}
+        .sw-step{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;color:inherit;padding:9px 8px;border-radius:8px;font:inherit;cursor:pointer}.sw-step:hover:not(:disabled){background:rgba(255,255,255,.08)}.sw-step:disabled{opacity:.45;cursor:not-allowed}.sw-step[aria-current=step]{background:rgba(255,255,255,.14);font-weight:600}
+        .sw-dot{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}.sw-dot.ready{background:var(--sw-ok);border-color:var(--sw-ok);color:#fff}.sw-tag{margin-left:auto;font-size:11px;opacity:.85}
+        .sw-main{padding:24px clamp(16px,4vw,48px);max-width:860px;width:100%}.sw-main h2{font-size:26px;margin:0 0 4px}.sw-sub{color:var(--sw-muted);margin:0 0 18px}.sw-start{background:var(--sw-soft);border:1px solid var(--sw-line);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+        .sw-card{background:var(--sw-card);border:1px solid var(--sw-line);border-radius:12px;padding:18px;margin-bottom:14px}.sw-miss{border-left:4px solid var(--sw-warn);background:var(--sw-card);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:14px;font-size:14px}.sw-miss strong{color:var(--sw-warn)}.sw-good{border-left-color:var(--sw-ok)}.sw-good strong{color:var(--sw-ok)}
+        .sw-actions{display:flex;justify-content:space-between;gap:10px;margin-top:16px;flex-wrap:wrap}.sw-btn{background:var(--sw-accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}.sw-btn.secondary{background:transparent;color:var(--sw-ink);border:1px solid var(--sw-line)}.sw-btn:disabled{opacity:.45;cursor:not-allowed}
+        .sw-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.sw-stats div{background:var(--sw-soft);border-radius:10px;padding:10px}.sw-stats b{font-size:22px;display:block}
+        .school-setup-reference button:focus-visible,.school-setup-reference input:focus-visible,.school-setup-reference select:focus-visible{outline:3px solid var(--sw-accent);outline-offset:1px}
+        @media(prefers-color-scheme:dark){.school-setup-reference:not([data-theme=light]){--sw-bg:#121a17;--sw-card:#1a2420;--sw-ink:#e6efe9;--sw-muted:#9db0a7;--sw-line:#2d3b35;--sw-side:#0d2a21;--sw-sideink:#d5e6dd;--sw-ok:#4cc58a;--sw-warn:#e8a042;--sw-bad:#f2867f;--sw-accent:#4cc58a;--sw-soft:#1f2f28;color-scheme:dark}}
+        @media(max-width:760px){.school-setup-reference{grid-template-columns:1fr}.sw-side{padding:12px}.sw-side p{display:none}.sw-steps{display:flex;overflow-x:auto;gap:4px;scrollbar-width:thin}.sw-step{width:auto;white-space:nowrap;flex:none}.sw-main{padding:20px 16px}}
+      `}</style>
+      <aside className="sw-side"><h1>Setup Wizard</h1><p>Dugsi cusub: dhammaystir tallaabooyinka si Dashboard-ku u furmo.</p>
+        <nav className="sw-steps" aria-label="Tallaabooyinka">
+          {wizardSteps.map((item, index) => {
+            const isReady = readyFor(item.id), locked = !unlockedFor(item.id);
+            return <button key={item.id} type="button" className="sw-step" aria-current={referenceStep === index ? 'step' : undefined} disabled={locked} onClick={() => setReferenceStep(index)}>
+              <span className={'sw-dot' + (isReady ? ' ready' : '')}>{isReady ? '✓' : locked ? '🔒' : index + 1}</span>
+              <span>{item.title}</span><span className="sw-tag">{item.required ? 'khasab' : 'optional'}</span>
+            </button>;
+          })}
+        </nav>
+      </aside>
+      <main className="sw-main">
+        {!setupState?.progress.completedAt && completedCount === 0 && <div className="sw-start"><strong>START HERE:</strong> Dugsigaagu wuxuu u baahan yahay dejin. Ka bilow macluumaadka dugsiga, kadib raac tallaabooyinka kala horreeya.</div>}
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2>{current.title}</h2><p className="sw-sub">{current.required ? 'Tallaabo khasab ah' : 'Tallaabo optional ah'} · Tallaabada {referenceStep + 1} ee 9</p></div><div className="text-sm font-semibold">{completedCount}/9 diyaar</div></div>
+        {error && <div role="alert" className="sw-miss"><strong>Cilad:</strong> {error}</div>}
+        {current.id !== 'finish' && current.id !== 'timetable' && currentEvidence && <div className={'sw-miss' + (currentEvidence.ready ? ' sw-good' : '')} role="status"><strong>{currentEvidence.ready ? 'Tallaabadani waa diyaar ✓' : 'Wax ka maqan:'}</strong>{!currentEvidence.ready && <p className="mt-1">{currentEvidence.reason}</p>}</div>}
+        {current.id === 'profile' && <section className="sw-card"><p className="sw-sub">Diiwaangeli magaca, cinwaanka, magaalada, telefoonka, email-ka iyo WhatsApp-ka maamulka. Kaydintu waxay adeegsanaysaa SchoolOS API-ga jira.</p><button className="sw-btn" type="button" onClick={() => openTarget('profile')}>Fur School Profile →</button></section>}
+        {current.id === 'year' && <section className="sw-card"><p className="sw-sub">Deji sannad-dugsiyeedka, taariikhaha iyo semesters-ka. Jadwalka iyo taariikhaha waxaa lagu kaydinayaa xogta dugsiga.</p><button className="sw-btn" type="button" onClick={() => openTarget('year')}>Fur Academic Year & Terms →</button></section>}
+        {current.id === 'classes' && <section className="sw-card"><p className="sw-sub">Samee fasallada iyo sections-ka. Xogta fasallada ee dugsiga ayaa readiness-ka lagu hubinayaa.</p><button className="sw-btn" type="button" onClick={() => openTarget('classes')}>Fur Classes →</button></section>}
+        {current.id === 'subjects' && <section className="sw-card"><p className="sw-sub">Ku dar maaddooyinka iyo class curriculum; fasal kasta waa inuu leeyahay ugu yaraan hal maaddo.</p><button className="sw-btn" type="button" onClick={() => openTarget('subjects')}>Fur Subjects & Curriculum →</button></section>}
+        {current.id === 'teachers' && <section className="sw-card"><p className="sw-sub">Diiwaangeli macallimiinta iyo xogtooda shaqo.</p><button className="sw-btn" type="button" onClick={() => openTarget('teachers')}>Fur Teachers →</button></section>}
+        {current.id === 'assign' && <section className="sw-card"><p className="sw-sub">Hal Form Teacher fasal kasta, macallin maaddo kasta, culayskuna kama badnaan karo 30 periods toddobaadkii.</p><button className="sw-btn" type="button" onClick={() => openTarget('assign')}>Fur Teacher Assignment →</button></section>}
+        {current.id === 'students' && <section className="sw-card"><p className="sw-sub">Diiwaangeli ardayda oo ku xidh fasalladooda; parent/guardian records-ka jira way sii shaqaynayaan.</p><button className="sw-btn" type="button" onClick={() => openTarget('students')}>Fur Students →</button></section>}
+        {current.id === 'timetable' && <><section className="sw-card"><p className="sw-sub">Timetable waa optional. Waxaad hadda abuuri kartaa jadwalka ama waad ka boodi kartaa oo dib ayaad ugu noqon kartaa.</p><button className="sw-btn" type="button" onClick={() => openTarget('timetable')}>Fur Timetable →</button> <button className="sw-btn secondary ml-2" type="button" disabled={saving || !setupState} onClick={() => void skipOptionalStep(7)}>Ka bood hadda</button></section></>}
+        {current.id === 'finish' && <><section className="sw-card"><h3 className="mb-3 text-lg font-semibold">Hubinta ugu dambaysa</h3><div className="sw-stats"><div><b>{setupState?.checklist[3]?.ready ? '✓' : '—'}</b>Fasallo</div><div><b>{setupState?.checklist[4]?.ready ? '✓' : '—'}</b>Maaddooyin</div><div><b>{setupState?.checklist[5]?.ready ? '✓' : '—'}</b>Macallimiin</div><div><b>{setupState?.checklist[6]?.ready ? '✓' : '—'}</b>Arday</div><div><b>{setupState?.checklist[7]?.ready ? '✓' : '—'}</b>Timetable</div></div></section>
+          <section className="sw-card"><p className="sw-sub">SchoolOS wuxuu sii ilaalinayaa hubinnadii hore ee Attendance & Exams iyo Fees. Haddii ay wali khasab yihiin sida ku cad validator-ka server-ka, waa in la dhammaystiraa ka hor furitaanka Dashboard-ka.</p>
+            {[8,9].map(id => <div key={id} className="flex items-center justify-between gap-3 border-b py-2"><span>{id === 8 ? 'Attendance & Exams' : 'Fees & Extra Modules'}</span><span className="text-sm">{setupState?.checklist[id]?.ready ? '✓ Diyaar' : setupState?.progress.skippedSteps.includes(id) ? 'La booday' : 'Wax baa maqan'}</span><button className="sw-btn secondary" type="button" onClick={() => onNavigate(id === 8 ? 'sch_attendance' : 'sch_fees')}>Fur</button></div>)}
+          </section>
+          {!setupState?.canFinish && <div className="sw-miss"><strong>Wax ka maqan:</strong><p className="mt-1">Dashboard-ka lama furi karo ilaa hubinnada server-ka ee khasabka ahi gudbaan.</p></div>}
+          <button type="button" className="sw-btn" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()}>{saving ? 'Waa la dhammaynayaa…' : 'Dhammee setup-ka oo fur Dashboard'}</button>
+        </>}
+        <div className="sw-actions"><button type="button" className="sw-btn secondary" disabled={referenceStep === 0} onClick={() => setReferenceStep(value => Math.max(0, value - 1))}>← Hore</button><button type="button" className="sw-btn" disabled={referenceStep === 8 || !readyFor(current.id)} onClick={() => setReferenceStep(value => Math.min(8, value + 1))}>Xiga →</button></div>
+        <p className="text-xs mt-4" style={{color:'var(--sw-muted)'}}>Horumarka waxaa laga akhriyaa xogta dhabta ah ee SchoolOS. Waxba laguma kaydiyo browser localStorage.</p>
+      </main>
+    </div>;
+  }
 
   return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
     <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
