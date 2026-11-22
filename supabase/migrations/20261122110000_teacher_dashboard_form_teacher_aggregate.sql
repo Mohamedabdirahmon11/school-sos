@@ -66,6 +66,20 @@ AS $function$
       END
     ),
     'totalClasses', (SELECT COUNT(*) FROM teacher_classes),
+    'totalPeriodsPerWeek', (
+      SELECT COUNT(*)::integer
+      FROM public.timetable_slots
+      WHERE school_id = p_school_id
+        AND teacher_id = p_teacher_id
+        AND is_active = TRUE
+    ),
+    'openHomeworkCount', (
+      SELECT COUNT(*)::integer
+      FROM public.assignments
+      WHERE school_id = p_school_id
+        AND teacher_id = (SELECT user_id FROM public.teachers WHERE id = p_teacher_id AND school_id = p_school_id)
+        AND due_date >= (now() AT TIME ZONE COALESCE((SELECT timezone FROM school_context), 'Africa/Addis_Ababa'))::date
+    ),
     'attendanceRecordedToday', (SELECT recorded FROM attendance_totals),
     'todayAttendance', (SELECT attended FROM attendance_totals),
     'recentStudents', COALESCE((

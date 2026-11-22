@@ -5225,7 +5225,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   let teacherAssignedClassIds: string[] = [];
   if (user.role === 'teacher') {
     const ownFormTeacherClasses = await getTeacherFormTeacherClassIds(school.id, user.id);
-    const assigned = ownFormTeacherClasses.length ? ownFormTeacherClasses : await getTeacherAssignedClassIds(school.id, user.id);
+    const assigned = [...new Set([...ownFormTeacherClasses, ...await getTeacherAssignedClassIds(school.id, user.id)])];
     teacherAssignedClassIds = assigned;
     if (classId && !assigned.includes(classId)) { res.status(403).json({ error: 'Student access is limited to your assigned classes.' }); return; }
     if (!assigned.length) { res.json([]); return; }

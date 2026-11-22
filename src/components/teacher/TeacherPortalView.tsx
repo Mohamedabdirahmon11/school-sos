@@ -45,6 +45,18 @@ import {
   Clock3
 } from 'lucide-react';
 
+const formatTeacherGuardianPhone = (...values: unknown[]) => {
+  const value = values.find(item => typeof item === 'string' && item.trim());
+  if (typeof value !== 'string') return 'Phone not provided';
+  const raw = value.trim().replace(/[\\s().-]/g, '');
+  if (raw.startsWith('+')) return raw;
+  if (raw.startsWith('00')) return `+${raw.slice(2)}`;
+  if (raw.startsWith('251')) return `+${raw}`;
+  if (raw.startsWith('0') && raw.length === 10) return `+251${raw.slice(1)}`;
+  if (/^[79]\\d{8}$/.test(raw)) return `+251${raw}`;
+  return raw || 'Phone not provided';
+};
+
 interface TeacherPortalViewProps {
   initialTab?: 'dashboard' | 'timetable' | 'students' | 'attendance' | 'grades' | 'exam_results' | 'assignments' | 'notices' | 'profile';
 }
@@ -156,6 +168,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
     : [];
   const assignmentsState = useApi(() => ApiClient.getAssignments(), [school?.id, user?.id], Boolean(school && user));
   const homework = Array.isArray(assignmentsState.data) ? assignmentsState.data : [];
+  const schoolWeekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', timeZone: school?.timezone || 'Africa/Addis_Ababa'
+  }).format(new Date());
+  const todaysLessons = timetable.filter(slot => slot.dayOfWeek === schoolWeekday)
+    .slice().sort((a, b) => a.periodNumber - b.periodNumber);
+  const weeklyPeriods = Number(dashboardSummary?.totalPeriodsPerWeek ?? timetable.length);
+  const openHomeworkCount = Number(dashboardSummary?.openHomeworkCount ??
+    homework.filter(item => String(item.dueDate || '') >= getSchoolLocalDate(school?.timezone)).length);
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [assignmentDescription, setAssignmentDescription] = useState('');
   const [assignmentDueDate, setAssignmentDueDate] = useState('');
@@ -678,30 +698,52 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
       )}
 
       {activeTab === 'dashboard' && (
-        <section className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <section className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 to-white p-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Form Teacher responsibility</p>
-              <h2 className="mt-1 text-base font-bold text-slate-900">Your assigned class</h2>
-              {formTeacherClasses.length ? <ul className="mt-3 space-y-2">{formTeacherClasses.map(klass => <li key={klass.id} className="rounded-xl border border-teal-100 bg-white px-3 py-2 text-sm font-semibold text-slate-800">{klass.name}{klass.section ? ` · ${klass.section}` : ''}<span className="ml-2 rounded-full bg-teal-50 px-2 py-1 text-[11px] text-teal-800">Form Teacher</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No Form Teacher class has been assigned to your account.</p>}
-            </section>
-            <section className="rounded-2xl border border-slate-200 bg-white p-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Teaching assignments</p>
-              <h2 className="mt-1 text-base font-bold text-slate-900">Subjects you teach</h2>
-              {teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).length ? <ul className="mt-3 space-y-2">{teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => <li key={`${assignment.classId}:${assignment.subject.id}`} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold text-slate-800">{assignment.subject.name}</span><span className="text-slate-500">{assignment.class?.name || 'Assigned class'}</span></li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No teaching subjects have been assigned yet.</p>}
-            </section>
+        <section className="space-y-4" aria-labelledby="teacher-dashboard-heading">
+          <div>
+            <h2 id="teacher-dashboard-heading" className="text-lg font-semibold">Dashboard</h2>
+            <p className="mt-1 text-sm text-slate-500">Fasalladaada, casharrada maanta iyo shaqooyinka furan.</p>
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <article className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">Ardayda fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{assignedClassStudentTotal}</p><p className="mt-1 text-[10px] text-slate-500">Wadarta ardayda fasalladaada</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Fasallada laguu xilsaaray</p><p className="mt-2 text-2xl font-black text-slate-900">{Number(dashboardSummary?.totalClasses ?? new Set([...teacherAssignments.filter((assignment: any) => !assignment.isFormTeacher).map((assignment: any) => assignment.classId), ...formTeacherClasses.map(klass => klass.id)]).size)}</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Attendance maanta</p><p className="mt-2 text-2xl font-black text-slate-900">{Number(dashboardSummary?.stats?.attendanceRate ?? 0)}%</p><p className="mt-1 text-[10px] text-slate-500">{Number(dashboardSummary?.attendanceRecordedToday ?? 0)} / {assignedClassStudentTotal} la diiwaangeliyey</p></article>
-            <article className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Casharrada laguu qoondeeyay</p><p className="mt-2 text-2xl font-black text-slate-900">{timetable.length}</p><p className="mt-1 text-[10px] text-slate-500">Xogta timetable-ka dugsiga</p></article>
+            <article className="tp-stat"><small>Fasallo</small><b>{Number(dashboardSummary?.totalClasses ?? classes.length)}</b></article>
+            <article className="tp-stat"><small>Arday</small><b>{assignedClassStudentTotal}</b></article>
+            <article className="tp-stat"><small>Xiisado/toddobaad</small><b>{weeklyPeriods}</b></article>
+            <article className="tp-stat"><small>Shaqo guri furan</small><b>{openHomeworkCount}</b></article>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <a href="#attendance" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Daily Attendance</strong><span className="mt-1 block text-xs text-slate-500">{Number(dashboardSummary?.attendanceRecordedToday ?? 0)} of {assignedClassStudentTotal} student records today</span></a>
-            <a href="#grades" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Exam Marks</strong><span className="mt-1 block text-xs text-slate-500">{subjects.length} assigned subjects ready for mark entry</span></a>
-            <a href="#assignments" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Homework</strong><span className="mt-1 block text-xs text-slate-500">{homework.length} current assignments</span></a>
-            <a href="#notices" className="rounded-xl border border-slate-200 bg-white p-3 text-sm hover:border-teal-300"><strong className="block text-slate-900">Notice Board</strong><span className="mt-1 block text-xs text-slate-500">{notices.length} published notices</span></a>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <article className="tp-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">Casharrada maanta</h3>
+              {todaysLessons.length ? (
+                <div className="divide-y divide-slate-100">
+                  {todaysLessons.map(slot => {
+                    const klass = classes.find(item => item.id === slot.classId);
+                    const subject = subjects.find(item => item.id === slot.subjectId);
+                    return <div key={slot.id} className="flex items-center gap-3 py-2 text-sm">
+                      <span className="w-24 shrink-0 font-mono text-xs text-slate-500">{String(slot.startTime).slice(0,5)}–{String(slot.endTime).slice(0,5)}</span>
+                      <span className="min-w-0 flex-1 font-semibold">{(slot as any).subjectName || subject?.name || '—'} <span className="font-normal text-slate-500">· {(slot as any).className || klass?.name || '—'}{klass?.section ? ` · ${klass.section}` : ''}</span></span>
+                      <span className="text-xs text-slate-500">P{slot.periodNumber}</span>
+                    </div>;
+                  })}
+                </div>
+              ) : <p className="text-sm text-slate-500">Maanta cashar ma jiro.</p>}
+            </article>
+            <article className="tp-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">Waxa la sameeyo</h3>
+              <div className="divide-y divide-slate-100">
+                <div className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span>Attendance — {formTeacherClasses[0] ? `${formTeacherClasses[0].name}${formTeacherClasses[0].section ? ` · ${formTeacherClasses[0].section}` : ''}` : 'Form Teacher'}</span>
+                  {formTeacherClasses.length
+                    ? <span className={`rounded-full px-2 py-1 text-xs font-semibold ${Number(dashboardSummary?.attendanceRecordedToday || 0) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>{Number(dashboardSummary?.attendanceRecordedToday || 0) > 0 ? 'La qaaday' : 'Weli lama qaadin'}</span>
+                    : <span className="text-xs text-slate-500">Form Teacher keliya</span>}
+                  <a href="#attendance" className="font-semibold text-teal-700">Fur</a>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span>Gelinta dhibcaha</span><a href="#grades" className="font-semibold text-teal-700">Fur</a>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <span>Notice cusub</span><span className="text-xs text-slate-500">{notices.length}</span><a href="#notices" className="font-semibold text-teal-700">Eeg</a>
+                </div>
+              </div>
+            </article>
           </div>
         </section>
       )}
@@ -799,7 +841,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({ initialTab
                 {visibleStudents.map((student, index) => <article key={student.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-slate-400">#{index + 1}</span><span className="rounded-lg bg-white px-2 py-1 font-mono text-[11px] text-slate-600">{student.rollNumber || student.studentId}</span></div>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{student.firstName} {student.middleName} {student.lastName}</p>
-                  <p className="mt-1 text-xs text-slate-500">Parent phone: {student.fatherPhone || student.motherPhone || '—'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Parent phone: {formatTeacherGuardianPhone((student as any).fatherPhone, (student as any).motherPhone, (student as any).guardianPhone)}</p>
                   <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">{student.status || 'Active'}</span>
                 </article>)}
                 {visibleStudents.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No students match your search.</p>}

@@ -20,6 +20,11 @@
 .teacher-portal-design table{font-variant-numeric:tabular-nums}
 .teacher-portal-design .tp-card{background:var(--tp-surface);border:1px solid var(--tp-line);border-radius:12px}
 .teacher-portal-design .tp-muted{color:var(--tp-muted)}
+
+.teacher-portal-design .tp-stat{min-width:0;padding:12px 14px;border:1px solid var(--tp-line);border-radius:12px;background:var(--tp-surface)}
+.teacher-portal-design .tp-stat small{display:block;color:var(--tp-muted);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.teacher-portal-design .tp-stat b{display:block;margin-top:2px;font-family:"Space Grotesk",Inter,system-ui,sans-serif;font-size:26px;font-variant-numeric:tabular-nums}
+
 .teacher-portal-design [role="status"]{min-height:20px}
 @media(max-width:860px){.teacher-portal-design .tp-navigation{display:flex;overflow-x:auto;white-space:nowrap}}
 
