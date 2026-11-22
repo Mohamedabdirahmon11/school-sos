@@ -20,6 +20,7 @@ for (const width of widths) {
       await page.goto(`http://127.0.0.1:4173/teacher-portal-visual.html?component=setup&theme=${theme}`);
       await expect(page.locator('.school-setup-reference')).toBeVisible();
       await expect(page.getByText('Setup Wizard', { exact: true })).toBeVisible();
+      await expect(page.getByText('9/9 diyaar')).toBeVisible();
       const folder = path.join(root, 'artifacts', 'school-setup', theme, String(width));
       fs.mkdirSync(folder, { recursive: true });
       const pageLinks: string[] = [];
