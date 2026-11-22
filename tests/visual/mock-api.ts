@@ -1,7 +1,7 @@
 const klass = { id: 'class-4a', name: 'Grade 4', section: 'A', classTeacherId: 'teacher-visual-001', academicYear: '2026-2027' };
 const math = { id: 'subject-math', name: 'Mathematics', code: 'MATH' };
 const science = { id: 'subject-science', name: 'Environmental Science', code: 'ENV' };
-const teacher = { id: 'teacher-visual-001', fullName: 'Amina Teacher', staffId: 'TCH-001', phone: '+251911000001', status: 'active' };
+const teacher = { id: 'teacher-visual-001', userId: 'teacher-user-visual-001', fullName: 'Amina Teacher', staffId: 'TCH-001', phone: '+251911000001', status: 'active' };
 const term = { id: 'term-visual-001', name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-20', isCurrent: true };
 const students = [
   { id: 'student-001', studentId: 'ST-001', firstName: 'Ayaan', middleName: 'Test', lastName: 'Student', gender: 'female', rollNumber: '1', fatherPhone: '+251911000001', motherPhone: '+251922000001', classId: klass.id, status: 'active' },
