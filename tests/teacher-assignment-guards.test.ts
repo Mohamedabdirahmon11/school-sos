@@ -51,4 +51,13 @@ test('Assignment uniqueness is per school, year, term, class and subject—not s
   assert.doesNotMatch(upsert, /query\.is\('section_id'/);
   assert.doesNotMatch(upsert, /query\.eq\('section_id'/);
 });
+test('Teacher Assignment uses the shared Academic Setup header and theme stylesheet', () => {
+  const view = readFileSync(new URL('../src/components/schooladmin/TeacherAssignmentsView.tsx', import.meta.url), 'utf8');
+  const style = readFileSync(new URL('../src/components/schooladmin/academic-setup.css', import.meta.url), 'utf8');
+  assert.match(view, /AcademicSetupHeader active="sch_teacher_assignments"/);
+  assert.match(view, /className="academic-setup"/);
+  assert.match(view, /academic-setup\.css/);
+  assert.match(style, /schoolos-assignment-page/);
+  assert.doesNotMatch(style, /\\\\n/);
+});
 

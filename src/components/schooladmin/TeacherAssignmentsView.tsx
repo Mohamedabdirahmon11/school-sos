@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BookOpen, CheckCircle2, Copy, Printer, RefreshCw, Users } from 'lucide-react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
-import { PageHeader, Stepper, Card, Button, Pill, EmptyState, FormRow } from '../SchoolDesignSystem.tsx';
+import { Card, Button, Pill, EmptyState, FormRow } from '../SchoolDesignSystem.tsx';
+import { AcademicSetupHeader } from './AcademicSetupHeader.tsx';
+import './academic-setup.css';
 
 type Row = { id: string; class_id: string; subject_id: string; teacher_id: string | null; periods_per_week: number; is_active: boolean };
 type Assignment = { id: string; academic_year_id: string; term_id: string | null; class_id: string; section_id: string | null; subject_id: string; teacher_id: string; qualification_override: boolean };
@@ -218,8 +220,8 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     finally { setSaving(false); }
   };
 
-  if (loading && !data) return <div className="mx-auto max-w-6xl space-y-4 p-5"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700" /><div className="h-40 animate-pulse rounded-2xl bg-white dark:bg-slate-900" /></div>;
-  if (error && !data) return <div className="mx-auto max-w-4xl p-6"><Card><EmptyState><p className="font-semibold">{error}</p><Button onClick={() => void load()}>Mar kale isku day</Button></EmptyState></Card></div>;
+  if (loading && !data) return <div className="academic-setup"><div className="wrap"><AcademicSetupHeader active="sch_teacher_assignments" onNavigate={onNavigate} /><div className="loading">Loading teacher assignments…</div></div></div>;
+  if (error && !data) return <div className="academic-setup"><div className="wrap"><AcademicSetupHeader active="sch_teacher_assignments" onNavigate={onNavigate} /><section className="card"><EmptyState><p className="font-semibold">{error}</p><Button onClick={() => void load()}>Mar kale isku day</Button></EmptyState></section></div></div>;
   if (!data) return null;
 
   const missingSetup = !data.academicYears.length
@@ -229,18 +231,20 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     : !data.curriculum.length ? { title: 'Manhaj lama diyaarin', detail: 'Marka hore dhammee Tallaabada 4.', view: 'sch_curriculum' }
     : !data.teachers.length ? { title: 'Macallimiin lama diiwaangelin', detail: 'Marka hore dhammee Tallaabada 5.', view: 'sch_teachers' }
     : null;
-  if (missingSetup) return <main className="mx-auto max-w-5xl space-y-5 p-4 md:p-8">
-    <PageHeader title="Qoondeynta Macallimiinta" subtitle="Ku xidh macallin, maaddo iyo fasal/qayb." />
-    <Stepper activeStep={6} labels={['Sannad & Xiisado', 'Fasallo', 'Maaddooyin', 'Manhaj', 'Macallimiin', 'Qoondeyn']} />
-    <Card><EmptyState><BookOpen className="mx-auto h-8 w-8 text-teal-700" /><p className="font-semibold">{missingSetup.title}</p><p>{missingSetup.detail}</p><Button onClick={() => onNavigate(missingSetup.view)}>Tag tallaabada loo baahan yahay</Button></EmptyState></Card>
-  </main>;
+  if (missingSetup) return <div className="academic-setup"><div className="wrap">
+    <AcademicSetupHeader active="sch_teacher_assignments" onNavigate={onNavigate} />
+    <h2>Teacher Assignment</h2>
+    <p className="lead">Maaddo kasta ee fasalka waxaa leh hal macallin. Form Teacher-ku waa macallinka masuulka ah fasalka.</p>
+    <section className="card"><EmptyState><BookOpen className="mx-auto h-8 w-8 text-teal-700" /><p className="font-semibold">{missingSetup.title}</p><p>{missingSetup.detail}</p><Button onClick={() => onNavigate(missingSetup.view)}>Tag tallaabada loo baahan yahay</Button></EmptyState></section>
+  </div></div>;
 
   const workloadByTeacher = new Map(data.workload.map(w => [w.teacherId, w]));
   const replacementSubjectIds = [...new Set(data.assignments.filter(a => a.teacher_id === replaceFrom).map(a => a.subject_id))];
   const qualifiedForReplacement = (teacherId: string) => !replacementSubjectIds.length || replacementSubjectIds.every(subjectId => qualified(subjectId, teacherId));
-  return <main className="schoolos-assignment-page mx-auto min-w-0 w-full max-w-[1500px] space-y-5 p-4 md:p-8">
-    <PageHeader title="Qoondaynta macallinka" subtitle="Ku xidh macallin, maaddo iyo fasal; si cad ula soco maaddooyinka bannaan iyo culayska shaqada." />
-    <Stepper activeStep={6} labels={['Sannad & Xiisado', 'Fasallo', 'Maaddooyin', 'Manhaj', 'Macallimiin', 'Qoondeyn']} ariaLabel="Tallaabooyinka dejinta waxbarashada" />
+  return <div className="academic-setup"><div className="wrap schoolos-assignment-page">
+    <AcademicSetupHeader active="sch_teacher_assignments" onNavigate={onNavigate} />
+    <h2>Teacher Assignment</h2>
+    <p className="lead">Maaddo kasta ee fasalka waxaa leh hal macallin. Form Teacher-ku waa macallinka masuulka ah fasalka.</p>
     {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"><CheckCircle2 className="mr-2 inline h-4 w-4" />{notice}</div>}
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">{error}</div>}
     <div className="inline-flex min-h-9 items-center rounded-full border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] px-3 text-xs font-bold text-[var(--schoolos-accent)]">{data.unassignedCount > 0 ? data.unassignedCount + " maaddo macallin la’aan" : "Dhammaan waa la qoondeeyay"}</div>
@@ -287,5 +291,5 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     </section>}
     {!!data.unassigned.length && <Card className="p-4"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4 text-amber-600" />Maaddooyinka aan weli macallin loo qoondeyn</div><p className="mt-1 text-xs text-slate-500">{data.unassigned.length} maaddo/fasal ayaa sugaya qoondeyn.</p><div className="mt-3 flex flex-wrap gap-2">{data.unassigned.map((r,i) => <Pill key={i}>{className(r.classId)} · {subjectName(r.subjectId)} ({r.periodsPerWeek})</Pill>)}</div></Card>}
     {!data.teachers.length && <Card><EmptyState><Users className="mx-auto h-8 w-8 text-teal-700" /><p>Macallimiin lama helin.</p><Button onClick={() => onNavigate('sch_teachers')}>Tag Macallimiinta (Tallaabada 5)</Button></EmptyState></Card>}
-  </main>;
+  </div></div>;
 };
