@@ -2290,3 +2290,54 @@ body { font-family: var(--schoolos-font-body); }
   .schoolos-teacher-portal { padding: 10px !important; }
   .schoolos-teacher-portal .schoolos-mark-entry-toolbar { padding: 12px; }
 }
+
+
+/* Simple, calm School Admin dashboard palette and full-height sidebar alignment. */
+.school-admin-role .school-admin-sidebar {
+  height: calc(100dvh / var(--school-ui-zoom, 0.96)) !important;
+  min-height: calc(100dvh / var(--school-ui-zoom, 0.96)) !important;
+  max-height: calc(100dvh / var(--school-ui-zoom, 0.96)) !important;
+}
+.school-admin-role .school-dashboard-hero {
+  background: #fff !important;
+  color: #18202c !important;
+  box-shadow: 0 2px 8px rgba(16,24,40,.05) !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric,
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone] {
+  min-height: 104px;
+  border: 1px solid #e5e7eb !important;
+  border-left: 3px solid #0f766e !important;
+  border-radius: 12px !important;
+  padding: 15px !important;
+  background: #fff !important;
+  color: #18202c !important;
+  box-shadow: 0 1px 4px rgba(16,24,40,.045) !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric:hover {
+  transform: none !important;
+  border-color: #d1d5db !important;
+  border-left-color: #0f766e !important;
+  background: #fafafa !important;
+  box-shadow: 0 2px 7px rgba(16,24,40,.06) !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-label { color: #667085 !important; }
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-value { color: #18202c !important; }
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-hint { color: #475569 !important; background: #f3f4f6 !important; }
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-icon { color: #0f766e !important; background: #f0fdfa !important; }
+.school-admin-role .school-dashboard-page .school-dashboard-panel {
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: 0 1px 5px rgba(16,24,40,.045) !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel :is(h2,h3) { color: #1f2937; }
+.school-admin-role .school-dashboard-page button:hover { transition: background-color .15s ease, border-color .15s ease; }
+@media (max-width: 767px) {
+  .school-admin-role .school-admin-sidebar {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+  .school-admin-role .school-dashboard-page { padding: 12px !important; }
+}
