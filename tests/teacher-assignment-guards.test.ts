@@ -31,7 +31,7 @@ test('Teacher assignment workload display and editable limit never exceed 30', (
 });
 
 test('Teacher timetable clash validation checks both teacher and class period conflicts', () => {
-  const timetable = api.slice(api.indexOf("apiRouter.post('/timetable'"), api.indexOf("apiRouter.put('/timetable/"));
+  const timetable = api.slice(api.indexOf("apiRouter.post('/timetable/generate'"), api.indexOf("apiRouter.post('/timetable/generate-all'"));
   assert.match(timetable, /teacher_id/);
   assert.match(timetable, /day_of_week/);
   assert.match(timetable, /period_number/);
