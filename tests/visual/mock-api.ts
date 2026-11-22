@@ -34,7 +34,7 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getNotices: async () => [],
   getPublishedExamSchedules: async () => [],
   getTeacherExamInvigilation: async () => [],
-  getSchoolDashboard: async () => ({ stats: { totalStudents: students.length } }),
+  getSchoolDashboard: async () => ({ stats: { totalStudents: students.length, attendanceRate: 67 }, totalClasses: 1, attendanceRecordedToday: 2, todayAttendance: 2 }),
   getAssignments: async () => [],
   getAllStudents: async () => students,
   getDailyAttendance: async () => [],
