@@ -44,7 +44,6 @@ import {
 } from '../types/index.ts';
 import { DEFAULT_ATTENDANCE_RULES, DEFAULT_CLASS_LEVELS, DEFAULT_GRADING_SCALE, DEFAULT_NOTIFICATION_PREFERENCES, DEFAULT_TERMS } from './school-settings.ts';
 import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.ts';
-import { rankExamStudentResults } from '../lib/exam-calculations.ts';
 import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
@@ -3191,27 +3190,57 @@ class StorageEngine {
       records.push(record);
       attendanceByStudent.set(record.studentId, records);
     }
-    const assignments = await this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId, is_active: 'true' });
-    const expectedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
-    const expectedSubjectIdSet = new Set(expectedSubjectIds);
-    const subjects = (await this.getSubjects(schoolId)).filter(subject => expectedSubjectIdSet.has(subject.id));
+
+    // Keep inactive class subjects as blank report-card rows, but exclude them from every total and rank.
+    const assignments = await this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId });
+    const activeAssignments = assignments.filter(assignment => assignment.isActive);
+    const expectedSubjectIds = [...new Set(activeAssignments.map(assignment => assignment.subjectId).filter(Boolean))];
+    const allAssignedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
+    const activeSubjectIds = new Set(expectedSubjectIds);
+    const subjects = (await this.getSubjects(schoolId)).filter(subject => allAssignedSubjectIds.includes(subject.id));
+
+    const getTermRankMap = (termMarks: StudentMark[]) => {
+      const rows = students.map(student => {
+        const studentMarks = termMarks.filter(mark => mark.studentId === student.id && activeSubjectIds.has(mark.subjectId));
+        const complete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
+          studentMarks.some(mark => mark.subjectId === subjectId)
+        );
+        return {
+          studentId: student.id,
+          totalMarks: studentMarks.reduce((sum, mark) => sum + (Number(mark.totalMarks) || 0), 0),
+          complete,
+          rank: 0
+        };
+      }).sort((a, b) => Number(b.complete) - Number(a.complete) || b.totalMarks - a.totalMarks);
+      let position = 0;
+      let previousTotal: number | null = null;
+      let previousRank = 0;
+      const result = new Map<string, number>();
+      for (const row of rows) {
+        if (!row.complete) { result.set(row.studentId, 0); continue; }
+        position += 1;
+        if (previousTotal !== null && row.totalMarks === previousTotal) row.rank = previousRank;
+        else { row.rank = position; previousRank = position; previousTotal = row.totalMarks; }
+        result.set(row.studentId, row.rank);
+      }
+      return result;
+    };
+    const semester1Ranks = getTermRankMap(sem1Marks);
+    const semester2Ranks = getTermRankMap(sem2Marks);
 
     const yearlyResults = students.map(student => {
-      const s1 = sem1Marks.filter(m => m.studentId === student.id);
-      const s2 = sem2Marks.filter(m => m.studentId === student.id);
-
-      // Subject by subject combining
+      const s1 = sem1Marks.filter(mark => mark.studentId === student.id);
+      const s2 = sem2Marks.filter(mark => mark.studentId === student.id);
+      const hasAnyApprovedActiveMark = expectedSubjectIds.some(subjectId =>
+        s1.some(mark => mark.subjectId === subjectId) || s2.some(mark => mark.subjectId === subjectId)
+      );
       const subjectResults = subjects.map(sub => {
-        const m1 = s1.find(m => m.subjectId === sub.id);
-        const m2 = s2.find(m => m.subjectId === sub.id);
+        const isActive = activeSubjectIds.has(sub.id);
+        const m1 = isActive ? s1.find(mark => mark.subjectId === sub.id) : undefined;
+        const m2 = isActive ? s2.find(mark => mark.subjectId === sub.id) : undefined;
         const p1 = m1 ? m1.percentage : null;
         const p2 = m2 ? m2.percentage : null;
-        // A yearly subject average is valid only when both semester results
-        // have been approved. Never present a single semester as the full-year average.
-        const yearlyP = p1 !== null && p2 !== null
-          ? Math.round(((p1 + p2) / 2) * 100) / 100
-          : null;
-
+        const yearlyP = p1 !== null && p2 !== null ? Math.round(((p1 + p2) / 2) * 100) / 100 : null;
         const markDetails = (mark: StudentMark | undefined) => mark ? {
           smallExamMarks: mark.smallExamMarks,
           bigExamMarks: mark.bigExamMarks,
@@ -3220,14 +3249,11 @@ class StorageEngine {
           status: mark.status,
           teacherRemarks: mark.teacherRemarks?.trim() || '',
           publishedAt: mark.publishedAt || null,
-          // Use the immutable scheme saved with this mark. Admin changes to a
-          // later scheme must never change the denominator shown for old marks.
           maxMarks: getMarkSchemeMaximums(mark.schemeSnapshot, config.smallExamMax, config.bigExamMax)
         } : null;
-
         return {
           subject: sub,
-          isActive: true,
+          isActive,
           sem1Marks: markDetails(m1),
           sem2Marks: markDetails(m2),
           sem1Percentage: p1,
@@ -3240,7 +3266,9 @@ class StorageEngine {
             total: (config.smallExamMax || 0) + (config.bigExamMax || 0)
           }
         };
-      }).filter(sr => sr.sem1Percentage !== null || sr.sem2Percentage !== null);
+      }).filter(row => row.isActive
+        ? row.sem1Percentage !== null || row.sem2Percentage !== null
+        : hasAnyApprovedActiveMark);
 
       const annualComplete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId =>
         s1.some(mark => mark.subjectId === subjectId) && s2.some(mark => mark.subjectId === subjectId)
@@ -3249,14 +3277,15 @@ class StorageEngine {
         Boolean(s1.find(mark => mark.subjectId === subjectId)?.publishedAt) &&
         Boolean(s2.find(mark => mark.subjectId === subjectId)?.publishedAt)
       );
+      const activeRows = subjectResults.filter(row => row.isActive);
       const term1Complete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId => s1.some(mark => mark.subjectId === subjectId));
       const term2Complete = expectedSubjectIds.length > 0 && expectedSubjectIds.every(subjectId => s2.some(mark => mark.subjectId === subjectId));
-      const term1Total = subjectResults.reduce((sum, row) => sum + (row.sem1Marks?.totalMarks || 0), 0);
-      const term2Total = subjectResults.reduce((sum, row) => sum + (row.sem2Marks?.totalMarks || 0), 0);
-      const yearlyTotal = subjectResults.reduce((sum, row) => sum + (row.yearlyMarks || 0), 0);
-      const validPercentages = subjectResults.map(sr => sr.yearlyPercentage).filter((percentage): percentage is number => percentage !== null);
+      const term1Total = activeRows.reduce((sum, row) => sum + (row.sem1Marks?.totalMarks || 0), 0);
+      const term2Total = activeRows.reduce((sum, row) => sum + (row.sem2Marks?.totalMarks || 0), 0);
+      const yearlyTotal = activeRows.reduce((sum, row) => sum + (row.yearlyMarks || 0), 0);
+      const validPercentages = activeRows.map(row => row.yearlyPercentage).filter((percentage): percentage is number => percentage !== null);
       const yearlyAvg = annualComplete && validPercentages.length === expectedSubjectIds.length
-        ? Math.round((validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length) * 100) / 100
+        ? Math.round((validPercentages.reduce((sum, percentage) => sum + percentage, 0) / validPercentages.length) * 100) / 100
         : 0;
       const isPass = annualComplete && yearlyAvg >= (config.passMarkPercentage || 50);
 
@@ -3282,8 +3311,8 @@ class StorageEngine {
         term1Total,
         term2Total,
         yearlyTotal,
-        semester1Rank: 0,
-        semester2Rank: 0,
+        semester1Rank: semester1Ranks.get(student.id) || 0,
+        semester2Rank: semester2Ranks.get(student.id) || 0,
         yearlyPercentage: yearlyAvg,
         isPass,
         yearlyRank: 0,
@@ -3292,7 +3321,6 @@ class StorageEngine {
     });
 
     yearlyResults.sort((a, b) => Number(b.annualComplete) - Number(a.annualComplete) || b.yearlyPercentage - a.yearlyPercentage);
-
     let completedRank = 0;
     let previousPercentage: number | null = null;
     let previousRank = 0;
@@ -3303,23 +3331,13 @@ class StorageEngine {
         continue;
       }
       completedRank += 1;
-      if (previousPercentage !== null && result.yearlyPercentage === previousPercentage) {
-        result.yearlyRank = previousRank;
-      } else {
+      if (previousPercentage !== null && result.yearlyPercentage === previousPercentage) result.yearlyRank = previousRank;
+      else {
         result.yearlyRank = completedRank;
         previousRank = completedRank;
         previousPercentage = result.yearlyPercentage;
       }
       result.isTopThree = result.yearlyRank > 0 && result.yearlyRank <= 3;
-    }
-
-    const term1Ranks = rankExamStudentResults(yearlyResults.map(result => ({ studentId: result.student.id, total: result.term1Total, complete: result.term1Complete })));
-    const term2Ranks = rankExamStudentResults(yearlyResults.map(result => ({ studentId: result.student.id, total: result.term2Total, complete: result.term2Complete })));
-    const term1RankByStudent = new Map(term1Ranks.map(row => [row.studentId, row.rank]));
-    const term2RankByStudent = new Map(term2Ranks.map(row => [row.studentId, row.rank]));
-    for (const result of yearlyResults) {
-      result.semester1Rank = term1RankByStudent.get(result.student.id) ?? 0;
-      result.semester2Rank = term2RankByStudent.get(result.student.id) ?? 0;
     }
     return yearlyResults;
   }
