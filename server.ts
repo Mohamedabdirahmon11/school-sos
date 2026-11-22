@@ -103,7 +103,9 @@ async function startServer() {
   };
 
   const publishDueBroadcasts = async () => {
-    const context = await db.prepareRequestContext(false, 'broadcast-scheduler', false);
+    // The broadcast worker only reads due broadcasts and publishes them via an atomic RPC.
+    // Do not hydrate API-wide settings/plans for this background task on every minute tick.
+    const context = await db.createRequestContext('broadcast-scheduler');
     const published = await db.runWithRequestContext(context, () => db.publishDueBroadcasts());
     if (published > 0) console.info(`[broadcast-scheduler] published=${published}`);
   };
