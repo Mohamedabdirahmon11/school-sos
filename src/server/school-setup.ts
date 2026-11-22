@@ -2,7 +2,8 @@ import { School, SchoolSetupChecklistItem, SchoolSetupProgress, SchoolSetupProgr
 import { normalizeWhatsAppNumber } from '../lib/whatsapp.ts';
 import { isSchoolSetupProgressComplete } from '../lib/school-setup-navigation.ts';
 
-export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 6, 8] as const;
+// Step 0 is a new stable ID reserved for Teacher Assignment. Existing IDs 1–9 remain unchanged.
+export const REQUIRED_SCHOOL_SETUP_STEPS = [1, 2, 3, 4, 5, 0, 6, 8] as const;
 export const OPTIONAL_SCHOOL_SETUP_STEPS = [7, 9] as const;
 
 export interface SchoolSetupEvidence {
@@ -14,6 +15,8 @@ export interface SchoolSetupEvidence {
   timetableSlotCount: number;
   hasExamConfig: boolean;
   feeStructureCount: number;
+  teacherAssignmentReady: boolean;
+  teacherAssignmentIssues: string[];
 }
 
 export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgress {
@@ -21,7 +24,7 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
     ? value as Record<string, unknown>
     : {};
   const validSteps = (input: unknown) => Array.isArray(input)
-    ? [...new Set(input.filter((step): step is number => Number.isInteger(step) && Number(step) >= 1 && Number(step) <= 10))]
+    ? [...new Set(input.filter((step): step is number => Number.isInteger(step) && Number(step) >= 0 && Number(step) <= 10))]
     : [];
   const skippedSteps = validSteps(source.skippedSteps).filter(step => OPTIONAL_SCHOOL_SETUP_STEPS.includes(step as 7 | 9));
   const rawCompletedSteps = validSteps(source.completedSteps).filter(step => !skippedSteps.includes(step));
@@ -80,6 +83,7 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
     4: step(evidence.subjectCount > 0, false, 'Add at least one school subject.'),
     5: step(teachersReady, false, 'Add at least one teacher; every teacher needs a school-specific ID and a linked teacher login with a password/PIN hash.'),
+    0: step(evidence.teacherAssignmentReady, false, evidence.teacherAssignmentIssues.length ? 'Marka hore qoondee macallimiinta: ' + evidence.teacherAssignmentIssues.join(' · ') : 'Qoondee Form Teacher fasal kasta iyo macallin maaddo kasta; culayska macallin kasta waa inuu ahaadaa 30 xiisadood ama ka yar toddobaadkii.'),
     6: step(evidence.studentCount > 0 && evidence.guardianContactCount > 0, false, 'Add students and at least one parent/guardian contact number.'),
     7: step(evidence.timetableSlotCount > 0, true, 'Create at least one active timetable period, or skip and configure the timetable later.'),
     8: step(Boolean(school.attendanceRules) && evidence.hasExamConfig, false, 'Review attendance rules and ensure this school has an exam configuration.'),
@@ -103,11 +107,11 @@ export function sanitizeSchoolSetupProgressUpdate(body: unknown): SchoolSetupPro
   }
   const source = body as Record<string, unknown>;
   const currentStep = Number(source.currentStep);
-  if (!Number.isInteger(currentStep) || currentStep < 1 || currentStep > 10) {
+  if (!Number.isInteger(currentStep) || currentStep < 0 || currentStep > 10) {
     throw new Error('Current setup step must be a whole number from 1 to 10.');
   }
   const parseSteps = (value: unknown, label: string): number[] => {
-    if (!Array.isArray(value) || value.length > 10 || value.some(item => !Number.isInteger(item) || Number(item) < 1 || Number(item) > 9)) {
+    if (!Array.isArray(value) || value.length > 10 || value.some(item => !Number.isInteger(item) || Number(item) < 0 || Number(item) > 9)) {
       throw new Error(label + ' must contain step numbers from 1 to 9.');
     }
     const steps = value as number[];
@@ -151,7 +155,7 @@ export function applySchoolSetupProgressUpdate(
       completedAt: null
     };
     if (!canFinishSchoolSetup(candidate, checklist)) {
-      throw new Error('Complete steps 1–6 and 8, then complete or skip steps 7 and 9 before opening the dashboard.');
+      throw new Error('Complete steps 1–6, Teacher Assignment, and 8, then complete or skip steps 7 and 9 before opening the dashboard.');
     }
     return {
       currentStep: 10,
