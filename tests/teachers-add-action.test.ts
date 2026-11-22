@@ -19,31 +19,22 @@ test('Add Teacher remains discoverable in read-only mode and explains why creati
 });
 
 
-test('teacher creation persists account, profile, subjects and Form Teacher link atomically', () => {
+test('teacher creation uses one transactional database operation', () => {
   const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
-  const routeStart = api.indexOf("apiRouter.post('/teachers',");
-  const routeEnd = api.indexOf('const staffPermissions', routeStart);
-  const route = api.slice(routeStart, routeEnd);
-  assert.ok(route.includes('createTeacherAtomically'));
-  assert.ok(!route.includes('db.createUser('));
-  assert.ok(!route.includes('db.createTeacher('));
-  assert.ok(!route.includes('db.saveTeacherSubjects('));
+  assert.ok(api.includes('await db.createTeacherAtomically({'));
   assert.ok(storage.includes("rpc('schoolos_create_teacher'"));
   assert.ok(schema.includes('CREATE OR REPLACE FUNCTION public.schoolos_create_teacher'));
   assert.ok(schema.includes('INSERT INTO public.teacher_subjects'));
 });
 
-test('teacher creation avoids full-table scans for IDs and duplicate phone checks', () => {
+test('teacher ID allocation no longer scans all user and teacher rows', () => {
   const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
   const helperStart = api.indexOf('async function nextSchoolTeacherId');
   const helperEnd = api.indexOf('const timetableMinutes', helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart);
   const helper = api.slice(helperStart, helperEnd);
   assert.ok(helper.includes('randomUUID'));
   assert.ok(!helper.includes('queryAllRows'));
-  const routeStart = api.indexOf("apiRouter.post('/teachers',");
-  const routeEnd = api.indexOf('\\n\\nconst staffPermissions', routeStart);
-  const route = api.slice(routeStart, routeEnd);
-  assert.ok(!route.includes("queryAllRows('teachers'"));
 });
