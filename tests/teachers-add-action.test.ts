@@ -24,6 +24,7 @@ test('teacher creation uses one transactional database operation', () => {
   const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
   assert.ok(api.includes('await db.createTeacherAtomically({'));
+  assert.ok(api.includes('db.getClassById(formTeacherClassId, school.id)'));
   assert.ok(storage.includes("rpc('schoolos_create_teacher'"));
   assert.ok(schema.includes('CREATE OR REPLACE FUNCTION public.schoolos_create_teacher'));
   assert.ok(schema.includes('INSERT INTO public.teacher_subjects'));
