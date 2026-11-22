@@ -203,7 +203,7 @@ test('teacher has separate subject-wise Small Exam and Big Exam entry and a read
   assert.match(mobileNav, /id: 't_grades'/);
   assert.match(sidebar, /item\('t_students'/);
   assert.match(sidebar, /item\('t_grades'/);
-  assert.match(sidebar, /item\('t_exam_results'/);
+  assert.doesNotMatch(sidebar, /item\('t_exam_results'/);
   assert.match(app, /activeView\.replace\('t_', ''\)/);
   assert.match(teacher, /examType === 'small' \? 'continuous' : 'final'/);
   assert.match(teacher, /gradeSubjects\.map\(subject =>/);
