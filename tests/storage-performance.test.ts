@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { calculateSubscriptionGraceEnd, lockoutAttemptCountFromRow, shouldTouchSession, shouldReuseCachedAuthSession } from '../src/server/storage.ts';
+import { db, calculateSubscriptionGraceEnd, lockoutAttemptCountFromRow, shouldTouchSession, shouldReuseCachedAuthSession } from '../src/server/storage.ts';
 
 test('session refresh persistence is throttled to at most once per minute', () => {
   const now = Date.UTC(2026, 10, 3, 12, 0, 0);
@@ -71,4 +71,12 @@ test('class attendance reads avoid exact-count pagination and select only regist
   assert.match(method, /\.eq\('school_id', schoolId\)[\s\S]*?\.eq\('class_id', classId\)[\s\S]*?\.eq\('date', date\)/);
   assert.match(method, /\.range\(offset, offset \+ 999\)/);
   assert.doesNotMatch(method, /count:\s*'exact'/);
+});
+
+
+test('request query metrics read the originating AsyncLocalStorage context', async () => {
+  const requestContext = await db.createRequestContext('GET /metrics-test');
+  requestContext.queryCount = 7;
+  requestContext.queryDurationMs = 123.45;
+  assert.deepEqual(db.getRequestQueryMetrics(requestContext), { count: 7, durationMs: 123.45 });
 });
