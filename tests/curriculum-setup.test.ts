@@ -23,7 +23,7 @@ test('curriculum subject removal detaches teacher assignment and preserves histo
 test('Reset to standard template synchronizes exactly the selected class and deactivates extra subjects', () => {
   const route = api.slice(api.indexOf("apiRouter.post('/curriculum/classes/:classId/apply-template'"), api.indexOf("apiRouter.post('/curriculum/classes/:classId/copy'"));
   assert.match(route, /syncPrimarySubjectTemplates\([\s\S]*\[klass\.id\]/);
-  assert.match(api, /classIds\?\.has\(klass\.id\)/);
+  assert.match(api, /classIdSet\.has\(klass\.id\)/);
 });
 
 test('Copy curriculum is restricted to same-grade sections and preserves removed-subject history', () => {
