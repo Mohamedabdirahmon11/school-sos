@@ -76,6 +76,8 @@ test('student-teacher message contacts and sends require a current class assignm
   assert.match(route, /eligibleUserIds/);
   assert.match(route, /getTeacherAssignedClassIds\(school\.id, recipient\.id\)/);
   assert.match(route, /getTeacherAssignedClassIds\(school\.id, user\.id\)/);
+  const studentContactsBlock = route.slice(route.indexOf("if (user.role === 'student')"), route.indexOf("} else {", route.indexOf("if (user.role === 'student')")));
+  assert.doesNotMatch(studentContactsBlock, /db\.getUsers\(/, 'student contacts must not scan every school user');
   assert.match(route, /Students may message only teachers assigned to their current class/);
   assert.match(route, /Teachers may message only students in their assigned classes/);
 });
