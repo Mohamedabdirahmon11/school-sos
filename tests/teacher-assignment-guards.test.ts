@@ -93,3 +93,10 @@ test('Removing a subject from a curriculum detaches assignments without deleting
   assert.doesNotMatch(sync, /student_marks'[\s\S]*?\.delete\(\)/);
 });
 
+test('Form Teachers can read only their own attendance register without a school-wide setup scan', () => {
+  const readiness = api.slice(api.indexOf('async function requireSchoolSetupReady'), api.indexOf('async function getTeacherAssignmentReadinessForSchool'));
+  assert.match(readiness, /role === 'teacher' && req\.method === 'GET' && req\.path === '\/attendance'/);
+  const route = api.slice(api.indexOf("apiRouter.get('/attendance'"), api.indexOf("apiRouter.get('/attendance/month'"));
+  assert.match(route, /requireSchoolSetupReady/);
+  assert.match(route, /canAccessFormTeacherClass\(req, res, classId as string\)/);
+});
