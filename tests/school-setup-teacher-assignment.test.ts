@@ -128,7 +128,8 @@ test('teacher-only routes preserve HTTP 403 for parent, student and non-Form-Tea
   const attendanceWrite = api.slice(api.indexOf("apiRouter.post('/attendance'"), api.indexOf('// ==============================================================================', api.indexOf("apiRouter.post('/attendance'")));
   assert.match(attendanceWrite, /requireSchoolStaff/);
   assert.match(attendanceWrite, /attendanceClass\.classTeacherId !== user\.id[\s\S]*?res\.status\(403\)/);
-  assert.ok(attendanceWrite.indexOf('res.status(403)') < attendanceWrite.indexOf('ensureTeacherAssignmentReadyForTeacher'));
+  assert.match(attendanceWrite, /attendanceClass\.classTeacherId !== user\.id[\s\S]*?res\.status\(403\)/);
+  assert.doesNotMatch(attendanceWrite, /ensureTeacherAssignmentReadyForTeacher/);
 });
 
 
