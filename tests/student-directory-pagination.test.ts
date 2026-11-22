@@ -51,6 +51,6 @@ test('student directory uses active current-year enrollments for class filters a
 
 test('school roster lookup indexes cover current academic year and Form Teacher scopes', () => {
   const migration = read('../supabase/migrations/20261122170000_school_roster_lookup_indexes.sql');
-  assert.match(migration, /academic_years_current_school_idx[\s\\S]*?ON public\.academic_years \(school_id, id\)[\s\\S]*?WHERE is_current = true/);
-  assert.match(migration, /classes_form_teacher_school_active_idx[\s\\S]*?ON public\.classes \(school_id, class_teacher_id\)[\s\\S]*?WHERE is_archived = false/);
+  assert.match(migration, /academic_years_current_school_idx[\s\S]*?ON public\.academic_years \(school_id, id\)[\s\S]*?WHERE is_current = true/);
+  assert.match(migration, /classes_form_teacher_school_active_idx[\s\S]*?ON public\.classes \(school_id, class_teacher_id\)[\s\S]*?WHERE is_archived = false/);
 });
