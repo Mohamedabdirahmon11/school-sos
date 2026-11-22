@@ -178,8 +178,8 @@ export class InMemorySupabase {
         ...this.rows('teachers').map(row => String(row.staff_id ?? row.staffId ?? ''))
       ];
       const maxNumber = usedIds.reduce((max, id) => {
-        const match = id.match(/^T(\\d+)$/i);
-        return match ? Math.max(max, Number(match[1]) || 0) : max;
+        const suffix = id.toUpperCase().startsWith('T') ? Number(id.slice(1)) : 0;
+        return Number.isSafeInteger(suffix) ? Math.max(max, suffix) : max;
       }, 0);
       const nextNumber = maxNumber + 1;
       const staffId = 'T' + (nextNumber < 1000 ? String(nextNumber).padStart(3, '0') : String(nextNumber));
