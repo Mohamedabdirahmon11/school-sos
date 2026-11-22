@@ -4530,7 +4530,8 @@ apiRouter.post('/assignments/:id/submissions', requireAuth, requireSchoolContext
   if (!assignment) { res.status(404).json({ error: 'Homework was not found.' }); return; }
   const student = (await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,school_id,student_id,first_name,middle_name,last_name,class_id')).items[0];
   if (!student) { res.status(403).json({ error: 'Your student record is not linked to this school.' }); return; }
-  if (student.classId !== assignment.classId) { res.status(403).json({ error: 'You can only submit homework assigned to your class.' }); return; }
+  const currentClassId = await getStudentCurrentClassId(school.id, String(student.id), String(student.classId || ''));
+  if (!currentClassId || currentClassId !== assignment.classId) { res.status(403).json({ error: 'You can only submit homework assigned to your current class.' }); return; }
   const existing = await db.queryPage('assignment_submissions', { school_id: school.id, assignment_id: assignment.id, student_id: student.id }, 1, 1, undefined, '*');
   if (existing.items[0]?.status === 'graded') { res.status(409).json({ error: 'This submission has already been graded and cannot be changed.' }); return; }
   const studentName = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ');
