@@ -410,6 +410,24 @@ CREATE INDEX IF NOT EXISTS idx_teacher_subjects_teacher_school_fk ON teacher_sub
 CREATE INDEX IF NOT EXISTS idx_teacher_subjects_subject_school_fk ON teacher_subjects(subject_id, school_id);
 
 -- Create teacher account, profile, subject links and optional Form Teacher link in one transaction.
+CREATE SEQUENCE IF NOT EXISTS public.teacher_staff_id_seq AS BIGINT START WITH 1 INCREMENT BY 1 CACHE 1;
+SELECT setval(
+  'public.teacher_staff_id_seq'::regclass,
+  GREATEST(COALESCE((
+    SELECT MAX(staff_number) + 1
+    FROM (
+      SELECT substring(staff_id FROM 2)::BIGINT AS staff_number
+      FROM public.users WHERE role::TEXT = 'teacher' AND staff_id ~ '^T[0-9]+$'
+      UNION ALL
+      SELECT substring(staff_id FROM 2)::BIGINT AS staff_number
+      FROM public.teachers WHERE staff_id ~ '^T[0-9]+$'
+    ) existing_teacher_ids
+  ), 1), 1),
+  FALSE
+);
+REVOKE ALL ON SEQUENCE public.teacher_staff_id_seq FROM PUBLIC, anon, authenticated;
+GRANT USAGE, SELECT ON SEQUENCE public.teacher_staff_id_seq TO service_role;
+
 CREATE OR REPLACE FUNCTION public.schoolos_create_teacher(
   p_school_id VARCHAR,
   p_user JSONB,
@@ -424,6 +442,8 @@ AS $$
 DECLARE
   v_user_id VARCHAR(64);
   v_teacher_id VARCHAR(64);
+  v_staff_number BIGINT;
+  v_staff_id VARCHAR(64);
 BEGIN
   v_user_id := p_user->>'id';
   v_teacher_id := p_teacher->>'id';
@@ -435,12 +455,18 @@ BEGIN
     RAISE EXCEPTION 'Invalid teacher account payload' USING ERRCODE = '22023';
   END IF;
 
+  v_staff_number := nextval('public.teacher_staff_id_seq'::regclass);
+  v_staff_id := 'T' || CASE
+    WHEN v_staff_number < 1000 THEN lpad(v_staff_number::TEXT, 3, '0')
+    ELSE v_staff_number::TEXT
+  END;
+
   INSERT INTO public.users (
     id, school_id, branch_id, role, full_name, email, phone, staff_id, password_hash, pin_hash,
     must_change_password, is_blocked, failed_login_attempts, assigned_class_ids, assigned_subject_ids
   ) VALUES (
     v_user_id, p_school_id, NULLIF(p_user->>'branch_id', ''), 'teacher', p_user->>'full_name', NULLIF(p_user->>'email', ''),
-    NULLIF(p_user->>'phone', ''), p_user->>'staff_id', p_user->>'password_hash', p_user->>'pin_hash',
+    NULLIF(p_user->>'phone', ''), v_staff_id, p_user->>'password_hash', p_user->>'pin_hash',
     COALESCE((p_user->>'must_change_password')::BOOLEAN, FALSE),
     COALESCE((p_user->>'is_blocked')::BOOLEAN, FALSE),
     COALESCE((p_user->>'failed_login_attempts')::INTEGER, 0),
@@ -454,7 +480,7 @@ BEGIN
   ) VALUES (
     v_teacher_id, p_school_id, v_user_id,
     p_teacher->>'full_name', COALESCE(p_teacher->>'email', ''), NULLIF(p_teacher->>'phone', ''),
-    COALESCE(p_teacher->>'address', ''), p_teacher->>'staff_id', p_teacher->>'gender',
+    COALESCE(p_teacher->>'address', ''), v_staff_id, p_teacher->>'gender',
     NULLIF(p_teacher->>'qualification', ''), NULLIF(p_teacher->>'department', ''),
     ARRAY(SELECT jsonb_array_elements_text(COALESCE(p_teacher->'assigned_classes', '[]'::JSONB))),
     ARRAY(SELECT jsonb_array_elements_text(COALESCE(p_teacher->'assigned_subjects', '[]'::JSONB))),
@@ -476,7 +502,7 @@ BEGIN
     END IF;
   END IF;
 
-  RETURN jsonb_build_object('user_id', v_user_id, 'teacher_id', v_teacher_id);
+  RETURN jsonb_build_object('user_id', v_user_id, 'teacher_id', v_teacher_id, 'staff_id', v_staff_id);
 END;
 $$;
 REVOKE ALL ON FUNCTION public.schoolos_create_teacher(VARCHAR, JSONB, JSONB, TEXT[], VARCHAR) FROM PUBLIC, anon, authenticated;
