@@ -3743,8 +3743,14 @@ apiRouter.get('/teacher/form-teacher-classes', requireAuth, requireSchoolContext
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   if (normalizeRole(user.role) !== 'teacher') { res.status(403).json({ error: 'This route is for teachers only.' }); return; }
-  const classes = await db.getClasses(school.id);
-  res.json(classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived));
+  // Attendance bootstrap needs only this teacher's own class labels; avoid
+  // loading the school's entire class directory and unrelated class fields.
+  const classes = await queryAllRows('classes', {
+    school_id: school.id,
+    class_teacher_id: user.id,
+    is_archived: 'false'
+  }, 'id,school_id,name,section,class_teacher_id,is_archived');
+  res.json(classes);
 });
 apiRouter.get('/teacher/exam-invigilation', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school as School;
