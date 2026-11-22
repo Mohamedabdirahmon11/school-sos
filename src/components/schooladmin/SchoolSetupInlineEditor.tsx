@@ -104,7 +104,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
       else if (step === 'teachers') await ApiClient.deleteTeacher(row.id);
       else if (step === 'students') await ApiClient.deleteStudent(row.id);
       else if (step === 'assign') await ApiClient.request(`/teacher-assignments/${encodeURIComponent(row.id)}?clearDependentEntries=false`, { method: 'DELETE' });
-      else throw new Error('Timetable slot-kan si gaar ah looma tirtiri karo; isticmaal maamulka jadwalka fasalka.');
+      else await ApiClient.request(`/timetable/${encodeURIComponent(row.classId)}/${encodeURIComponent(row.dayOfWeek)}/${encodeURIComponent(row.periodNumber)}?termId=${encodeURIComponent(row.termId)}${row.sectionId ? `&sectionId=${encodeURIComponent(row.sectionId)}` : ''}`, { method: 'DELETE' });
       await load();
       await onChanged();
     } catch (e) {
