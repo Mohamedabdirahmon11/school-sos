@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { sanitizeSchoolSettings, sanitizeExamConfigSettings, sanitizeTimetableSettings } from '../src/server/school-settings.ts';
 import { getLanguageDirection } from '../src/lib/translations.ts';
@@ -161,4 +162,11 @@ test('timetable settings support breaks after periods one through seven for eigh
   assert.equal(sanitizeTimetableSettings(base).shift2BreakAfterPeriod, 7);
   assert.throws(() => sanitizeTimetableSettings({ ...base, breakAfterPeriod: 8 }), /Break must follow period 1-7/);
   assert.throws(() => sanitizeTimetableSettings({ ...base, shift2BreakAfterPeriod: 8 }));
+});
+
+
+test('school profile save persists the official telephone and email fields', () => {
+  const source = readFileSync(new URL('../src/components/schooladmin/SchoolSettingsView.tsx', import.meta.url), 'utf8');
+  const profileSave = source.slice(source.indexOf("await ApiClient.request('/school/settings'"), source.indexOf('await refreshUser()', source.indexOf("await ApiClient.request('/school/settings'")));
+  assert.match(profileSave, /phone,\s*email,/);
 });
