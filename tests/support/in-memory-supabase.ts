@@ -166,6 +166,37 @@ export class InMemorySupabase {
   failNextBackupRestore() { this.failBackupRestore = true; }
 
   async rpc(name: string, args?: any) {
+    if (name === 'schoolos_create_teacher') {
+      const schoolId = String(args?.p_school_id || '');
+      const user = { ...(args?.p_user || {}) };
+      const teacher = { ...(args?.p_teacher || {}) };
+      if (!schoolId || user.school_id !== schoolId || teacher.school_id !== schoolId || user.role !== 'teacher' || teacher.user_id !== user.id) {
+        return { data: null, error: { message: 'Invalid teacher account payload.', code: '22023' } };
+      }
+      const usedIds = [
+        ...this.rows('users').filter(row => row.role === 'teacher').map(row => String(row.staff_id ?? row.staffId ?? '')),
+        ...this.rows('teachers').map(row => String(row.staff_id ?? row.staffId ?? ''))
+      ];
+      const maxNumber = usedIds.reduce((max, id) => {
+        const match = id.match(/^T(\\d+)$/i);
+        return match ? Math.max(max, Number(match[1]) || 0) : max;
+      }, 0);
+      const nextNumber = maxNumber + 1;
+      const staffId = 'T' + (nextNumber < 1000 ? String(nextNumber).padStart(3, '0') : String(nextNumber));
+      user.staff_id = staffId;
+      teacher.staff_id = staffId;
+      this.rows('users').push(user);
+      this.rows('teachers').push(teacher);
+      for (const subjectId of [...new Set((args?.p_subject_ids || []).map((id: unknown) => String(id)))]) {
+        this.rows('teacher_subjects').push({ school_id: schoolId, teacher_id: teacher.id, subject_id: subjectId, is_active: true });
+      }
+      if (args?.p_form_teacher_class_id) {
+        const klass = this.rows('classes').find(row => String(row.id) === String(args.p_form_teacher_class_id) && String(row.school_id ?? row.schoolId) === schoolId && (row.is_archived ?? row.isArchived) !== true);
+        if (!klass) return { data: null, error: { message: 'Form Teacher class must belong to this school and be active.', code: '23503' } };
+        klass.class_teacher_id = user.id;
+      }
+      return { data: { user_id: user.id, teacher_id: teacher.id, staff_id: staffId }, error: null };
+    }
     if (name === 'schoolos_sync_student_guardian') {
       const schoolId = String(args?.p_school_id || '');
       const studentId = String(args?.p_student_pk || '');
