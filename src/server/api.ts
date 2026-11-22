@@ -6221,8 +6221,8 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (body.formTeacherClassId !== undefined && body.formTeacherClassId !== null && typeof body.formTeacherClassId !== 'string') { res.status(400).json({ error: 'Form Teacher class must be a valid class ID.' }); return; }
   const formTeacherClassId = typeof body.formTeacherClassId === 'string' ? body.formTeacherClassId.trim() : '';
   if (formTeacherClassId) {
-    const schoolClasses = await db.getClasses(school.id);
-    if (!schoolClasses.some(klass => klass.id === formTeacherClassId && klass.schoolId === school.id && !klass.isArchived)) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
+    const formTeacherClass = await db.getClassById(formTeacherClassId, school.id);
+    if (!formTeacherClass || formTeacherClass.isArchived) { res.status(400).json({ error: 'Form Teacher class must belong to this school and be active.' }); return; }
   }
   if (validSubjects.length !== assignedSubjects.length) { res.status(400).json({ error: 'Every assigned subject must belong to this school.' }); return; }
 
