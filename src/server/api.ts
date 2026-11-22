@@ -4380,7 +4380,8 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
       if (own.items[0]) {
         studentIds = [String((own.items[0] as any).id)];
         const currentClassId = await getStudentCurrentClassId(school.id, String((own.items[0] as any).id), String((own.items[0] as any).classId || ''));
-        if (currentClassId) classId = currentClassId;
+        if (classId && currentClassId && classId !== currentClassId) { res.status(403).json({ error: 'Timetable access is limited to your current class.' }); return; }
+        classId = currentClassId;
       } else studentIds = [];
     } else if (role === 'parent' && user.phone) {
       const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id');
