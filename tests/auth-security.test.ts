@@ -164,3 +164,15 @@ test('profile password input enforces the same eight-character minimum as the ba
   assert.match(profileSource, /New password \(min 8 characters\)/);
   assert.match(securitySource, /password\.length < 8/);
 });
+
+
+test('session authentication remains compatible before the additive setup completion migration is applied', () => {
+  const storageSource = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const authJoinStart = storageSource.indexOf("const schoolColumns = '", storageSource.indexOf('getSessionAndUserById'));
+  const authJoinEnd = storageSource.indexOf("';", authJoinStart);
+  assert.notEqual(authJoinStart, -1, 'joined school columns are defined');
+  assert.notEqual(authJoinEnd, -1, 'joined school columns are terminated');
+  const schoolColumns = storageSource.slice(authJoinStart, authJoinEnd);
+  assert.match(schoolColumns, /setup_progress/);
+  assert.doesNotMatch(schoolColumns, /setup_completed_at/);
+});
