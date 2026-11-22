@@ -51,6 +51,9 @@ test('student marks are published-only at the server and again filtered in the p
   assert.match(route, /marks = marks\.filter\(mark => Boolean\(mark\.publishedAt\)\)/);
   assert.match(portal, /marksState\.data\)\?marksState\.data\.filter\(\(m:any\)=>Boolean\(m\.publishedAt\)\)/);
   assert.match(portal, /Weli lama daabicin natiijooyinkaaga/);
+  assert.match(portal, /ExamTimetablePrint schedules=\{publishedExamSchedules\}/);
+  assert.match(portal, /getPublishedExamSchedules\(studentRecord\.classId\)/);
+  assert.match(portal, /term-marks\/report-cards\?studentId=/);
 });
 
 test('student homework reads current enrollment class and only their own submissions', () => {
@@ -97,4 +100,7 @@ test('student portal reference layout preserves desktop sidebar, four-button mob
   assert.match(portal, /noticePage/);
   assert.match(portal, /messagePage/);
   assert.match(portal, /sp-pagination/);
+  assert.match(portal, /profileState\.loading/);
+  assert.match(portal, /PortalError/);
+  assert.match(portal, /sp-empty/);
 });
