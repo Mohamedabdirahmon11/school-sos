@@ -11395,15 +11395,12 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
     : await query.maybeSingle();
   if (found.error || (id && !found.data)) throw new Error('Qoondeyntan lagama helin dugsigan.');
   const old = found.data;
+  const clearDependentSlots = Boolean(old && (old.teacher_id !== payload.teacher_id || old.class_id !== payload.class_id || old.subject_id !== payload.subject_id || old.section_id !== payload.section_id) && body?.clearDependentEntries === true);
   if (old && (old.teacher_id !== payload.teacher_id || old.class_id !== payload.class_id || old.subject_id !== payload.subject_id || old.section_id !== payload.section_id)) {
     const dep = await client.from('timetable_slots').select('id', { count: 'exact', head: true })
       .eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id);
     if (dep.error) throw new Error('Xiriirka jadwalka lama hubin karin.');
-    if ((dep.count || 0) > 0 && body?.clearDependentEntries !== true) throw new Error('Qoondeyntan waxaa ku xiran jadwal casharro. Xaqiiji nadiifinta jadwalka ka hor beddelidda.');
-    if ((dep.count || 0) > 0) {
-      const cleared = await client.from('timetable_slots').delete().eq('school_id', school.id).eq('class_id', old.class_id).eq('subject_id', old.subject_id);
-      if (cleared.error) throw new Error('Jadwalka ku xiran lama nadiifin karin.');
-    }
+    if ((dep.count || 0) > 0 && !clearDependentSlots) throw new Error('Qoondeyntan waxaa ku xiran jadwal casharro. Xaqiiji nadiifinta jadwalka ka hor beddelidda.');
   }
   const saved = await client.rpc('upsert_teacher_assignment_atomic', {
     p_assignment_id: old?.id || null,
@@ -11415,7 +11412,8 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
     p_subject_id: payload.subject_id,
     p_teacher_id: payload.teacher_id,
     p_qualification_override: payload.qualification_override,
-    p_changed_by: user.id
+    p_changed_by: user.id,
+    p_clear_dependent_slots: clearDependentSlots
   });
   if (saved.error || !saved.data) {
     const code = saved.error?.code;
