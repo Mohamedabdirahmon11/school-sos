@@ -12059,9 +12059,13 @@ apiRouter.get('/term-marks/report-cards/classes/:classId/pdf', requireAuth, requ
     .order('rank_in_class',{ascending:true});
   if (error || !cards?.length) { res.status(404).json({ error: 'Report cards fasalkan lama helin.' }); return; }
   if (cards.some((card:any)=>card.is_stale)) { res.status(409).json({ error: 'Report Cards-ka fasalkan waa duugoobeen; dib u samee ka hor PDF.' }); return; }
-  const students = await Promise.all(cards.map((card: any) => db.getStudentById(card.student_id,school.id)));
+  const students = await db.getStudentsByIds(cards.map((card: any) => card.student_id), school.id);
+  const studentById = new Map(students.map(student => [student.id, student]));
   const klass = await db.getClassById(req.params.classId,school.id);
-  const pages = cards.flatMap((card: any,index: number) => students[index] ? [termReportCardPdfPage(school,card,students[index],`${klass?.name || ''} ${klass?.section || ''}`.trim())] : []);
+  const pages = cards.flatMap((card: any) => {
+    const student = studentById.get(card.student_id);
+    return student ? [termReportCardPdfPage(school,card,student,`${klass?.name || ''} ${klass?.section || ''}`.trim())] : [];
+  });
   if (!pages.length) { res.status(404).json({ error: 'Arday lama helin.' }); return; }
   sendPdf(res,`term-report-cards-${klass?.name || 'class'}`,pages);
 });
