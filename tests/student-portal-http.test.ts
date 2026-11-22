@@ -114,9 +114,10 @@ test('student timetable ignores requested foreign class and reads only current c
 });
 
 test('student homework is current-class-only and submissions always bind to the authenticated student',async()=>{
- const ownAssignment=db.createAssignment({schoolId:school.id,classId:klass.id,subjectId:subject.id,teacherId:subjectUser.id,title:'Own class task',description:'Submit your own work',dueDate:today,maxPoints:20} as any);
- db.createAssignment({schoolId:school.id,classId:otherClass.id,subjectId:otherSubject.id,teacherId:otherTeacherUser.id,title:'Other class task',description:'Not visible',dueDate:today,maxPoints:20} as any);
- await db.flush();
+ const created=await post('/assignments',cookies.teacher,{classId:klass.id,subjectId:subject.id,title:'Own class task',description:'Submit your own work',dueDate:today,maxPoints:20});
+ assert.equal(created.status,201,await created.clone().text());const ownAssignment=await created.json() as any;
+ const otherCreated=await post('/assignments',cookies.otherTeacher,{classId:otherClass.id,subjectId:otherSubject.id,title:'Other class task',description:'Not visible',dueDate:today,maxPoints:20});
+ assert.equal(otherCreated.status,201,await otherCreated.clone().text());
  const list=await request('/assignments',cookies.student);assert.equal(list.status,200);
  const rows=await list.json() as any[];assert.ok(rows.some(row=>row.id===ownAssignment.id));assert.equal(rows.some(row=>row.title==='Other class task'),false);
  const submit=await post('/assignments/'+ownAssignment.id+'/submissions',cookies.student,{content:'My work',studentId:sameClassStudent.id});
@@ -124,6 +125,8 @@ test('student homework is current-class-only and submissions always bind to the 
  await db.flush();
  const submissions=memory.rows('assignment_submissions').filter(row=>row.assignment_id===ownAssignment.id);
  assert.equal(submissions.length,1);assert.equal(submissions[0].student_id,student.id);
+ const teacherView=await request('/assignments/'+ownAssignment.id+'/submissions',cookies.teacher);
+ assert.equal(teacherView.status,200);assert.equal((await teacherView.json() as any[])[0].studentId,student.id);
 });
 
 test('student and teacher messages are limited to current assignment classes',async()=>{
