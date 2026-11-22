@@ -5325,22 +5325,29 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   // instead of loading every active enrollment in the school for a single-class roster.
   const enrollmentClassScope = classId ? [classId] : user.role === 'teacher' ? teacherAssignedClassIds : undefined;
   const currentYearId = await getCurrentAcademicYearId(school.id);
-  const currentEnrollments = currentYearId
-    ? await queryAllRows('enrollments', {
-      school_id: school.id,
-      academic_year_id: currentYearId,
-      status: 'active',
-      class_id: enrollmentClassScope
-    }, 'id,student_id,class_id,section_id,roll_number')
-    : [];
+  // Enrollment scope and class labels are independent reads. Fetch them together
+  // so a slow Supabase round trip does not hold up the next one unnecessarily.
+  const [currentEnrollments, classRows] = await Promise.all([
+    currentYearId
+      ? queryAllRows('enrollments', {
+        school_id: school.id,
+        academic_year_id: currentYearId,
+        status: 'active',
+        class_id: enrollmentClassScope
+      }, 'id,student_id,class_id,section_id,roll_number')
+      : Promise.resolve([] as any[]),
+    db.getClasses(school.id)
+  ]);
   const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
-  const classRows = await db.getClasses(school.id);
   const classById = new Map<string, SchoolClass>(classRows.map(klass => [klass.id, klass] as const));
   const sectionIds = [...new Set(currentEnrollments.map((row: any) => String(row.sectionId || '')).filter(Boolean))];
-  const sectionRows = sectionIds.length
-    ? await queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name')
-    : [];
-  const sectionById = new Map<string, string>(sectionRows.map((row: any) => [String(row.id), String(row.name || '')]));
+  const sectionRowsPromise = sectionIds.length
+    ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name')
+    : Promise.resolve([] as any[]);
+  let sectionById = new Map<string, string>();
+  const setSectionRows = (rows: any[]) => {
+    sectionById = new Map<string, string>(rows.map((row: any) => [String(row.id), String(row.name || '')]));
+  };
   const decorateWithCurrentEnrollment = (rows: any[]) => rows.map(student => {
     if (!currentYearId) {
       const legacyClass = classById.get(String(student.classId || ''));
@@ -5372,7 +5379,12 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
 
   // One class selected: return the whole class at once (A-Z), so numbering 1, 2, 3 is stable.
   if (classId && req.query.allClass === 'true' && !roleFilter && feeStatus === 'all') {
-    const classStudents = (await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students))
+    const [rawClassStudents, sectionRows] = await Promise.all([
+      queryAllRows('students', filters, LIST_QUERY_COLUMNS.students),
+      sectionRowsPromise
+    ]);
+    setSectionRows(sectionRows);
+    const classStudents = rawClassStudents
       .filter((student: any) => !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
       .sort(compareStudentsByName);
@@ -5384,7 +5396,11 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
   }
 
   if (feeStatus !== 'all') {
-    const allStudents = await queryAllRows('students', filters, LIST_QUERY_COLUMNS.students);
+    const [allStudents, sectionRows] = await Promise.all([
+      queryAllRows('students', filters, LIST_QUERY_COLUMNS.students),
+      sectionRowsPromise
+    ]);
+    setSectionRows(sectionRows);
     const statusMap = await getStudentFeeStatusMap(school.id, undefined, school.academicYear);
     const filtered = allStudents.filter((student: any) => {
       const matchesSearch = !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
@@ -5400,7 +5416,11 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     return;
   }
 
-  const result = await db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'student_id');
+  const [result, sectionRows] = await Promise.all([
+    db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'student_id'),
+    sectionRowsPromise
+  ]);
+  setSectionRows(sectionRows);
   res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)) });
   const canDecorateFeeStatus = canViewFeeStatus;
   if (!canDecorateFeeStatus) {
