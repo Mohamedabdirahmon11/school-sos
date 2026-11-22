@@ -6490,7 +6490,6 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(403).json({ error: 'Only the Form Teacher assigned to this class can submit its daily attendance.' });
     return;
   }
-  if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const allowedStatuses = new Set(['present', 'absent', 'late', 'excused']);
   const seenStudentIds = new Set<string>();
   for (const record of records) {
@@ -6527,6 +6526,7 @@ apiRouter.post('/attendance', requireAuth, requireSchoolContext, requireSchoolSt
     res.status(400).json({ error: 'Submit attendance for every student in the selected class in one operation.' });
     return;
   }
+  if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const previous = await db.getAttendance(school.id, normalizedClassId, date);
   const previousByStudent = new Map((previous || []).map((record:any)=>[String(record.studentId),record.status]));
   const changes = normalizedRecords.map((record:any)=>({studentId:record.studentId,oldStatus:previousByStudent.get(record.studentId)||null,newStatus:record.status}))
