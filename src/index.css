@@ -2341,3 +2341,39 @@ body { font-family: var(--schoolos-font-body); }
   }
   .school-admin-role .school-dashboard-page { padding: 12px !important; }
 }
+
+
+/* Keep the School Admin shell itself viewport-height after the zoom scaling.
+   The previous rule enlarged only the sidebar; its flex parent was still scaled
+   to 96vh, leaving the visible strip below the sidebar. */
+.school-admin-role {
+  height: calc(100dvh / var(--school-ui-zoom, 0.96)) !important;
+  min-height: calc(100dvh / var(--school-ui-zoom, 0.96)) !important;
+  max-height: calc(100dvh / var(--school-ui-zoom, 0.96)) !important;
+}
+.school-admin-role > .min-h-0.flex-1.flex.overflow-hidden {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  align-items: stretch;
+}
+.school-admin-role .school-admin-sidebar {
+  align-self: stretch;
+  top: 0 !important;
+  bottom: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+@media (max-width: 767px) {
+  .school-admin-role {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+  .school-admin-role .school-admin-sidebar {
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+}
