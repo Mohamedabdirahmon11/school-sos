@@ -754,7 +754,8 @@ class StorageEngine {
       rows.push(...result.items);
       if (rows.length >= result.total || result.items.length === 0) break;
     }
-    this.cacheQueryRows(table, rows);
+    // Partial projections must not pollute the in-memory write-through cache.
+    if (columns === '*') this.cacheQueryRows(table, rows);
     return rows;
   }
 
