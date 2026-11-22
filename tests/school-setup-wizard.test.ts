@@ -134,18 +134,18 @@ test('required steps cannot be skipped and cannot be marked complete before thei
   assert.throws(() => sanitizeSchoolSetupProgressUpdate({ currentStep: 2, completedSteps: [], skippedSteps: [1] }), /Only timetable and fees/);
 });
 
-test('finalization requires steps 1–6, Teacher Assignment and 8; timetable and fees may be completed or skipped', () => {
+test('finalization requires the seven reference steps; timetable and fees may be completed or skipped', () => {
   const checklist = buildSchoolSetupChecklist(school, completeEvidence);
   const initial = normalizeSchoolSetupProgress(null);
-  const requiredWithoutEight = {
+  const requiredWithoutAssignment = {
     ...initial,
     completedSteps: [1, 2, 3, 4, 5, 6],
     skippedSteps: [7, 9]
   };
-  assert.equal(canFinishSchoolSetup(requiredWithoutEight, checklist), false);
+  assert.equal(canFinishSchoolSetup(requiredWithoutAssignment, checklist), false);
   const readyToFinish = sanitizeSchoolSetupProgressUpdate({
     currentStep: 10,
-    completedSteps: [1, 2, 3, 4, 5, 0, 6, 8],
+    completedSteps: [1, 2, 3, 4, 5, 0, 6],
     skippedSteps: [7, 9]
   });
   assert.equal(canFinishSchoolSetup({
@@ -158,7 +158,7 @@ test('finalization requires steps 1–6, Teacher Assignment and 8; timetable and
     complete: true
   }, checklist, '2026-11-07T12:00:00.000Z');
   assert.equal(finished.completedAt, '2026-11-07T12:00:00.000Z');
-  assert.deepEqual(finished.completedSteps, [0, 1, 2, 3, 4, 5, 6, 8, 10]);
+  assert.deepEqual(finished.completedSteps, [0, 1, 2, 3, 4, 5, 6, 10]);
 });
 
 test('setup progress rejects a step that is both completed and skipped', () => {
