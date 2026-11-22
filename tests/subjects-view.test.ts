@@ -38,3 +38,10 @@ test('Subject template API enforces 30-period cap and administrator-only writes'
   assert.match(api, /total > capacity\.weeklyCapacity/);
   assert.match(api, /res\.status\(422\)/);
 });
+
+test('bulk template API synchronizes only the requested grade bands', () => {
+  const periodRoute = api.slice(api.indexOf("apiRouter.put('/subjects/template-periods'"), api.indexOf("apiRouter.put('/subjects/templates',"));
+  const bulkRoute = api.slice(api.indexOf("apiRouter.put('/subjects/templates',"), api.indexOf("apiRouter.put('/subjects/templates/:gradeBand'"));
+  assert.doesNotMatch(periodRoute, /requestedBands/);
+  assert.match(bulkRoute, /syncPrimarySubjectTemplates\(school, templates, periods, requestedBands as PrimarySubjectGradeBand\[\]\)/);
+});

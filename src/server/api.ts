@@ -3833,7 +3833,7 @@ apiRouter.put('/subjects/template-periods', requireAuth, requireSchoolContext, a
   }
   const templates = getPrimarySubjectTemplates(school);
   try {
-    const sync = await syncPrimarySubjectTemplates(school, templates, periods, requestedBands as PrimarySubjectGradeBand[]);
+    const sync = await syncPrimarySubjectTemplates(school, templates, periods);
     const setupData = { ...(school.setupData || {}), subjectTemplatePeriods: periods } as NonNullable<School['setupData']>;
     if (!db.updateSchool(school.id, { setupData })) { res.status(404).json({ error: 'School not found.' }); return; }
     await db.flush();
@@ -3874,7 +3874,7 @@ apiRouter.put('/subjects/templates', requireAuth, requireSchoolContext, async (r
     periods[name] = value;
   }
   try {
-    const sync = await syncPrimarySubjectTemplates(school, templates, periods);
+    const sync = await syncPrimarySubjectTemplates(school, templates, periods, requestedBands as PrimarySubjectGradeBand[]);
     const setupData = { ...(school.setupData || {}), subjectTemplates: templates, subjectTemplatePeriods: periods } as NonNullable<School['setupData']>;
     if (!db.updateSchool(school.id, { setupData })) { res.status(404).json({ error: 'School not found.' }); return; }
     await db.flush();

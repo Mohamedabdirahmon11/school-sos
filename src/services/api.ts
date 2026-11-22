@@ -647,7 +647,7 @@ export class ApiClient {
     periods: Record<string, number>,
     bands: Array<'1-4' | '5-6' | '7-8'>
   ) {
-    return this.request<{ success: boolean; templates: Record<'1-4' | '5-6' | '7-8', string[]>; periods: Record<string, number> }>(
+    return this.request<{ success: boolean; updatedClasses: number; subjectsAdded: number; subjectsRemoved: number; templates: Record<'1-4' | '5-6' | '7-8', string[]>; periods: Record<string, number> }>(
       '/subjects/templates',
       { method: 'PUT', body: JSON.stringify({ templates, periods, bands }) }
     );
