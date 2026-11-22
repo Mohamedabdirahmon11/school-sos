@@ -4377,7 +4377,11 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
     let studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
-      studentIds = own.items.map((item: any) => item.id);
+      if (own.items[0]) {
+        studentIds = [String((own.items[0] as any).id)];
+        const currentClassId = await getStudentCurrentClassId(school.id, String((own.items[0] as any).id), String((own.items[0] as any).classId || ''));
+        if (currentClassId) classId = currentClassId;
+      } else studentIds = [];
     } else if (role === 'parent' && user.phone) {
       const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id');
       studentIds = [...new Set([...studentIds, ...phoneChildren.items.map((item: any) => item.id)])];
@@ -4418,6 +4422,7 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
   const role = normalizeRole(user.role);
   let classIds: string[] | null = null;
   let studentIds: string[] | null = null;
+  let studentCurrentClassIds: string[] | null = null;
 
   let teacherSubjectPairs: Set<string> | null = null;
   if (role === 'teacher') {
@@ -4430,12 +4435,19 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
       studentIds = own.items.map((item: any) => item.id);
+      const ownRow = own.items[0] as any;
+      const currentClassId = ownRow ? await getStudentCurrentClassId(school.id, String(ownRow.id), String(ownRow.classId || '')) : '';
+      studentCurrentClassIds = currentClassId ? [currentClassId] : [];
     } else if (user.phone) {
       const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id,class_id');
       studentIds = [...new Set([...studentIds, ...phoneChildren.items.map((item: any) => item.id)])];
     }
-    const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
-    classIds = [...new Set(children.items.map((item: any) => item.classId))];
+    if (role === 'student') {
+      classIds = studentCurrentClassIds || [];
+    } else {
+      const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
+      classIds = [...new Set(children.items.map((item: any) => item.classId))];
+    }
   }
 
   if (classIds && !classIds.length) { res.json([]); return; }
@@ -9168,6 +9180,31 @@ apiRouter.delete('/school/events/:id', requireAuth, requireSchoolContext, requir
     details: `Deleted school event ${req.params.id}.`, severity: 'warning'
   });
   res.status(204).end();
+});
+
+apiRouter.get('/student/notices', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'student') {
+    res.status(403).json({ ok: false, data: null, error: { code: 'STUDENT_ONLY', message: 'Student accounts only.' } });
+    return;
+  }
+  const classIds = await getNoticeClassIds(school.id, user);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  const audiences = ['audience.eq.all', 'audience.eq.school', 'audience.eq.students'];
+  if (classIds.length) audiences.push('and(audience.eq.class,class_id.in.(' + classIds.join(',') + '))');
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 20));
+  const result = await db.queryPage('school_notices', { school_id: school.id, is_active: 'true' }, page, pageSize,
+    'and(publish_date.lte.' + today + ',or(' + audiences.join(',') + '))',
+    'id,school_id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role,is_active', 'publish_date');
+  const noticeIds = result.items.map((notice: any) => String(notice.id));
+  const reads = noticeIds.length
+    ? await db.queryPage('notice_reads', { school_id: school.id, user_id: user.id, notice_id: noticeIds }, 1, 50, undefined, 'notice_id')
+    : { items: [] as any[] };
+  const readIds = new Set(reads.items.map((row: any) => String(row.noticeId)));
+  res.set({ 'X-Page': String(result.page), 'X-Page-Size': String(result.pageSize), 'X-Total-Count': String(result.total), 'X-Total-Pages': String(Math.ceil(result.total / result.pageSize)), 'Cache-Control': 'private, no-store, max-age=0' });
+  res.json({ ok: true, data: result.items.map((notice: any) => ({ ...notice, isRead: readIds.has(String(notice.id)) })), error: null });
 });
 
 apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
