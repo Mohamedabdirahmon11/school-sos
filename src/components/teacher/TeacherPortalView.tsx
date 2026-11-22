@@ -48,12 +48,12 @@ import {
 const formatTeacherGuardianPhone = (...values: unknown[]) => {
   const value = values.find(item => typeof item === 'string' && item.trim());
   if (typeof value !== 'string') return 'Phone not provided';
-  const raw = value.trim().replace(/[\\s().-]/g, '');
+  const raw = value.trim().replace(/[\s().-]/g, '');
   if (raw.startsWith('+')) return raw;
   if (raw.startsWith('00')) return `+${raw.slice(2)}`;
   if (raw.startsWith('251')) return `+${raw}`;
   if (raw.startsWith('0') && raw.length === 10) return `+251${raw.slice(1)}`;
-  if (/^[79]\\d{8}$/.test(raw)) return `+251${raw}`;
+  if (/^[79]\d{8}$/.test(raw)) return `+251${raw}`;
   return raw || 'Phone not provided';
 };
 
