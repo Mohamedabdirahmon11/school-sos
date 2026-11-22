@@ -12,11 +12,22 @@ const gradeBand = (grade: number) => grade <= 4 ? 'Grade 1–4' : grade <= 6 ? '
 const classLabel = (row: SchoolClass) => `Grade ${row.gradeLevel} · ${row.section || '—'}`;
 const activeClass = (row: SchoolClass) => row.isArchived !== true;
 
+async function fetchAllPages<T>(path: string): Promise<T[]> {
+  const all: T[] = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const batch = await ApiClient.request<T[]>(`${path}?page=${page}&pageSize=100`);
+    all.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return all;
+}
+
 export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const { school, isReadOnly } = useAuth();
   const [rows, setRows] = useState<SchoolClass[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [subjectCounts, setSubjectCounts] = useState<Record<string, number>>({});
+  const [capacityDrafts, setCapacityDrafts] = useState<Record<string, string>>({});
   const [shiftSettings, setShiftSettings] = useState<ShiftSettings>({ shiftCount: 1 });
   const [grade, setGrade] = useState(1);
   const [section, setSection] = useState('B');
@@ -32,14 +43,15 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     setLoading(true);
     try {
       const [classRows, teacherRows, settings] = await Promise.all([
-        ApiClient.getClasses(),
-        ApiClient.getTeachers({ page: 1, pageSize: 200 }),
+        fetchAllPages<SchoolClass>('/classes'),
+        fetchAllPages<Teacher>('/teachers'),
         ApiClient.getTimetableSettings()
       ]);
-      const safeClasses = (Array.isArray(classRows) ? classRows : []).filter(activeClass)
+      const safeClasses = classRows.filter(activeClass)
         .sort((a, b) => a.gradeLevel - b.gradeLevel || a.section.localeCompare(b.section));
       setRows(safeClasses);
-      setTeachers((Array.isArray(teacherRows) ? teacherRows : []).filter(teacher => teacher.status === 'active'));
+      setCapacityDrafts({});
+      setTeachers(teacherRows.filter(teacher => teacher.status === 'active'));
       setShiftSettings({ shiftCount: settings.shiftCount });
       const counts = await Promise.all(safeClasses.map(async row => {
         try {
@@ -93,7 +105,6 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     try {
       const created = await createClass(grade, cleanSection, classCapacity, shift);
       setRows(current => [...current, created].sort((a, b) => a.gradeLevel - b.gradeLevel || a.section.localeCompare(b.section)));
-      setSubjectCounts(current => ({ ...current, [created.id]: 0 }));
       setSection('B');
       setNotice({ kind: 'ok', text: `${classLabel(created)} waa lagu daray.` });
       await load();
@@ -133,11 +144,28 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     try {
       const saved = await ApiClient.updateClass(row.id, updates);
       setRows(current => current.map(item => item.id === row.id ? saved : item));
+      if (updates.capacity !== undefined) setCapacityDrafts(current => { const next = { ...current }; delete next[row.id]; return next; });
       setNotice({ kind: 'ok', text: 'Fasalka waa la cusboonaysiiyey.' });
     } catch (error) {
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Fasalka lama cusboonaysiin karin.' });
       await load();
     } finally { setBusyClassId(null); }
+  };
+
+  const saveCapacity = async (row: SchoolClass) => {
+    const draft = capacityDrafts[row.id];
+    if (draft === undefined) return;
+    const next = Number(draft);
+    if (!Number.isInteger(next) || next < 1 || next > 200) {
+      setNotice({ kind: 'error', text: 'Capacity must be between 1 and 200.' });
+      setCapacityDrafts(current => { const value = { ...current }; delete value[row.id]; return value; });
+      return;
+    }
+    if (next === row.capacity) {
+      setCapacityDrafts(current => { const value = { ...current }; delete value[row.id]; return value; });
+      return;
+    }
+    await update(row, { capacity: next });
   };
 
   const remove = async (row: SchoolClass) => {
@@ -158,9 +186,8 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <AcademicSetupHeader active="sch_classes" onNavigate={onNavigate} />
         <h2>Classes &amp; Sections</h2>
         <p className="lead">Fasal kasta waa Grade iyo Section (tusaale Grade 4 · A). Fasal kasta hal shift ayuu ku jiraa, hal Form Teacherna wuu leeyahay.</p>
-        {notice && <div role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite" className={`msg ${notice.kind === 'error' ? 'bad' : 'ok'}`}>{notice.text}</div>}
-        {!isReadOnly && (
-          <div className="card">
+        <section className="card">
+          {!isReadOnly && (
             <form className="bar" onSubmit={add}>
               <div className="f">
                 <label htmlFor="ng">Grade</label>
@@ -187,53 +214,46 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <span className="spacer" />
               <button type="button" onClick={() => void addStandard()} disabled={busy || loading}>Standard: Grade 1–8</button>
             </form>
-            <div className="mut">Academic year: {school?.academicYear || '—'}</div>
+          )}
+          {notice && <div role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite" className={`msg ${notice.kind === 'error' ? 'bad' : 'ok'}`}>{notice.text}</div>}
+          <div className="scroll">
+            <table>
+              <thead><tr><th>Class</th><th>Level</th><th>Shift</th><th className="n">Capacity</th><th>Form Teacher</th><th className="n">Subjects</th><th></th></tr></thead>
+              <tbody>
+                {loading ? <tr><td colSpan={7} className="mut">Loading classes…</td></tr> : sortedRows.length === 0 ? (
+                  <tr><td colSpan={7} className="mut">Wali fasal lama darin. Riix "Standard: Grade 1–8".</td></tr>
+                ) : sortedRows.map(row => {
+                  const free = freeTeachersFor(row);
+                  const selectedTeacher = teachers.find(teacher => teacher.userId === row.classTeacherId);
+                  return (
+                    <tr key={row.id}>
+                      <td><b>{classLabel(row)}</b></td>
+                      <td className="mut">{gradeBand(row.gradeLevel)}</td>
+                      <td>
+                        <select value={row.shift || 1} disabled={isReadOnly || busyClassId === row.id} aria-label={`Shift ${classLabel(row)}`} onChange={event => void update(row, { shift: Number(event.target.value) as 1 | 2 })}>
+                          <option value={1}>Morning</option>
+                          {(shiftSettings.shiftCount === 2 || row.shift === 2) && <option value={2}>Afternoon</option>}
+                        </select>
+                      </td>
+                      <td className="n">
+                        <input type="number" min={1} max={200} value={capacityDrafts[row.id] ?? String(row.capacity)} disabled={isReadOnly || busyClassId === row.id} aria-label={`Capacity ${classLabel(row)}`} onChange={event => setCapacityDrafts(current => ({ ...current, [row.id]: event.target.value }))} onBlur={() => void saveCapacity(row)} />
+                      </td>
+                      <td>
+                        <select value={row.classTeacherId || ''} disabled={isReadOnly || busyClassId === row.id} aria-label={`Form teacher ${classLabel(row)}`} onChange={event => void update(row, { classTeacherId: event.target.value || null })}>
+                          <option value="">—</option>
+                          {free.map(teacher => <option key={teacher.id} value={teacher.userId}>{teacher.fullName}</option>)}
+                          {selectedTeacher && !free.some(teacher => teacher.id === selectedTeacher.id) && <option value={selectedTeacher.userId}>{selectedTeacher.fullName}</option>}
+                        </select>
+                      </td>
+                      <td className="n">{subjectCounts[row.id] ?? 0}</td>
+                      <td><button type="button" className="ghost" disabled={isReadOnly || busyClassId === row.id} aria-label={`Delete ${classLabel(row)}`} onClick={() => void remove(row)}>Delete</button></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-        <div className="bar" style={{ alignItems: 'center', marginTop: 16 }}>
-          <h2 style={{ fontSize: 16, margin: 0 }}>Class list</h2>
-          <span className="spacer" />
-          <span className="pill">{sortedRows.length} classes</span>
-        </div>
-        {loading ? <div className="loading">Loading classes…</div> : !sortedRows.length ? (
-          <div className="card empty">Wali fasal lama darin. Riix "Standard: Grade 1–8".</div>
-        ) : (
-          <div className="card">
-            <div className="scroll">
-              <table>
-                <thead><tr><th>Class</th><th>Level</th><th>Shift</th><th className="n">Capacity</th><th>Form Teacher</th><th className="n">Subjects</th><th className="n"> </th></tr></thead>
-                <tbody>
-                  {sortedRows.map(row => {
-                    const free = freeTeachersFor(row);
-                    const selectedTeacher = teachers.find(teacher => teacher.userId === row.classTeacherId);
-                    return (
-                      <tr key={row.id}>
-                        <td><b>{classLabel(row)}</b></td>
-                        <td className="mut">{gradeBand(row.gradeLevel)}</td>
-                        <td>
-                          <select value={row.shift || 1} disabled={isReadOnly || busyClassId === row.id} aria-label={`Shift ${classLabel(row)}`} onChange={event => void update(row, { shift: Number(event.target.value) as 1 | 2 })}>
-                            <option value={1}>Morning</option>
-                            {(shiftSettings.shiftCount === 2 || row.shift === 2) && <option value={2}>Afternoon</option>}
-                          </select>
-                        </td>
-                        <td className="n"><input type="number" min={1} max={200} value={row.capacity} disabled={isReadOnly || busyClassId === row.id} aria-label={`Capacity ${classLabel(row)}`} onChange={event => setRows(current => current.map(item => item.id === row.id ? { ...item, capacity: Number(event.target.value) } : item))} onBlur={event => { const next = Number(event.target.value); if (Number.isInteger(next) && next >= 1 && next <= 200 && next !== row.capacity) void update(row, { capacity: next }); }} /></td>
-                        <td>
-                          <select value={row.classTeacherId || ''} disabled={isReadOnly || busyClassId === row.id} aria-label={`Form teacher ${classLabel(row)}`} onChange={event => void update(row, { classTeacherId: event.target.value || null })}>
-                            <option value="">—</option>
-                            {free.map(teacher => <option key={teacher.id} value={teacher.userId}>{teacher.fullName}</option>)}
-                            {selectedTeacher && !free.some(teacher => teacher.id === selectedTeacher.id) && <option value={selectedTeacher.userId}>{selectedTeacher.fullName}</option>}
-                          </select>
-                        </td>
-                        <td className="n">{subjectCounts[row.id] ?? 0}</td>
-                        <td className="n"><button type="button" className="ghost" disabled={isReadOnly || busyClassId === row.id} aria-label={`Delete ${classLabel(row)}`} onClick={() => void remove(row)}>Delete</button></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        </section>
       </div>
     </div>
   );

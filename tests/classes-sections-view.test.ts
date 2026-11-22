@@ -41,3 +41,9 @@ test('Academic setup CSS preserves the reference design tokens and responsive ta
   assert.match(css, /overflow-x:auto/);
   assert.match(css, /:focus-visible/);
 });
+
+test('Class table capacity edits persist on blur instead of remaining local-only', () => {
+  assert.match(view, /capacityDrafts\[row\.id\]/);
+  assert.match(view, /onBlur=\{\(\) => void saveCapacity\(row\)\}/);
+  assert.match(view, /ApiClient\.updateClass\(row\.id, updates\)/);
+});
