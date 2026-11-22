@@ -9205,7 +9205,7 @@ apiRouter.get('/student/notices', requireAuth, requireSchoolContext, async (req,
   const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 20));
   const result = await db.queryPage('school_notices', { school_id: school.id, is_active: 'true' }, page, pageSize,
     'and(publish_date.lte.' + today + ',or(' + audiences.join(',') + '))',
-    'id,school_id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role,is_active', 'publish_date');
+    'id,school_id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role,is_active', 'publish_date', false);
   const noticeIds = result.items.map((notice: any) => String(notice.id));
   const reads = noticeIds.length
     ? await db.queryPage('notice_reads', { school_id: school.id, user_id: user.id, notice_id: noticeIds }, 1, 50, undefined, 'notice_id')
