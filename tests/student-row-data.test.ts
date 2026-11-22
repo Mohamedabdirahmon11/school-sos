@@ -56,5 +56,5 @@ test('student reconciliation migration is additive, tenant-scoped, and never ove
   assert.match(migration, /e\.academic_year_id = cy\.academic_year_id/);
   assert.match(migration, /AND e\.school_id = s\.school_id/);
   assert.match(migration, /ON CONFLICT DO NOTHING/);
-  assert.doesNotMatch(migration, /\\bDELETE\\s+FROM\\s+public\\.(students|enrollments|fee_payments|student_invoices)\\b/i);
+  assert.doesNotMatch(migration, /\bDELETE\s+FROM\s+public\.(students|enrollments|fee_payments|student_invoices)\b/i);
 });
