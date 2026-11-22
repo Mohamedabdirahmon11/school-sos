@@ -6,9 +6,11 @@ const root = process.cwd();
 const widths = [360, 390, 768, 1280];
 const themes = ['light', 'dark'] as const;
 const steps = [
-  'Macluumaadka dugsiga', 'Sanad dugsiyeed & Terms', 'Fasallada',
-  'Maaddooyinka (Curriculum)', 'Macallimiinta', 'Teacher Assignment',
-  'Ardayda', 'Timetable', 'Dhammee & Fur Dashboard'
+  'Sanad dugsiyeed & Semesters', 'Macluumaadka dugsiga & WhatsApp',
+  'Classes & Grades (KG 1 / KG 2)', 'Maaddooyinka & Curriculum',
+  'Macallimiinta & Teacher Assignment', 'Ardayda & Waalidiinta',
+  'Timetable', 'Attendance & Exams', 'Fees & Extra Modules',
+  'Hubinta ugu dambaysa & Dashboard'
 ];
 
 for (const width of widths) {
@@ -20,7 +22,7 @@ for (const width of widths) {
       await page.goto(`http://127.0.0.1:4173/teacher-portal-visual.html?component=setup&theme=${theme}`);
       await expect(page.locator('.school-setup-reference')).toBeVisible();
       await expect(page.getByText('Setup Wizard', { exact: true })).toBeVisible();
-      await expect(page.getByText('9/9 diyaar')).toBeVisible();
+      await expect(page.getByText('10/10 diyaar')).toBeVisible();
       const folder = path.join(root, 'artifacts', 'school-setup', theme, String(width));
       fs.mkdirSync(folder, { recursive: true });
       const pageLinks: string[] = [];
@@ -58,6 +60,6 @@ test('School Setup Wizard screenshot matrix index', async () => {
   const folder = path.join(root, 'artifacts', 'school-setup');
   fs.mkdirSync(folder, { recursive: true });
   const links = themes.flatMap(theme => widths.map(width => `<li><a href="${theme}/${width}/">${width}px · ${theme}</a></li>`)).join('');
-  fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>School Setup Wizard screenshot matrix</title><style>body{font:16px system-ui;margin:40px;background:#f6f4ee;color:#1c2b26}li{margin:12px 0}a{color:#1f4d3f;font-weight:700}</style><h1>School Setup Wizard · responsive matrix</h1><p>9 steps × 4 viewport widths × 2 themes. PNG files are grouped by theme and width.</p><ul>${links}</ul>`);
+  fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><meta charset="utf-8"><title>School Setup Wizard screenshot matrix</title><style>body{font:16px system-ui;margin:40px;background:#f6f4ee;color:#1c2b26}li{margin:12px 0}a{color:#1f4d3f;font-weight:700}</style><h1>School Setup Wizard · responsive matrix</h1><p>10 steps × 4 viewport widths × 2 themes. PNG files are grouped by theme and width.</p><ul>${links}</ul>`);
   expect(fs.existsSync(path.join(folder, 'index.html'))).toBeTruthy();
 });

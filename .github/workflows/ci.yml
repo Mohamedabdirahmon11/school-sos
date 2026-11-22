@@ -116,7 +116,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Capture nine-step Setup Wizard matrix
+      - name: Capture ten-step Setup Wizard matrix
         run: npx playwright test --config tests/visual/playwright.config.ts --grep 'School Setup Wizard'
 
       - name: Upload Setup Wizard screenshots

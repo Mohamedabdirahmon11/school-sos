@@ -5,17 +5,24 @@ import path from 'node:path';
 
 const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), 'utf8');
 
-test('School Setup UI exposes the nine reference steps and the responsive 290px/860px layout', () => {
+test('School Setup UI exposes the ten requested steps in order and the responsive 290px/860px layout', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  for (const id of ['profile', 'year', 'classes', 'subjects', 'teachers', 'assign', 'students', 'timetable', 'finish']) {
-    assert.match(source, new RegExp(`id: '${id}'`), `missing step ${id}`);
-  }
-  assert.match(source, /grid-template-columns:290px minmax\(0,1fr\)/);
-  assert.match(source, /max-width:860px/);
-  assert.match(source, /@media\(max-width:760px\)/);
-  assert.match(source, /START HERE/);
-  assert.match(source, /Wax ka maqan/);
-  assert.match(source, /prefers-color-scheme:dark/);
+  const ids = ['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'timetable', 'attendance', 'fees', 'finish'];
+  const positions = ids.map(id => source.indexOf("id: '" + id + "'"));
+  assert.ok(positions.every(position => position >= 0), 'all ten setup steps must exist');
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'steps must follow the requested order');
+  assert.ok(source.includes("view: 'sch_setup_academics'"));
+  assert.ok(source.includes("view: 'sch_settings'"));
+  assert.ok(source.includes('assignmentEvidence: 0'));
+  assert.ok(source.includes('REFERENCE_STEP_BY_PROGRESS_ID'));
+  assert.ok(source.includes('Tallaabada {referenceStep + 1} ee {wizardSteps.length}'));
+  assert.ok(source.includes('{completedCount}/{wizardSteps.length} diyaar'));
+  assert.ok(source.includes('grid-template-columns:290px minmax(0,1fr)'));
+  assert.ok(source.includes('max-width:860px'));
+  assert.ok(source.includes('@media(max-width:760px)'));
+  assert.ok(source.includes('START HERE'));
+  assert.ok(source.includes('Wax ka maqan'));
+  assert.ok(source.includes('prefers-color-scheme:dark'));
 });
 
 test('setup readiness is shared by API reads and writes and protects attendance, marks, and timetable routes', () => {
@@ -47,7 +54,7 @@ test('completed existing schools are grandfathered and are not relocked by setup
 
 test('legacy setup checklist identifiers remain mapped to the new wizard evidence', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  for (const evidence of ['evidence: 2', 'evidence: 1', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'evidence: 0', 'evidence: 6', 'evidence: 7']) {
+  for (const evidence of ['evidence: 1', 'evidence: 2', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'assignmentEvidence: 0', 'evidence: 6', 'evidence: 7', 'evidence: 8', 'evidence: 9']) {
     assert.ok(source.includes(evidence), `legacy checklist mapping missing: ${evidence}`);
   }
 });

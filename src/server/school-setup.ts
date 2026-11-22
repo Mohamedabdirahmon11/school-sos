@@ -214,7 +214,7 @@ export function applySchoolSetupProgressUpdate(
       completedAt: null
     };
     if (!canFinishSchoolSetup(candidate, checklist)) {
-      throw new Error('Complete steps 1–6, Teacher Assignment, and 8, then complete or skip steps 7 and 9 before opening the dashboard.');
+      throw new Error('Complete steps 1–6 and Teacher Assignment, then complete or skip Timetable (7) and Fees/Modules (9) before opening the dashboard. Attendance & Exams (8) is a follow-up check and does not block the dashboard.');
     }
     return {
       currentStep: 10,

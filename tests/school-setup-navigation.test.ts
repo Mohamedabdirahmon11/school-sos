@@ -8,7 +8,7 @@ import {
 
 test('School Admin setup can open fees, parents, attendance, exams, and all optional school modules', () => {
   assert.equal(SCHOOL_SETUP_ALLOWED_VIEWS.has(SCHOOL_SETUP_STEP_TARGETS.fees), true);
-  for (const view of ['sch_parents', 'sch_attendance', 'sch_exams']) {
+  for (const view of ['sch_parents', 'sch_curriculum', 'sch_attendance', 'sch_exams']) {
     assert.equal(SCHOOL_SETUP_ALLOWED_VIEWS.has(view), true, view);
   }
   for (const module of SCHOOL_SETUP_EXTRA_MODULES) {
