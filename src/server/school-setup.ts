@@ -103,7 +103,8 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
       ? Math.min(10, Math.max(0, rawCurrentStep === 5 && [1, 2, 3, 4, 5].every(step => completedSteps.includes(step)) ? 6 : rawCurrentStep))
       : 1;
   const completedAt = fullyComplete ? rawCompletedAt : null;
-  return { currentStep, completedSteps, skippedSteps, completedAt };
+  const startedAt = typeof source.startedAt === 'string' && source.startedAt.trim() ? source.startedAt : null;
+  return { currentStep, completedSteps, skippedSteps, completedAt, startedAt };
 }
 
 function validDate(value: unknown): value is string {
@@ -219,13 +220,15 @@ export function applySchoolSetupProgressUpdate(
       currentStep: 10,
       completedSteps: [...new Set([...update.completedSteps, 10])].sort((a, b) => a - b),
       skippedSteps: [...update.skippedSteps],
-      completedAt: now
+      completedAt: now,
+      startedAt: existing.startedAt || now
     };
   }
   return {
     currentStep: update.currentStep,
     completedSteps: [...update.completedSteps],
     skippedSteps: [...update.skippedSteps],
-    completedAt: existing.completedAt
+    completedAt: existing.completedAt,
+    startedAt: existing.startedAt || now
   };
 }
