@@ -101,12 +101,12 @@ test('teacher appointment supports optional multiple profile tags and one-time s
   assert.doesNotMatch(admin, /Teacher ID \*/);
   assert.match(admin, /Teacher PIN \(required\)/);
   assert.match(admin, /Date of Joining/);
-  assert.match(api, /nextSchoolTeacherId\(school\)/);
+  assert.match(api, /createTeacherAtomically/);
   assert.match(api, /Teacher PIN must contain 4–6 digits/);
   assert.match(admin, /formTeacherClassId/);
   assert.match(admin, /Form Teacher class/);
   assert.match(api, /body\.formTeacherClassId/);
-  assert.match(api, /classTeacherId: account\.id/);
+  assert.match(api, /formTeacherClassId: formTeacherClassId/);
   assert.match(admin, /Teacher ID: /);
   assert.match(admin, /Initial PIN:/);
   assert.match(admin, /Reset PIN/);
