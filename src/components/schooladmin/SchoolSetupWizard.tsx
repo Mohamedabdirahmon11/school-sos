@@ -45,7 +45,7 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 9, title: 'Fees & Extra Modules', description: 'Create fee structures or skip fees for the Accountant; configure optional modules as needed.', optional: true, views: [{ label: 'Open Fees', view: 'sch_fees' }, { label: 'Inventory', view: 'sch_inventory' }, { label: 'Library', view: 'sch_library' }, { label: 'Transport', view: 'sch_transport' }, { label: 'Discipline', view: 'sch_discipline' }, { label: 'Health', view: 'sch_health' }] }
 ];
 
-const REFERENCE_STEP_BY_PROGRESS_ID: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 0: 5, 6: 6, 7: 7, 8: 8, 9: 8, 10: 8 };
+const REFERENCE_STEP_BY_PROGRESS_ID: Record<number, number> = { 1: 1, 2: 0, 3: 2, 4: 3, 5: 4, 0: 5, 6: 6, 7: 7, 8: 8, 9: 8, 10: 8 };
 
 export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) => {
   const { school, user } = useAuth();
@@ -218,12 +218,12 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
 
   if (showChecklist) {
     const wizardSteps: Array<{ id: string; title: string; required: boolean; evidence: number; assignmentEvidence?: number; followUp?: boolean; needs: string[]; view?: string }> = [
-      { id: 'year', title: 'Sanad dugsiyeed & Semesters', required: true, evidence: 1, needs: [], view: 'sch_setup_academics' },
-      { id: 'profile', title: 'Macluumaadka dugsiga & WhatsApp', required: true, evidence: 2, needs: ['year'], view: 'sch_settings' },
+      { id: 'profile', title: 'Macluumaadka dugsiga', required: true, evidence: 2, needs: [], view: 'sch_settings' },
+      { id: 'year', title: 'Sanad dugsiyeed & Terms', required: true, evidence: 1, needs: ['profile'], view: 'sch_setup_academics' },
       { id: 'classes', title: 'Classes & Sections', required: true, evidence: 3, needs: ['profile', 'year'] },
       { id: 'subjects', title: 'Subjects & Curriculum', required: true, evidence: 4, needs: ['classes'] },
-      { id: 'teachers', title: 'Teachers', required: true, evidence: 5, needs: ['classes', 'subjects'] },
-      { id: 'assign', title: 'Teacher Assignment & Form Teachers', required: true, evidence: 0, needs: ['teachers', 'subjects'] },
+      { id: 'teachers', title: 'Macallimiinta', required: true, evidence: 5, needs: ['profile'] },
+      { id: 'assign', title: 'Teacher Assignment', required: true, evidence: 0, needs: ['classes', 'subjects', 'teachers'] },
       { id: 'students', title: 'Students & Parents', required: true, evidence: 6, needs: ['assign'] },
       { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['assign'] },
       { id: 'finish', title: 'Hubinta ugu dambaysa & Dashboard', required: true, evidence: -1, needs: ['year', 'profile', 'classes', 'subjects', 'teachers', 'assign', 'students'] }
