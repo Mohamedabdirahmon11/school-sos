@@ -11399,12 +11399,26 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
       if (cleared.error) throw new Error('Jadwalka ku xiran lama nadiifin karin.');
     }
   }
-  const saved = old
-    ? await client.from('teacher_class_subject_assignments').update({ ...payload, updated_at: new Date().toISOString() }).eq('school_id', school.id).eq('id', old.id).select('*').single()
-    : await client.from('teacher_class_subject_assignments').insert({ ...payload, created_by: user.id }).select('*').single();
-  if (saved.error || !saved.data) { const error = new Error(saved.error?.code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.' : 'Qoondeynta lama kaydin karin.') as Error & { status: number }; error.status = saved.error?.code === '23505' ? 409 : 503; throw error; }
-  await syncTeacherAssignmentLegacy(client, school.id, payload.academic_year_id, payload.class_id, payload.subject_id, payload.section_id);
-  await teacherAssignmentAudit(client, school.id, user.id, old ? 'updated' : 'created', old, saved.data);
+  const saved = await client.rpc('upsert_teacher_assignment_atomic', {
+    p_assignment_id: old?.id || null,
+    p_school_id: school.id,
+    p_academic_year_id: payload.academic_year_id,
+    p_term_id: payload.term_id,
+    p_class_id: payload.class_id,
+    p_section_id: payload.section_id,
+    p_subject_id: payload.subject_id,
+    p_teacher_id: payload.teacher_id,
+    p_qualification_override: payload.qualification_override,
+    p_changed_by: user.id
+  });
+  if (saved.error || !saved.data) {
+    const code = saved.error?.code;
+    const error = new Error(code === '23505' ? 'Fasalkan iyo maaddadan hore ayaa macallin loogu qoondeeyey.'
+      : code === '23514' ? 'Culayska macallinka wuxuu dhaafayaa 30 periods toddobaadkii.'
+      : 'Qoondeynta atomic ahaan looma kaydin karin.') as Error & { status: number };
+    error.status = code === '23505' ? 409 : code === '23514' ? 422 : 503;
+    throw error;
+  }
   return { assignment: saved.data, warning: payload.qualification_override ? 'Digniin: macallinku kuma xirna maaddadan.' : null };
 }
 async function removeTeacherAssignment(client: any, school: School, user: User, id: string, clear: boolean) {
