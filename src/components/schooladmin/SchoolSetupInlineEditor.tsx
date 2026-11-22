@@ -5,11 +5,11 @@ type Props = { step: 'classes' | 'subjects' | 'teachers' | 'assign' | 'students'
 type Field = { name: string; label: string; type?: string; required?: boolean; options?: Array<{ value: string; label: string }> };
 
 const fields: Record<Props['step'], Field[]> = {
-  classes: [{ name: 'name', label: 'Magaca fasalka', required: true }, { name: 'gradeLevel', label: 'Grade / Heerka' }, { name: 'section', label: 'Section' }],
+  classes: [{ name: 'name', label: 'Magaca fasalka', required: true }, { name: 'gradeLevel', label: 'Grade / Heerka', type: 'number', required: true }, { name: 'section', label: 'Section' }],
   subjects: [{ name: 'name', label: 'Magaca maaddada', required: true }, { name: 'code', label: 'Subject code' }, { name: 'classId', label: 'Fasalka', required: true }, { name: 'periodsPerWeek', label: 'Periods toddobaadkii', type: 'number', required: true }],
-  teachers: [{ name: 'fullName', label: 'Magaca macallinka', required: true }, { name: 'staffId', label: 'Teacher ID', required: true }, { name: 'phone', label: 'Telefoonka' }],
+  teachers: [{ name: 'fullName', label: 'Magaca macallinka', required: true }, { name: 'gender', label: 'Jinsiga', required: true, options: [{ value: 'male', label: 'Lab' }, { value: 'female', label: 'Dhedig' }] }, { name: 'phone', label: 'Telefoonka', required: true }, { name: 'pin', label: 'PIN (4–6 lambar)', type: 'password', required: true }, { name: 'subjectId', label: 'Maaddada uu ku takhasusay' }],
   assign: [{ name: 'classId', label: 'Fasalka', required: true }, { name: 'subjectId', label: 'Maaddada', required: true }, { name: 'teacherId', label: 'Macallinka maaddada', required: true }],
-  students: [{ name: 'firstName', label: 'Magaca koowaad', required: true }, { name: 'middleName', label: 'Magaca dhexe' }, { name: 'lastName', label: 'Magaca dambe' }, { name: 'classId', label: 'Fasalka', required: true }, { name: 'guardianPhone', label: 'Telefoonka waalidka' }],
+  students: [{ name: 'firstName', label: 'Magaca koowaad', required: true }, { name: 'middleName', label: 'Magaca dhexe' }, { name: 'lastName', label: 'Magaca dambe' }, { name: 'classId', label: 'Fasalka', required: true }, { name: 'guardianName', label: 'Magaca waalidka/masuulka', required: true }, { name: 'guardianPhone', label: 'Telefoonka waalidka', required: true }, { name: 'gender', label: 'Jinsiga', required: true, options: [{ value: 'male', label: 'Lab' }, { value: 'female', label: 'Dhedig' }] }],
   timetable: [{ name: 'classId', label: 'Fasalka', required: true }, { name: 'subjectId', label: 'Maaddada', required: true }, { name: 'teacherId', label: 'Macallinka', required: true }, { name: 'dayOfWeek', label: 'Maalinta', required: true, options: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(value => ({ value, label: value })) }, { name: 'periodNumber', label: 'Period', type: 'number', required: true }, { name: 'startTime', label: 'Bilow', type: 'time', required: true }, { name: 'endTime', label: 'Dhammaad', type: 'time', required: true }]
 };
 
@@ -65,14 +65,14 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
     setError('');
     try {
       if (step === 'classes') {
-        await ApiClient.createClass({ name: form.name, gradeLevel: form.gradeLevel || undefined, section: form.section || undefined });
+        await ApiClient.createClass({ name: form.name, gradeLevel: Number(form.gradeLevel), section: form.section || undefined });
       } else if (step === 'subjects') {
         const subject = await ApiClient.createSubject({ name: form.name, code: form.code || undefined });
         const curriculum = await ApiClient.getClassCurriculum(form.classId);
         const current = (curriculum.curriculum || []).filter((item: any) => item.isActive).map((item: any) => ({ subjectId: item.subjectId, periodsPerWeek: Number(item.periodsPerWeek || 1) }));
         await ApiClient.saveClassCurriculum(form.classId, [...current, { subjectId: subject.id, periodsPerWeek: Math.max(1, Number(form.periodsPerWeek || 1)) }]);
       } else if (step === 'teachers') {
-        await ApiClient.createTeacher({ fullName: form.fullName, staffId: form.staffId, phone: form.phone || undefined });
+        const created = await ApiClient.createTeacher({ fullName: form.fullName, gender: form.gender as any, phone: form.phone, pin: form.pin } as any); if (form.subjectId) await ApiClient.saveTeacherSubjects(created.id, [form.subjectId]);
       } else if (step === 'assign') {
         await ApiClient.request('/teacher-assignments', { method: 'POST', body: JSON.stringify({
           academicYearId: assignmentData?.selectedAcademicYearId, termId: assignmentData?.selectedTermId || undefined,
@@ -80,7 +80,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
           clearDependentEntries: false
         }) });
       } else if (step === 'students') {
-        await ApiClient.createStudent({ firstName: form.firstName, middleName: form.middleName || undefined, lastName: form.lastName || undefined, classId: form.classId, guardianPhone: form.guardianPhone || undefined });
+        await ApiClient.createStudent({ firstName: form.firstName, middleName: form.middleName, lastName: form.lastName, gender: form.gender as any, classId: form.classId, guardianName: form.guardianName, guardianPhone: form.guardianPhone });
       } else {
         await ApiClient.setTimetableSlot({ classId: form.classId, subjectId: form.subjectId, teacherId: form.teacherId, dayOfWeek: form.dayOfWeek, periodNumber: Number(form.periodNumber), startTime: form.startTime, endTime: form.endTime, termId: terms.find(term => term.isCurrent)?.id });
       }
@@ -114,7 +114,7 @@ export const SchoolSetupInlineEditor: React.FC<Props> = ({ step, onChanged }) =>
     }
   };
 
-  const saveFormTeacher = async () => { setSaving(true); setError(''); try { await ApiClient.updateClass(formTeacher.classId, { classTeacherId: formTeacher.teacherId } as any); await load(); await onChanged(); } catch (e) { setError(e instanceof Error ? e.message : 'Form Teacher lama kaydin karin.'); } finally { setSaving(false); } };
+  const saveFormTeacher = async () => { setSaving(true); setError(''); try { const selectedTeacher = teachers.find(row => row.id === formTeacher.teacherId); await ApiClient.updateClass(formTeacher.classId, { classTeacherId: selectedTeacher?.userId } as any); await load(); await onChanged(); } catch (e) { setError(e instanceof Error ? e.message : 'Form Teacher lama kaydin karin.'); } finally { setSaving(false); } };
   const title = ({ classes: 'Classes & Sections', subjects: 'Subjects & Class Curriculum', teachers: 'Teachers', assign: 'Teacher Assignment', students: 'Students', timetable: 'Timetable' } as const)[step];
   const nameOf = (row: any) => row.fullName || row.name || [row.firstName, row.middleName, row.lastName].filter(Boolean).join(' ') || row.subjectName || row.title || 'Record';
   const selectOptions = (field: Field) => field.name === 'classId' ? classes.map(row => ({ value: row.id, label: row.name })) : field.name === 'subjectId' ? subjects.map(row => ({ value: row.id, label: row.name })) : field.name === 'teacherId' ? teachers.map(row => ({ value: row.id, label: row.fullName })) : field.options || [];
