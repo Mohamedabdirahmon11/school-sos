@@ -1765,12 +1765,23 @@ class StorageEngine {
   public async getStudentsByIdentifiers(identifiers: string[], schoolId: string): Promise<Student[]> {
     const uniqueIdentifiers = [...new Set(identifiers.filter(id => typeof id === 'string' && id.length > 0))];
     if (!uniqueIdentifiers.length) return [];
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Supabase client is not configured.');
+    const primaryKeyStartedAt = performance.now();
+    const studentIdStartedAt = performance.now();
     const [byPrimaryKey, byStudentId] = await Promise.all([
-      this.queryPage<Student>('students', { school_id: schoolId, id: uniqueIdentifiers }, 1, 100, undefined, '*'),
-      this.queryPage<Student>('students', { school_id: schoolId, student_id: uniqueIdentifiers }, 1, 100, undefined, '*')
+      client.from('students').select('*').eq('school_id', schoolId).in('id', uniqueIdentifiers),
+      client.from('students').select('*').eq('school_id', schoolId).in('student_id', uniqueIdentifiers)
     ]);
+    this.recordQuery('students', 'select-batch-id', primaryKeyStartedAt);
+    this.recordQuery('students', 'select-batch-student-id', studentIdStartedAt);
+    if (byPrimaryKey.error) throw new Error('Unable to resolve student IDs: ' + byPrimaryKey.error.message);
+    if (byStudentId.error) throw new Error('Unable to resolve student codes: ' + byStudentId.error.message);
     const merged = new Map<string, Student>();
-    for (const student of [...byPrimaryKey.items, ...byStudentId.items]) merged.set(student.id, student);
+    for (const row of [...(byPrimaryKey.data || []), ...(byStudentId.data || [])]) {
+      const student = fromSupabaseRow(row, 'students') as Student;
+      merged.set(student.id, student);
+    }
     return [...merged.values()];
   }
 
