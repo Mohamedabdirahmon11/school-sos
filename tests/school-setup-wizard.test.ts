@@ -113,6 +113,8 @@ test('a full ten-step record with both optional steps explicitly skipped remains
     completedAt: '2026-11-14T12:00:00.000Z'
   };
   assert.equal(isSchoolSetupProgressComplete(progress), true);
+  const missingAttendance = { ...progress, completedSteps: progress.completedSteps.filter(step => step !== 8) };
+  assert.equal(isSchoolSetupProgressComplete(missingAttendance), false);
   assert.equal(normalizeSchoolSetupProgress(progress).completedAt, progress.completedAt);
 });
 
@@ -134,15 +136,21 @@ test('required steps cannot be skipped and cannot be marked complete before thei
   assert.throws(() => sanitizeSchoolSetupProgressUpdate({ currentStep: 2, completedSteps: [], skippedSteps: [1] }), /Only timetable and fees/);
 });
 
-test('finalization requires steps 1–6, Teacher Assignment and 8; timetable and fees may be completed or skipped', () => {
+test('finalization requires Attendance & Exams; timetable and fees may be completed or skipped', () => {
   const checklist = buildSchoolSetupChecklist(school, completeEvidence);
   const initial = normalizeSchoolSetupProgress(null);
-  const requiredWithoutEight = {
+  const requiredWithoutAssignment = {
     ...initial,
     completedSteps: [1, 2, 3, 4, 5, 6],
     skippedSteps: [7, 9]
   };
-  assert.equal(canFinishSchoolSetup(requiredWithoutEight, checklist), false);
+  assert.equal(canFinishSchoolSetup(requiredWithoutAssignment, checklist), false);
+  const requiredWithoutAttendance = {
+    ...initial,
+    completedSteps: [1, 2, 3, 4, 5, 0, 6],
+    skippedSteps: [7, 9]
+  };
+  assert.equal(canFinishSchoolSetup(requiredWithoutAttendance, checklist), false);
   const readyToFinish = sanitizeSchoolSetupProgressUpdate({
     currentStep: 10,
     completedSteps: [1, 2, 3, 4, 5, 0, 6, 8],
@@ -171,4 +179,27 @@ test('setup progress rejects a step that is both completed and skipped', () => {
   assert.throws(() => applySchoolSetupProgressUpdate(
     normalizeSchoolSetupProgress(null), input, checklist, '2026-11-07T00:00:00.000Z'
   ), /both completed and skipped/);
+});
+
+
+test('previously completed schools stay complete when the newer assignment audit reports a gap', () => {
+  const legacyComplete = normalizeSchoolSetupProgress({
+    currentStep: 10,
+    completedSteps: [1, 2, 3, 4, 5, 6, 8, 10],
+    skippedSteps: [7, 9],
+    completedAt: '2026-11-20T12:00:00.000Z'
+  });
+  assert.equal(legacyComplete.completedAt, '2026-11-20T12:00:00.000Z');
+  assert.equal(isSchoolSetupProgressComplete(legacyComplete), true);
+});
+
+test('curriculum setup requires at least one subject in every active class', () => {
+  const checklist = buildSchoolSetupChecklist(school, {
+    ...completeEvidence,
+    subjectCount: 2,
+    curriculumClassCoverageReady: false,
+    curriculumClassCoverageIssues: ['Grade 1: ugu yaraan hal maaddo ma leh']
+  });
+  assert.equal(checklist[4].ready, false);
+  assert.match(checklist[4].reason, /ugu yaraan hal maaddo ma leh/);
 });

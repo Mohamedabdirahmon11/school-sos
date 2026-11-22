@@ -21,7 +21,8 @@ test('Teacher weekly workload is capped at 30 and returns HTTP 422 when exceeded
 });
 
 test('Duplicate class-subject-teacher assignment returns HTTP 409', () => {
-  assert.match(api, /saved\.error\?\.code === '23505' \? 409/);
+  assert.match(api, /client\.rpc\('upsert_teacher_assignment_atomic'/);
+  assert.match(api, /code === '23505' \? 409/);
   assert.match(migration, /unique.*school_id.*academic_year_id.*class_id.*subject_id/is);
 });
 

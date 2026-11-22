@@ -74,6 +74,12 @@ const cookies = {
   parent: cookieFor(parentUser, 'parent'),
   admin: cookieFor(schoolAdmin, 'admin')
 };
+const setupGateSchool = makeSchool('Incomplete Setup Gate School', 'SETUPGATE');
+const setupGateTeacher = makeUser(setupGateSchool.id, 'teacher', 'Setup Gate Teacher');
+const setupGateAdmin = makeUser(setupGateSchool.id, 'school_admin', 'Setup Gate Admin');
+const setupGateCookie = cookieFor(setupGateTeacher, 'setup-gate');
+const setupGateAdminCookie = cookieFor(setupGateAdmin, 'setup-gate-admin');
+
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
@@ -90,6 +96,24 @@ const postJson = (path: string, cookie: string, body: unknown) =>
   request(path, cookie, { method: 'POST', body: JSON.stringify(body) });
 
 after(async () => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
+
+
+test('15.0 opening the new-school wizard persists startedAt and incomplete setup returns HTTP 423', async () => {
+  const progressResponse = await request('/school/setup-progress', setupGateAdminCookie);
+  assert.equal(progressResponse.status, 200, await progressResponse.clone().text());
+  const progress = await progressResponse.json() as any;
+  assert.ok(progress.progress.startedAt);
+  const response = await request('/attendance', setupGateCookie);
+  assert.equal(response.status, 423, await response.clone().text());
+  const payload = await response.json() as any;
+  assert.equal(payload.code, 'SCHOOL_SETUP_REQUIRED');
+  assert.ok(Array.isArray(payload.missing) && payload.missing.length > 0);
+});
+
+test('15.0a wrong role remains HTTP 403 before setup readiness gating', async () => {
+  const response = await request('/attendance', cookies.parent);
+  assert.equal(response.status, 403);
+});
 
 test('15.1 attendance POST is forbidden for a teacher who is not the Form Teacher', async () => {
   const response = await postJson('/attendance', cookies.subject, { classId: klass.id, date: today, records: [{ studentId: student.id, status: 'present' }] });

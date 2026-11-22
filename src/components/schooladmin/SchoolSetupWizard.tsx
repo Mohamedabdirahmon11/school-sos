@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolSetupData, SchoolSetupState } from '../../types/index.ts';
 import { getEthiopianCalendarInfo } from '../../lib/ethiopian-calendar.ts';
+import { SchoolSetupInlineEditor } from './SchoolSetupInlineEditor.tsx';
 
 interface Props { onNavigate: (view: string) => void; onComplete: () => Promise<void>; }
 
@@ -44,8 +45,10 @@ const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; c
   { id: 9, title: 'Fees & Extra Modules', description: 'Create fee structures or skip fees for the Accountant; configure optional modules as needed.', optional: true, views: [{ label: 'Open Fees', view: 'sch_fees' }, { label: 'Inventory', view: 'sch_inventory' }, { label: 'Library', view: 'sch_library' }, { label: 'Transport', view: 'sch_transport' }, { label: 'Discipline', view: 'sch_discipline' }, { label: 'Health', view: 'sch_health' }] }
 ];
 
+const REFERENCE_STEP_BY_PROGRESS_ID: Record<number, number> = { 1: 1, 2: 0, 3: 2, 4: 3, 5: 4, 0: 5, 6: 6, 7: 7, 8: 8, 9: 8, 10: 8 };
+
 export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) => {
-  const { school } = useAuth();
+  const { school, user } = useAuth();
   const [data, setData] = useState<SchoolSetupData>(DEFAULT_DATA);
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -58,6 +61,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   const [returnToChecklist, setReturnToChecklist] = useState(false);
   const [setupState, setSetupState] = useState<SchoolSetupState | null>(null);
   const [checklistLoading, setChecklistLoading] = useState(false);
+  const [referenceStep, setReferenceStep] = useState(0);
 
   const refreshSetupProgress = async () => {
     setChecklistLoading(true);
@@ -65,6 +69,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       const current = await ApiClient.getSchoolSetupProgress();
       if (current.progress.completedAt) {
         setSetupState(current);
+        setReferenceStep(9);
         return;
       }
       const order = [1, 2, 3, 4, 5, 0, 6, 7, 8, 9];
@@ -76,6 +81,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         && JSON.stringify(current.progress.skippedSteps) === JSON.stringify(skippedSteps);
       const next = unchanged ? current : await ApiClient.updateSchoolSetupProgress({ currentStep, completedSteps, skippedSteps });
       setSetupState(next);
+      setReferenceStep(REFERENCE_STEP_BY_PROGRESS_ID[next.progress.currentStep] ?? 9);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The school setup checklist could not be refreshed.');
     } finally {
@@ -93,6 +99,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       const currentStep = [1, 2, 3, 4, 5, 0, 6, 7, 8, 9].find(id => !completedSteps.includes(id) && !skippedSteps.includes(id)) ?? 10;
       const next = await ApiClient.updateSchoolSetupProgress({ currentStep, completedSteps, skippedSteps });
       setSetupState(next);
+      setReferenceStep(REFERENCE_STEP_BY_PROGRESS_ID[next.progress.currentStep] ?? 9);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'This optional setup step could not be skipped.');
     } finally {
@@ -200,6 +207,28 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     finally { setSaving(false); }
   };
 
+  const saveReferenceProfile = async () => {
+    setSaving(true); setError(null);
+    try {
+      const result = await ApiClient.saveSchoolSetupStep(1, { schoolInformation: data.schoolInformation });
+      setData(result.data); setSaved(result.data.completedSteps || []);
+      await refreshSetupProgress();
+    } catch (err) { setError(err instanceof Error ? err.message : 'School profile lama kaydin karin.'); }
+    finally { setSaving(false); }
+  };
+
+  const saveReferenceYear = async () => {
+    setSaving(true); setError(null);
+    try {
+      const yearResult = await ApiClient.saveSchoolSetupStep(2, { academicYear: data.academicYear });
+      const termsResult = await ApiClient.saveSchoolSetupStep(3, { terms: data.terms });
+      setData(termsResult.data || yearResult.data);
+      setSaved(termsResult.data.completedSteps || yearResult.data.completedSteps || []);
+      await refreshSetupProgress();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Academic year iyo semesters lama kaydin karin.'); }
+    finally { setSaving(false); }
+  };
+
   const field = (label: string, value: string, onChange: (value: string) => void, type = 'text', placeholder = '') => (
     <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><input type={type} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100" />{type === 'date' && value && <span className="block text-xs text-teal-700">Ethiopian date: {getEthiopianCalendarInfo(value).dateLabel} · Gregorian date: {value}</span>}</label>
   );
@@ -209,58 +238,150 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
 
   if (loading) return <div className="mx-auto max-w-4xl p-8 text-sm text-slate-500">Loading school setup…</div>;
 
-  if (showChecklist) return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-    <header className="rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
-      <p className="text-xs font-bold uppercase tracking-[.2em] text-teal-200">SCHOOL OS · FIRST-TIME SETUP</p>
-      <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Complete your school setup</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-teal-50">Your progress is saved in this school. Open each section, then return here to refresh its readiness check. The Dashboard stays locked until the required steps are verified.</p>
-      <div className="mt-5 rounded-xl border border-white/20 bg-white/10 p-4 text-sm leading-6"><strong>START HERE · Kala horreynta</strong><ol className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">{['Academic Year & Semesters','School Information','Classes & Grades','Subjects & Curriculum','Teachers','Teacher Assignment & Form Teachers','Students & Parents','Timetable (optional)','Attendance & Exams','Fees & Extra (optional)','Final review'].map((label, index) => <li key={label}>{index + 1}. {label}{!setupState?.progress.completedAt && index === [1, 2, 3, 4, 5, 0, 6, 7, 8, 9, 10].indexOf(setupState?.progress.currentStep ?? -1) ? ' · Next' : ''}</li>)}</ol></div>
-      <div className="mt-5 text-sm font-semibold">{setupState?.progress.completedSteps.filter(id => id !== 10).length || 0} of 10 steps verified · {setupState?.progress.skippedSteps.length || 0} optional steps skipped</div>
-    </header>
-
-    {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
-
-    {checklistLoading && !setupState && <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading school readiness checks…</div>}
-    <section className="space-y-3">
-      {CHECKLIST_STEPS.map(item => {
-        const evidence = setupState?.checklist[item.id];
-        const completed = Boolean(setupState?.progress.completedSteps.includes(item.id));
-        const skipped = Boolean(setupState?.progress.skippedSteps.includes(item.id));
-        return <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-50 text-xs font-bold text-teal-800">{item.id === 0 ? 6 : item.id > 5 ? item.id + 1 : item.id}</span>
-                <h2 className="font-bold text-slate-900">{item.title}</h2>
-                {completed && <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Verified</span>}
-                {skipped && <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">Skipped</span>}
-                {!completed && !skipped && setupState?.progress.currentStep === item.id && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}
-              </div>
-              <p className="mt-2 text-sm text-slate-600">{item.description}</p>
-              {!completed && !skipped && evidence?.reason && <p className="mt-2 text-xs text-amber-700">{evidence.reason}</p>}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {item.coreSteps?.map(coreStep => <button key={coreStep} type="button" onClick={() => { setReturnToChecklist(true); setShowChecklist(false); setStep(coreStep); setError(null); }} className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-800">{coreStep === 1 ? 'School profile' : coreStep === 2 ? 'Academic year' : coreStep === 3 ? 'Semesters' : coreStep === 4 ? 'Academic calendar' : 'Working hours'}</button>)}
-              {item.views?.map(target => <button key={target.view} type="button" disabled={target.view === 'sch_timetable' && !setupState?.checklist[0]?.ready} onClick={() => onNavigate(target.view)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">{target.label}</button>)}
-              {item.id === 7 && !setupState?.checklist[0]?.ready && <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">Marka hore qoondee macallimiinta. <button type="button" onClick={() => onNavigate('sch_teacher_assignments')} className="ml-1 font-bold underline">Open Teacher Assignments</button></div>}
-              {item.id === 0 && [3, 4, 5].some(id => !setupState?.checklist[id]?.ready) && <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><strong>Marka hore: ku dar</strong><div className="mt-2 flex flex-wrap gap-2">{!setupState?.checklist[3]?.ready && <button type="button" onClick={() => onNavigate('sch_classes')} className="underline">Classes</button>}{!setupState?.checklist[4]?.ready && <button type="button" onClick={() => onNavigate('sch_subjects')} className="underline">Subjects & Curriculum</button>}{!setupState?.checklist[5]?.ready && <button type="button" onClick={() => onNavigate('sch_teachers')} className="underline">Teachers</button>}</div></div>}
-              {item.optional && !completed && !skipped && <button type="button" disabled={saving} onClick={() => void skipOptionalStep(item.id)} className="rounded-lg border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Skip for now</button>}
-            </div>
+  if (showChecklist) {
+    const wizardSteps: Array<{ id: string; title: string; required: boolean; evidence: number; assignmentEvidence?: number; followUp?: boolean; needs: string[]; view?: string }> = [
+      { id: 'profile', title: 'Macluumaadka dugsiga', required: true, evidence: 2, needs: [], view: 'sch_settings' },
+      { id: 'year', title: 'Sanad dugsiyeed & Terms', required: true, evidence: 1, needs: ['profile'], view: 'sch_setup_academics' },
+      { id: 'classes', title: 'Classes & Sections', required: true, evidence: 3, needs: ['profile', 'year'] },
+      { id: 'subjects', title: 'Subjects & Curriculum', required: true, evidence: 4, needs: ['classes'] },
+      { id: 'teachers', title: 'Macallimiinta', required: true, evidence: 5, needs: ['profile'] },
+      { id: 'assign', title: 'Teacher Assignment', required: true, evidence: 0, needs: ['classes', 'subjects', 'teachers'] },
+      { id: 'students', title: 'Students & Parents', required: true, evidence: 6, needs: ['assign'] },
+      { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['assign'] },
+      { id: 'finish', title: 'Hubinta ugu dambaysa & Dashboard', required: true, evidence: -1, needs: ['year', 'profile', 'classes', 'subjects', 'teachers', 'assign', 'students'] }
+    ];
+    const readyFor = (id: string) => {
+      const item = wizardSteps.find(candidate => candidate.id === id);
+      if (!item || !setupState) return false;
+      if (id === 'finish') return Boolean(setupState.canFinish);
+      if (id === 'teachers') return Boolean(setupState.checklist[5]?.ready);
+      if (id === 'assign') return Boolean(setupState.checklist[0]?.ready);
+      if (id === 'timetable') return Boolean(setupState.checklist[7]?.ready || setupState.progress.skippedSteps.includes(7));
+      return Boolean(setupState.checklist[item.evidence]?.ready);
+    };
+    const unlockedFor = (id: string) => {
+      const item = wizardSteps.find(candidate => candidate.id === id);
+      return Boolean(item && item.needs.every(readyFor));
+    };
+    const current = wizardSteps[referenceStep] || wizardSteps[0];
+    const currentEvidence = current.evidence >= 0 ? setupState?.checklist[current.evidence] : undefined;
+    const assignmentEvidence = setupState?.checklist[current.assignmentEvidence ?? -1];
+    const completedCount = wizardSteps.filter(item => readyFor(item.id)).length;
+    const openTarget = (id: string) => {
+      const item = wizardSteps.find(candidate => candidate.id === id);
+      if (!item || !unlockedFor(id)) return;
+      setError(null);
+      if (item.view) onNavigate(item.view);
+      else setReferenceStep(wizardSteps.findIndex(candidate => candidate.id === id));
+    };
+    return <div className="school-setup-reference">
+      <style>{`
+        .school-setup-reference{--sw-bg:#f6f4ee;--sw-card:#fff;--sw-ink:#1c2b26;--sw-muted:#5f6f68;--sw-line:#d9d6cb;--sw-side:#1f4d3f;--sw-sideink:#e8f1ec;--sw-ok:#1b7f4b;--sw-warn:#a65b00;--sw-bad:#b3261e;--sw-accent:#1f4d3f;--sw-soft:#eaf2ed;display:grid;grid-template-columns:290px minmax(0,1fr);min-height:calc(100vh - 2rem);background:var(--sw-bg);color:var(--sw-ink);margin:-1rem;border-radius:12px;overflow:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);font:16px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+        .school-setup-reference *{box-sizing:border-box}.school-setup-reference h1,.school-setup-reference h2,.school-setup-reference h3{font-family:Georgia,"Iowan Old Style",serif}
+        .sw-side{background:var(--sw-side);color:var(--sw-sideink);padding:20px 14px}.sw-side h1{font-size:20px;margin:0 8px 4px}.sw-side p{margin:0 8px 14px;font-size:13px;opacity:.8}
+        .sw-step{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;color:inherit;padding:9px 8px;border-radius:8px;font:inherit;cursor:pointer}.sw-step:hover:not(:disabled){background:rgba(255,255,255,.08)}.sw-step:disabled{opacity:.45;cursor:not-allowed}.sw-step[aria-current=step]{background:rgba(255,255,255,.14);font-weight:600}
+        .sw-dot{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}.sw-dot.ready{background:var(--sw-ok);border-color:var(--sw-ok);color:#fff}.sw-tag{margin-left:auto;font-size:11px;opacity:.85}
+        .sw-main{padding:24px clamp(16px,4vw,48px);max-width:860px;width:100%}.sw-main h2{font-size:26px;margin:0 0 4px}.sw-sub{color:var(--sw-muted);margin:0 0 18px}.sw-start{background:var(--sw-soft);border:1px solid var(--sw-line);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+        .sw-card{background:var(--sw-card);border:1px solid var(--sw-line);border-radius:12px;padding:18px;margin-bottom:14px}.sw-miss{border-left:4px solid var(--sw-warn);background:var(--sw-card);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:14px;font-size:14px}.sw-miss strong{color:var(--sw-warn)}.sw-good{border-left-color:var(--sw-ok)}.sw-good strong{color:var(--sw-ok)}
+        .sw-actions{display:flex;justify-content:space-between;gap:10px;margin-top:16px;flex-wrap:wrap}.sw-btn{background:var(--sw-accent);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}.sw-btn.secondary{background:transparent;color:var(--sw-ink);border:1px solid var(--sw-line)}.sw-btn:disabled{opacity:.45;cursor:not-allowed}
+        .sw-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.sw-stats div{background:var(--sw-soft);border-radius:10px;padding:10px}.sw-stats b{font-size:22px;display:block}
+        .school-setup-reference button:focus-visible,.school-setup-reference input:focus-visible,.school-setup-reference select:focus-visible{outline:3px solid var(--sw-accent);outline-offset:1px}
+        @media(prefers-color-scheme:dark){.school-setup-reference:not([data-theme=light]){--sw-bg:#121a17;--sw-card:#1a2420;--sw-ink:#e6efe9;--sw-muted:#9db0a7;--sw-line:#2d3b35;--sw-side:#0d2a21;--sw-sideink:#d5e6dd;--sw-ok:#4cc58a;--sw-warn:#e8a042;--sw-bad:#f2867f;--sw-accent:#4cc58a;--sw-soft:#1f2f28;color-scheme:dark}}
+        html[data-theme=dark] .school-setup-reference{--sw-bg:#121a17;--sw-card:#1a2420;--sw-ink:#e6efe9;--sw-muted:#9db0a7;--sw-line:#2d3b35;--sw-side:#0d2a21;--sw-sideink:#d5e6dd;--sw-ok:#4cc58a;--sw-warn:#e8a042;--sw-bad:#f2867f;--sw-accent:#4cc58a;--sw-soft:#1f2f28;color-scheme:dark}
+        html[data-theme=light] .school-setup-reference{--sw-bg:#f6f4ee;--sw-card:#fff;--sw-ink:#1c2b26;--sw-muted:#5f6f68;--sw-line:#d9d6cb;--sw-side:#1f4d3f;--sw-sideink:#e8f1ec;--sw-ok:#1b7f4b;--sw-warn:#a65b00;--sw-bad:#b3261e;--sw-accent:#1f4d3f;--sw-soft:#eaf2ed;color-scheme:light}
+        @media(max-width:760px){.school-setup-reference{grid-template-columns:1fr}.sw-side{padding:12px}.sw-side p{display:none}.sw-steps{display:flex;overflow-x:auto;gap:4px;scrollbar-width:thin}.sw-step{width:auto;white-space:nowrap;flex:none}.sw-main{padding:20px 16px}}
+      `}</style>
+      <aside className="sw-side"><h1>Setup Wizard</h1><p>Dugsi cusub: dhammaystir tallaabooyinka si Dashboard-ku u furmo.</p>
+        <nav className="sw-steps" aria-label="Tallaabooyinka">
+          {wizardSteps.map((item, index) => {
+            const isReady = readyFor(item.id), locked = !unlockedFor(item.id);
+            return <button key={item.id} type="button" className="sw-step" aria-current={referenceStep === index ? 'step' : undefined} disabled={locked} onClick={() => setReferenceStep(index)}>
+              <span className={'sw-dot' + (isReady ? ' ready' : '')}>{isReady ? '✓' : locked ? '🔒' : index + 1}</span>
+              <span>{item.title}</span><span className="sw-tag">{item.followUp ? 'dabagal' : item.required ? 'khasab' : 'optional'}</span>
+            </button>;
+          })}
+        </nav>
+      </aside>
+      <main className="sw-main">
+        {!setupState?.progress.completedAt && (!setupState?.checklist[1]?.ready || !setupState?.checklist[2]?.ready) && <div className="sw-start"><strong>START HERE:</strong> Dugsigaagu wuxuu u baahan yahay dejin. Ka bilow macluumaadka dugsiga, kadib raac tallaabooyinka kala horreeya.</div>}
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2>{current.title}</h2><p className="sw-sub">{current.followUp ? 'Tallaabo dabagal ah · ma xannibayso Dashboard-ka' : current.required ? 'Tallaabo khasab ah' : 'Tallaabo optional ah'} · Tallaabada {referenceStep + 1} ee {wizardSteps.length}</p></div><div className="text-sm font-semibold">{completedCount}/{wizardSteps.length} diyaar</div></div>
+        {error && <div role="alert" className="sw-miss"><strong>Cilad:</strong> {error}</div>}
+        {current.id !== 'finish' && current.id !== 'timetable' && current.id !== 'fees' && currentEvidence && <div className={'sw-miss' + (currentEvidence.ready ? ' sw-good' : '')} role="status"><strong>{currentEvidence.ready ? 'Tallaabadani waa diyaar ✓' : 'Wax ka maqan:'}</strong>{!currentEvidence.ready && <p className="mt-1">{currentEvidence.reason}</p>}</div>}
+        {current.id === 'profile' && <section className="sw-card">
+          <p className="sw-sub">Diiwaangeli xogta rasmiga ah ee dugsiga. Isbeddellada waxaa si toos ah loogu kaydinayaa SchoolOS.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {field('Magaca dugsiga', data.schoolInformation.name, value => patch('schoolInformation', { ...data.schoolInformation, name: value }))}
+            {field('Cinwaanka', data.schoolInformation.address, value => patch('schoolInformation', { ...data.schoolInformation, address: value }))}
+            {field('Magaalada', data.schoolInformation.city, value => patch('schoolInformation', { ...data.schoolInformation, city: value }))}
+            {field('Telefoonka', data.schoolInformation.phone, value => patch('schoolInformation', { ...data.schoolInformation, phone: value }), 'tel')}
+            {field('Email', data.schoolInformation.email, value => patch('schoolInformation', { ...data.schoolInformation, email: value }), 'email')}
+            {field('WhatsApp-ka maamulka (+country code)', data.schoolInformation.whatsappPhone, value => patch('schoolInformation', { ...data.schoolInformation, whatsappPhone: value }), 'tel', '+251…')}
+            {select('Nooca dugsiga', data.schoolInformation.schoolType, [['primary','Primary'],['secondary','Secondary'],['combined','Combined']], value => patch('schoolInformation', { ...data.schoolInformation, schoolType: value as any }))}
           </div>
-        </article>;
-      })}
-    </section>
-
-    <section className="rounded-2xl border border-teal-200 bg-teal-50/50 p-5">
-      <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">11. Final review</h2>{setupState?.progress.currentStep === 10 && <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700">Next</span>}</div>
-      <p className="mt-1 text-sm text-slate-600">{setupState?.canFinish ? 'All required setup checks are ready. You can now open the School Admin Dashboard.' : 'Complete the required steps above. Timetable and Fees may be completed now or explicitly skipped.'}</p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" disabled={checklistLoading || saving} onClick={() => void refreshSetupProgress()} className="rounded-xl border border-teal-300 bg-white px-4 py-3 text-sm font-semibold text-teal-800 disabled:opacity-50">{checklistLoading ? 'Checking…' : 'Refresh setup checks'}</button>
-        <button type="button" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? 'Finishing…' : 'Finish setup and open Dashboard'}</button>
-        <button type="button" onClick={() => { setReturnToChecklist(false); setShowChecklist(false); setStep(1); }} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">Open all school settings</button>
-      </div>
-    </section>
-  </main>;
+          <div className="mt-4"><button className="sw-btn" type="button" disabled={saving} onClick={() => void saveReferenceProfile()}>{saving ? 'Kaydinaya…' : 'Kaydi School Profile'}</button></div>
+        </section>}
+        {current.id === 'year' && <section className="sw-card">
+          <p className="sw-sub">Deji sannad-dugsiyeedka iyo semester-yada adigoo ku jira wizard-ka.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {field('Sannad-dugsiyeedka (YYYY/YYYY)', data.academicYear.name, value => patch('academicYear', { ...data.academicYear, name: value }), 'text', '2026/2027')}
+            {field('Taariikhda bilowga', data.academicYear.startDate, value => patch('academicYear', { ...data.academicYear, startDate: value }), 'date')}
+            {field('Taariikhda dhammaadka', data.academicYear.endDate, value => patch('academicYear', { ...data.academicYear, endDate: value }), 'date')}
+            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={data.academicYear.isCurrent} onChange={event => patch('academicYear', { ...data.academicYear, isCurrent: event.target.checked })} /> Sannad-dugsiyeedka hadda socda</label>
+          </div>
+          <h3 className="mt-5 mb-2 font-semibold">Semesters / Terms</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {data.terms.map((term, index) => <div key={index} className="rounded-lg border p-3 space-y-2" style={{borderColor:'var(--sw-line)'}}>
+              <strong>{index === 0 ? 'Semester 1' : index === 1 ? 'Semester 2' : 'Semester 3'}</strong>
+              {field('Magaca', term.name, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, name: value } : item)))}
+              {field('Bilowga', term.startDate, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, startDate: value } : item)), 'date')}
+              {field('Dhammaadka', term.endDate, value => patch('terms', data.terms.map((item, i) => i === index ? { ...item, endDate: value } : item)), 'date')}
+            </div>)}
+          </div>
+          <div className="mt-4"><button className="sw-btn" type="button" disabled={saving} onClick={() => void saveReferenceYear()}>{saving ? 'Kaydinaya…' : 'Kaydi Academic Year & Semesters'}</button></div>
+        </section>}
+        {current.id === 'classes' && <SchoolSetupInlineEditor step="classes" onChanged={refreshSetupProgress} />}
+        {current.id === 'subjects' && <SchoolSetupInlineEditor step="subjects" onChanged={refreshSetupProgress} />}
+        {current.id === 'teachers' && <SchoolSetupInlineEditor step="teachers" onChanged={refreshSetupProgress} />}
+        {current.id === 'assign' && <SchoolSetupInlineEditor step="assign" onChanged={refreshSetupProgress} />}
+        {current.id === 'students' && <SchoolSetupInlineEditor step="students" onChanged={refreshSetupProgress} />}
+        {current.id === 'timetable' && <><SchoolSetupInlineEditor step="timetable" onChanged={refreshSetupProgress} /><div className="sw-card"><p className="sw-sub">Timetable waa optional; waxaad ka boodi kartaa hadda oo dib ayaad uga dejin kartaa qaybta Timetable.</p><button className="sw-btn secondary" type="button" disabled={saving || !setupState} onClick={() => void skipOptionalStep(7)}>Ka bood hadda</button></div></>}
+        {current.id === 'finish' && <>
+          {setupState?.progress.completedAt && !setupState?.checklist[0]?.ready && <div className="sw-miss" role="status"><strong>Digniin: Teacher Assignment ayaa u baahan dib-u-eegis.</strong><p className="mt-1">Dugsigan hore ayuu setup-kiisa u dhammeeyey, sidaas darteed Dashboard-ka dib looma xirin. Fadlan hubi qoondeynta macallimiinta marka ay kuu suurto gasho.</p><button className="sw-btn secondary mt-2" type="button" onClick={() => onNavigate('sch_teacher_assignments')}>Hubi Teacher Assignment</button></div>}
+          <section className="sw-card">
+            <h3 className="mb-3 text-lg font-semibold">Hubinta xogta aasaasiga ah</h3>
+            <div className="sw-stats">
+              <div><b>{setupState?.checklist[1]?.ready ? '✓' : '—'}</b>Academic Year</div>
+              <div><b>{setupState?.checklist[2]?.ready ? '✓' : '—'}</b>School Profile</div>
+              <div><b>{setupState?.checklist[3]?.ready ? '✓' : '—'}</b>Classes</div>
+              <div><b>{setupState?.checklist[4]?.ready ? '✓' : '—'}</b>Subjects</div>
+              <div><b>{setupState?.checklist[5]?.ready ? '✓' : '—'}</b>Teachers</div>
+              <div><b>{setupState?.checklist[0]?.ready ? '✓' : '—'}</b>Teacher Assignment</div>
+              <div><b>{setupState?.checklist[6]?.ready ? '✓' : '—'}</b>Students & Parents</div>
+            </div>
+          </section>
+          <section className="sw-card">
+            <h3 className="mb-2 text-base font-semibold">Timetable, Attendance, Exams & Fees</h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b py-3">
+              <div><strong>Timetable</strong><p className="text-xs" style={{color:'var(--sw-muted)'}}>{setupState?.checklist[7]?.ready ? 'Diyaar' : setupState?.progress.skippedSteps.includes(7) ? 'La booday' : 'Optional — wali lama dejin'}</p></div>
+              <div className="flex flex-wrap gap-2"><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_timetable')}>Fur</button>{!setupState?.checklist[7]?.ready && !setupState?.progress.skippedSteps.includes(7) && <button className="sw-btn secondary" type="button" disabled={saving} onClick={() => void skipOptionalStep(7)}>Ka bood</button>}</div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b py-3">
+              <div><strong>Attendance & Exams</strong><p className="text-xs" style={{color:'var(--sw-muted)'}}>{setupState?.checklist[8]?.ready ? 'Diyaar' : 'Dabagal ayaa dhiman; Dashboard ma xannibayo'}</p></div>
+              <div className="flex flex-wrap gap-2"><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_attendance')}>Attendance</button><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_exams')}>Exams</button></div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div><strong>Fees & Extra Modules</strong><p className="text-xs" style={{color:'var(--sw-muted)'}}>{setupState?.checklist[9]?.ready ? 'Diyaar' : setupState?.progress.skippedSteps.includes(9) ? 'La booday' : 'Optional — wali lama dejin'}</p></div>
+              <div className="flex flex-wrap gap-2"><button className="sw-btn secondary" type="button" onClick={() => onNavigate('sch_fees')}>Fur Fees</button>{!setupState?.checklist[9]?.ready && !setupState?.progress.skippedSteps.includes(9) && <button className="sw-btn secondary" type="button" disabled={saving} onClick={() => void skipOptionalStep(9)}>Ka bood</button>}</div>
+            </div>
+          </section>
+          {!setupState?.canFinish && <div className="sw-miss"><strong>Wax ka maqan:</strong><p className="mt-1">Dashboard-ka lama furi karo ilaa dhammaan toddobada tallaabo ee aasaasiga ah la xaqiijiyo.</p></div>}
+          <button type="button" className="sw-btn" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()}>{saving ? 'Waa la dhammaynayaa…' : 'Dhammee setup-ka oo fur Dashboard'}</button>
+        </>}
+        <div className="sw-actions"><button type="button" className="sw-btn secondary" disabled={referenceStep === 0} onClick={() => setReferenceStep(value => Math.max(0, value - 1))}>← Hore</button><button type="button" className="sw-btn" disabled={referenceStep === wizardSteps.length - 1 || (current.required && !readyFor(current.id))} onClick={() => setReferenceStep(value => Math.min(wizardSteps.length - 1, value + 1))}>Xiga →</button></div>
+        <p className="text-xs mt-4" style={{color:'var(--sw-muted)'}}>Horumarka waxaa laga akhriyaa xogta dhabta ah ee SchoolOS. Waxba laguma kaydiyo browser localStorage.</p>
+      </main>
+    </div>;
+  }
 
   return <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
     <header className="overflow-hidden rounded-3xl bg-gradient-to-br from-[#092f2d] via-[#0d4843] to-[#117568] p-6 text-white shadow-lg sm:p-8">
@@ -276,6 +397,8 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
 
       {step === 1 && <div className="grid gap-4 sm:grid-cols-2">
         {field('School name', data.schoolInformation.name, v => patch('schoolInformation', { ...data.schoolInformation, name: v }))}
+        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School code</span><input readOnly value={school?.code || ''} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-600" /></label>
+        <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School Administrator / Principal</span><input readOnly value={user?.fullName || ''} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-600" /></label>
         <label className="block space-y-1.5"><span className="text-sm font-semibold text-slate-700">School logo (PNG, JPEG or WebP · max 1.5 MB)</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={logoUploading} onChange={e => { const input = e.currentTarget; const file = input.files?.[0]; if (!file) return; if (file.size > 1_572_864 || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { setError('Choose a PNG, JPEG or WebP logo smaller than 1.5 MB.'); input.value = ''; return; } setLogoUploading(true); setError(null); void ApiClient.uploadSchoolLogo(file).then(result => setData(current => ({ ...current, schoolInformation: { ...current.schoolInformation, logoUrl: result.logoUrl } }))).catch(err => setError(err instanceof Error ? err.message : 'The school logo could not be uploaded.')).finally(() => { setLogoUploading(false); input.value = ''; }); }} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:opacity-50" />{logoUploading && <span className="text-xs text-teal-700">Uploading logo securely to Supabase Storage…</span>}{!logoUploading && data.schoolInformation.logoUrl && <div className="flex items-center gap-3 text-xs text-teal-700"><img src={data.schoolInformation.logoUrl} alt="School logo preview" className="h-12 w-12 rounded-lg border border-slate-200 object-contain" />Logo uploaded and ready to save.</div>}</label>
         {field('School address', data.schoolInformation.address, v => patch('schoolInformation', { ...data.schoolInformation, address: v }))}
         {field('City / Town', data.schoolInformation.city, v => patch('schoolInformation', { ...data.schoolInformation, city: v }))}

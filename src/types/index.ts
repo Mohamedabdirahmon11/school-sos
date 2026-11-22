@@ -92,6 +92,7 @@ export interface SchoolSetupProgress {
   completedSteps: number[];
   skippedSteps: number[];
   completedAt: string | null;
+  startedAt?: string | null;
 }
 
 export interface SchoolSetupChecklistItem {
@@ -169,6 +170,8 @@ export interface School {
   receiptFooter?: string;
   notificationPreferences?: NotificationPreferences;
   setupProgress?: SchoolSetupProgress;
+  /** Dedicated database timestamp; setupProgress.completedAt remains the compatibility source. */
+  setupCompletedAt?: string | null;
   setupData?: SchoolSetupData;
   defaultClassCapacity: number;
   studentAccessEnabled: boolean; // School Admin and Super Admin can toggle

@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {
   SCHOOL_SETUP_ALLOWED_VIEWS,
   SCHOOL_SETUP_EXTRA_MODULES,
-  SCHOOL_SETUP_STEP_TARGETS
+  SCHOOL_SETUP_STEP_TARGETS,
+  isSchoolSetupWizardEligible
 } from '../src/lib/school-setup-navigation.ts';
 
 test('School Admin setup can open fees, parents, attendance, exams, and all optional school modules', () => {
   assert.equal(SCHOOL_SETUP_ALLOWED_VIEWS.has(SCHOOL_SETUP_STEP_TARGETS.fees), true);
-  for (const view of ['sch_parents', 'sch_attendance', 'sch_exams']) {
+  for (const view of ['sch_parents', 'sch_curriculum', 'sch_attendance', 'sch_exams']) {
     assert.equal(SCHOOL_SETUP_ALLOWED_VIEWS.has(view), true, view);
   }
   for (const module of SCHOOL_SETUP_EXTRA_MODULES) {
@@ -18,4 +19,11 @@ test('School Admin setup can open fees, parents, attendance, exams, and all opti
 
 test('School Admin setup still blocks the normal dashboard until completion', () => {
   assert.equal(SCHOOL_SETUP_ALLOWED_VIEWS.has('sch_dashboard'), false);
+});
+
+
+test('first-time setup eligibility is consistent at the rollout boundary', () => {
+  assert.equal(isSchoolSetupWizardEligible('2026-11-21T23:59:59.999Z'), false);
+  assert.equal(isSchoolSetupWizardEligible('2026-11-22T00:00:00.000Z'), true);
+  assert.equal(isSchoolSetupWizardEligible(null), false);
 });

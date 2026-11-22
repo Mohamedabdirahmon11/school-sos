@@ -7,7 +7,7 @@ export const SCHOOL_SETUP_EXTRA_MODULES = [
 ] as const;
 
 export const SCHOOL_SETUP_ALLOWED_VIEWS: ReadonlySet<string> = new Set([
-  'sch_setup', 'sch_settings', 'sch_setup_academics', 'sch_classes', 'sch_subjects',
+  'sch_setup', 'sch_settings', 'sch_setup_academics', 'sch_classes', 'sch_subjects', 'sch_curriculum',
   'sch_teachers', 'sch_teacher_assignments', 'sch_students', 'sch_parents', 'sch_timetable', 'sch_attendance', 'sch_exams',
   'sch_fees', ...SCHOOL_SETUP_EXTRA_MODULES.map(module => module.view),
   'sch_admissions', 'sch_events', 'sch_report_cards', 'sch_staff', 'sch_messages', 'sch_support'
@@ -16,6 +16,14 @@ export const SCHOOL_SETUP_ALLOWED_VIEWS: ReadonlySet<string> = new Set([
 export const SCHOOL_SETUP_STEP_TARGETS = {
   fees: 'sch_fees'
 } as const;
+
+export const SCHOOL_SETUP_ROLLOUT_AT = '2026-11-22T00:00:00.000Z';
+
+export function isSchoolSetupWizardEligible(createdAt: unknown): boolean {
+  if (typeof createdAt !== 'string' || !createdAt.trim()) return false;
+  const createdAtTime = Date.parse(createdAt);
+  return Number.isFinite(createdAtTime) && createdAtTime >= Date.parse(SCHOOL_SETUP_ROLLOUT_AT);
+}
 
 
 /**

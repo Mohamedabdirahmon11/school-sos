@@ -26,20 +26,35 @@ export function evaluateTeacherAssignmentReadiness(
   const subjectById = new Map(subjects.filter(row => !row.schoolId || row.schoolId === schoolId).map(row => [String(row.id), row]));
   const issues: string[] = [];
   if (!activeClasses.length) issues.push('Marka hore ku dar Classes');
+  const formTeacherClassByUser = new Map<string, string>();
+  const curriculumByClass = new Map<string, number>();
+  const classLabelFor = (klass: typeof activeClasses[number]) => `${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}`;
   for (const klass of activeClasses) {
-    const formTeacher = klass.classTeacherId ? teacherByUserId.get(String(klass.classTeacherId)) : null;
-    if (!formTeacher) issues.push(`${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}: Form Teacher la'aan`);
+    const classLabel = classLabelFor(klass);
+    const formTeacherUserId = klass.classTeacherId ? String(klass.classTeacherId) : '';
+    const formTeacher = formTeacherUserId ? teacherByUserId.get(formTeacherUserId) : null;
+    if (!formTeacher) {
+      issues.push(`${classLabel}: Form Teacher la'aan`);
+    } else {
+      const previousClass = formTeacherClassByUser.get(formTeacherUserId);
+      if (previousClass) issues.push(`${formTeacher.fullName || 'Macallin'}: Form Teacher ayuu uga yahay laba fasal (${previousClass} iyo ${classLabel})`);
+      else formTeacherClassByUser.set(formTeacherUserId, classLabel);
+    }
   }
   const periodsByTeacher = new Map<string, number>();
   for (const row of curriculum) {
     if ((row.schoolId && row.schoolId !== schoolId) || row.isActive === false) continue;
     const klass = classById.get(String(row.classId));
     if (!klass) continue;
+    curriculumByClass.set(String(row.classId), (curriculumByClass.get(String(row.classId)) || 0) + 1);
     const subjectName = String(subjectById.get(String(row.subjectId))?.name || 'Maaddo');
     const teacher = row.teacherId ? teacherById.get(String(row.teacherId)) : null;
-    const classLabel = `${klass.name || 'Fasal'}${klass.section ? ' · ' + klass.section : ''}`;
+    const classLabel = classLabelFor(klass);
     if (!teacher) issues.push(`${classLabel}: ${subjectName} macallin la'aan`);
     else periodsByTeacher.set(String(teacher.id), (periodsByTeacher.get(String(teacher.id)) || 0) + Number(row.periodsPerWeek || 0));
+  }
+  for (const klass of activeClasses) {
+    if (!curriculumByClass.has(String(klass.id))) issues.push(`${classLabelFor(klass)}: ugu yaraan hal maaddo ma leh`);
   }
   for (const [teacherId, periods] of periodsByTeacher) {
     if (periods > 30) issues.push(`${teacherById.get(teacherId)?.fullName || 'Macallin'}: ${periods}/30 xiisadood toddobaadkii`);
@@ -58,6 +73,8 @@ export interface SchoolSetupEvidence {
   feeStructureCount: number;
   teacherAssignmentReady?: boolean;
   teacherAssignmentIssues?: string[];
+  curriculumClassCoverageReady?: boolean;
+  curriculumClassCoverageIssues?: string[];
 }
 
 export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgress {
@@ -86,7 +103,8 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
       ? Math.min(10, Math.max(0, rawCurrentStep === 5 && [1, 2, 3, 4, 5].every(step => completedSteps.includes(step)) ? 6 : rawCurrentStep))
       : 1;
   const completedAt = fullyComplete ? rawCompletedAt : null;
-  return { currentStep, completedSteps, skippedSteps, completedAt };
+  const startedAt = typeof source.startedAt === 'string' && source.startedAt.trim() ? source.startedAt : null;
+  return { currentStep, completedSteps, skippedSteps, completedAt, ...(startedAt ? { startedAt } : {}) };
 }
 
 function validDate(value: unknown): value is string {
@@ -122,7 +140,7 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     1: step(yearReady && datesReady, false, 'Set a valid academic year and complete start/end dates for both semesters.'),
     2: step(profileReady, false, 'Complete the school name, address, city, email, and an international administration WhatsApp number.'),
     3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
-    4: step(evidence.subjectCount > 0, false, 'Add at least one school subject.'),
+    4: step(evidence.subjectCount > 0 && evidence.curriculumClassCoverageReady !== false, false, evidence.subjectCount === 0 ? 'Add at least one school subject.' : (evidence.curriculumClassCoverageIssues || []).join(' · ') || 'Add subjects to the active class curriculum; every class needs at least one subject.'),
     5: step(teachersReady, false, 'Add at least one teacher; every teacher needs a school-specific ID and a linked teacher login with a password/PIN hash.'),
     0: step(Boolean(evidence.teacherAssignmentReady), false, (evidence.teacherAssignmentIssues || []).length ? 'Marka hore qoondee macallimiinta: ' + (evidence.teacherAssignmentIssues || []).join(' · ') : 'Qoondee Form Teacher fasal kasta iyo macallin maaddo kasta; culayska macallin kasta waa inuu ahaadaa 30 xiisadood ama ka yar toddobaadkii.'),
     6: step(evidence.studentCount > 0 && evidence.guardianContactCount > 0, false, 'Add students and at least one parent/guardian contact number.'),
@@ -196,19 +214,21 @@ export function applySchoolSetupProgressUpdate(
       completedAt: null
     };
     if (!canFinishSchoolSetup(candidate, checklist)) {
-      throw new Error('Complete steps 1–6, Teacher Assignment, and 8, then complete or skip steps 7 and 9 before opening the dashboard.');
+      throw new Error('Complete steps 1–6, Teacher Assignment, and Attendance & Exams (8), then complete or skip Timetable (7) and Fees/Modules (9) before opening the dashboard.');
     }
     return {
       currentStep: 10,
       completedSteps: [...new Set([...update.completedSteps, 10])].sort((a, b) => a - b),
       skippedSteps: [...update.skippedSteps],
-      completedAt: now
+      completedAt: now,
+      startedAt: existing.startedAt || now
     };
   }
   return {
     currentStep: update.currentStep,
     completedSteps: [...update.completedSteps],
     skippedSteps: [...update.skippedSteps],
-    completedAt: existing.completedAt
+    completedAt: existing.completedAt,
+    startedAt: existing.startedAt || now
   };
 }

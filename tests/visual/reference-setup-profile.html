@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="so" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Setup Wizard – Reference HTML</title>
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--ink:#1c2b26;--mut:#5f6f68;--line:#d9d6cb;--side:#1f4d3f;--sideink:#e8f1ec;--ok:#1b7f4b;--warn:#a65b00;--bad:#b3261e;--acc:#1f4d3f;--accink:#fff;--soft:#eaf2ed;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a17;--card:#1a2420;--ink:#e6efe9;--mut:#9db0a7;--line:#2d3b35;--side:#0d2a21;--sideink:#d5e6dd;--ok:#4cc58a;--warn:#e8a042;--bad:#f2867f;--acc:#4cc58a;--accink:#08241a;--soft:#1f2f28;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121a17;--card:#1a2420;--ink:#e6efe9;--mut:#9db0a7;--line:#2d3b35;--side:#0d2a21;--sideink:#d5e6dd;--ok:#4cc58a;--warn:#e8a042;--bad:#f2867f;--acc:#4cc58a;--accink:#08241a;--soft:#1f2f28;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+h1,h2{font-family:Georgia,"Iowan Old Style",serif;margin:0}
+.app{display:grid;grid-template-columns:290px 1fr;min-height:100vh}
+aside{background:var(--side);color:var(--sideink);padding:20px 14px}
+aside h1{font-size:20px;padding:0 8px 4px}
+aside p{margin:0 8px 14px;font-size:13px;opacity:.8}
+.st{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;color:inherit;padding:9px 8px;border-radius:8px;font:inherit;cursor:pointer}
+.st:hover:not(:disabled){background:rgba(255,255,255,.08)}
+.st:disabled{opacity:.45;cursor:not-allowed}
+.st.cur{background:rgba(255,255,255,.14);font-weight:600}
+.dot{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:12px}
+.dot.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.tag{margin-left:auto;font-size:11px;opacity:.85}
+main{padding:24px clamp(16px,4vw,48px);max-width:860px;width:100%}
+.start{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px}
+h2{font-size:26px;margin-bottom:4px}
+.sub{color:var(--mut);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label{display:block;font-size:14px;font-weight:600}
+input,select{width:100%;margin-top:4px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.btn{background:var(--acc);color:var(--accink);border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}
+.btn.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.x{background:none;border:0;color:var(--bad);cursor:pointer;font-size:18px;padding:2px 8px}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:0}
+.empty{color:var(--mut);padding:10px 0;font-style:italic}
+.miss{border-left:4px solid var(--warn);background:var(--card);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:14px;font-size:14px}
+.miss b{color:var(--warn)}
+.miss ul{margin:6px 0 0;padding-left:18px}
+.good{border-left-color:var(--ok)}.good b{color:var(--ok)}
+.foot{display:flex;justify-content:space-between;gap:10px;margin-top:16px;flex-wrap:wrap}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chips label{font-weight:400;display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:4px 10px}
+.chips input{width:auto;margin:0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+.wrap{overflow-x:auto}
+.load{font-size:13px;color:var(--mut)}.load.over{color:var(--bad);font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.stats div{background:var(--soft);border-radius:10px;padding:10px}.stats b{font-size:22px;display:block}
+@media(max-width:760px){.app{grid-template-columns:1fr}aside{padding:12px}.steps{display:flex;overflow-x:auto;gap:4px}.st{width:auto;white-space:nowrap}aside p{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside><h1>Setup Wizard</h1><p>Dugsi cusub: dhammaystir talaabooyinka si Dashboard-ku u furmo.</p><nav class="steps" aria-label="Talaabooyinka">
+<button class="st cur" aria-current="step"><span class="dot">1</span>Macluumaadka dugsiga<span class="tag">khasab</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Sanad dugsiyeed & Terms<span class="tag">khasab</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Fasallada<span class="tag">khasab</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Maaddooyinka (Curriculum)<span class="tag">khasab</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Macallimiinta<span class="tag">khasab</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Teacher Assignment<span class="tag">khasab</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Ardayda<span class="tag">khasab</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Timetable<span class="tag">optional</span></button>
+<button class="st" disabled><span class="dot">🔒</span>Dhammee & Fur Dashboard<span class="tag">khasab</span></button>
+</nav></aside>
+<main>
+<div class="start"><b>START HERE:</b> Dugsigaagu waa cusub yahay. Ka bilow macluumaadka dugsiga, kadib raac talaabooyinka kala horreeya.</div>
+<h2>Macluumaadka dugsiga</h2><p class="sub">Talaabo khasab ah</p>
+<div class="miss" role="status"><b>Wax ka maqan (4):</b><ul><li>Magaca dugsiga</li><li>Koodhka dugsiga</li><li>Maamulaha dugsiga</li><li>Telefoonka</li></ul></div>
+<div class="card"><div class="row">
+<label>Magaca dugsiga<input placeholder="Magaca dugsiga"></label>
+<label>Koodhka dugsiga (tusaale BUS10)<input placeholder="Koodhka dugsiga"></label>
+<label>Magaca maamulaha<input placeholder="Magaca maamulaha"></label>
+<label>Telefoonka<input type="tel" placeholder="Telefoonka"></label>
+<label>Email<input type="email" placeholder="Email"></label>
+<label>Magaalada / Gobolka<input placeholder="Magaalada / Gobolka"></label>
+</div></div>
+<div class="foot"><button class="btn sec" disabled>← Hore</button><button class="btn" disabled>Xiga →</button></div>
+</main></div>
+</body></html>

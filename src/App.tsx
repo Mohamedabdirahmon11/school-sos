@@ -14,7 +14,7 @@ import { PrintIDCardModal } from './components/common/PrintIDCardModal.tsx';
 import { AppErrorBoundary } from './components/common/AppErrorBoundary.tsx';
 import { LoadingState, ErrorState } from './components/common/AsyncState.tsx';
 import { ApiClient } from './services/api.ts';
-import { isSchoolSetupProgressCompleteWithTeacherAssignment, SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
+import { isSchoolSetupProgressCompleteWithTeacherAssignment, isSchoolSetupWizardEligible, SCHOOL_SETUP_ALLOWED_VIEWS } from './lib/school-setup-navigation.ts';
 import { hasStaffNavigationPermission } from './lib/staff-permissions.ts';
 import { getNavigationRoute, type SchoolOSRole } from './lib/navigation-registry.ts';
 
@@ -125,7 +125,7 @@ const AppContent: React.FC = () => {
 
   // Only schools onboarded after the first-time setup rollout should be forced through the wizard.
   // Existing tenants must retain direct dashboard access even if their legacy setupProgress is incomplete.
-  const setupWizardEligible = Boolean(school?.createdAt && Date.parse(school.createdAt) >= Date.parse('2026-11-22T00:00:00.000Z'));
+  const setupWizardEligible = isSchoolSetupWizardEligible(school?.createdAt);
   const setupRequired = user.role === 'school_admin' && setupWizardEligible && !isSchoolSetupProgressCompleteWithTeacherAssignment(school?.setupProgress);
   const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
   const activeView = setupRequired

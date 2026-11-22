@@ -743,13 +743,14 @@ export class ApiClient {
     if (tId) params.append('teacherId', tId);
     if (classOrParams?.dayOfWeek || dayOfWeek) params.append('dayOfWeek', classOrParams?.dayOfWeek || dayOfWeek!);
     if (classOrParams?.scope === 'school') params.append('scope', 'school');
+    if (classOrParams?.setupWizard) params.append('setupWizard', 'true');
     if (classOrParams?.termId) params.append('termId', classOrParams.termId);
     if (classOrParams?.sectionId) params.append('sectionId', classOrParams.sectionId);
     return this.request<TimetableSlot[]>(`/timetable?${params.toString()}`);
   }
 
-  public static async setTimetableSlot(slot: Partial<TimetableSlot>) {
-    return this.request<TimetableSlot>('/timetable', {
+  public static async setTimetableSlot(slot: Partial<TimetableSlot>, setupWizard = false) {
+    return this.request<TimetableSlot>(setupWizard ? '/timetable?setupWizard=true' : '/timetable', {
       method: 'POST',
       body: JSON.stringify(slot)
     });
