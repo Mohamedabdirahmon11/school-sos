@@ -43,7 +43,7 @@ export const StudentPortalView:React.FC=()=>{
  const attendanceState=useApi(()=>ApiClient.getStudentAttendance(student.id),[school?.id,student?.id],active&&(home||view==='att'));
  const marksState=useApi(()=>ApiClient.getStudentMarks(student.id),[school?.id,student?.id],active&&(home||view==='marks'));
  const homeworkState=useApi(()=>ApiClient.getAssignments(),[school?.id,user?.id],active&&(home||view==='hw'));
- const noticesState=useApi(()=>ApiClient.getNotices({page:1,pageSize:20}),[school?.id,user?.id],active&&(home||view==='news'));
+ const noticesState=useApi(()=>ApiClient.getStudentNotices({page:1,pageSize:20}),[school?.id,user?.id],active&&(home||view==='news'));
  const unreadState=useApi(()=>ApiClient.getNoticeUnreadCount(),[school?.id,user?.id],active);
  const contactsState=useApi(()=>ApiClient.getMessageContacts(),[school?.id,user?.id],active&&view==='msg');
  const contacts=Array.isArray(contactsState.data)?contactsState.data:[];
