@@ -129,6 +129,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: validate
     timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -152,6 +155,7 @@ jobs:
         run: npx playwright test --config tests/visual/playwright.config.ts --grep 'Student Portal'
 
       - name: Upload Student Portal screenshots and comparisons
+        id: student-portal-artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -161,6 +165,23 @@ jobs:
             artifacts/playwright-results/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Link side-by-side screenshots in the pull request
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifactUrl = '${{ steps.student-portal-artifact.outputs.artifact-url }}';
+            if (!artifactUrl) return;
+            const marker = '<!-- student-portal-visual-comparison -->';
+            const body = marker + '\n### Student Portal visual comparison\nThe artifact contains reference and SchoolOS screenshots side by side for 8 sections × 4 viewport widths × 2 themes.\n\n[Open screenshot comparison artifact](' + artifactUrl + ')';
+            const { data: comments } = await github.rest.issues.listComments({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number });
+            const existing = comments.find(comment => comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
 
   school-setup-visual:
     name: School Setup Wizard responsive screenshots
