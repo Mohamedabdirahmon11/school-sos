@@ -9348,63 +9348,65 @@ apiRouter.post('/notices/:id/read', requireAuth, requireSchoolContext, async (re
 apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (req, res) => {
   const user = (req as any).user as User;
   const school = (req as any).school;
-  const users = await db.getUsers(school.id);
   const allowedRoles: Record<string, string[]> = {
     school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent', 'student'], parent: ['teacher', 'student'], student: ['teacher']
   };
-  let contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
-  if (user.role === 'teacher') {
-    const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
-    const currentYearId = await getCurrentAcademicYearId(school.id);
-    const activeEnrollments = currentYearId && assignedClassIds.length
-      ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', class_id: assignedClassIds }, 'student_id,class_id')
-      : [];
-    const enrolledStudentIds = [...new Set(activeEnrollments.map((enrollment: any) => String(enrollment.studentId || '')).filter(Boolean))];
-    const assignedStudents = !assignedClassIds.length
-      ? []
-      : currentYearId
-        ? enrolledStudentIds.length ? await queryAllRows('students', { school_id: school.id, id: enrolledStudentIds }, 'id,student_id,class_id,father_phone,mother_phone') : []
-        : await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone');
-    const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
-    const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
-    const phones = new Set(assignedStudents.flatMap((student: any) => [student.fatherPhone, student.motherPhone]).filter(Boolean));
-    contacts = contacts.filter(contact => contact.role === 'parent'
-      ? (contact.linkedStudentIds || []).some(id => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone))
-      : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
-  }
-  if (user.role === 'parent') {
-    const linkedStudents = (await db.getStudents(school.id)).filter(student => user.linkedStudentIds?.includes(student.id) || [user.phone, user.parentPhone].includes(student.fatherPhone || '') || [user.phone, user.parentPhone].includes(student.motherPhone || ''));
-    const linkedIds = new Set(linkedStudents.flatMap(student => [student.id, student.studentId]));
-    const linkedClasses = new Set(linkedStudents.map(student => student.classId));
-    const teacherClassScopes = new Map<string, string[]>();
-    for (const contact of contacts.filter(item => item.role === 'teacher')) {
-      teacherClassScopes.set(contact.id, await getTeacherAssignedClassIds(school.id, contact.id));
-    }
-    contacts = contacts.filter(contact => contact.role === 'student'
-      ? Boolean(contact.studentId && linkedIds.has(contact.studentId))
-      : contact.role !== 'teacher' || Boolean((teacherClassScopes.get(contact.id) || []).some(classId => linkedClasses.has(classId))));
-  }
+  let contacts: any[] = [];
   if (user.role === 'student') {
     const student = user.studentId
       ? (await db.queryPage('students', { school_id: school.id, student_id: user.studentId }, 1, 1, undefined, 'id,class_id')).items[0] as any
       : null;
-    if (!student) {
-      contacts = [];
-    } else {
+    if (student) {
       const currentClassId = await getStudentCurrentClassId(school.id, String(student.id), String(student.classId || ''));
-      const klass = currentClassId ? await db.getClassById(currentClassId, school.id) : null;
-      const classAssignments = currentClassId
-        ? await db.queryPage('class_subjects', { school_id: school.id, class_id: currentClassId, is_active: 'true' }, 1, 100, undefined, 'teacher_id')
-        : { items: [] as any[] };
+      const [klass, classAssignments] = await Promise.all([
+        currentClassId ? db.getClassById(currentClassId, school.id) : Promise.resolve(null),
+        currentClassId ? db.queryPage('class_subjects', { school_id: school.id, class_id: currentClassId, is_active: 'true' }, 1, 100, undefined, 'teacher_id') : Promise.resolve({ items: [] as any[] })
+      ]);
       const teacherIds = [...new Set(classAssignments.items.map((row: any) => String(row.teacherId || '')).filter(Boolean))];
       const teachers = teacherIds.length
         ? await db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 100, undefined, 'id,user_id')
         : { items: [] as any[] };
-      const eligibleUserIds = new Set<string>([
+      const eligibleUserIds = [...new Set([
         ...(klass?.classTeacherId ? [String(klass.classTeacherId)] : []),
         ...teachers.items.map((teacher: any) => String(teacher.userId || '')).filter(Boolean)
-      ]);
-      contacts = contacts.filter(contact => contact.role === 'teacher' && eligibleUserIds.has(contact.id));
+      ])];
+      contacts = eligibleUserIds.length
+        ? (await db.queryPage('users', { school_id: school.id, id: eligibleUserIds, role: 'teacher' }, 1, 100, undefined, 'id,role,full_name,email,phone')).items as any[]
+        : [];
+    }
+  } else {
+    const users = await db.getUsers(school.id);
+    contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
+    if (user.role === 'teacher') {
+      const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
+      const currentYearId = await getCurrentAcademicYearId(school.id);
+      const activeEnrollments = currentYearId && assignedClassIds.length
+        ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', class_id: assignedClassIds }, 'student_id,class_id')
+        : [];
+      const enrolledStudentIds = [...new Set(activeEnrollments.map((enrollment: any) => String(enrollment.studentId || '')).filter(Boolean))];
+      const assignedStudents = !assignedClassIds.length
+        ? []
+        : currentYearId
+          ? enrolledStudentIds.length ? await queryAllRows('students', { school_id: school.id, id: enrolledStudentIds }, 'id,student_id,class_id,father_phone,mother_phone') : []
+          : await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone');
+      const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
+      const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
+      const phones = new Set(assignedStudents.flatMap((student: any) => [student.fatherPhone, student.motherPhone]).filter(Boolean));
+      contacts = contacts.filter(contact => contact.role === 'parent'
+        ? (contact.linkedStudentIds || []).some(id => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone))
+        : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
+    }
+    if (user.role === 'parent') {
+      const linkedStudents = (await db.getStudents(school.id)).filter(student => user.linkedStudentIds?.includes(student.id) || [user.phone, user.parentPhone].includes(student.fatherPhone || '') || [user.phone, user.parentPhone].includes(student.motherPhone || ''));
+      const linkedIds = new Set(linkedStudents.flatMap(student => [student.id, student.studentId]));
+      const linkedClasses = new Set(linkedStudents.map(student => student.classId));
+      const teacherClassScopes = new Map<string, string[]>();
+      for (const contact of contacts.filter(item => item.role === 'teacher')) {
+        teacherClassScopes.set(contact.id, await getTeacherAssignedClassIds(school.id, contact.id));
+      }
+      contacts = contacts.filter(contact => contact.role === 'student'
+        ? Boolean(contact.studentId && linkedIds.has(contact.studentId))
+        : contact.role !== 'teacher' || Boolean((teacherClassScopes.get(contact.id) || []).some(classId => linkedClasses.has(classId))));
     }
   }
   res.json(contacts.map(({ id, role, fullName, email, phone }) => ({ id, role, fullName, email, phone })));
