@@ -8,8 +8,8 @@ CREATE OR REPLACE FUNCTION public.schoolos_create_teacher(
   p_form_teacher_class_id VARCHAR DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
+SECURITY INVOKER
+SET search_path = ''
 AS $$
 DECLARE
   v_user_id VARCHAR(64);
