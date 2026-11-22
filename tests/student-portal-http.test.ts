@@ -132,7 +132,7 @@ test('student and teacher messages are limited to current assignment classes',as
  assert.equal((await post('/messages',cookies.student,{recipientId:otherTeacherUser.id,content:'Cross-class message'})).status,403);
  assert.equal((await post('/messages',cookies.student,{recipientId:subjectUser.id,content:'Question for my teacher'})).status,201);
  assert.equal((await post('/messages',cookies.teacher,{recipientId:sameClassStudentUser.id,content:'Your homework'})).status,201);
- assert.equal((await post('/messages',cookies.teacher,{recipientId:otherTeacherUser.id,content:'No self message'})).status,404);
+ assert.equal((await post('/messages',cookies.teacher,{recipientId:otherTeacherUser.id,content:'No self message'})).status,403);
 });
 
 test('teacher attendance is visible in the student attendance endpoint and other student IDs are forbidden',async()=>{
