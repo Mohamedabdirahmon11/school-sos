@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { isSessionExpiryValid, passwordPolicyError } from '../src/server/auth-security.ts';
+import { isSessionExpiryValid, passwordPolicyError, generateTemporaryPin } from '../src/server/auth-security.ts';
 
 test('session expiry accepts only a valid future ISO timestamp', () => {
   const now = Date.parse('2026-11-03T12:00:00.000Z');
@@ -175,4 +175,15 @@ test('session authentication remains compatible before the additive setup comple
   const schoolColumns = storageSource.slice(authJoinStart, authJoinEnd);
   assert.match(schoolColumns, /setup_progress/);
   assert.doesNotMatch(schoolColumns, /setup_completed_at/);
+});
+
+
+test('temporary portal PIN generator always returns non-obvious six-digit values', () => {
+  const weak = new Set(['000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '123456', '654321', '112233', '121212', '123123', '987654', '101010']);
+  for (let index = 0; index < 100; index += 1) {
+    const pin = generateTemporaryPin();
+    assert.match(pin, /^\d{6}$/);
+    assert.equal(weak.has(pin), false);
+    assert.equal(/^(\d)\1{5}$/.test(pin), false);
+  }
 });
