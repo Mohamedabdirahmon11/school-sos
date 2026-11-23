@@ -47,7 +47,7 @@ import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.
 import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
-import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid, generateTemporaryPin } from './auth-security.ts';
+import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid, generateTemporaryPin, isStrongPortalPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 interface DatabaseSchema {
@@ -1930,7 +1930,7 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string, actor?: { id: string; name: string; role: UserRole; ipAddress?: string }): Promise<{ student: Student; newPin: string } | null> {
-    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\d{6}$/.test(customPin) || ['000000', '123456', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'].includes(customPin))) {
+    if (customPin !== undefined && !isStrongPortalPin(customPin)) {
       throw new Error('Student PIN must be a strong 6-digit number.');
     }
     const student = await this.getStudentById(studentId, schoolId);
