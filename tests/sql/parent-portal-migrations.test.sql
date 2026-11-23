@@ -54,6 +54,15 @@ BEGIN
   IF (SELECT count(*) FROM public.parent_students) <> 2 THEN
     RAISE EXCEPTION 'Expected two legacy parent links after backfill.';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-array' AND student_id='student-array' AND revoked_at IS NULL) THEN
+    RAISE EXCEPTION 'Linked student IDs must be backfilled to the canonical parent relation.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-phone' AND student_id='student-phone' AND revoked_at IS NULL) THEN
+    RAISE EXCEPTION 'The dedicated parent_phone field must backfill legacy relationships.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-array' AND student_id='student-phone') THEN
+    RAISE EXCEPTION 'An empty parent_phone must not match an empty student guardian phone.';
+  END IF;
   IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.parent_students'::regclass) THEN
     RAISE EXCEPTION 'Canonical parent links must have row-level security enabled.';
   END IF;
