@@ -68,6 +68,8 @@ function cookieFor(user: any, label: string) {
   db.createSession({ id: sessionId, userId: user.id, userRole: user.role, schoolId: user.schoolId, ipAddress: '127.0.0.1', userAgent: 'teacher-acceptance-test', createdAt: new Date().toISOString(), expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString() });
   return `schoolos_session=${auth.createSignedSessionToken({ sessionId, userId: user.id, role: user.role, schoolId: user.schoolId, createdAt: Date.now(), expiresAt })}`;
 }
+const studentPortalUser = makeUser(school.id, 'student', 'Student Portal User', { studentId: student.studentId });
+const studentPortalCookie = cookieFor(studentPortalUser, 'student-portal');
 const cookies = {
   form: cookieFor(formTeacherUser, 'form'),
   subject: cookieFor(subjectTeacherUser, 'subject'),
@@ -188,6 +190,54 @@ test('15.9 another teacher cannot grade or modify a colleague homework submissio
 test('15.10 a parent cannot message a teacher who is not assigned to the linked child class', async () => {
   const response = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, content: 'Please discuss my child.' });
   assert.equal(response.status, 403);
+});
+
+test('15.10a parent child directory returns only canonical linked students in the current school', async () => {
+  const response = await request('/parent/children', cookies.parent);
+  assert.equal(response.status, 200, await response.clone().text());
+  const payload = await response.json() as any;
+  assert.deepEqual(payload.data.children.map((child: any) => child.id), [student.id]);
+  assert.equal(payload.data.children.some((child: any) => child.id === otherStudent.id), false);
+});
+
+test('15.10b parent cannot read attendance or homework for an unlinked student', async () => {
+  const attendance = await request('/attendance/student?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
+  assert.equal(attendance.status, 403);
+  const homework = await request('/assignments?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
+  assert.equal(homework.status, 403);
+});
+
+test('15.10c parent message history and read receipts require a currently assigned teacher', async () => {
+  const allowed = await request('/parent/messages?contactId=' + encodeURIComponent(subjectTeacherUser.id), cookies.parent);
+  assert.equal(allowed.status, 200, await allowed.clone().text());
+  const denied = await request('/parent/messages?contactId=' + encodeURIComponent(otherTeacherUser.id), cookies.parent);
+  assert.equal(denied.status, 403);
+  const markRead = await postJson('/messages/read', cookies.parent, { contactId: otherTeacherUser.id });
+  assert.equal(markRead.status, 403);
+});
+
+test('15.10d parent cannot submit homework or enter student and teacher portals', async () => {
+  const assignment = db.createAssignment({ schoolId: school.id, classId: klass.id, subjectId: subject.id, teacherId: subjectTeacherUser.id, title: 'Parent read-only check', description: 'Read only', dueDate: today, maxPoints: 20 });
+  await db.flush();
+  const submit = await postJson('/assignments/' + assignment.id + '/submissions', cookies.parent, { content: 'Parent must not submit.' });
+  assert.equal(submit.status, 403);
+  assert.equal((await request('/student/me', cookies.parent)).status, 403);
+  assert.equal((await request('/teacher/subject-assignments', cookies.parent)).status, 403);
+});
+
+test('15.10e student cannot enter the parent portal', async () => {
+  const response = await request('/parent/children', studentPortalCookie);
+  assert.equal(response.status, 403);
+});
+
+test('15.10f removing the canonical parent link immediately revokes child attendance access', async () => {
+  const removed = await memory.from('parent_students').delete().eq('school_id', school.id).eq('parent_id', parentUser.id).eq('student_id', student.id);
+  assert.equal(removed.error, null);
+  const response = await request('/attendance/student?studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(response.status, 403);
+  const children = await request('/parent/children', cookies.parent);
+  assert.equal(children.status, 200);
+  assert.deepEqual((await children.json() as any).data.children, []);
 });
 
 test('15.11 a teacher cannot open another teacher personal payslip', async () => {
