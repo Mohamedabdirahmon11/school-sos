@@ -265,7 +265,7 @@ jobs:
             const artifactUrl = '${{ steps.parent-portal-artifact.outputs.artifact-url }}';
             if (!artifactUrl) return;
             const marker = '<!-- parent-portal-visual-comparison -->';
-            const body = marker + '\\n### Parent Portal visual comparison\\nThe artifact contains reference and SchoolOS screenshots side by side for 9 sections × 4 viewport widths × 2 themes, using a seeded parent with 3 children.\\n\\n[Open screenshot comparison artifact](' + artifactUrl + ')';
+            const body = marker + '\n### Parent Portal visual comparison\nThe artifact contains reference and SchoolOS screenshots side by side for 9 sections × 4 viewport widths × 2 themes, using a seeded parent with 3 children.\n\n[Open screenshot comparison artifact](' + artifactUrl + ')';
             const { data: comments } = await github.rest.issues.listComments({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number });
             const existing = comments.find(comment => comment.body?.includes(marker));
             if (existing) {
