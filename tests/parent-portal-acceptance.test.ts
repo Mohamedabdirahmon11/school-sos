@@ -106,6 +106,8 @@ test('parent profile and child list use server data and one-child mode hides sib
  assert.match(portal,/children\.length>1&&<div className="pp-child-strip"/);
  assert.match(portal,/parent\?\.fullName/);
  assert.match(portal,/x\.studentId/);
+ assert.match(portal,/childBadge=Number\(x\.homeworkPending\|\|0\)\+Number\(x\.unreadNotices\|\|0\)/);
+ assert.match(portal,/Ogeysiis aan la akhrin/);
 });
 
 test('parent message history is paginated and scoped to the authenticated parent conversation',()=>{
