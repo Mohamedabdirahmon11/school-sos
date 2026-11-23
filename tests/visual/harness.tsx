@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { TeacherPortalView } from '../../src/components/teacher/TeacherPortalView.tsx';
 import { StudentPortalView } from '../../src/components/student/StudentPortalView.tsx';
+import { ParentPortalView } from '../../src/components/parent/ParentPortalView.tsx';
 import { MessagesView } from '../../src/components/schooladmin/MessagesView.tsx';
 import { StaffPayslipsView } from '../../src/components/accountant/AccountantPayrollView.tsx';
 import { SchoolSetupWizard } from '../../src/components/schooladmin/SchoolSetupWizard.tsx';
@@ -19,6 +20,7 @@ const tabs: Record<string, string> = {
 function Harness() {
   if (component === 'setup') return <SchoolSetupWizard onNavigate={() => undefined} onComplete={async () => undefined} />;
   if (component === 'student') return <StudentPortalView />;
+  if (component === 'parent') return <ParentPortalView />;
   if (section === 'messages') return <MessagesView />;
   if (section === 'payslip') return <StaffPayslipsView />;
   return <TeacherPortalView initialTab={(tabs[section] || 'dashboard') as any} />;

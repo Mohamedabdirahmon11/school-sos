@@ -8,7 +8,7 @@ const visualParams = new URLSearchParams(window.location.search);
 const studentMode = visualParams.get('component') === 'student';
 const parentMode = visualParams.get('component') === 'parent';
 const user = parentMode
-  ? { id: 'parent-user-visual-001', role: 'parent', fullName: 'Amina Parent', phone: '+251911000001', linkedStudentIds: ['student-001','student-002','student-003'] }
+  ? { id: 'parent-user-visual-001', role: 'parent', fullName: 'Axmed Cabdi', phone: '+251911000001', linkedStudentIds: ['student-001','student-002','student-003'] }
   : studentMode
   ? { id: 'student-user-visual-001', role: 'student', fullName: 'Faadumo Axmed Cabdi', studentId: 'ST-0421' }
   : { id: 'teacher-visual-001', role: 'teacher', fullName: 'Amina Teacher', staffId: 'T-001', teacherCode: 'T-001', phone: '+251900000001' };

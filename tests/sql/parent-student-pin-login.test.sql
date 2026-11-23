@@ -37,6 +37,10 @@ CREATE TABLE public.users (
   failed_login_attempts INTEGER DEFAULT 0,
   locked_until TIMESTAMPTZ
 );
+CREATE TABLE public.assignments (school_id VARCHAR(64), class_id VARCHAR(64), due_date DATE);
+CREATE TABLE public.student_marks (school_id VARCHAR(64), student_id VARCHAR(64), published_at TIMESTAMPTZ);
+CREATE TABLE public.notice_reads (id TEXT PRIMARY KEY, school_id VARCHAR(64), user_id VARCHAR(64), notice_id TEXT);
+\i supabase/migrations/20261123010000_parent_portal_relationships.sql
 CREATE TABLE public.user_sessions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id VARCHAR(64));
 CREATE TABLE public.lockout_counters (
   id TEXT PRIMARY KEY,
@@ -104,8 +108,8 @@ BEGIN
   VALUES ('phone-parent-other-school','pin-school-b','parent','Other School Phone Parent','+251911222333','scrypt:hash');
   UPDATE public.users SET linked_student_ids=ARRAY['new-child-1'] WHERE id='new-parent';
   SELECT count(*) INTO v_count FROM public.parent_students
-   WHERE parent_id='new-parent' AND student_id='new-child-2' AND school_id='pin-school-a';
-  IF v_count <> 0 THEN RAISE EXCEPTION 'Removed child relationship must be revoked immediately.'; END IF;
+   WHERE parent_id='new-parent' AND student_id='new-child-2' AND school_id='pin-school-a' AND revoked_at IS NOT NULL;
+  IF v_count <> 1 THEN RAISE EXCEPTION 'Removed child relationship must be revoked immediately.'; END IF;
 
   INSERT INTO public.users(id,school_id,role,full_name,student_id,pin_hash)
   VALUES ('new-student-user','pin-school-a','student','New Student','ST-0002','scrypt:hash');

@@ -1,0 +1,125 @@
+\set ON_ERROR_STOP on
+DO $roles$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role BYPASSRLS; END IF;
+END $roles$;
+ALTER ROLE authenticated NOSUPERUSER NOBYPASSRLS;
+REVOKE service_role FROM authenticated;
+DO $types$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='user_role_enum') THEN
+    CREATE TYPE public.user_role_enum AS ENUM ('parent','student','teacher','school_admin','super_admin');
+  END IF;
+END $types$;
+CREATE TABLE public.schools (id varchar(64) PRIMARY KEY);
+CREATE TABLE public.users (
+  id varchar(64) PRIMARY KEY,
+  school_id varchar(64) REFERENCES public.schools(id) ON DELETE CASCADE,
+  role public.user_role_enum NOT NULL,
+  linked_student_ids text[] NOT NULL DEFAULT ARRAY[]::text[],
+  phone text,
+  parent_phone text
+);
+CREATE TABLE public.students (
+  id varchar(64) PRIMARY KEY,
+  school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
+  father_phone text,
+  mother_phone text
+);
+CREATE TABLE public.attendance_records (school_id varchar(64),student_id varchar(64),class_id varchar(64),date date);
+CREATE TABLE public.assignments (school_id varchar(64),class_id varchar(64),due_date date);
+CREATE TABLE public.student_marks (school_id varchar(64),student_id varchar(64),published_at timestamptz);
+CREATE TABLE public.notice_reads (id varchar(160) PRIMARY KEY, school_id varchar(64) NOT NULL, notice_id varchar(64) NOT NULL, user_id varchar(64) NOT NULL, read_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE public.direct_messages (
+  id varchar(64) PRIMARY KEY,
+  school_id varchar(64) NOT NULL,
+  sender_id varchar(64) NOT NULL,
+  recipient_id varchar(64) NOT NULL,
+  content text NOT NULL
+);
+INSERT INTO public.schools(id) VALUES ('school-a'),('school-b');
+INSERT INTO public.students(id,school_id,father_phone,mother_phone) VALUES
+ ('student-array','school-a','+251900000001',''),
+ ('student-phone','school-a','','+251900000002'),
+ ('student-cross','school-b','+251900000003','');
+INSERT INTO public.users(id,school_id,role,linked_student_ids,phone,parent_phone) VALUES
+ ('parent-array','school-a','parent',ARRAY['student-array'],'+251900000001',''),
+ ('parent-phone','school-a','parent',ARRAY[]::text[],'+251900000009','+251900000002');
+INSERT INTO public.notice_reads(id,school_id,notice_id,user_id) VALUES ('read-backfill','school-a','notice-1','parent-array');
+\ir ../../supabase/migrations/20261123010000_parent_portal_relationships.sql
+\ir ../../supabase/migrations/20261123010000_parent_portal_relationships.sql
+
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.parent_students) <> 2 THEN
+    RAISE EXCEPTION 'Expected two legacy parent links after backfill.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-array' AND student_id='student-array' AND revoked_at IS NULL) THEN
+    RAISE EXCEPTION 'Linked student IDs must be backfilled to the canonical parent relation.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-phone' AND student_id='student-phone' AND revoked_at IS NULL) THEN
+    RAISE EXCEPTION 'The dedicated parent_phone field must backfill legacy relationships.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-array' AND student_id='student-phone') THEN
+    RAISE EXCEPTION 'An empty parent_phone must not match an empty student guardian phone.';
+  END IF;
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.parent_students'::regclass) THEN
+    RAISE EXCEPTION 'Canonical parent links must have row-level security enabled.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.role_table_grants WHERE grantee='authenticated' AND table_schema='public' AND table_name='parent_students' AND privilege_type='SELECT') THEN
+    RAISE EXCEPTION 'Authenticated role must not have direct SELECT grants on canonical parent links.';
+  END IF;
+  IF NOT has_table_privilege('service_role','public.parent_students','SELECT') THEN
+    RAISE EXCEPTION 'Service role must read canonical parent links.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='parent_students' AND roles @> ARRAY['service_role']::name[]) THEN
+    RAISE EXCEPTION 'Parent links must be accessible through the service-role-only policy.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_assignments_school_class_due') THEN
+    RAISE EXCEPTION 'Class homework due-date index is missing.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_student_marks_school_student_published') THEN
+    RAISE EXCEPTION 'Published marks lookup index is missing.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.notice_reads WHERE id='read-backfill' AND parent_id='parent-array') THEN
+    RAISE EXCEPTION 'Existing parent notice receipts must be backfilled to parent_id.';
+  END IF;
+END $$;
+
+INSERT INTO public.notice_reads(id,school_id,notice_id,user_id) VALUES ('read-trigger','school-a','notice-2','parent-phone');
+INSERT INTO public.direct_messages(id,school_id,sender_id,recipient_id,content)
+VALUES ('message-keep','school-a','parent-array','teacher-a','Keep message history.');
+UPDATE public.users SET linked_student_ids=ARRAY[]::text[] WHERE id='parent-array';
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-array' AND student_id='student-array' AND revoked_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'Removing an admin-managed link must revoke the parent relation without deleting history.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-phone' AND student_id='student-phone') THEN
+    RAISE EXCEPTION 'Legacy guardian-phone backfill must be retained.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.notice_reads WHERE id='read-trigger' AND parent_id='parent-phone') THEN
+    RAISE EXCEPTION 'Parent notice read inserts must record parent_id.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.direct_messages WHERE id='message-keep') THEN
+    RAISE EXCEPTION 'Revoking a parent link must preserve message history.';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO public.parent_students(school_id,parent_id,student_id,relation)
+    VALUES ('school-b','parent-phone','student-cross','guardian');
+    RAISE EXCEPTION 'Cross-school parent/student link should fail.';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO public.parent_students(school_id,parent_id,student_id,relation)
+    VALUES ('school-a','parent-phone','student-phone','guardian');
+    RAISE EXCEPTION 'Duplicate parent/student link should fail.';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+END $$;
+
+SELECT 'Parent Portal migration checks passed.' AS result;
