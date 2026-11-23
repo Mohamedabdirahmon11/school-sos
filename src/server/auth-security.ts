@@ -102,14 +102,10 @@ export function hashPin(pin: string): string {
   if (!pin) return '';
   const salt = crypto.randomBytes(16).toString('hex');
   const derivedKey = crypto.scryptSync(pin, salt, PORTAL_PIN_SCRYPT.keyLength, {
-    N: PORTAL_PIN_SCRYPT.N,
-    r: PORTAL_PIN_SCRYPT.r,
-    p: PORTAL_PIN_SCRYPT.p,
+    N: PORTAL_PIN_SCRYPT.N, r: PORTAL_PIN_SCRYPT.r, p: PORTAL_PIN_SCRYPT.p,
     maxmem: PORTAL_PIN_SCRYPT.maxmem
   });
-  // Store algorithm parameters with each hash so verification is stable if
-  // defaults change later. The random 128-bit salt is unique per credential.
-  return `pin_scrypt${PORTAL_PIN_SCRYPT.N}${PORTAL_PIN_SCRYPT.r}${PORTAL_PIN_SCRYPT.p}${salt}${derivedKey.toString('hex')}`;
+  return ['pin_scrypt', PORTAL_PIN_SCRYPT.N, PORTAL_PIN_SCRYPT.r, PORTAL_PIN_SCRYPT.p, salt, derivedKey.toString('hex')].join('|');
 }
 
 export function verifyPin(pin: string, storedHash: string): boolean {
@@ -119,8 +115,36 @@ export function verifyPin(pin: string, storedHash: string): boolean {
   let N = PORTAL_PIN_SCRYPT.N;
   let r = PORTAL_PIN_SCRYPT.r;
   let p = PORTAL_PIN_SCRYPT.p;
+  if (storedHash.startsWith('pin_scrypt|')) {
+    const parts = storedHash.split('|');
+    if (parts.length !== 6) return false;
+    N = Number(parts[1]); r = Number(parts[2]); p = Number(parts[3]);
+    salt = parts[4]; key = parts[5];
+    if (!Number.isSafeInteger(N) || N < 2 || N > 32768 || (N & (N - 1)) !== 0
+      || !Number.isSafeInteger(r) || r < 1 || r > 16
+      || !Number.isSafeInteger(p) || p < 1 || p > 4) return false;
+  } else if (storedHash.startsWith('pin_scrypt:')) {
+    const parts = storedHash.split(':');
+    if (parts.length !== 3) return false;
+    salt = parts[1]; key = parts[2];
+  } else {
+    return false;
+  }
+  if (!/^[a-f0-9]{32}$/i.test(salt) || !/^[a-f0-9]{64}$/i.test(key)) return false;
+  try {
+    const derivedKey = crypto.scryptSync(pin, salt, 32, { N, r, p, maxmem: PORTAL_PIN_SCRYPT.maxmem });
+    return crypto.timingSafeEqual(derivedKey, Buffer.from(key, 'hex'));
+  } catch {
+    return false;
+  }
+}
 
-  if (storedHash.startsWith('pin_scrypt
+export function pinHashNeedsRehash(storedHash: string): boolean {
+  if (typeof storedHash !== 'string' || !storedHash.startsWith('pin_scrypt|')) return true;
+  const parts = storedHash.split('|');
+  return parts.length !== 6 || Number(parts[1]) !== PORTAL_PIN_SCRYPT.N
+    || Number(parts[2]) !== PORTAL_PIN_SCRYPT.r || Number(parts[3]) !== PORTAL_PIN_SCRYPT.p;
+}
 
 // -------------------------------------------------------------
 // 2. Signed Session Tokens & HMAC
