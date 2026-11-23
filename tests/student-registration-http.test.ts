@@ -258,3 +258,38 @@ test('parent child selection is persisted in the signed session and rejects unli
   });
   assert.equal(parentOnStudentEndpoint.status, 403);
 });
+
+
+test('parent PIN reset and phone replacement are administrator-only and audited', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  assert.ok(parent);
+  const cookie = adminCookie();
+  const reset = await fetch(`${baseUrl}/parents/${parent.id}/reset-pin`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  assert.equal(reset.status, 200);
+  const resetBody = await reset.json() as any;
+  assert.match(resetBody.newPin, /^\d{6}$/);
+  assert.equal(parent.must_change_password, true);
+  assert.equal(verifyPin(resetBody.newPin, parent.pin_hash), true);
+
+  const duplicatePhone = await fetch(`${baseUrl}/parents/${parent.id}/phone`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: '+251912345678' })
+  });
+  assert.equal(duplicatePhone.status, 409);
+
+  const changedPhone = await fetch(`${baseUrl}/parents/${parent.id}/phone`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: '+251913333333' })
+  });
+  assert.equal(changedPhone.status, 200);
+  const updated = memory.rows('users').find(row => row.id === parent.id);
+  assert.equal(updated?.phone, '+251913333333');
+  assert.ok(memory.rows('audit_logs').some(row => row.action === 'PARENT_PHONE_CHANGED'));
+  assert.ok(memory.rows('audit_logs').some(row => row.action === 'PARENT_PIN_RESET'));
+});
