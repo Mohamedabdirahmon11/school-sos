@@ -4432,7 +4432,14 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
     teacherSubjectPairs = new Set(teaching.items.map((item: any) => `${item.classId}::${item.subjectId}`));
     classIds = [...new Set(teaching.items.map((item: any) => item.classId))];
   } else if (role === 'parent' || role === 'student') {
-    studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
+    studentIds = role === 'parent' ? await getParentLinkedStudentIds(school.id, user.id) : [];
+    if (role === 'parent' && typeof req.query.studentId === 'string') {
+      if (!studentIds.includes(req.query.studentId)) {
+        res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CHILD_FORBIDDEN', message: 'This student is not linked to your parent account.' } });
+        return;
+      }
+      studentIds = [req.query.studentId];
+    }
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
       studentIds = own.items.map((item: any) => item.id);
@@ -5324,6 +5331,31 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   });
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   res.json({ ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children }, error: null });
+});
+
+apiRouter.get('/parent/notices', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'parent') {
+    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_ONLY', message: 'Parent accounts only.' } });
+    return;
+  }
+  const classIds = await getNoticeClassIds(school.id, user);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  const audiences = ['audience.eq.all', 'audience.eq.school', 'audience.eq.parents'];
+  if (classIds.length) audiences.push('and(audience.eq.class,class_id.in.(' + classIds.join(',') + '))');
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 20));
+  const result = await db.queryPage('school_notices', { school_id: school.id, is_active: 'true' }, page, pageSize,
+    'and(publish_date.lte.' + today + ',or(' + audiences.join(',') + '))',
+    'id,school_id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role,is_active', 'publish_date', false);
+  const noticeIds = result.items.map((notice: any) => String(notice.id));
+  const reads = noticeIds.length
+    ? await db.queryPage('notice_reads', { school_id: school.id, user_id: user.id, notice_id: noticeIds }, 1, 50, undefined, 'notice_id')
+    : { items: [] as any[] };
+  const readIds = new Set(reads.items.map((row: any) => String(row.noticeId)));
+  res.set({ 'Cache-Control': 'private, no-store, max-age=0' });
+  res.json({ ok: true, data: { items: result.items.map((notice: any) => ({ ...notice, isRead: readIds.has(String(notice.id)) })), pagination: { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: Math.ceil(result.total / result.pageSize) } }, error: null });
 });
 
 apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res) => {
