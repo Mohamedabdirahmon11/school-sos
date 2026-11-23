@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS public.parent_students (
   parent_id varchar(64) NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   student_id varchar(64) NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   relation varchar(40) NOT NULL DEFAULT 'guardian',
+  revoked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT parent_students_parent_student_unique UNIQUE (parent_id, student_id),
   CONSTRAINT parent_students_school_parent_fk FOREIGN KEY (parent_id, school_id)
@@ -20,9 +21,9 @@ CREATE TABLE IF NOT EXISTS public.parent_students (
 );
 
 CREATE INDEX IF NOT EXISTS parent_students_parent_school_idx
-  ON public.parent_students (parent_id, school_id, student_id);
+  ON public.parent_students (parent_id, school_id, student_id) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS parent_students_student_school_idx
-  ON public.parent_students (student_id, school_id, parent_id);
+  ON public.parent_students (student_id, school_id, parent_id) WHERE revoked_at IS NULL;
 
 -- Backfill the already-admin-managed links without changing existing account data.
 INSERT INTO public.parent_students (school_id, parent_id, student_id, relation)
@@ -62,19 +63,23 @@ SET search_path = ''
 AS $function$
 BEGIN
   IF NEW.role = 'parent'::public.user_role_enum AND NEW.school_id IS NOT NULL THEN
-    DELETE FROM public.parent_students
+    UPDATE public.parent_students
+    SET revoked_at = now()
     WHERE parent_id = NEW.id
-      AND school_id = NEW.school_id
-      AND NOT (student_id = ANY(COALESCE(NEW.linked_student_ids, ARRAY[]::text[])));
+      AND revoked_at IS NULL
+      AND (school_id <> NEW.school_id
+        OR NOT (student_id = ANY(COALESCE(NEW.linked_student_ids, ARRAY[]::text[]))));
 
     INSERT INTO public.parent_students (school_id, parent_id, student_id, relation)
     SELECT NEW.school_id, NEW.id, s.id, 'guardian'
     FROM public.students AS s
     WHERE s.school_id = NEW.school_id
       AND s.id = ANY(COALESCE(NEW.linked_student_ids, ARRAY[]::text[]))
-    ON CONFLICT (parent_id, student_id) DO NOTHING;
+    ON CONFLICT (parent_id, student_id)
+    DO UPDATE SET revoked_at = NULL, relation = EXCLUDED.relation;
   ELSE
-    DELETE FROM public.parent_students WHERE parent_id = NEW.id;
+    UPDATE public.parent_students SET revoked_at = now()
+    WHERE parent_id = NEW.id AND revoked_at IS NULL;
   END IF;
   RETURN NEW;
 END;
