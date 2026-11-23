@@ -5317,11 +5317,13 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   const classById = new Map(classes.items.map((row: any) => [String(row.id), row]));
   const teacherById = new Map(teachers.items.map((row: any) => [String(row.id), row]));
   const relationByStudent = new Map(links.items.map((row: any) => [String(row.studentId), String(row.relation || 'guardian')]));
-  const [attendanceRows, markRows, assignments, submissions] = await Promise.all([
+  const [attendanceRows, markRows, assignments, submissions, noticeRows, noticeReads] = await Promise.all([
     queryAllRows('attendance_records', { school_id: school.id, student_id: studentIds }, 'student_id,date,status'),
     queryAllRows('student_marks', { school_id: school.id, student_id: studentIds, status: 'approved' }, 'student_id,total_marks,status,published_at,scheme_snapshot'),
     classIds.length ? queryAllRows('assignments', { school_id: school.id, class_id: classIds }, 'id,class_id,due_date') : Promise.resolve([] as any[]),
-    queryAllRows('assignment_submissions', { school_id: school.id, student_id: studentIds }, 'assignment_id,student_id,status')
+    queryAllRows('assignment_submissions', { school_id: school.id, student_id: studentIds }, 'assignment_id,student_id,status'),
+    queryAllRows('school_notices', { school_id: school.id, is_active: 'true' }, 'id,audience,class_id,publish_date'),
+    queryAllRows('notice_reads', { school_id: school.id, user_id: user.id }, 'notice_id')
   ]);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   const monthKey = today.slice(0, 7);
@@ -5338,6 +5340,7 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
     marksByStudent.get(key)!.push(row);
   }
   const submittedKeys = new Set(submissions.map((row: any) => String(row.studentId) + ':' + String(row.assignmentId)));
+  const readNoticeIds = new Set(noticeReads.map((row: any) => String(row.noticeId)));
   const assignmentByClass = new Map<string, any[]>();
   for (const row of assignments) {
     const key = String((row as any).classId || '');
@@ -5362,7 +5365,8 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
         const rows = marksByStudent.get(String(student.id)) || [];
         return { total: rows.reduce((sum: number, row: any) => sum + Number(row.totalMarks || 0), 0), max: rows.reduce((sum: number, row: any) => sum + (Array.isArray(row.schemeSnapshot) ? row.schemeSnapshot.reduce((part: number, component: any) => part + Number(component.maxMarks || 0), 0) : 0), 0), subjects: rows.length };
       })(),
-      homeworkPending: (assignmentByClass.get(String(student.classId)) || []).filter((item: any) => String(item.dueDate || '') >= today && !submittedKeys.has(String(student.id) + ':' + String(item.id))).length
+      homeworkPending: (assignmentByClass.get(String(student.classId)) || []).filter((item: any) => !submittedKeys.has(String(student.id) + ':' + String(item.id))).length,
+      unreadNotices: noticeRows.filter((notice: any) => ['all', 'school', 'parents'].includes(String(notice.audience)) || (notice.audience === 'class' && String(notice.classId) === String(student.classId))).filter((notice: any) => String(notice.publishDate || '').slice(0, 10) <= today && !readNoticeIds.has(String(notice.id))).length
     };
   });
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
