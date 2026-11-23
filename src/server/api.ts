@@ -517,10 +517,10 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
   const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
-  const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
-  const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
-  const teacherCredentialRoutes = ['/auth/me', '/auth/change-teacher-pin', '/auth/logout'];
-  const portalCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
+  const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout', '/auth/logout-all'];
+  const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout', '/auth/logout-all'];
+  const teacherCredentialRoutes = ['/auth/me', '/auth/change-teacher-pin', '/auth/logout', '/auth/logout-all'];
+  const portalCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout', '/auth/logout-all'];
   const allowedCredentialRoutes = ['student', 'parent'].includes(user.role) ? portalCredentialRoutes
     : user.role === 'school_admin' ? schoolAdminCredentialRoutes
     : user.role === 'teacher' ? teacherCredentialRoutes : superAdminCredentialRoutes;
@@ -1433,6 +1433,13 @@ apiRouter.post('/auth/login', async (req, res) => {
 });
 
 // Logout endpoint (clears HttpOnly cookie)
+apiRouter.post('/auth/logout-all', requireAuth, async (req, res) => {
+  const user = (req as any).user as User;
+  await db.revokeUserSessions(user.id);
+  res.clearCookie('schoolos_session', { path: '/' });
+  res.json({ success: true, message: 'You have been signed out of all sessions.' });
+});
+
 apiRouter.post('/auth/logout', async (req, res) => {
   const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
@@ -1589,6 +1596,7 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   }
   invalidateAuthenticatedSnapshot(user.id);
   await db.flush();
+  await db.revokeUserSessions(user.id);
   db.logAudit({
     action: 'PIN_CHANGED',
     category: 'auth',
