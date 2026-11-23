@@ -2,6 +2,9 @@
 -- Existing users remain the parent identity; no duplicate parent profile table is introduced.
 BEGIN;
 
+CREATE UNIQUE INDEX IF NOT EXISTS users_id_school_id_parent_link_uidx ON public.users (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS students_id_school_id_parent_link_uidx ON public.students (id, school_id);
+
 CREATE TABLE IF NOT EXISTS public.parent_students (
   id text PRIMARY KEY DEFAULT ('pls-' || gen_random_uuid()::text),
   school_id varchar(64) NOT NULL REFERENCES public.schools(id) ON DELETE CASCADE,
