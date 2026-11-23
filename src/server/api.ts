@@ -4217,10 +4217,10 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   return statuses;
 }
 
-async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string) {
+async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string, orFilter?: string) {
   const rows: any[] = [];
   for (let page = 1;; page += 1) {
-    const result = await db.queryPage(table, filters, page, 100, undefined, columns, orderBy);
+    const result = await db.queryPage(table, filters, page, 100, orFilter, columns, orderBy);
     rows.push(...result.items);
     if (rows.length >= result.total || result.items.length === 0) break;
   }
@@ -9554,7 +9554,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         ...classRows.items.map((row: any) => String(row.classTeacherId || '')).filter(Boolean),
         ...profiles.items.map((row: any) => String((row as any).userId || '')).filter(Boolean)
       ]);
-      const historyRows = await queryAllRows('direct_messages', { school_id: school.id }, 'sender_id,recipient_id');
+      const historyRows = await queryAllRows('direct_messages', { school_id: school.id }, 'sender_id,recipient_id', 'timestamp', 'or(sender_id.eq.' + user.id + ',recipient_id.eq.' + user.id + ')');
       const historyTeacherIds = new Set(historyRows.flatMap((row: any) => {
         if (String(row.senderId) === String(user.id)) return [String(row.recipientId)];
         if (String(row.recipientId) === String(user.id)) return [String(row.senderId)];
