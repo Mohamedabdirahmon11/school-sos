@@ -4393,7 +4393,7 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
     const children = role === 'student'
       ? { items: [] as any[] }
       : studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
-    const classIds = role === 'student' ? (classId ? [classId] : []) : [...new Set(children.items.map((item: any) => item.classId))];
+    const classIds = role === 'student' ? (classId ? [classId] : []) : role === 'parent' ? await getNoticeClassIds(school.id, user) : [...new Set(children.items.map((item: any) => item.classId))];
     if (classId && !classIds.includes(classId)) { res.status(403).json({ error: 'Timetable access is limited to your own class.' }); return; }
     if (!classIds.length) { res.json([]); return; }
     let slots = await queryAllRows('timetable_slots', { school_id: school.id, class_id: classId || classIds, term_id: termId || undefined, is_active: 'true' }, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id,section_id,assignment_id,room_id');
@@ -4454,9 +4454,15 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
     }
     if (role === 'student') {
       classIds = studentCurrentClassIds || [];
-    } else {
-      const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
-      classIds = [...new Set(children.items.map((item: any) => item.classId))];
+    } else if (role === 'parent') {
+      const currentYearId = await getCurrentAcademicYearId(school.id);
+      if (currentYearId) {
+        const enrollments = studentIds.length ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', student_id: studentIds }, 'student_id,class_id') : [];
+        classIds = [...new Set(enrollments.map((row: any) => String(row.classId || '')).filter(Boolean))];
+      } else {
+        const children = studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
+        classIds = [...new Set(children.items.map((item: any) => String(item.classId || '')).filter(Boolean))];
+      }
     }
   }
 
@@ -9523,7 +9529,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
       const linkedStudents = linkedIds.length
         ? await db.queryPage('students', { school_id: school.id, id: linkedIds }, 1, 100, undefined, 'id,class_id,student_id')
         : { items: [] as any[] };
-      const linkedClasses = [...new Set(linkedStudents.items.map((student: any) => String(student.classId || '')).filter(Boolean))];
+      const linkedClasses = await getNoticeClassIds(school.id, user);
       const [classRows, assignments] = await Promise.all([
         linkedClasses.length ? db.queryPage('classes', { school_id: school.id, id: linkedClasses }, 1, 100, undefined, 'id,class_teacher_id') : Promise.resolve({ items: [] as any[] }),
         linkedClasses.length ? db.queryPage('class_subjects', { school_id: school.id, class_id: linkedClasses, is_active: 'true' }, 1, 100, undefined, 'class_id,teacher_id') : Promise.resolve({ items: [] as any[] })
@@ -9587,15 +9593,13 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
   if (user.role === 'parent' && recipient.role === 'student') return res.status(403).json({ error: 'Parents may message only assigned teachers. Student conversations are private.' });
   if (user.role === 'teacher' && recipient.role === 'parent') {
     const assignedClassIds = new Set(await getTeacherAssignedClassIds(school.id, user.id));
-    const linkedIds = await getParentLinkedStudentIds(school.id, recipient.id);
-    const linkedStudents = linkedIds.length ? await db.queryPage('students', { school_id: school.id, id: linkedIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
-    if (!linkedStudents.items.some((student: any) => assignedClassIds.has(String(student.classId)))) return res.status(403).json({ error: 'Teachers may message only parents of students in their assigned classes.' });
+    const parentClassIds = await getNoticeClassIds(school.id, recipient);
+    if (!parentClassIds.some(classId => assignedClassIds.has(classId))) return res.status(403).json({ error: 'Teachers may message only parents of students in their assigned classes.' });
   }
   if (user.role === 'parent' && recipient.role === 'teacher') {
-    const linkedIds = await getParentLinkedStudentIds(school.id, user.id);
-    const linkedStudents = linkedIds.length ? await db.queryPage('students', { school_id: school.id, id: linkedIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
+    const linkedClasses = new Set(await getNoticeClassIds(school.id, user));
     const teacherClasses = new Set(await getTeacherAssignedClassIds(school.id, recipient.id));
-    if (!linkedStudents.items.some((student: any) => teacherClasses.has(String(student.classId)))) return res.status(403).json({ error: 'Parents may message only teachers assigned to their children.' });
+    if (![...teacherClasses].some(classId => linkedClasses.has(classId))) return res.status(403).json({ error: 'Parents may message only teachers assigned to their children.' });
   }
   if (user.role === 'student' && recipient.role === 'parent') {
     const student = (await db.getStudents(school.id)).find(item => item.studentId === user.studentId || item.id === user.id.replace(/^usr-student-/, 'std-'));
