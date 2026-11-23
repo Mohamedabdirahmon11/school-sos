@@ -3,8 +3,10 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role BYPASSRLS; END IF;
-END $$;
-DO $$ BEGIN
+END $;
+ALTER ROLE authenticated NOSUPERUSER NOBYPASSRLS;
+REVOKE service_role FROM authenticated;
+DO $ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='user_role_enum') THEN
     CREATE TYPE public.user_role_enum AS ENUM ('parent','student','teacher','school_admin','super_admin');
   END IF;
@@ -52,11 +54,17 @@ BEGIN
   IF (SELECT count(*) FROM public.parent_students) <> 2 THEN
     RAISE EXCEPTION 'Expected two legacy parent links after backfill.';
   END IF;
-  IF NOT has_table_privilege('authenticated','public.parent_students','SELECT') THEN
-    RAISE EXCEPTION 'Authenticated role must not read canonical parent links directly.';
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid='public.parent_students'::regclass) THEN
+    RAISE EXCEPTION 'Canonical parent links must have row-level security enabled.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.role_table_grants WHERE grantee='authenticated' AND table_schema='public' AND table_name='parent_students' AND privilege_type='SELECT') THEN
+    RAISE EXCEPTION 'Authenticated role must not have direct SELECT grants on canonical parent links.';
   END IF;
   IF NOT has_table_privilege('service_role','public.parent_students','SELECT') THEN
     RAISE EXCEPTION 'Service role must read canonical parent links.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='parent_students' AND roles @> ARRAY['service_role']::name[]) THEN
+    RAISE EXCEPTION 'Parent links must be accessible through the service-role-only policy.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_assignments_school_class_due') THEN
     RAISE EXCEPTION 'Class homework due-date index is missing.';
