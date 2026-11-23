@@ -5808,21 +5808,30 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   res.status(201).json({ ...sanitizeStudent(student), initialPin });
 });
 
-apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
+apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const student = await db.getStudentById(req.params.id, school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found.' }); return; }
+
+  if (user.role === 'teacher') {
+    const formTeacherClassIds = await getTeacherFormTeacherClassIds(school.id, user.id);
+    const currentClassId = await getStudentCurrentClassId(school.id, student.id, student.classId);
+    if (!currentClassId || !formTeacherClassIds.includes(currentClassId)) {
+      res.status(403).json({ error: 'Only this student’s Form Teacher can reset the student PIN.' });
+      return;
+    }
+  } else if (!['school_admin', 'super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'Only a School Admin or the student’s Form Teacher can reset a student PIN.' });
+    return;
+  }
+
   if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\d{6}$/.test(req.body.customPin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(req.body.customPin))) {
     res.status(400).json({ error: 'Student PIN must be a strong 6-digit number.' }); return;
   }
-  const result = await db.resetStudentPin(req.params.id, school.id, req.body?.customPin);
-  if (!result) {
-    res.status(404).json({ error: 'Student not found.' });
-    return;
-  }
-  res.json({
-    success: true,
-    newPin: result.newPin,
-    student: sanitizeStudent(result.student)
-  });
+  const result = await db.resetStudentPin(student.id, school.id, req.body?.customPin);
+  if (!result) { res.status(404).json({ error: 'Student not found.' }); return; }
+  res.json({ success: true, newPin: result.newPin, student: sanitizeStudent(result.student) });
 });
 
 apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
