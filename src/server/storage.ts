@@ -828,8 +828,44 @@ class StorageEngine {
     this.persistedRows.set(table, latestRows);
   }
 
+  private getLockoutEntry(key: string): { count: number; firstFailedAt: number; lockedUntil: number | null; lockoutCount?: number } | undefined {
+    let entry = this.getLockoutEntry(key);
+    if (!entry) {
+      const row = this.data.lockoutCounterRows.find((item: any) => String(item.id) === key);
+      if (row) {
+        entry = {
+          count: Number(row.attemptCount ?? row.attempt_count ?? 0),
+          firstFailedAt: new Date(row.firstFailedAt ?? row.first_failed_at ?? Date.now()).getTime(),
+          lockedUntil: row.lockedUntil || row.locked_until ? new Date(row.lockedUntil ?? row.locked_until).getTime() : null,
+          lockoutCount: Number(row.lockoutCount ?? row.lockout_count ?? 0)
+        };
+        this.data.lockoutCounters[key] = entry;
+      }
+    }
+    return entry;
+  }
+
+  private persistLockoutEntry(key: string, entry?: { count: number; firstFailedAt: number; lockedUntil: number | null; lockoutCount?: number }): void {
+    const index = this.data.lockoutCounterRows.findIndex((row: any) => String(row.id) === key);
+    if (!entry) {
+      if (index >= 0) this.data.lockoutCounterRows.splice(index, 1);
+    } else {
+      const row = {
+        id: key,
+        attemptCount: entry.count,
+        firstFailedAt: new Date(entry.firstFailedAt).toISOString(),
+        lockedUntil: entry.lockedUntil ? new Date(entry.lockedUntil).toISOString() : null,
+        lockoutCount: entry.lockoutCount || 0,
+        updatedAt: new Date().toISOString()
+      };
+      if (index >= 0) this.data.lockoutCounterRows[index] = row;
+      else this.data.lockoutCounterRows.push(row);
+    }
+    this.save();
+  }
+
   public checkLoginLockout(key: string, threshold = 5, durationMinutes = 15) {
-    const entry = this.data.lockoutCounters[key];
+    const entry = this.getLockoutEntry(key);
     if (!entry) return { locked: false, remainingMinutes: 0 };
     const now = Date.now();
     if (entry.lockedUntil && entry.lockedUntil > now) {
@@ -840,10 +876,10 @@ class StorageEngine {
       entry.count = 0;
       entry.firstFailedAt = now;
       entry.lockoutCount = (entry.lockoutCount || 0) + 1;
-      this.save();
+      this.persistLockoutEntry(key, entry);
     } else if (now - entry.firstFailedAt > 30 * 60 * 1000) {
       delete this.data.lockoutCounters[key];
-      this.save();
+      this.persistLockoutEntry(key, undefined);
     }
     return { locked: false, remainingMinutes: 0 };
   }
@@ -861,13 +897,13 @@ class StorageEngine {
       entry.lockedUntil = now + backoffMinutes * 60 * 1000;
     }
     this.data.lockoutCounters[key] = entry;
-    this.save();
+    this.persistLockoutEntry(key, entry);
     return { newlyLocked, count: entry.count };
   }
 
   public clearLoginFailures(key: string) {
     delete this.data.lockoutCounters[key];
-    this.save();
+    this.persistLockoutEntry(key, undefined);
   }
 
   private ensureSeedData() {
