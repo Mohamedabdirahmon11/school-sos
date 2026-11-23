@@ -233,3 +233,33 @@ test('15.15 teacher timetable returns an empty state when no timetable slots are
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), []);
 });
+
+
+test('15.16 Form Teacher can reset only students in their own class without changing parent credentials', async () => {
+  const studentUser = makeUser(school.id, 'student', 'Test Student Portal', {
+    studentId: student.studentId,
+    pin: auth.hashPin('765432'),
+    mustChangePassword: false
+  });
+  parentUser.pin = auth.hashPin('876543');
+  await db.flush();
+
+  const allowed = await request(`/students/${student.id}/reset-pin`, cookies.form, {
+    method: 'POST', body: JSON.stringify({})
+  });
+  assert.equal(allowed.status, 200);
+  const receipt = await allowed.json() as any;
+  assert.match(receipt.newPin, /^\\d{6}$/);
+  assert.equal(studentUser.mustChangePassword, true);
+  assert.equal(auth.verifyPin(receipt.newPin, studentUser.pin), true);
+  assert.equal(auth.verifyPin('876543', parentUser.pin), true);
+
+  const subjectTeacherDenied = await request(`/students/${student.id}/reset-pin`, cookies.subject, {
+    method: 'POST', body: JSON.stringify({})
+  });
+  assert.equal(subjectTeacherDenied.status, 403);
+  const otherClassDenied = await request(`/students/${otherStudent.id}/reset-pin`, cookies.form, {
+    method: 'POST', body: JSON.stringify({})
+  });
+  assert.equal(otherClassDenied.status, 403);
+});
