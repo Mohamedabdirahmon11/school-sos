@@ -185,23 +185,23 @@ test('student creation whitelists profile fields, enforces capacity and protects
     studentId: 'STU-CLEAN-001',
     guardianName: 'Clean Student Guardian',
     guardianPhone: '+15550007111',
-    pin: '1234'
+    pin: '654321'
   });
   assert.equal(created.status, 201, await created.clone().text());
   const response = await created.json();
   assert.equal(response.id === 'attacker-controlled-id', false);
   assert.equal(response.schoolId, school.id);
-  assert.equal(response.initialPin, '1234');
+  assert.equal(response.initialPin, '654321');
   assert.equal('passwordHash' in response, false);
   assert.equal('twoFactorSecret' in response, false);
   const storedStudent = memory.rows('students').find(row => row.id === response.id);
-  assert.ok(String(storedStudent?.pin_hash || storedStudent?.pinHash || '').startsWith('pin_scrypt:'));
+  assert.ok(String(storedStudent?.pin_hash || storedStudent?.pinHash || '').startsWith('pin_scrypt|'));
   assert.equal('pin' in (storedStudent as any), false, 'Plaintext student PIN must never be persisted.');
   assert.equal('password_hash' in (storedStudent as any), false);
   assert.equal('two_factor_secret' in (storedStudent as any), false);
   const parent = (await storage.db.getUsers(school.id, 'parent')).find(user => user.phone === '+15550007111');
   assert.ok(parent?.linkedStudentIds?.includes(response.id));
-  assert.ok(parent?.pin?.startsWith('pin_scrypt:'));
+  assert.ok(parent?.pin?.startsWith('pin_scrypt|'));
 
   const secondSchool = storage.db.createSchool({
     name: 'Other School', code: 'OTHER', address: '', city: '', phone: '',
@@ -212,15 +212,17 @@ test('student creation whitelists profile fields, enforces capacity and protects
   const otherSchoolParent = storage.db.createUser({
     schoolId: secondSchool.id, role: 'parent', fullName: 'Other School Parent',
     phone: '+15550007111', parentPhone: '+15550007111', passwordHash: '',
-    pin: '4321', isBlocked: false, failedLoginAttempts: 0
+    pin: '654321', isBlocked: false, failedLoginAttempts: 0
   } as any);
   await storage.db.flush();
-  const { verifyPin } = await import('../src/server/auth-security.ts');
-  const reset = await storage.db.resetStudentPin(response.id, school.id, '5678');
-  assert.equal(reset?.newPin, '5678');
+  const { verifyPin, generateTemporaryPin, isStrongPortalPin } = await import('../src/server/auth-security.ts');
+  const resetPin = generateTemporaryPin();
+  assert.equal(isStrongPortalPin(resetPin), true);
+  const reset = await storage.db.resetStudentPin(response.id, school.id, resetPin);
+  assert.equal(reset?.newPin, resetPin);
   await storage.db.flush();
   const unchangedParent = await storage.db.getUserById(otherSchoolParent.id, secondSchool.id);
-  assert.ok(unchangedParent?.pin && verifyPin('4321', unchangedParent.pin));
+  assert.ok(unchangedParent?.pin && verifyPin('654321', unchangedParent.pin));
 
   const fullClass = storage.db.createClass({
     schoolId: school.id, name: 'Full Class', gradeLevel: 2, section: 'A',
@@ -291,7 +293,7 @@ test('teacher creation generates a unique system-issued ID and ignores forged ac
   assert.equal('twoFactorSecret' in (storedTeacher as any), false);
   const teacherUser = await storage.db.getUserById(result.userId, school.id);
   assert.equal(teacherUser?.role, 'teacher');
-  assert.ok(teacherUser?.pin?.startsWith('pin_scrypt:'));
+  assert.ok(teacherUser?.pin?.startsWith('pin_scrypt|'));
 
   // Prime the shared list cache as an administrator, then request the same
   // list as a student to ensure salary fields cannot leak across cache roles.

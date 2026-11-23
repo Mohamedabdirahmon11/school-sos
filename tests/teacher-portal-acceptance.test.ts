@@ -51,6 +51,7 @@ const otherSubject = db.createSubject({ schoolId: school.id, name: 'Science', co
 const student = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-001', firstName: 'Test', middleName: '', lastName: 'Student', gender: 'female', admissionDate: today, fatherPhone: '+251900000001', classId: klass.id, status: 'active' } as any);
 const otherStudent = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-002', firstName: 'Other', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: otherClass.id, status: 'active' } as any);
 parentUser.linkedStudentIds = [student.id];
+await memory.from('parent_students').insert([{ parent_id: parentUser.id, student_id: student.id, school_id: school.id, relation: 'guardian' }]);
 await db.flush();
 await memory.from('parent_students').insert([{ id: 'taccept-parent-student-link', school_id: school.id, parent_id: parentUser.id, student_id: student.id, relation: 'guardian', revoked_at: null }]);
 await db.flush();
@@ -409,4 +410,37 @@ test('15.15 teacher timetable returns an empty state when no timetable slots are
   const response = await request('/timetable', cookies.empty);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), []);
+});
+
+
+test('15.16 Form Teacher can reset only students in their own class without changing parent credentials', async () => {
+  const studentUser = makeUser(school.id, 'student', 'Test Student Portal', {
+    studentId: student.studentId,
+    pin: auth.hashPin('765432'),
+    mustChangePassword: false
+  });
+  parentUser.pin = auth.hashPin('876543');
+  await memory.from('classes').update({ class_teacher_id: formTeacherUser.id, is_archived: false }).eq('id', klass.id);
+  await memory.from('students').update({ class_id: klass.id }).eq('id', student.id);
+  await db.flush();
+
+  const allowed = await request(`/students/${student.id}/reset-pin`, cookies.form, {
+    method: 'POST', body: JSON.stringify({})
+  });
+  assert.equal(allowed.status, 200, await allowed.clone().text());
+  const receipt = await allowed.json() as any;
+  assert.match(receipt.newPin, /^[0-9]{6}$/);
+  const resetStudentUser = await db.getUserById(studentUser.id, school.id);
+  assert.equal(resetStudentUser?.mustChangePassword, true);
+  assert.equal(auth.verifyPin(receipt.newPin, String(resetStudentUser?.pin || '')), true);
+  assert.equal(auth.verifyPin('876543', parentUser.pin), true);
+
+  const subjectTeacherDenied = await request(`/students/${student.id}/reset-pin`, cookies.subject, {
+    method: 'POST', body: JSON.stringify({})
+  });
+  assert.equal(subjectTeacherDenied.status, 403);
+  const otherClassDenied = await request(`/students/${otherStudent.id}/reset-pin`, cookies.form, {
+    method: 'POST', body: JSON.stringify({})
+  });
+  assert.equal(otherClassDenied.status, 403);
 });

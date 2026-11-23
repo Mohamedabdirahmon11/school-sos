@@ -79,7 +79,7 @@ test('CSV import creates one missing class, students, linked parent and one-time
   assert.equal(memory.rows('classes').filter(row => row.schoolId === admin.schoolId && row.name === 'Grade 2').length, 1);
   const students = memory.rows('students').filter(row => row.schoolId === admin.schoolId);
   assert.equal(students.length, 2);
-  assert.ok(students.every(row => row.pinHash?.startsWith('pin_scrypt:')));
+  assert.ok(students.every(row => row.pinHash?.startsWith('pin_scrypt|')));
   assert.ok(students.every(row => row.status === 'active'));
   assert.ok(students.every(row => /^S\d{3,}$/.test(row.studentId)), 'new students get simple S001-style IDs');
   assert.equal(new Set(students.map(row => row.studentId)).size, students.length);

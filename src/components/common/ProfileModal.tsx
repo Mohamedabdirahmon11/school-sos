@@ -13,7 +13,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const { user, refreshUser } = useAuth();
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || '');
+  const [phone, setPhone] = useState(user?.phone || user?.parentPhone || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,6 +25,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !user) return null;
+  const isPortalPinRole = user.role === 'student' || user.role === 'parent';
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +39,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
     if (user.role === 'school_admin' && newPin !== confirmPin) {
       setError('PINs do not match.');
+      return;
+    }
+    if (isPortalPinRole && newPin && (!/^\d{6}$/.test(newPin) || ['000000', '123456', '654321', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '112233', '121212', '123123', '987654', '101010'].includes(newPin))) {
+      setError('PIN-ku waa inuu noqdaa 6 lambar oo adag.');
+      return;
+    }
+    if (isPortalPinRole && newPin && !currentPin) {
+      setError('Geli PIN-kaaga hadda ka hor intaadan beddelin.');
+      return;
+    }
+    if (isPortalPinRole && newPin !== confirmPin) {
+      setError('PIN-yadu isma laha.');
       return;
     }
     if (user.role !== 'school_admin' && newPassword && newPassword !== confirmPassword) {
@@ -62,6 +75,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           newPin: user.role === 'school_admin' ? newPin || undefined : undefined
         })
       });
+      if (isPortalPinRole && newPin) {
+        await ApiClient.request('/auth/change-pin', {
+          method: 'POST',
+          body: JSON.stringify({ currentPin, newPin })
+        });
+      }
       await refreshUser();
 
       setMessage('Profile and credentials updated successfully.');
@@ -142,8 +161,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 type="text"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none"
+                readOnly={user.role === 'parent'}
+                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none read-only:bg-slate-50 read-only:text-slate-500"
               />
+              {user.role === 'parent' && <p className="mt-1 text-[10px] text-slate-500">Lambarkan waxaa beddeli kara maamulka dugsiga oo keliya.</p>}
             </div>
           </div>
 
@@ -156,6 +177,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                   <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="New 4–6 digit PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
                   <input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm new PIN" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
                   <p className="text-[11px] text-slate-500">Use this PIN with your School ID or Admin ID to sign in.</p>
+                </div>
+              </>
+            ) : isPortalPinRole ? (
+              <>
+                <label className="block text-xs font-bold text-slate-800 mb-2">Beddel PIN-ka (ikhtiyaari)</label>
+                <div className="space-y-2">
+                  <input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="PIN-ka hadda" autoComplete="current-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="PIN cusub (6 lambar)" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Ku celi PIN-ka cusub" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <p className="text-[11px] text-slate-500">Beddelidda PIN-ka waxay cusboonaysiinaysaa dhammaan sessions-ka amniga dartii.</p>
                 </div>
               </>
             ) : (

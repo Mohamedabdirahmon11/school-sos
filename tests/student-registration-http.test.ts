@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { createHttpTestStorage, InMemorySupabase } from './support/in-memory-supabase.ts';
 
 process.env.NODE_ENV = 'test';
@@ -74,7 +74,7 @@ test('student registration generates IDs server-side and reuses one normalized g
   const first = await firstResponse.json() as any;
   assert.match(first.studentId, /^S\d{3,}$/);
   assert.notEqual(first.studentId, 'CLIENT-SUPPLIED-001');
-  assert.match(first.initialPin, /^\d{4}$/);
+  assert.match(first.initialPin, /^\d{6}$/);
   const firstStudent = memory.rows('students').find(row => row.student_id === first.studentId);
   assert.ok(firstStudent);
   assert.equal(firstStudent.address, 'Jijiga');
@@ -83,19 +83,30 @@ test('student registration generates IDs server-side and reuses one normalized g
   assert.equal(verifyPin(first.initialPin, firstStudent.pin_hash), true);
   assert.equal(String(firstStudent.pin_hash).includes(first.initialPin), false);
 
-  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
-  assert.ok(parent);
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  const motherParent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251912345678');
+  assert.ok(parent && motherParent);
   const originalParentPinHash = parent.pin_hash;
+  assert.equal(motherParent.linked_student_ids.length, 1);
+  assert.equal(motherParent.linked_student_ids[0], firstStudent.id);
 
   const secondResponse = await register('Abdi Yusuf Noor', '+251-911-234-567', 'CLIENT-SUPPLIED-002');
   assert.equal(secondResponse.status, 201);
   const second = await secondResponse.json() as any;
   assert.notEqual(second.studentId, first.studentId);
+
+  const thirdResponse = await register('Sahra Yusuf Noor', '+251 911 234 567', 'CLIENT-SUPPLIED-003');
+  assert.equal(thirdResponse.status, 201);
+  const third = await thirdResponse.json() as any;
+  assert.notEqual(third.studentId, first.studentId);
+  assert.notEqual(third.studentId, second.studentId);
+
   const parents = memory.rows('users').filter(row => row.role === 'parent' && row.school_id === 'student-school');
-  assert.equal(parents.length, 1);
+  assert.equal(parents.length, 2);
   assert.equal(parent.pin_hash, originalParentPinHash);
-  assert.equal(parent.linked_student_ids.length, 2);
-  assert.equal(memory.rows('students').filter(row => row.school_id === 'student-school').length, 2);
+  assert.equal(parent.linked_student_ids.length, 3);
+  assert.ok(parent.linked_student_ids.includes(firstStudent.id));
+  assert.equal(memory.rows('students').filter(row => row.school_id === 'student-school').length, 3);
 });
 
 
@@ -129,7 +140,7 @@ test('bulk student PIN reset returns one-time PINs and stores hashes for the sel
   assert.equal(result.pinSlips.length, 1);
   assert.equal(result.pinSlips[0].studentId, studentId);
   assert.equal(result.pinSlips[0].studentName, 'Muna Amina Hassan');
-  assert.match(result.pinSlips[0].newPin, /^[0-9]{4}$/);
+  assert.match(result.pinSlips[0].newPin, /^[0-9]{6}$/);
 
   const student = memory.rows('students').find(row => row.student_id === studentId);
   const studentUser = memory.rows('users').find(row => row.student_id === studentId && row.role === 'student');
@@ -142,4 +153,348 @@ test('bulk student PIN reset returns one-time PINs and stores hashes for the sel
   assert.equal(parent?.pin_hash, parentPinHash);
   assert.equal(Object.hasOwn(student, 'pin'), false);
   assert.equal(Object.hasOwn(studentUser, 'pin'), false);
+});
+
+
+test('student ID and normalized parent phone logins are school-scoped and require temporary PIN rotation', async () => {
+  const student = memory.rows('students').find(row => row.student_id === 'S001');
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
+  const parentUser = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
+  assert.ok(student && studentUser && parentUser);
+  const temporaryPin = '654321';
+  student.pin_hash = hashPin(temporaryPin);
+  studentUser.pin_hash = hashPin(temporaryPin);
+  parentUser.pin_hash = hashPin(temporaryPin);
+  studentUser.must_change_password = true;
+  parentUser.must_change_password = true;
+
+  const login = (payload: Record<string, unknown>) => fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const studentLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 's001', pin: temporaryPin });
+  assert.equal(studentLogin.status, 200);
+  const studentResult = await studentLogin.json() as any;
+  assert.equal(studentResult.requirePinChange, true);
+  assert.ok(studentResult.challengeToken);
+
+  const parentLogin = await login({ role: 'parent', schoolCode: 'STU', phone: '+251-911-234-567', pin: temporaryPin });
+  assert.equal(parentLogin.status, 200);
+  const parentResult = await parentLogin.json() as any;
+  assert.equal(parentResult.requirePinChange, true);
+  assert.ok(parentResult.challengeToken);
+
+  const changePin = (challengeToken: string, newPin: string) => fetch(`${baseUrl}/auth/change-pin`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${challengeToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPin })
+  });
+  const weakPin = await changePin(studentResult.challengeToken, '123456');
+  assert.equal(weakPin.status, 400);
+  const unchangedPin = await changePin(studentResult.challengeToken, temporaryPin);
+  assert.equal(unchangedPin.status, 400);
+  const studentPinChanged = await changePin(studentResult.challengeToken, '765432');
+  assert.equal(studentPinChanged.status, 200);
+  assert.equal(studentUser.must_change_password, false);
+  assert.equal(verifyPin('765432', studentUser.pin_hash), true);
+  assert.equal(verifyPin('765432', student.pin_hash), true);
+
+  const parentPinChanged = await changePin(parentResult.challengeToken, '876543');
+  assert.equal(parentPinChanged.status, 200);
+  assert.equal(parentUser.must_change_password, false);
+  assert.equal(verifyPin('876543', parentUser.pin_hash), true);
+  assert.equal(verifyPin('765432', parentUser.pin_hash), false);
+
+  const wrongSchoolLogin = await login({ role: 'student', schoolCode: 'OTH', studentId: 'S001', pin: temporaryPin });
+  assert.equal(wrongSchoolLogin.status, 401);
+  const invalidPinLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin: '000000' });
+  assert.equal(invalidPinLogin.status, 401);
+});
+
+
+test('successful portal login transparently rehashes legacy scrypt PINs with persisted current parameters', async () => {
+  const student = memory.rows('students').find(row => row.student_id === 'S001');
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
+  assert.ok(student && studentUser);
+  const pin = '493827';
+  const legacySalt = randomBytes(16).toString('hex');
+  const legacyKey = scryptSync(pin, legacySalt, 32).toString('hex');
+  const legacyHash = `pin_scrypt:${legacySalt}:${legacyKey}`;
+  student.pin_hash = legacyHash;
+  studentUser.pin_hash = legacyHash;
+  studentUser.must_change_password = false;
+
+  const response = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin })
+  });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.ok(studentUser.pin_hash.startsWith('pin_scrypt|16384|8|1|'));
+  assert.ok(student.pin_hash.startsWith('pin_scrypt|16384|8|1|'));
+  assert.equal(verifyPin(pin, studentUser.pin_hash), true);
+  assert.equal(verifyPin(pin, student.pin_hash), true);
+});
+
+
+test('parent child selection is persisted in the signed session and rejects unlinked children and role mismatches', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
+  const student = memory.rows('students').find(row => row.student_id === 'S001');
+  assert.ok(parent && studentUser && student);
+  parent.must_change_password = false;
+  studentUser.must_change_password = false;
+
+  const makeSession = (userId: string, role: 'student' | 'parent', id: string) => {
+    const expiresAt = Date.now() + 60 * 60 * 1000;
+    memory.rows('user_sessions').push({
+      id, userId, userRole: role, schoolId: 'student-school',
+      ipAddress: '', userAgent: '', createdAt: new Date().toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString()
+    });
+    return createSignedSessionToken({ sessionId: id, userId, role, schoolId: 'student-school', createdAt: Date.now(), expiresAt });
+  };
+  const parentToken = makeSession(parent.id, 'parent', 'parent-selection-session');
+  const select = (token: string, studentId: string) => fetch(`${baseUrl}/parent/select-child`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentId })
+  });
+
+  const selected = await select(parentToken, student.id);
+  assert.equal(selected.status, 200);
+  const selectedBody = await selected.json() as any;
+  assert.equal(selectedBody.selectedStudentId, student.id);
+  const setCookies = (selected.headers as any).getSetCookie?.() || [];
+  const latestCookie = setCookies.at(-1) || '';
+  const sessionToken = /schoolos_session=([^;]+)/.exec(latestCookie)?.[1];
+  assert.ok(sessionToken);
+  const me = await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: `schoolos_session=${sessionToken}` } });
+  assert.equal(me.status, 200);
+  const meBody = await me.json() as any;
+  assert.equal(meBody.selectedStudentId, student.id);
+
+  await memory.from('students').insert([{
+    id: 'unlinked-student', school_id: 'student-school', student_id: 'ST-UNLINKED',
+    first_name: 'Unlinked', last_name: 'Student', class_id: 'student-class-1', status: 'active'
+  }]);
+  const forbiddenChild = await select(parentToken, 'unlinked-student');
+  assert.equal(forbiddenChild.status, 403);
+  const tamperedParentRead = await fetch(`${baseUrl}/students/unlinked-student`, {
+    headers: { Cookie: `schoolos_session=${parentToken}` }
+  });
+  assert.equal(tamperedParentRead.status, 403, 'changing a requested student_id must not bypass parent_students membership');
+
+  const studentToken = makeSession(studentUser.id, 'student', 'student-selection-session');
+  const wrongRole = await select(studentToken, student.id);
+  assert.equal(wrongRole.status, 403);
+  const parentOnStudentEndpoint = await fetch(`${baseUrl}/student/me`, {
+    headers: { Cookie: `schoolos_session=${parentToken}` }
+  });
+  assert.equal(parentOnStudentEndpoint.status, 403);
+});
+
+
+test('parent PIN reset and phone replacement are administrator-only and audited', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  assert.ok(parent);
+  const cookie = adminCookie();
+  const reset = await fetch(`${baseUrl}/parents/${parent.id}/reset-pin`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  assert.equal(reset.status, 200);
+  const resetBody = await reset.json() as any;
+  assert.match(resetBody.newPin, /^\d{6}$/);
+  assert.equal(parent.must_change_password, true);
+  assert.equal(verifyPin(resetBody.newPin, parent.pin_hash), true);
+
+  const duplicatePhone = await fetch(`${baseUrl}/parents/${parent.id}/phone`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: '+251912345678' })
+  });
+  assert.equal(duplicatePhone.status, 409);
+
+  const changedPhone = await fetch(`${baseUrl}/parents/${parent.id}/phone`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${cookie}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: '+251913333333' })
+  });
+  assert.equal(changedPhone.status, 200);
+  const updated = memory.rows('users').find(row => row.id === parent.id);
+  assert.equal(updated?.phone, '+251913333333');
+  assert.ok(memory.rows('audit_logs').some(row => row.action === 'PARENT_PHONE_CHANGED'));
+  assert.ok(memory.rows('audit_logs').some(row => row.action === 'PARENT_PIN_RESET'));
+});
+
+
+test('legacy student and parent identifiers without administrator-provisioned accounts cannot auto-create portal users', async () => {
+  await memory.from('students').insert([{
+    id: 'legacy-no-portal-account',
+    school_id: 'student-school',
+    student_id: 'ST-LEGACY-NO-ACCOUNT',
+    first_name: 'Legacy',
+    last_name: 'Student',
+    father_phone: '+251922222222',
+    class_id: 'student-class-1',
+    status: 'active',
+    pin_hash: hashPin('654321')
+  }]);
+  const login = (payload: Record<string, unknown>) => fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const studentBefore = memory.rows('users').filter(row => row.role === 'student' && row.student_id === 'ST-LEGACY-NO-ACCOUNT').length;
+  const studentLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'ST-LEGACY-NO-ACCOUNT', pin: '654321' });
+  assert.equal(studentLogin.status, 401);
+  assert.equal((await studentLogin.json() as any).error, 'ID or PIN is incorrect.');
+  assert.equal(memory.rows('users').filter(row => row.role === 'student' && row.student_id === 'ST-LEGACY-NO-ACCOUNT').length, studentBefore);
+
+  const parentBefore = memory.rows('users').filter(row => row.role === 'parent' && String(row.phone || '').replace(/[^0-9]/g, '') === '251922222222').length;
+  const parentLogin = await login({ role: 'parent', schoolCode: 'STU', phone: '+251-922-222-222', pin: '654321' });
+  assert.equal(parentLogin.status, 401);
+  assert.equal((await parentLogin.json() as any).error, 'ID or PIN is incorrect.');
+  assert.equal(memory.rows('users').filter(row => row.role === 'parent' && String(row.phone || '').replace(/[^0-9]/g, '') === '251922222222').length, parentBefore);
+});
+
+
+test('parent cannot change their phone through profile but can change PIN with current PIN verification', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && Boolean(row.phone || row.parent_phone));
+  assert.ok(parent);
+  parent.pin_hash = hashPin('765432');
+  parent.must_change_password = false;
+  const originalPhone = parent.phone;
+  const sessionId = 'parent-profile-security-session';
+  const createdAt = Date.now();
+  const expiresAt = createdAt + 30 * 24 * 60 * 60 * 1000;
+  memory.rows('user_sessions').push({
+    id: sessionId, userId: parent.id, userRole: 'parent', schoolId: 'student-school',
+    ipAddress: '127.0.0.1', userAgent: 'test', createdAt: new Date(createdAt).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date(createdAt).toISOString()
+  });
+  const token = createSignedSessionToken({
+    sessionId, userId: parent.id, role: 'parent', schoolId: 'student-school',
+    createdAt, expiresAt
+  });
+
+  const phoneChange = await fetch(`${baseUrl}/auth/profile`, {
+    method: 'PUT',
+    headers: { Cookie: `schoolos_session=${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fullName: parent.full_name, email: parent.email || '', phone: String(parent.phone || parent.parent_phone) === '+251922222222' ? '+251933333333' : '+251922222222' })
+  });
+  assert.equal(phoneChange.status, 403);
+  assert.equal(parent.phone, originalPhone);
+
+  const pinChange = await fetch(`${baseUrl}/auth/change-pin`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPin: '765432', newPin: '876543' })
+  });
+  assert.equal(pinChange.status, 200, await pinChange.clone().text());
+  assert.equal(verifyPin('876543', parent.pin_hash), true);
+  assert.equal(verifyPin('765432', parent.pin_hash), false);
+  assert.equal(parent.must_change_password, false);
+  assert.equal(memory.rows('user_sessions').some(row => row.id === sessionId), false);
+  assert.match(pinChange.headers.get('set-cookie') || '', /schoolos_session=/);
+  assert.ok(memory.rows('audit_logs').some(row => row.action === 'PIN_CHANGED' && row.user_id === parent.id));
+});
+
+
+test('parent PIN rotation issues one replacement session and preserves the server-verified selected child', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
+  const child = memory.rows('students').find(row => row.school_id === 'student-school');
+  assert.ok(parent && child);
+  parent.pin_hash = hashPin('876543');
+  parent.must_change_password = false;
+  await memory.from('parent_students').upsert([{
+    parent_id: parent.id,
+    student_id: child.id,
+    school_id: 'student-school',
+    relation: 'guardian'
+  }], { onConflict: 'parent_id,student_id' });
+
+  const sessionId = randomUUID();
+  const expiresAt = Date.now() + 60 * 60 * 1000;
+  memory.rows('user_sessions').push({
+    id: sessionId,
+    userId: parent.id,
+    userRole: 'parent',
+    schoolId: 'student-school',
+    ipAddress: '',
+    userAgent: '',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+    lastActivityAt: new Date().toISOString()
+  });
+  const token = createSignedSessionToken({
+    sessionId,
+    userId: parent.id,
+    role: 'parent',
+    schoolId: 'student-school',
+    selectedStudentId: child.id,
+    createdAt: Date.now(),
+    expiresAt
+  });
+
+  const changed = await fetch(`${baseUrl}/auth/change-pin`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPin: '876543', newPin: '234567' })
+  });
+  assert.equal(changed.status, 200, await changed.clone().text());
+  const cookies = (changed.headers as any).getSetCookie?.() || [];
+  assert.equal(cookies.length, 1, 'PIN rotation must issue exactly one replacement session cookie');
+  const sessionToken = /schoolos_session=([^;]+)/.exec(cookies[0])?.[1];
+  assert.ok(sessionToken);
+
+  const me = await fetch(`${baseUrl}/auth/me`, {
+    headers: { Cookie: `schoolos_session=${sessionToken}` }
+  });
+  assert.equal(me.status, 200);
+  const meBody = await me.json() as any;
+  assert.equal(meBody.selectedStudentId, child.id);
+  assert.equal(verifyPin('234567', parent.pin_hash), true);
+});
+
+
+test('student portal list is scoped by Student ID and never by a shared guardian phone', async () => {
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.school_id === 'student-school' && row.student_id === 'S001');
+  const student = memory.rows('students').find(row => row.school_id === 'student-school' && row.student_id === 'S001');
+  assert.ok(studentUser && student);
+  studentUser.must_change_password = false;
+  const guardianPhone = String(studentUser.phone || '');
+  const siblings = memory.rows('students').filter(row =>
+    row.school_id === 'student-school' && row.id !== student.id &&
+    String(row.father_phone || '').replace(/[^0-9]/g, '') === guardianPhone.replace(/[^0-9]/g, '')
+  );
+  assert.ok(siblings.length > 0, 'fixture must include a sibling sharing the guardian contact');
+
+  const sessionId = randomUUID();
+  const expiresAt = Date.now() + 60 * 60 * 1000;
+  memory.rows('user_sessions').push({
+    id: sessionId, userId: studentUser.id, userRole: 'student', schoolId: 'student-school',
+    ipAddress: '', userAgent: '', createdAt: new Date().toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString()
+  });
+  const token = createSignedSessionToken({
+    sessionId, userId: studentUser.id, role: 'student', schoolId: 'student-school',
+    createdAt: Date.now(), expiresAt
+  });
+  const response = await fetch(`${baseUrl}/students`, {
+    headers: { Cookie: `schoolos_session=${token}` }
+  });
+  assert.equal(response.status, 200);
+  const rows = await response.json() as any[];
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].studentId, studentUser.student_id);
+  const siblingResponse = await fetch(`${baseUrl}/students/${siblings[0].id}`, {
+    headers: { Cookie: `schoolos_session=${token}` }
+  });
+  assert.equal(siblingResponse.status, 403, 'Student A must not read Student B record even when guardian phone is shared');
 });

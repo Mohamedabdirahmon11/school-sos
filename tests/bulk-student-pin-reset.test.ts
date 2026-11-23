@@ -81,31 +81,31 @@ async function reset(user: typeof admin | typeof teacher, rows: any[], headers: 
   return { response, body: await response.json() as any };
 }
 
-test('bulk reset assigns unique four-digit PINs atomically and updates student accounts only', async () => {
+test('bulk reset assigns unique six-digit PINs atomically and updates student accounts only', async () => {
   const parentPinBefore = memory.rows('users').find(row => row.id === 'usr-parent-pin-1')?.pinHash;
   const { response, body } = await reset(admin, [
-    { studentId: 'STD-PIN-001', pin: '2468' },
+    { studentId: 'STD-PIN-001', pin: '246810' },
     { studentId: 'STD-PIN-002' }
   ]);
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.updatedCount, 2);
   assert.equal(body.pinSlips.length, 2);
-  assert.equal(body.pinSlips[0].newPin, '2468');
-  assert.match(body.pinSlips[1].newPin, /^\d{4}$/);
+  assert.equal(body.pinSlips[0].newPin, '246810');
+  assert.match(body.pinSlips[1].newPin, /^\d{6}$/);
   assert.notEqual(body.pinSlips[0].newPin, body.pinSlips[1].newPin);
   const studentOne = memory.rows('students').find(row => row.studentId === 'STD-PIN-001');
   const studentTwo = memory.rows('students').find(row => row.studentId === 'STD-PIN-002');
-  assert.equal(verifyPin('2468', String(studentOne?.pinHash || '')), true);
+  assert.equal(verifyPin('246810', String(studentOne?.pinHash || '')), true);
   assert.equal(verifyPin(body.pinSlips[1].newPin, String(studentTwo?.pinHash || '')), true);
   const studentUser = memory.rows('users').find(row => row.id === 'usr-student-std-pin-1');
-  assert.equal(verifyPin('2468', String(studentUser?.pinHash || '')), true);
+  assert.equal(verifyPin('246810', String(studentUser?.pinHash || '')), true);
   assert.equal(studentUser?.failedLoginAttempts, 0);
   assert.equal(studentUser?.lockedUntil, null);
   assert.equal(memory.rows('users').find(row => row.id === 'usr-parent-pin-1')?.pinHash, parentPinBefore);
   assert.equal(memory.rows('audit_logs').filter(row => row.action === 'STUDENT_BULK_PIN_RESET').length, 1);
   assert.equal(memory.rows('students').every(row => !Object.prototype.hasOwnProperty.call(row, 'pin')), true);
-  assert.notEqual(studentOne?.pinHash, '2468');
+  assert.notEqual(studentOne?.pinHash, '246810');
 });
 
 test('bulk reset rejects invalid PINs, duplicate IDs, and students from another school without partial changes', async () => {
@@ -113,11 +113,11 @@ test('bulk reset rejects invalid PINs, duplicate IDs, and students from another 
   const invalid = await reset(admin, [{ studentId: 'STD-PIN-001', pin: '12' }]);
   assert.equal(invalid.response.status, 400);
   const duplicate = await reset(admin, [
-    { studentId: 'STD-PIN-001', pin: '1234' },
-    { studentId: 'STD-PIN-001', pin: '5678' }
+    { studentId: 'STD-PIN-001', pin: '123456' },
+    { studentId: 'STD-PIN-001', pin: '567890' }
   ]);
   assert.equal(duplicate.response.status, 400);
-  const crossSchool = await reset(admin, [{ studentId: 'STD-OTHER-001', pin: '5678' }]);
+  const crossSchool = await reset(admin, [{ studentId: 'STD-OTHER-001', pin: '567890' }]);
   assert.equal(crossSchool.response.status, 400);
   assert.equal(memory.rows('students').find(row => row.studentId === 'STD-PIN-001')?.pinHash, before);
   assert.equal(verifyPin('4444', String(memory.rows('students').find(row => row.studentId === 'STD-OTHER-001')?.pinHash || '')), true);
@@ -142,8 +142,8 @@ test('one-time PINs survive a remount of the Students screen and are cleared on 
   const store = await import('../src/lib/bulk-pin-results.ts');
   store.clearPendingPinSlips();
   assert.deepEqual(store.getPendingPinSlips('school-a'), []);
-  store.setPendingPinSlips('school-a', [{ studentId: 'S001', studentName: 'Ayaan Ali', newPin: '2468' }]);
-  assert.equal(store.getPendingPinSlips('school-a')[0].newPin, '2468');
+  store.setPendingPinSlips('school-a', [{ studentId: 'S001', studentName: 'Ayaan Ali', newPin: '246810' }]);
+  assert.equal(store.getPendingPinSlips('school-a')[0].newPin, '246810');
   assert.deepEqual(store.getPendingPinSlips('school-b'), [], 'another school never sees these PINs');
   store.clearPendingPinSlips();
   assert.deepEqual(store.getPendingPinSlips('school-a'), []);

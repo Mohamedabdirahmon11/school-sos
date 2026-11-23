@@ -82,6 +82,10 @@ const parentNotices = [
 const parentMessages = [{id:'msg-parent-1',senderId:'teacher-user-visual-001',recipientId:'parent-user-visual-001',content:'Fadlan la soco layliska guriga ee toddobaadkan.',timestamp:'2026-11-20T08:00:00Z'}];
 const studentMessages = [{ id: 'msg-1', senderId: 'teacher-user-visual-001', recipientId: 'student-user-visual-001', content: 'Ku soo dhawoow fasalka.', timestamp: '2026-11-20T08:00:00Z' }];
 const values: Record<string, (...args: any[]) => Promise<any>> = {
+  getAllStudents: async () => students,
+  selectParentChild: async (studentId?: string) => ({ success: true, selectedStudentId: studentId || null }),
+  getNotices: async () => [],
+
   getStudentProfile: async () => studentProfile,
   getStudentNotices: async () => studentNotices,
   getNoticeUnreadCount: async () => ({ count: 1 }),

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { isSessionExpiryValid, passwordPolicyError } from '../src/server/auth-security.ts';
+import { isSessionExpiryValid, passwordPolicyError, generateTemporaryPin, isStrongPortalPin, hashPin, verifyPin, pinHashNeedsRehash } from '../src/server/auth-security.ts';
 
 test('session expiry accepts only a valid future ISO timestamp', () => {
   const now = Date.parse('2026-11-03T12:00:00.000Z');
@@ -175,4 +175,40 @@ test('session authentication remains compatible before the additive setup comple
   const schoolColumns = storageSource.slice(authJoinStart, authJoinEnd);
   assert.match(schoolColumns, /setup_progress/);
   assert.doesNotMatch(schoolColumns, /setup_completed_at/);
+});
+
+
+test('temporary portal PIN generator always returns non-obvious six-digit values', () => {
+  const weak = new Set(['000000', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '123456', '654321', '112233', '121212', '123123', '987654', '101010']);
+  for (let index = 0; index < 100; index += 1) {
+    const pin = generateTemporaryPin();
+    assert.match(pin, /^\d{6}$/);
+    assert.equal(weak.has(pin), false);
+    assert.equal(/^(\d)\1{5}$/.test(pin), false);
+    assert.equal(isStrongPortalPin(pin), true);
+  }
+  for (const pin of ['000000', '123456', '654321', '111111', '112233', '121212', '123123', '987654', '101010']) {
+    assert.equal(isStrongPortalPin(pin), false, `rejected weak PIN ${pin}`);
+  }
+});
+
+
+test('portal PIN scrypt hashes persist parameters, use unique salts, and transparently verify legacy hashes for rehash', () => {
+  const first = hashPin('583920');
+  const second = hashPin('583920');
+  assert.ok(first.startsWith('pin_scrypt|16384|8|1|'));
+  assert.notEqual(first.split('|')[4], second.split('|')[4], 'each PIN hash must use an independent random salt');
+  assert.match(first.split('|')[4], /^[a-f0-9]{32}$/);
+  assert.match(first.split('|')[5], /^[a-f0-9]{64}$/);
+  assert.equal(verifyPin('583920', first), true);
+  assert.equal(verifyPin('000000', first), false);
+  assert.equal(pinHashNeedsRehash(first), false);
+
+  const parts = first.split('|');
+  const legacySalt = 'a'.repeat(32);
+  assert.equal(parts[1], '16384');
+  assert.equal(parts[2], '8');
+  assert.equal(parts[3], '1');
+  assert.equal(pinHashNeedsRehash('pin_scrypt:' + legacySalt + ':' + 'b'.repeat(64)), true);
+  assert.equal(pinHashNeedsRehash('invalid-hash'), true);
 });

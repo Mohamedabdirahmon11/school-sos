@@ -36,7 +36,18 @@ function auditIdempotency(source: string, label: string) {
       && /security definer/i.test(source)
       && /revoke all on function public\.delete_school_permanently\s*\(\s*text\s*,\s*text\s*\)\s*from public\s*,\s*anon\s*,\s*authenticated/i.test(source)
       && /grant execute on function public\.delete_school_permanently\s*\(\s*text\s*,\s*text\s*\)\s*to service_role/i.test(source);
-    if (!guardedSchoolDeletionMigration) violations.push('destructive table/data statement');
+    const guardedParentLinkCleanup =
+      label === '20261123083200_parent_student_accounts.sql'
+      && /create or replace function public\.schoolos_sync_parent_student_links\s*\(/i.test(source)
+      && /delete from public\.parent_students[\s\S]{0,500}parent_id = (?:old|new)\.id[\s\S]{0,200}school_id = (?:old|new)\.school_id/i.test(source);
+    const guardedPortalSessionInvalidation =
+      label === '20261123090000_bulk_pin_reset_rotation.sql'
+      && /create or replace function public\.schoolos_bulk_reset_student_pins\s*\(/i.test(source)
+      && /security definer/i.test(source)
+      && /delete from public\.lockout_counters[\s\S]{0,500}delete from public\.user_sessions/i.test(source);
+    if (!guardedSchoolDeletionMigration && !guardedParentLinkCleanup && !guardedPortalSessionInvalidation) {
+      violations.push('destructive table/data statement');
+    }
   }
   for (const match of source.matchAll(/\bCREATE\s+POLICY\s+([a-z_][a-z0-9_]*|%I_[a-z_]+)\s+ON\s+([a-z_.%I]+)/gi)) {
     const prefix = source.slice(Math.max(0, match.index! - 2500), match.index);

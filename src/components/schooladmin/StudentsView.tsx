@@ -325,7 +325,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
 
   const handleResetPin = async () => {
     if (isReadOnly || !selectedStudent) return;
-    if (!confirm(`Reset the sign-in PIN for ${selectedStudent.firstName} ${selectedStudent.lastName} and linked parent accounts? The new PIN is shown once.`)) return;
+    if (!confirm(`Reset the sign-in PIN for ${selectedStudent.firstName} ${selectedStudent.lastName} The parent account PIN is separate. The new PIN is shown once.`)) return;
     try {
       const result = await ApiClient.resetStudentPin(selectedStudent.id);
       setPinSlip({ studentName: `${selectedStudent.firstName} ${selectedStudent.lastName}`, studentId: selectedStudent.studentId, pin: result.newPin });
@@ -844,7 +844,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
         )}
       </div>
 
-      {pinSlip && <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div className="w-full max-w-sm bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-xl"><h2 className="text-base font-bold text-[#132A29]">Student and parent PIN slip</h2><p className="mt-3 text-sm">{pinSlip.studentName}</p><p className="text-xs text-[#64748B]">{pinSlip.studentId}</p><p className="mt-4 text-xl font-mono font-bold tracking-widest">{pinSlip.pin}</p><p className="mt-2 text-xs text-[#64748B]">This PIN works for the student and linked parent login. It is shown once. Print or share securely now.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => window.print()} className="px-3 py-2 bg-[#0F766E] text-white rounded-lg text-xs font-semibold">Print PIN slip</button><button onClick={() => setPinSlip(null)} className="px-3 py-2 border border-slate-300 rounded-lg text-xs">Close</button></div></div></div>}
+      {pinSlip && <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div className="w-full max-w-sm bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-xl"><h2 className="text-base font-bold text-[#132A29]">Student PIN slip</h2><p className="mt-3 text-sm">{pinSlip.studentName}</p><p className="text-xs text-[#64748B]">{pinSlip.studentId}</p><p className="mt-4 text-xl font-mono font-bold tracking-widest">{pinSlip.pin}</p><p className="mt-2 text-xs text-[#64748B]">This PIN is for the student account only. Parent accounts have separate PINs. It is shown once; share it securely.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => window.print()} className="px-3 py-2 bg-[#0F766E] text-white rounded-lg text-xs font-semibold">Print PIN slip</button><button onClick={() => setPinSlip(null)} className="px-3 py-2 border border-slate-300 rounded-lg text-xs">Close</button></div></div></div>}
 
       {showEditModal && selectedStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

@@ -47,7 +47,7 @@ import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.
 import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
-import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid } from './auth-security.ts';
+import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid, generateTemporaryPin, isStrongPortalPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 interface DatabaseSchema {
@@ -91,7 +91,7 @@ interface DatabaseSchema {
   promotionHistory: any[];
   restoreTestRecords: any[];
   lockoutCounterRows: any[];
-  lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null }>;
+  lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null; lockoutCount?: number }>;
   libraryBooks: any[];
   libraryLoans: any[];
   transportRoutes: any[];
@@ -828,35 +828,82 @@ class StorageEngine {
     this.persistedRows.set(table, latestRows);
   }
 
+  private getLockoutEntry(key: string): { count: number; firstFailedAt: number; lockedUntil: number | null; lockoutCount?: number } | undefined {
+    let entry = this.data.lockoutCounters[key];
+    if (!entry) {
+      const row = this.data.lockoutCounterRows.find((item: any) => String(item.id) === key);
+      if (row) {
+        entry = {
+          count: Number(row.attemptCount ?? row.attempt_count ?? 0),
+          firstFailedAt: new Date(row.firstFailedAt ?? row.first_failed_at ?? Date.now()).getTime(),
+          lockedUntil: row.lockedUntil || row.locked_until ? new Date(row.lockedUntil ?? row.locked_until).getTime() : null,
+          lockoutCount: Number(row.lockoutCount ?? row.lockout_count ?? 0)
+        };
+        this.data.lockoutCounters[key] = entry;
+      }
+    }
+    return entry;
+  }
+
+  private persistLockoutEntry(key: string, entry?: { count: number; firstFailedAt: number; lockedUntil: number | null; lockoutCount?: number }): void {
+    const index = this.data.lockoutCounterRows.findIndex((row: any) => String(row.id) === key);
+    if (!entry) {
+      if (index >= 0) this.data.lockoutCounterRows.splice(index, 1);
+    } else {
+      const row = {
+        id: key,
+        attemptCount: entry.count,
+        firstFailedAt: new Date(entry.firstFailedAt).toISOString(),
+        lockedUntil: entry.lockedUntil ? new Date(entry.lockedUntil).toISOString() : null,
+        lockoutCount: entry.lockoutCount || 0,
+        updatedAt: new Date().toISOString()
+      };
+      if (index >= 0) this.data.lockoutCounterRows[index] = row;
+      else this.data.lockoutCounterRows.push(row);
+    }
+    this.save();
+  }
+
   public checkLoginLockout(key: string, threshold = 5, durationMinutes = 15) {
-    const entry = this.data.lockoutCounters[key];
+    const entry = this.getLockoutEntry(key);
     if (!entry) return { locked: false, remainingMinutes: 0 };
     const now = Date.now();
     if (entry.lockedUntil && entry.lockedUntil > now) {
       return { locked: true, remainingMinutes: Math.ceil((entry.lockedUntil - now) / 60000) };
     }
-    if ((entry.lockedUntil && entry.lockedUntil <= now) || now - entry.firstFailedAt > 30 * 60 * 1000) {
+    if (entry.lockedUntil && entry.lockedUntil <= now) {
+      entry.lockedUntil = null;
+      entry.count = 0;
+      entry.firstFailedAt = now;
+      entry.lockoutCount = (entry.lockoutCount || 0) + 1;
+      this.persistLockoutEntry(key, entry);
+    } else if (now - entry.firstFailedAt > 30 * 60 * 1000) {
       delete this.data.lockoutCounters[key];
-      this.save();
+      this.persistLockoutEntry(key, undefined);
     }
     return { locked: false, remainingMinutes: 0 };
   }
 
   public recordLoginFailure(key: string, threshold = 5, durationMinutes = 15) {
     const now = Date.now();
-    let entry = this.data.lockoutCounters[key];
-    if (!entry || now - entry.firstFailedAt > 30 * 60 * 1000) entry = { count: 0, firstFailedAt: now, lockedUntil: null };
+    let entry = this.getLockoutEntry(key);
+    if (!entry || now - entry.firstFailedAt > 30 * 60 * 1000) {
+      entry = { count: 0, firstFailedAt: now, lockedUntil: null, lockoutCount: entry?.lockoutCount || 0 };
+    }
     entry.count += 1;
     const newlyLocked = entry.count >= threshold;
-    if (newlyLocked) entry.lockedUntil = now + durationMinutes * 60 * 1000;
+    if (newlyLocked) {
+      const backoffMinutes = Math.min(durationMinutes * (2 ** Math.min(entry.lockoutCount || 0, 6)), 24 * 60);
+      entry.lockedUntil = now + backoffMinutes * 60 * 1000;
+    }
     this.data.lockoutCounters[key] = entry;
-    this.save();
+    this.persistLockoutEntry(key, entry);
     return { newlyLocked, count: entry.count };
   }
 
   public clearLoginFailures(key: string) {
     delete this.data.lockoutCounters[key];
-    this.save();
+    this.persistLockoutEntry(key, undefined);
   }
 
   private ensureSeedData() {
@@ -1522,7 +1569,7 @@ class StorageEngine {
       passwordHash = hashPassword(passwordHash);
     }
     let pin = userData.pin;
-    if (pin && !pin.startsWith('pin_scrypt:')) {
+    if (pin && !pin.startsWith('pin_scrypt')) {
       pin = hashPin(pin);
     }
     const user: User = {
@@ -1545,7 +1592,7 @@ class StorageEngine {
     if (payload.passwordHash && !payload.passwordHash.startsWith('scrypt:')) {
       payload.passwordHash = hashPassword(payload.passwordHash);
     }
-    if (payload.pin && !payload.pin.startsWith('pin_scrypt:')) {
+    if (payload.pin && !payload.pin.startsWith('pin_scrypt')) {
       payload.pin = hashPin(payload.pin);
     }
     this.data.users[idx] = { ...this.data.users[idx], ...payload };
@@ -1733,6 +1780,15 @@ class StorageEngine {
     return true;
   }
 
+  public async revokeUserSessions(userId: string): Promise<number> {
+    const sessions = await this.queryRows<UserSession>('user_sessions', { user_id: userId });
+    let revoked = 0;
+    for (const session of sessions) {
+      if (await this.revokeSession(session.id)) revoked += 1;
+    }
+    return revoked;
+  }
+
   public getSession(id: string): UserSession | null {
     return this.data.sessions.find(s => s.id === id) || null;
   }
@@ -1801,7 +1857,7 @@ class StorageEngine {
 
   public createStudent(studentData: Omit<Student, 'id' | 'createdAt'>): Student {
     const id = `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const rawPin = studentData.pin || randomInt(1000, 10000).toString();
+    const rawPin = studentData.pin || generateTemporaryPin();
     const pinHash = hashPin(rawPin);
     // Keep the plaintext PIN out of the persisted student row. It is returned
     // separately once to the authorized creator, never stored in the database.
@@ -1825,6 +1881,7 @@ class StorageEngine {
       studentId: student.studentId,
       passwordHash: '',
       pin: pinHash,
+      mustChangePassword: true,
       isBlocked: false,
       failedLoginAttempts: 0,
       createdAt: new Date().toISOString()
@@ -1861,6 +1918,7 @@ class StorageEngine {
           parentPhone,
           passwordHash: '',
           pin: pinHash,
+          mustChangePassword: true,
           linkedStudentIds: [id],
           isBlocked: false,
           failedLoginAttempts: 0,
@@ -1873,47 +1931,125 @@ class StorageEngine {
     return { ...student, pin: rawPin };
   }
 
-  public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
-    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\d{4}$/.test(customPin))) {
-      throw new Error('Student PIN must contain exactly four digits.');
+  public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string, actor?: { id: string; name: string; role: UserRole; ipAddress?: string }): Promise<{ student: Student; newPin: string } | null> {
+    if (customPin !== undefined && !isStrongPortalPin(customPin)) {
+      throw new Error('Student PIN must be a strong 6-digit number.');
     }
     const student = await this.getStudentById(studentId, schoolId);
     if (!student) return null;
-    await Promise.all([
-      this.getUsers(schoolId, 'student'), this.getUsers(schoolId, 'parent')
-    ]);
+    await this.getUsers(schoolId, 'student');
 
-    const newPin = customPin || randomInt(1000, 10000).toString();
+    const school = await this.getSchoolById(student.schoolId);
+    const schoolCode = String(school?.code || '').trim().toUpperCase();
+    if (schoolCode) this.clearLoginFailures(`sp:${schoolCode}:${student.studentId}`);
+    const newPin = customPin || generateTemporaryPin();
     const pinHash = hashPin(newPin);
     student.pinHash = pinHash;
     delete student.pin;
 
-    // The PIN is the shared credential for a student's and their linked parent's login.
-    const familyPhones = [student.studentPhone, student.fatherPhone, student.motherPhone].filter((phone): phone is string => Boolean(phone));
+    // A student reset affects only that student's credential. Parent accounts
+    // are independent and must never inherit a student's reset PIN.
     const linkedUsers = this.data.users.filter(user =>
       user.schoolId === student.schoolId &&
-      ['student', 'parent'].includes(user.role) &&
-      (user.studentId === student.studentId || user.id === `usr-student-${student.id}` || user.linkedStudentIds?.includes(student.id) || familyPhones.includes(user.phone || ''))
+      user.role === 'student' &&
+      (user.studentId === student.studentId || user.id === `usr-student-${student.id}`)
     );
     for (const linkedUser of linkedUsers) {
       linkedUser.pin = pinHash;
+      linkedUser.mustChangePassword = true;
       linkedUser.failedLoginAttempts = 0;
       linkedUser.lockedUntil = null;
+      authContextCache.delete(linkedUser.id);
+      await this.revokeUserSessions(linkedUser.id);
     }
 
     this.logAudit({
       action: 'STUDENT_PIN_RESET',
       category: 'security',
       schoolId: student.schoolId,
-      userId: student.id,
-      userName: `${student.firstName} ${student.lastName}`,
-      userRole: 'student',
-      details: `4-digit PIN reset for student ${student.studentId}.`,
+      userId: actor?.id || student.id,
+      userName: actor?.name || 'School administrator',
+      userRole: actor?.role || 'school_admin',
+      ipAddress: actor?.ipAddress,
+      details: `6-digit PIN reset for student ${student.studentId}; next login requires PIN rotation.`,
       severity: 'warning'
     });
 
     this.save();
+    await this.flush();
     return { student, newPin };
+  }
+
+  public async linkParentToStudent(
+    parentId: string, studentId: string, schoolId: string,
+    relation = 'guardian', createdBy?: string, createdByRole: UserRole = 'school_admin', ipAddress?: string
+  ): Promise<void> {
+    const [parent, student] = await Promise.all([
+      this.getUserById(parentId, schoolId),
+      this.getStudentById(studentId, schoolId)
+    ]);
+    if (!parent || parent.role !== 'parent' || !student || parent.schoolId !== student.schoolId || student.schoolId !== schoolId) {
+      throw new Error('Parent and student must belong to the same school.');
+    }
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Parent-student relationship storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('parent_students').upsert({
+      parent_id: parent.id,
+      student_id: student.id,
+      school_id: schoolId,
+      relation: relation.slice(0, 40),
+      created_by: createdBy || null
+    }, { onConflict: 'parent_id,student_id' });
+    this.recordQuery('parent_students', 'upsert', startedAt);
+    if (error) throw new Error(error.message || 'Parent-student link could not be saved.');
+    if (!parent.linkedStudentIds?.includes(student.id)) {
+      this.updateUser(parent.id, { linkedStudentIds: [...(parent.linkedStudentIds || []), student.id] });
+    }
+    this.logAudit({
+      action: 'PARENT_STUDENT_LINK_CREATED',
+      category: 'security',
+      schoolId,
+      userId: createdBy || parent.id,
+      userName: createdBy ? 'School administrator' : parent.fullName,
+      userRole: createdBy ? createdByRole : 'parent',
+      ipAddress,
+      details: `Linked parent account ${parent.id} to student ${student.studentId} (${relation}).`,
+      severity: 'info'
+    });
+    await this.flush();
+  }
+
+  public async resetParentPin(parentId: string, schoolId: string, actor?: { id: string; name: string; role: UserRole; ipAddress?: string }): Promise<{ parent: User; newPin: string } | null> {
+    const parent = await this.getUserById(parentId, schoolId);
+    if (!parent || parent.role !== 'parent') return null;
+    const school = await this.getSchoolById(schoolId);
+    const schoolCode = String(school?.code || '').trim().toUpperCase();
+    if (schoolCode) this.clearLoginFailures(`sp:${schoolCode}:${String(parent.phone || parent.parentPhone || '').replace(/[^0-9]/g, '')}`);
+    const newPin = generateTemporaryPin();
+    const updated = this.updateUser(parent.id, {
+      pin: hashPin(newPin),
+      mustChangePassword: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null
+    });
+    if (!updated) return null;
+    authContextCache.delete(parent.id);
+    await this.revokeUserSessions(parent.id);
+    this.logAudit({
+      action: 'PARENT_PIN_RESET',
+      category: 'security',
+      schoolId,
+      userId: actor?.id || parent.id,
+      userName: actor?.name || 'School administrator',
+      userRole: actor?.role || 'school_admin',
+      ipAddress: actor?.ipAddress,
+      details: `Parent PIN reset for account ${parent.id}; next login requires PIN rotation.`,
+      severity: 'warning'
+    });
+    this.save();
+    await this.flush();
+    return { parent: updated, newPin };
   }
 
   public async updateStudent(id: string, updates: Partial<Student>, schoolId?: string): Promise<Student | null> {
@@ -1988,6 +2124,7 @@ class StorageEngine {
             pin: parentPin,
             linkedStudentIds: [id],
             isBlocked: false,
+            mustChangePassword: true,
             failedLoginAttempts: 0,
             createdAt: new Date().toISOString()
           };

@@ -209,6 +209,7 @@ export class ApiClient {
     role: UserRole;
     email?: string;
     phone?: string;
+    studentId?: string;
     schoolCode?: string;
     pin?: string;
     password?: string;
@@ -217,6 +218,10 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(credentials)
     });
+  }
+
+  public static async logoutEverywhere() {
+    return this.request<{ success: boolean; message: string }>('/auth/logout-all', { method: 'POST' });
   }
 
   public static async logout() {
@@ -253,6 +258,24 @@ export class ApiClient {
     });
   }
 
+  public static async updateParentPhone(id: string, phone: string) {
+    return this.request<{ success: boolean; parent: any }>(`/parents/${encodeURIComponent(id)}/phone`, {
+      method: 'POST', body: JSON.stringify({ phone })
+    });
+  }
+
+  public static async selectParentChild(studentId?: string) {
+    return this.request<{ success: boolean; selectedStudentId: string | null }>('/parent/select-child', {
+      method: 'POST', body: JSON.stringify({ studentId: studentId || null })
+    });
+  }
+
+  public static async resetParentPin(id: string) {
+    return this.request<{ success: boolean; newPin: string; parent: any }>(`/parents/${encodeURIComponent(id)}/reset-pin`, {
+      method: 'POST'
+    });
+  }
+
   public static async bulkResetStudentPins(rows: Array<{ studentId: string; pin?: string }>) {
     return this.request<{ success: boolean; updatedCount: number; pinSlips: Array<{ studentId: string; studentName: string; newPin: string }> }>('/students/bulk-reset-pin', {
       method: 'POST',
@@ -284,7 +307,7 @@ export class ApiClient {
   }
 
   public static async getMe() {
-    return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number }>('/auth/me');
+    return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number; selectedStudentId?: string | null }>('/auth/me');
   }
 
   public static async uploadSchoolLogo(file: File): Promise<{ logoUrl: string }> {

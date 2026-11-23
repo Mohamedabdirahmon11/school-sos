@@ -34,7 +34,10 @@ import {
   verify2FACode,
   hashRecoveryCode,
   findRecoveryCodeIndex,
-  generateRecoveryCodes
+  generateRecoveryCodes,
+  generateTemporaryPin,
+  isStrongPortalPin,
+  pinHashNeedsRehash
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
@@ -512,7 +515,7 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   if (!normalizedRole) return null;
   const user: User = { ...storedUser, role: normalizedRole };
   const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-')
-    && ['super_admin', 'school_admin'].includes(user.role)
+    && ['super_admin', 'school_admin', 'student', 'parent'].includes(user.role)
     && user.mustChangePassword === true
     && payload.role === user.role;
   if (!session && !isBootstrap) return null;
@@ -547,13 +550,16 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
   const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
-  const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
-  const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
-  const teacherCredentialRoutes = ['/auth/me', '/auth/change-teacher-pin', '/auth/logout'];
-  const allowedCredentialRoutes = user.role === 'school_admin' ? schoolAdminCredentialRoutes : user.role === 'teacher' ? teacherCredentialRoutes : superAdminCredentialRoutes;
+  const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout', '/auth/logout-all'];
+  const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout', '/auth/logout-all'];
+  const teacherCredentialRoutes = ['/auth/me', '/auth/change-teacher-pin', '/auth/logout', '/auth/logout-all'];
+  const portalCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout', '/auth/logout-all'];
+  const allowedCredentialRoutes = ['student', 'parent'].includes(user.role) ? portalCredentialRoutes
+    : user.role === 'school_admin' ? schoolAdminCredentialRoutes
+    : user.role === 'teacher' ? teacherCredentialRoutes : superAdminCredentialRoutes;
   if (isBootstrap) {
     if (!user.mustChangePassword || !allowedCredentialRoutes.includes(req.path)
-      || !['super_admin', 'school_admin'].includes(user.role)) {
+      || !['super_admin', 'school_admin', 'student', 'parent'].includes(user.role)) {
       res.status(403).json({ error: 'Complete the required credential setup before continuing.' }); return;
     }
   }
@@ -564,7 +570,16 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
     });
     return;
   }
-  if (payload && !isBootstrap) await refreshSessionCookie(res, user, payload);
+  // Credential changes and logout-all replace or revoke the current session
+  // themselves. Do not emit an intermediate refreshed cookie before those routes
+  // issue the replacement session or clear the cookie.
+  const sessionMutationRoutes = new Set([
+    '/auth/change-password', '/auth/change-pin', '/auth/change-teacher-pin', '/auth/logout-all'
+  ]);
+  if (payload && !isBootstrap && !sessionMutationRoutes.has(req.path)) {
+    await refreshSessionCookie(res, user, payload);
+  }
+  (req as any).sessionPayload = payload;
   (req as any).user = user;
   next();
 }
@@ -689,6 +704,11 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
 async function getParentLinkedStudentIds(schoolId: string, parentId: string): Promise<string[]> {
   const links = await db.queryPage('parent_students', { school_id: schoolId, parent_id: parentId }, 1, 100, undefined, 'student_id,revoked_at');
   return [...new Set(links.items.filter((row: any) => !row.revokedAt).map((row: any) => String(row.studentId || '')).filter(Boolean))];
+}
+
+async function hasParentStudentLink(user: User, studentId: string, schoolId: string): Promise<boolean> {
+  if (user.role !== 'parent' || user.schoolId !== schoolId) return false;
+  return (await getParentLinkedStudentIds(schoolId, user.id)).includes(studentId);
 }
 
 async function getParentSelectedClassId(schoolId: string, parentId: string, studentId: string): Promise<string | null> {
@@ -822,9 +842,9 @@ async function requireSchoolContextForSupportWrite(req: Request, res: Response, 
 }
 
 // Helper: Issue signed cookie session
-async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string): Promise<void> {
+async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string, selectedStudentId?: string): Promise<void> {
   const settings = db.getSettings();
-  const timeoutMinutes = settings.sessionTimeoutMinutes || 60;
+  const timeoutMinutes = ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : settings.sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
 
   const sessionId = randomUUID();
@@ -834,6 +854,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
     userId: user.id,
     role: user.role,
     schoolId: user.schoolId || schoolId,
+    ...(selectedStudentId ? { selectedStudentId } : {}),
     createdAt,
     expiresAt
   });
@@ -862,7 +883,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
 
 async function refreshSessionCookie(res: Response, user: User, previous: ReturnType<typeof verifySignedSessionToken>): Promise<void> {
   if (!previous) return;
-  const timeoutMinutes = db.getSettings().sessionTimeoutMinutes || 60;
+  const timeoutMinutes = ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : db.getSettings().sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
   await db.touchSession(previous.sessionId, new Date(expiresAt).toISOString());
   const token = createSignedSessionToken({ ...previous, role: user.role, schoolId: user.schoolId || previous.schoolId, expiresAt });
@@ -993,28 +1014,35 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
 // 1. AUTHENTICATION & LOGIN (PASSWORD, STAFF FIRST-LOGIN, STUDENT/PARENT PIN)
 // ==============================================================================
 
+// STUDENT & PARENT LOGIN — school code + Student ID or normalized phone + PIN.
 apiRouter.post('/auth/login', async (req, res) => {
-  const { email, phone, schoolCode, pin, password } = req.body;
+  // STUDENT & PARENT LOGIN — independent SchoolOS portal credentials.
+  const { email, phone, schoolCode, studentId, pin, password } = req.body;
   const requestedRole = normalizeRole(req.body?.role);
   const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
   const settings = db.getSettings();
-  const threshold = settings.lockoutThreshold || 5;
-  const ipThreshold = threshold * 10;
-  const durationMins = settings.lockoutDurationMinutes || 15;
+  const isPortalLogin = ['student', 'parent'].includes(requestedRole || '');
+  const threshold = isPortalLogin ? 5 : settings.lockoutThreshold || 5;
+  const ipThreshold = isPortalLogin ? 5 : threshold * 10;
+  const durationMins = isPortalLogin ? 15 : settings.lockoutDurationMinutes || 15;
 
-  // A. STUDENT & PARENT LOGIN (School Code + Phone Number + PIN)
+  // A. STUDENT (school code + Student ID + PIN) and PARENT (school code + phone + PIN).
   if (requestedRole === 'student' || requestedRole === 'parent') {
     const role = requestedRole;
-    if (!schoolCode || !phone || !pin) {
-      res.status(400).json({ error: 'School code, phone number, and PIN are required.' });
+    const portalStudentId = typeof studentId === 'string' ? studentId.trim().toUpperCase() : '';
+    const portalPhone = typeof phone === 'string' ? phone.replace(/[^0-9]/g, '') : '';
+    if (!schoolCode || !pin || (role === 'student' ? !portalStudentId : !portalPhone) || !/^\d{6}$/.test(String(pin))) {
+      res.status(400).json({ error: role === 'student' ? 'School code, Student ID and 6-digit PIN are required.' : 'School code, phone number and 6-digit PIN are required.' });
       return;
     }
 
     // Rate Limiting & Lockout for Student/Parent
-    const lockKey = `sp:${schoolCode}:${phone.trim()}`;
+    const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
+    const lockKey = role === 'student' ? `sp:${normalizedSchoolCode}:${portalStudentId}` : `sp:${normalizedSchoolCode}:${portalPhone}`;
     const ipKey = `ip:${clientIp}`;
     const lockCheck = db.checkLoginLockout(lockKey, threshold, durationMins);
     const ipCheck = db.checkLoginLockout(ipKey, ipThreshold, durationMins);
+    await db.flush();
 
     if (lockCheck.locked || ipCheck.locked) {
       const waitMins = lockCheck.remainingMinutes || ipCheck.remainingMinutes || 15;
@@ -1026,13 +1054,14 @@ apiRouter.post('/auth/login', async (req, res) => {
     if (!school) {
       const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
       db.recordLoginFailure(ipKey, ipThreshold, durationMins);
+      await db.flush();
       db.logAudit({
         action: 'FAILED_LOGIN_UNKNOWN_SCHOOL', category: 'auth', userId: 'unknown',
-        userName: 'Unknown account', userRole: role,
+        userName: 'Unknown account', userRole: role, ipAddress: clientIp,
         details: `Student/parent login failed for an unknown school code from IP ${clientIp}.`,
         severity: failed.newlyLocked ? 'critical' : 'warning'
       });
-      res.status(failed.newlyLocked ? 429 : 404).json({ error: failed.newlyLocked ? `Too many failed attempts. Try again in ${durationMins} minutes.` : 'Invalid school code. School does not exist.' });
+      res.status(failed.newlyLocked ? 429 : 401).json({ error: failed.newlyLocked ? `Too many failed attempts. Try again in ${durationMins} minutes.` : 'ID or PIN is incorrect.' });
       return;
     }
 
@@ -1042,121 +1071,35 @@ apiRouter.post('/auth/login', async (req, res) => {
       return;
     }
 
-    const matchingUsers = await db.findUsersByPhoneInSchool(phone, school.id);
+    const matchingUsers = role === 'student'
+      ? (await db.getUsers(school.id)).filter(u => normalizeRole(u.role) === 'student' && String(u.studentId || '').trim().toUpperCase() === portalStudentId)
+      : (await db.getParents(school.id)).filter(u => String(u.phone || u.parentPhone || '').replace(/[^0-9]/g, '') === portalPhone);
     const candidateUsers = matchingUsers.filter(u => normalizeRole(u.role) === role).map(u => ({ ...u, role }));
 
     if (candidateUsers.length === 0) {
-      // Check if student or parent exists in student records
-      const students = await db.getStudents(school.id);
-      let guardianStudentIds: string[] = [];
-      if (role === 'parent') {
-        const client = documentServiceClient(res);
-        if (client) {
-          const normalizedPhone = phone.replace(/[^0-9]/g, '');
-          if (normalizedPhone) {
-            const { data: guardian, error: guardianError } = await client.from('guardians').select('id')
-              .eq('school_id', school.id).eq('phone_normalized', normalizedPhone).maybeSingle();
-            if (guardianError) { res.status(503).json({ error: 'Guardian account could not be checked.' }); return; }
-            if (guardian?.id) {
-              const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
-                .eq('school_id', school.id).eq('guardian_id', guardian.id);
-              if (linksError) { res.status(503).json({ error: 'Guardian student links could not be loaded.' }); return; }
-              guardianStudentIds = (links || []).map((link: any) => String(link.student_id));
-            }
-          }
-        } else if (res.headersSent) return;
-      }
-      const matchedStudents = students.filter(student => role === 'student'
-        ? student.studentPhone === phone || student.fatherPhone === phone
-        : student.fatherPhone === phone || student.motherPhone === phone || guardianStudentIds.includes(student.id));
-      const matchStd = matchedStudents.find(student => verifyPin(pin, student.pinHash || (student as any).pin)) || matchedStudents[0];
-
-      if (!matchStd) {
-        const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
-        db.recordLoginFailure(ipKey, ipThreshold, durationMins);
-        db.logAudit({
-          action: 'FAILED_LOGIN_NOT_FOUND',
-          category: 'auth',
-          schoolId: school.id,
-          schoolName: school.name,
-          userId: 'unknown',
-          userName: 'Unknown account',
-          userRole: role,
-          details: `Login failed for non-existent ${role} with phone ${phone} from IP ${clientIp}.`,
-          severity: 'warning'
-        });
-        if (failed.newlyLocked) {
-          res.status(429).json({ error: `Too many failed attempts. Account locked for ${durationMins} minutes.` });
-          return;
-        }
-        res.status(401).json({ error: `No ${role} record found for phone ${phone} at school ${school.name}.` });
-        return;
-      }
-
-      // Check PIN using scrypt verifyPin
-      const isValidPin = verifyPin(pin, matchStd.pinHash || (matchStd as any).pin);
-      if (!isValidPin) {
-        const failedResult = db.recordLoginFailure(lockKey, threshold, durationMins);
-        db.recordLoginFailure(ipKey, ipThreshold, durationMins);
-        db.logAudit({
-          action: 'FAILED_LOGIN_PIN',
-          category: 'auth',
-          schoolId: school.id,
-          schoolName: school.name,
-          userId: 'unknown',
-          userName: 'Unknown account',
-          userRole: role,
-          details: `Incorrect PIN attempt for ${role} (student ${matchStd.studentId}) from IP ${clientIp}. Attempt ${failedResult.count}/${threshold}.`,
-          severity: failedResult.newlyLocked ? 'critical' : 'warning'
-        });
-
-        if (failedResult.newlyLocked) {
-          res.status(429).json({ error: `Too many failed attempts. Account locked for ${durationMins} minutes.` });
-          return;
-        }
-        res.status(401).json({ error: `Incorrect 4-digit PIN. ${threshold - failedResult.count} attempts remaining.` });
-        return;
-      }
-
-      // Successful verification -> Clear rate limits
-      db.clearLoginFailures(lockKey);
-
-      // Find or create user session
-      let existingUser = (await db.getUsers(school.id)).find(u => u.role === role && (u.phone === phone || u.parentPhone === phone));
-      if (!existingUser) {
-        existingUser = db.createUser({
-          schoolId: school.id,
-          role,
-          fullName: role === 'parent' ? `Parent of ${matchStd.firstName}` : `${matchStd.firstName} ${matchStd.lastName}`,
-          phone,
-          studentId: matchStd.studentId,
-          passwordHash: '',
-          pin: matchStd.pinHash,
-          isBlocked: false,
-          failedLoginAttempts: 0,
-          linkedStudentIds: role === 'parent' ? matchedStudents.map(student => student.id) : [matchStd.id]
-        });
-      }
-
-      await issueSessionCookie(res, existingUser, req, school.id);
+      // Portal identities must be provisioned by an administrator at registration
+      // or by an explicit admin-issued legacy backfill. Never create an account
+      // from a student record or let a parent authenticate with a child's PIN.
+      const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
+      db.recordLoginFailure(ipKey, ipThreshold, durationMins);
+      await db.flush();
       db.logAudit({
-        action: 'USER_LOGIN_SUCCESS',
+        action: 'FAILED_LOGIN_NOT_FOUND',
         category: 'auth',
         schoolId: school.id,
         schoolName: school.name,
-        userId: existingUser.id,
-        userName: existingUser.fullName,
-        userRole: existingUser.role,
-        details: `${role} authenticated successfully via PIN from IP ${clientIp}.`,
-        severity: 'info'
+        userId: 'unknown',
+        userName: 'Unknown account',
+        userRole: role,
+        ipAddress: clientIp,
+        details: `Portal login failed because no administrator-provisioned ${role} account matched the supplied identifier. IP ${clientIp}.`,
+        severity: failed.newlyLocked ? 'critical' : 'warning'
       });
-
-      res.json({
-        user: sanitizeUser(existingUser),
-        school,
-        sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
-        linkedStudents: role === 'parent' ? sanitizeStudents(matchedStudents) : undefined
-      });
+      if (failed.newlyLocked) {
+        res.status(429).json({ error: `Too many failed attempts. Try again in ${durationMins} minutes.` });
+        return;
+      }
+      res.status(401).json({ error: 'ID or PIN is incorrect.' });
       return;
     }
 
@@ -1166,8 +1109,19 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     const targetUser = candidateUsers[0];
+    if (role === 'student') {
+      const studentRecord = (await db.getStudents(school.id)).find(student => student.studentId === targetUser.studentId);
+      if (!studentRecord || (studentRecord.status && studentRecord.status !== 'active')) {
+        res.status(403).json({ error: 'This student account is disabled. Contact your school administrator.' });
+        return;
+      }
+    }
 
     // Check user record lockout
+    if (targetUser.isBlocked) {
+      res.status(403).json({ error: 'This account has been disabled. Contact your school administrator.' });
+      return;
+    }
     if (targetUser.lockedUntil && new Date(targetUser.lockedUntil) > new Date()) {
       const waitMins = Math.ceil((new Date(targetUser.lockedUntil).getTime() - Date.now()) / 60000);
       res.status(429).json({ error: `Account locked due to multiple failed logins. Try again in ${waitMins} minutes.` });
@@ -1179,6 +1133,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     const lockResult = await db.handleFailedLogin(targetUser.id);
       db.recordLoginFailure(lockKey, threshold, durationMins);
       db.recordLoginFailure(ipKey, ipThreshold, durationMins);
+      await db.flush();
       db.logAudit({
         action: 'FAILED_LOGIN_PIN',
         category: 'auth',
@@ -1187,6 +1142,7 @@ apiRouter.post('/auth/login', async (req, res) => {
         userId: targetUser.id,
         userName: targetUser.fullName,
         userRole: targetUser.role,
+        ipAddress: clientIp,
         details: `Incorrect PIN for ${role} account from IP ${clientIp}.`,
         severity: lockResult.locked ? 'critical' : 'warning'
       });
@@ -1195,13 +1151,28 @@ apiRouter.post('/auth/login', async (req, res) => {
         res.status(429).json({ error: `Too many incorrect attempts. Account locked for ${durationMins} minutes.` });
         return;
       }
-      res.status(401).json({ error: `Incorrect PIN. ${threshold - lockResult.attempts} attempts remaining.` });
+      res.status(401).json({ error: 'ID or PIN is incorrect.' });
       return;
+    }
+
+    // Upgrade legacy or outdated hashes only after successful verification.
+    // The submitted PIN is never logged or returned by this path.
+    if (pinHashNeedsRehash(String(targetUser.pin || ''))) {
+      const upgradedPinHash = hashPin(String(pin));
+      const upgradedUser = db.updateUser(targetUser.id, { pin: upgradedPinHash });
+      if (upgradedUser) Object.assign(targetUser, upgradedUser);
+      if (role === 'student') {
+        const studentRecord = (await db.getStudents(school.id)).find(student => student.studentId === targetUser.studentId);
+        if (studentRecord) await db.updateStudent(studentRecord.id, { pinHash: upgradedPinHash }, school.id);
+      }
+      await db.flush();
     }
 
     // Success -> Clear failed attempts
     db.handleSuccessfulLogin(targetUser.id);
     db.clearLoginFailures(lockKey);
+    db.clearLoginFailures(ipKey);
+    await db.flush();
 
     // Linked children for parent
     let linkedStudents: any[] = [];
@@ -1212,7 +1183,12 @@ apiRouter.post('/auth/login', async (req, res) => {
       linkedStudents = allStudents.items as any[];
     }
 
-    await issueSessionCookie(res, targetUser, req, school.id);
+    if (targetUser.mustChangePassword) {
+      const challengeToken = createSignedSessionToken({ sessionId: `bootstrap-${randomUUID()}`, userId: targetUser.id, role: targetUser.role, schoolId: school.id, createdAt: Date.now(), expiresAt: Date.now() + 5 * 60 * 1000 });
+      res.json({ requirePinChange: true, challengeToken });
+      return;
+    }
+    await issueSessionCookie(res, targetUser, req, school.id, role === 'parent' && linkedStudents.length === 1 ? linkedStudents[0].id : undefined);
     db.logAudit({
       action: 'USER_LOGIN_SUCCESS',
       category: 'auth',
@@ -1221,6 +1197,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       userId: targetUser.id,
       userName: targetUser.fullName,
       userRole: targetUser.role,
+      ipAddress: clientIp,
       details: `${role} signed in successfully via PIN from IP ${clientIp}.`,
       severity: 'info'
     });
@@ -1229,7 +1206,8 @@ apiRouter.post('/auth/login', async (req, res) => {
       user: sanitizeUser(targetUser),
       school,
       sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
-      linkedStudents: role === 'parent' ? sanitizeStudents(linkedStudents) : undefined
+      linkedStudents: role === 'parent' ? sanitizeStudents(linkedStudents) : undefined,
+      selectedStudentId: role === 'parent' && linkedStudents.length === 1 ? linkedStudents[0].id : null
     });
     return;
   }
@@ -1374,7 +1352,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   // First login: Super Admin must choose a password; School Admin must choose a PIN.
-  if (user.mustChangePassword && ['super_admin', 'school_admin'].includes(user.role)) {
+  if (user.mustChangePassword && ['super_admin', 'school_admin', 'student', 'parent'].includes(user.role)) {
     const challengeToken = createSignedSessionToken({
       sessionId: `bootstrap-${randomUUID()}`,
       userId: user.id,
@@ -1382,9 +1360,9 @@ apiRouter.post('/auth/login', async (req, res) => {
       createdAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000
     });
-    res.json(user.role === 'school_admin'
-      ? { requirePinChange: true, challengeToken }
-      : { requirePasswordChange: true, challengeToken });
+    res.json(user.role === 'super_admin'
+      ? { requirePasswordChange: true, challengeToken }
+      : { requirePinChange: true, challengeToken });
     return;
   }
 
@@ -1395,6 +1373,13 @@ apiRouter.post('/auth/login', async (req, res) => {
   // their existing sign-in flow.
   if (!authUserId && verifiedLegacyPassword && user.role === 'super_admin') {
     await linkLegacyLoginToSupabaseAuth(user, password);
+  }
+
+  // Upgrade legacy staff PIN hashes after successful verification as well.
+  if (user.role !== 'super_admin' && submittedPin && pinHashNeedsRehash(String(user.pin || ''))) {
+    const upgraded = db.updateUser(user.id, { pin: hashPin(submittedPin) });
+    if (upgraded) Object.assign(user, upgraded);
+    await db.flush();
   }
 
   // Success -> Reset failed attempts
@@ -1416,6 +1401,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
+    ipAddress: clientIp,
     details: `${user.role} user logged in successfully from IP ${clientIp}.`,
     severity: 'info'
   });
@@ -1429,6 +1415,13 @@ apiRouter.post('/auth/login', async (req, res) => {
 });
 
 // Logout endpoint (clears HttpOnly cookie)
+apiRouter.post('/auth/logout-all', requireAuth, async (req, res) => {
+  const user = (req as any).user as User;
+  await db.revokeUserSessions(user.id);
+  res.clearCookie('schoolos_session', { path: '/' });
+  res.json({ success: true, message: 'You have been signed out of all sessions.' });
+});
+
 apiRouter.post('/auth/logout', async (req, res) => {
   const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
   const payload = token ? verifySignedSessionToken(token) : null;
@@ -1561,42 +1554,65 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 // School Admin first-login PIN setup. This route is available only in the short-lived bootstrap session.
 apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
-  if (user.role !== 'school_admin' || !user.mustChangePassword) {
-    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });
+  const isPortalPinRole = user.role === 'student' || user.role === 'parent';
+  if (!['school_admin', 'student', 'parent'].includes(user.role) || (!user.mustChangePassword && !isPortalPinRole)) {
+    res.status(403).json({ error: 'PIN setup or change is not available for this account.' });
     return;
   }
+  if (isPortalPinRole && !user.mustChangePassword) {
+    const currentPin = typeof req.body?.currentPin === 'string' ? req.body.currentPin.trim() : '';
+    if (!verifyPin(currentPin, String(user.pin || ''))) {
+      res.status(400).json({ error: 'Current PIN is incorrect.' });
+      return;
+    }
+  }
   const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
-  if (!/^\d{4,6}$/.test(newPin)) {
-    res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' });
+  if (user.role === 'school_admin' ? (!/^\d{4,6}$/.test(newPin) || ['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '1234', '4321'].includes(newPin)) : !isStrongPortalPin(newPin)) {
+    res.status(400).json({ error: 'Choose a strong 6-digit PIN (School Admin may use 4–6 digits).', code: 'PIN_POLICY_FAILED' });
     return;
   }
   if (verifyPin(newPin, String(user.pin || '')) || verifyPassword(newPin, user.passwordHash)) {
-    res.status(400).json({ error: 'Choose a new PIN that is different from your temporary PIN.' });
+    res.status(400).json({ error: 'Choose a new PIN that is different from your current PIN.' });
     return;
   }
   const updated = db.updateUser(user.id, {
     pin: hashPin(newPin),
-    passwordHash: hashPassword(newPin),
+    ...(user.role === 'school_admin' ? { passwordHash: hashPassword(newPin) } : {}),
     mustChangePassword: false
   });
   if (!updated) {
-    res.status(404).json({ error: 'School Admin account not found; PIN was not changed.' });
+    res.status(404).json({ error: 'Account not found; PIN was not changed.' });
     return;
+  }
+  if (user.role === 'student' && user.studentId && user.schoolId) {
+    const studentRecord = (await db.getStudents(user.schoolId)).find(student => student.studentId === user.studentId);
+    if (!studentRecord) { res.status(403).json({ error: 'Student record is not linked to this account.' }); return; }
+    await db.updateStudent(studentRecord.id, { pinHash: hashPin(newPin) }, user.schoolId);
   }
   invalidateAuthenticatedSnapshot(user.id);
   await db.flush();
+  await db.revokeUserSessions(user.id);
+  const currentSession = (req as any).sessionPayload;
+  const retainedChildId = user.role === 'parent'
+    && currentSession?.selectedStudentId
+    && await hasParentStudentLink(user, String(currentSession.selectedStudentId), String(user.schoolId || ''))
+      ? String(currentSession.selectedStudentId)
+      : undefined;
   db.logAudit({
     action: 'PIN_CHANGED',
     category: 'auth',
     schoolId: user.schoolId,
     userId: user.id,
     userName: user.fullName,
-    userRole: 'school_admin',
-    details: 'School Admin completed first-login PIN setup.',
+    userRole: user.role,
+    ipAddress: req.ip,
+    details: `${user.role} completed first-login PIN setup.`,
     severity: 'info'
   });
   await db.flush();
-  await issueSessionCookie(res, updated, req);
+  // Issue exactly one replacement session after revoking the old sessions.
+  // Preserve the already-verified selected child for multi-child parents.
+  await issueSessionCookie(res, updated, req, user.schoolId, retainedChildId);
   res.json({ success: true, message: 'PIN set successfully.' });
 });
 
@@ -1657,7 +1673,29 @@ apiRouter.get('/auth/me', requireAuth, async (req, res) => {
   const sessionUser = user.role === 'accountant'
     ? { ...user, permissions: staff?.status === 'active' && Array.isArray(staff.permissions) ? staff.permissions : [] }
     : user;
-  res.json({ user: sanitizeUser(sessionUser), school, sessionTimeoutMinutes: db.getSettings().sessionTimeoutMinutes || 60 });
+  res.json({ user: sanitizeUser(sessionUser), school, sessionTimeoutMinutes: ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : db.getSettings().sessionTimeoutMinutes || 60, selectedStudentId: (req as any).sessionPayload?.selectedStudentId || null });
+});
+
+apiRouter.post('/parent/select-child', requireAuth, requireSchoolContext, async (req, res) => {
+  const user = (req as any).user as User;
+  if (user.role !== 'parent') { res.status(403).json({ error: 'Only parent accounts can select a child.' }); return; }
+  const payload = (req as any).sessionPayload;
+  if (!payload) { res.status(401).json({ error: 'Your session has expired. Sign in again.' }); return; }
+  const requestedStudentId = typeof req.body?.studentId === 'string' ? req.body.studentId.trim() : '';
+  const { selectedStudentId: _previousSelection, ...basePayload } = payload;
+  if (requestedStudentId && !await canAccessStudentRecord(user, requestedStudentId)) {
+    res.status(403).json({ error: 'This child is not linked to your parent account.' });
+    return;
+  }
+  const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const nextPayload = { ...basePayload, ...(requestedStudentId ? { selectedStudentId: requestedStudentId } : {}), expiresAt };
+  const token = createSignedSessionToken(nextPayload);
+  await db.touchSession(payload.sessionId, new Date(expiresAt).toISOString());
+  res.cookie('schoolos_session', token, {
+    httpOnly: true, secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60 * 1000
+  });
+  res.json({ success: true, selectedStudentId: requestedStudentId || null });
 });
 
 apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
@@ -1670,7 +1708,15 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     res.status(400).json({ error: 'Staff accounts use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
   }
   if (!['school_admin', 'teacher', 'accountant'].includes(user.role) && newPin) {
-    res.status(400).json({ error: 'PIN changes are only available for staff accounts.' }); return;
+    res.status(400).json({ error: 'Portal PIN changes must use the verified current-PIN flow.' }); return;
+  }
+  if (user.role === 'parent' && typeof phone === 'string') {
+    const currentParentPhone = String(user.phone || user.parentPhone || '').replace(/[^0-9]/g, '');
+    const requestedParentPhone = phone.replace(/[^0-9]/g, '');
+    if (requestedParentPhone !== currentParentPhone) {
+      res.status(403).json({ error: 'Only the school administrator can change a parent phone number.' });
+      return;
+    }
   }
   if (newPin !== undefined && newPin !== '') {
     if (typeof newPin !== 'string' || !/^\d{4,6}$/.test(newPin)) {
@@ -1703,9 +1749,14 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     res.status(503).json({ error: 'The linked authentication account could not be updated. No local profile changes were saved.' });
     return;
   }
-  const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
+  const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined };
+  if (user.role !== 'parent') updates.phone = typeof phone === 'string' ? phone.trim() : '';
   if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
-  if (newPin) { updates.pin = hashPin(newPin); updates.passwordHash = hashPassword(newPin); updates.mustChangePassword = false; }
+  if (newPin) {
+    updates.pin = hashPin(newPin);
+    if (['school_admin', 'teacher', 'accountant'].includes(user.role)) updates.passwordHash = hashPassword(newPin);
+    updates.mustChangePassword = false;
+  }
   const updated = db.updateUser(user.id, updates);
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
@@ -2688,7 +2739,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     const names = splitStudentName(row.data.studentName);
     const id = `std-${randomUUID()}`;
     const studentId = newStudentIds[rowIndex];
-    const pin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
+    const pin = generateTemporaryPin();
     const pinHash = hashPin(pin);
     const classId = classIds.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`)!;
     const klass = classes.find(item => item.id === classId) || classPayload.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`);
@@ -2709,7 +2760,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
           [item.phone, item.parentPhone].some(value => String(value || '').replace(/\D/g, '') === phoneKey)
         );
         const existingPinHash = parent?.pin || (parent as any)?.pinHash;
-        const parentPin = existingPinHash ? undefined : String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
+        const parentPin = existingPinHash ? undefined : generateTemporaryPin();
         parentRecord = {
           id: parent?.id || ('usr-parent-' + randomUUID()),
           schoolId: school.id,
@@ -2732,12 +2783,25 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     classes: classRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, name: item.name, class_code: item.classCode, academic_year: item.academicYear, grade_level: item.gradeLevel, section: item.section, shift: item.shift, room_number: item.roomNumber, capacity: item.capacity, monthly_fee: item.monthlyFee })),
     students: studentRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, student_id: item.studentId, first_name: item.firstName, middle_name: item.middleName, last_name: item.lastName, gender: item.gender, admission_date: item.admissionDate, student_phone: item.studentPhone, father_phone: item.fatherPhone, father_name: item.fatherName, address: item.address, mother_phone: null, class_id: item.classId, section: item.section, status: item.status || 'active', pin_hash: item.pinHash })),
     users: userRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, role: item.role, full_name: item.fullName, phone: item.phone, parent_phone: item.parentPhone, student_id: item.studentId, linked_student_ids: item.linkedStudentIds, pin_hash: item.pin })),
-    audit_logs: [{ id: auditId, action: 'SCHOOL_BULK_IMPORT', category: 'school', school_id: school.id, school_name: school.name, user_id: user.id, user_name: user.fullName, user_role: user.role, details: `Bulk import completed: ${studentRecords.length} students, ${classRecords.length} classes, ${parentRecords.size} parent accounts.` }]
+    audit_logs: [{ id: auditId, action: 'SCHOOL_BULK_IMPORT', category: 'school', school_id: school.id, school_name: school.name, user_id: user.id, user_name: user.fullName, user_role: user.role, ip_address: req.ip, details: `Bulk import completed: ${studentRecords.length} students, ${classRecords.length} classes, ${parentRecords.size} parent accounts.` }]
   };
   try {
     await db.bulkImportStudents(payload);
   } catch {
     res.status(500).json({ error: 'Import failed. No records were written; please retry.' }); return;
+  }
+  try {
+    for (const parentRecord of parentRecords.values()) {
+      for (const studentRecord of studentRecords) {
+        if (parentRecord.linkedStudentIds?.includes(studentRecord.id)) {
+          await db.linkParentToStudent(parentRecord.id, studentRecord.id, school.id, 'guardian', user.id, user.role, req.ip);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[auth] Bulk import parent links need reconciliation:', error instanceof Error ? error.message : 'unknown error');
+    res.status(503).json({ error: 'Import data was saved, but parent links need administrator reconciliation. Do not repeat the import.' });
+    return;
   }
   res.json({ success: true, counts: { classes: classRecords.length, students: studentRecords.length, parents: parentRecords.size, skipped: validated.totals.skipped }, pinSlips });
 });
@@ -5594,9 +5658,12 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
     if (!assigned.length) { res.json([]); return; }
     filters.class_id = classId || assigned;
   } else if (user.role === 'student') {
-    const terms = [user.studentId ? `student_id.eq.${user.studentId}` : '', user.phone ? `student_phone.eq.${user.phone}` : ''].filter(Boolean);
-    if (!terms.length) { res.json([]); return; }
-    roleFilter = terms.join(',');
+    // Student identity is the school-scoped Student ID only. A phone number
+    // may be shared by siblings or fall back to a guardian contact, so it must
+    // never broaden an individual student's record scope.
+    const studentId = String(user.studentId || '').trim();
+    if (!studentId) { res.json([]); return; }
+    roleFilter = `student_id.eq.${studentId}`;
   } else if (user.role === 'parent') {
     const ids = await getParentLinkedStudentIds(school.id, user.id);
     if (!ids.length) { res.json([]); return; }
@@ -5960,8 +6027,8 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!validImportPhone(guardianPhone) || typeof studentPhone !== 'string' || studentPhone.length > 30 || (studentPhone.trim() && !validImportPhone(studentPhone.trim())) || typeof motherPhone !== 'string' || motherPhone.length > 30 || (motherPhone.trim() && !validImportPhone(motherPhone.trim()))) {
     res.status(400).json({ error: 'Guardian and student phone numbers must be valid international numbers.' }); return;
   }
-  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{4}$/.test(body.pin))) {
-    res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
+  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{6}$/.test(body.pin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(body.pin))) {
+    res.status(400).json({ error: 'Student PIN must be a strong 6-digit number.' }); return;
   }
   const isDate = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
@@ -5971,8 +6038,8 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     res.status(400).json({ error: 'Address must be 500 characters or fewer.' }); return;
   }
 
-  const initialPin = typeof body.pin === 'string' ? body.pin : String(randomInt(1000, 10000));
-  const student = await db.createStudentAtomically({
+  const initialPin = typeof body.pin === 'string' ? body.pin : generateTemporaryPin();
+  let student = await db.createStudentAtomically({
     school_id: school.id,
     branch_id: branchId || null,
     first_name: body.firstName.trim(),
@@ -5993,24 +6060,114 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     created_by_role: user.role,
     school_name: school.name
   });
+
+  // Keep the second guardian phone as a separate school-scoped parent identity.
+  // Existing normalized phone accounts are reused; a new mother account receives
+  // the same one-time temporary PIN as the student and must rotate it on first use.
+  try {
+    if (motherPhone.trim()) {
+      const updatedStudent = await db.updateStudent(student.id, { motherPhone: motherPhone.trim() }, school.id);
+      if (!updatedStudent) throw new Error('Student was created but the mother phone could not be saved.');
+      student = updatedStudent;
+    }
+    const normalizeGuardianPhone = (value: string) => value.replace(/[^0-9]/g, '');
+    const parentAccounts = await db.getParents(school.id);
+    const guardianAccount = parentAccounts.find(parent =>
+      normalizeGuardianPhone(String(parent.phone || parent.parentPhone || '')) === normalizeGuardianPhone(guardianPhone)
+    );
+    if (guardianAccount) await db.linkParentToStudent(guardianAccount.id, student.id, school.id, 'guardian', user.id, user.role, req.ip);
+
+    if (motherPhone.trim() && normalizeGuardianPhone(motherPhone) !== normalizeGuardianPhone(guardianPhone)) {
+      let motherAccount = parentAccounts.find(parent =>
+        normalizeGuardianPhone(String(parent.phone || parent.parentPhone || '')) === normalizeGuardianPhone(motherPhone)
+      );
+      if (!motherAccount) {
+        motherAccount = db.createUser({
+          schoolId: school.id,
+          role: 'parent',
+          fullName: `Parent of ${student.firstName}`,
+          phone: motherPhone.trim(),
+          parentPhone: motherPhone.trim(),
+          passwordHash: '',
+          pin: hashPin(initialPin),
+          isBlocked: false,
+          mustChangePassword: true,
+          failedLoginAttempts: 0,
+          linkedStudentIds: []
+        });
+      }
+      await db.linkParentToStudent(motherAccount.id, student.id, school.id, 'mother', user.id, user.role, req.ip);
+    }
+    await db.flush();
+  } catch (error) {
+    console.error('[auth] Parent-student relationship setup failed after student registration:', error instanceof Error ? error.message : 'unknown error');
+    res.status(503).json({
+      error: 'Student was registered, but a parent link could not be completed. Do not register the student again; contact the school administrator.',
+      student: sanitizeStudent(student),
+      initialPin
+    });
+    return;
+  }
+
   res.status(201).json({ ...sanitizeStudent(student), initialPin });
 });
 
-apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
-  const school = (req as any).school;
-  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\d{4}$/.test(req.body.customPin))) {
-    res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
-  }
-  const result = await db.resetStudentPin(req.params.id, school.id, req.body?.customPin);
-  if (!result) {
-    res.status(404).json({ error: 'Student not found.' });
+apiRouter.post('/parents/:id/phone', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const actor = (req as any).user as User;
+  const parent = await db.getUserById(String(req.params.id || ''), school.id);
+  if (!parent || parent.role !== 'parent') { res.status(404).json({ error: 'Parent account was not found in this school.' }); return; }
+  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  if (!validImportPhone(phone)) { res.status(400).json({ error: 'Enter a valid international phone number.' }); return; }
+  const normalized = phone.replace(/[^0-9]/g, '');
+  const oldNormalized = String(parent.phone || parent.parentPhone || '').replace(/[^0-9]/g, '');
+  const duplicate = (await db.getParents(school.id)).some(row => row.id !== parent.id
+    && String(row.phone || row.parentPhone || '').replace(/[^0-9]/g, '') === normalized);
+  if (duplicate) { res.status(409).json({ error: 'This phone number is already used by another parent account in this school.' }); return; }
+  const updated = db.updateUser(parent.id, { phone, parentPhone: phone });
+  if (oldNormalized && school.code) db.clearLoginFailures(`sp:${school.code.trim().toUpperCase()}:${oldNormalized}`);
+  if (!updated) { res.status(404).json({ error: 'Parent account was not updated.' }); return; }
+  db.logAudit({
+    action: 'PARENT_PHONE_CHANGED', category: 'auth', schoolId: school.id,
+    userId: actor.id, userName: actor.fullName, userRole: actor.role, ipAddress: req.ip,
+    details: `Parent phone number updated for parent account ${parent.id}.`, severity: 'warning'
+  });
+  await db.flush();
+  res.json({ success: true, parent: sanitizeUser(updated) });
+});
+
+apiRouter.post('/parents/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const actor = (req as any).user as User;
+  const result = await db.resetParentPin(String(req.params.id || ''), school.id, { id: actor.id, name: actor.fullName, role: actor.role, ipAddress: req.ip });
+  if (!result) { res.status(404).json({ error: 'Parent account was not found in this school.' }); return; }
+  res.json({ success: true, newPin: result.newPin, parent: sanitizeUser(result.parent) });
+});
+
+apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  const student = await db.getStudentById(req.params.id, school.id);
+  if (!student) { res.status(404).json({ error: 'Student not found.' }); return; }
+
+  if (user.role === 'teacher') {
+    const formTeacherClassIds = await getTeacherFormTeacherClassIds(school.id, user.id);
+    const currentClassId = await getStudentCurrentClassId(school.id, student.id, student.classId);
+    if (!currentClassId || !formTeacherClassIds.includes(currentClassId)) {
+      res.status(403).json({ error: 'Only this student’s Form Teacher can reset the student PIN.' });
+      return;
+    }
+  } else if (!['school_admin', 'super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'Only a School Admin or the student’s Form Teacher can reset a student PIN.' });
     return;
   }
-  res.json({
-    success: true,
-    newPin: result.newPin,
-    student: sanitizeStudent(result.student)
-  });
+
+  if (req.body?.customPin !== undefined && !isStrongPortalPin(req.body.customPin)) {
+    res.status(400).json({ error: 'Student PIN must be a strong 6-digit number.' }); return;
+  }
+  const result = await db.resetStudentPin(student.id, school.id, req.body?.customPin, { id: user.id, name: user.fullName, role: user.role, ipAddress: req.ip });
+  if (!result) { res.status(404).json({ error: 'Student not found.' }); return; }
+  res.json({ success: true, newPin: result.newPin, student: sanitizeStudent(result.student) });
 });
 
 apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -6034,16 +6191,16 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
     if (seenStudents.has(studentId)) {
       res.status(400).json({ error: `Duplicate Student ID: ${studentId}.` }); return;
     }
-    if (suppliedPin && !/^\d{4}$/.test(suppliedPin)) {
-      res.status(400).json({ error: `PIN for ${studentId} must contain exactly four digits.` }); return;
+    if (suppliedPin && !isStrongPortalPin(suppliedPin)) {
+      res.status(400).json({ error: `PIN for ${studentId} must be a strong 6-digit number.` }); return;
     }
-    let pin = suppliedPin || String(randomInt(1000, 10000));
+    let pin = suppliedPin || generateTemporaryPin();
     if (seenPins.has(pin)) {
       if (suppliedPin) {
         res.status(400).json({ error: 'Each custom PIN in the file must be unique.' }); return;
       }
       let attempts = 0;
-      while (seenPins.has(pin) && attempts < 100) { pin = String(randomInt(1000, 10000)); attempts += 1; }
+      while (seenPins.has(pin) && attempts < 100) { pin = generateTemporaryPin(); attempts += 1; }
       if (seenPins.has(pin)) { res.status(503).json({ error: 'Could not generate unique PINs. Please retry.' }); return; }
     }
     seenStudents.add(studentId);
@@ -6058,6 +6215,7 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
       changed_by: user.id,
       changed_by_name: user.fullName,
       changed_by_role: user.role,
+      changed_by_ip: req.ip,
       students: rows
     });
     const updatedStudents = Array.isArray(result.students) ? result.students : [];
@@ -6726,7 +6884,7 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolConte
   // The RPC locks both the pending application and class row, then inserts the
   // student, student login, parent links and audit record in one transaction.
   // The initial PIN is generated and hashed here; only this response exposes it.
-  const initialPin = randomInt(1000, 10000).toString();
+  const initialPin = generateTemporaryPin();
   const studentId = (await nextSchoolStudentIds(school.id, 1))[0];
   const studentRecordId = randomUUID();
   try {
