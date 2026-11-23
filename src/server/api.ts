@@ -5808,6 +5808,13 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   res.status(201).json({ ...sanitizeStudent(student), initialPin });
 });
 
+apiRouter.post('/parents/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const result = await db.resetParentPin(String(req.params.id || ''), school.id);
+  if (!result) { res.status(404).json({ error: 'Parent account was not found in this school.' }); return; }
+  res.json({ success: true, newPin: result.newPin, parent: sanitizeUser(result.parent) });
+});
+
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
