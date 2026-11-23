@@ -42,8 +42,9 @@ test('parent portal loads all children authorized by the server, including linke
   const api = read('../src/server/api.ts');
   const client = read('../src/services/api.ts');
   assert.match(portal, /ApiClient\.getAllStudents\(\)/);
-  assert.match(api, /user\.phone, user\.parentPhone/);
-  assert.match(api, /guardianStudentIds/);
+  assert.match(api, /async function getParentStudentIds/);
+  assert.match(api, /parent_id: user\.id, school_id: schoolId/);
+  assert.match(api, /hasParentStudentLink/);
   assert.match(client, /for \(let page = 2; page <= totalPages; page \+= 1\)/);
 });
 
