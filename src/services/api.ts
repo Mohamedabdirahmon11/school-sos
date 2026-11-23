@@ -220,6 +220,10 @@ export class ApiClient {
     });
   }
 
+  public static async logoutEverywhere() {
+    return this.request<{ success: boolean; message: string }>('/auth/logout-all', { method: 'POST' });
+  }
+
   public static async logout() {
     return this.request<{ success: boolean; message: string }>('/auth/logout', {
       method: 'POST'
