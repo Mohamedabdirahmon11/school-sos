@@ -6,7 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['teacher-portal.visual.spec.ts', 'school-setup.visual.spec.ts', 'student-portal.visual.spec.ts'],
+  testMatch: ['teacher-portal.visual.spec.ts', 'school-setup.visual.spec.ts', 'student-portal.visual.spec.ts', 'login.visual.spec.ts'],
   outputDir: path.join(root, 'artifacts', 'playwright-results'),
   timeout: 180_000,
   expect: { timeout: 10_000 },
