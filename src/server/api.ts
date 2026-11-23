@@ -1497,9 +1497,17 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 // School Admin first-login PIN setup. This route is available only in the short-lived bootstrap session.
 apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
-  if (!['school_admin', 'student', 'parent'].includes(user.role) || !user.mustChangePassword) {
-    res.status(403).json({ error: 'PIN setup is only available during first login for this account.' });
+  const isPortalPinRole = user.role === 'student' || user.role === 'parent';
+  if (!['school_admin', 'student', 'parent'].includes(user.role) || (!user.mustChangePassword && !isPortalPinRole)) {
+    res.status(403).json({ error: 'PIN setup or change is not available for this account.' });
     return;
+  }
+  if (isPortalPinRole && !user.mustChangePassword) {
+    const currentPin = typeof req.body?.currentPin === 'string' ? req.body.currentPin.trim() : '';
+    if (!verifyPin(currentPin, String(user.pin || ''))) {
+      res.status(400).json({ error: 'Current PIN is incorrect.' });
+      return;
+    }
   }
   const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
   if (user.role === 'school_admin' ? (!/^\d{4,6}$/.test(newPin) || ['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '1234', '4321'].includes(newPin)) : !isStrongPortalPin(newPin)) {
@@ -1507,7 +1515,7 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     return;
   }
   if (verifyPin(newPin, String(user.pin || '')) || verifyPassword(newPin, user.passwordHash)) {
-    res.status(400).json({ error: 'Choose a new PIN that is different from your temporary PIN.' });
+    res.status(400).json({ error: 'Choose a new PIN that is different from your current PIN.' });
     return;
   }
   const updated = db.updateUser(user.id, {
@@ -1527,6 +1535,13 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   invalidateAuthenticatedSnapshot(user.id);
   await db.flush();
   await db.revokeUserSessions(user.id);
+  const currentSession = (req as any).sessionPayload;
+  const retainedChildId = user.role === 'parent'
+    && currentSession?.selectedStudentId
+    && await hasParentStudentLink(user, String(currentSession.selectedStudentId), String(user.schoolId || ''))
+      ? String(currentSession.selectedStudentId)
+      : undefined;
+  await issueSessionCookie(res, updated, req, user.schoolId, retainedChildId);
   db.logAudit({
     action: 'PIN_CHANGED',
     category: 'auth',
@@ -1634,8 +1649,16 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   if (['school_admin', 'teacher', 'accountant'].includes(user.role) && newPassword) {
     res.status(400).json({ error: 'Staff accounts use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
   }
-  if (!['school_admin', 'teacher', 'accountant'].includes(user.role) && newPin) {
-    res.status(400).json({ error: 'PIN changes are only available for staff accounts.' }); return;
+  if (!['school_admin', 'teacher', 'accountant', 'student', 'parent'].includes(user.role) && newPin) {
+    res.status(400).json({ error: 'PIN changes are not available for this account.' }); return;
+  }
+  if (user.role === 'parent' && typeof phone === 'string') {
+    const currentParentPhone = String(user.phone || user.parentPhone || '').replace(/[^0-9]/g, '');
+    const requestedParentPhone = phone.replace(/[^0-9]/g, '');
+    if (requestedParentPhone !== currentParentPhone) {
+      res.status(403).json({ error: 'Only the school administrator can change a parent phone number.' });
+      return;
+    }
   }
   if (newPin !== undefined && newPin !== '') {
     if (typeof newPin !== 'string' || !/^\d{4,6}$/.test(newPin)) {
@@ -1668,9 +1691,14 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
     res.status(503).json({ error: 'The linked authentication account could not be updated. No local profile changes were saved.' });
     return;
   }
-  const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined, phone: typeof phone === 'string' ? phone.trim() : '' };
+  const updates: Partial<User> = { fullName: fullName.trim(), email: cleanEmail || undefined };
+  if (user.role !== 'parent') updates.phone = typeof phone === 'string' ? phone.trim() : '';
   if (newPassword) { updates.passwordHash = hashPassword(newPassword); updates.mustChangePassword = false; }
-  if (newPin) { updates.pin = hashPin(newPin); updates.passwordHash = hashPassword(newPin); updates.mustChangePassword = false; }
+  if (newPin) {
+    updates.pin = hashPin(newPin);
+    if (['school_admin', 'teacher', 'accountant'].includes(user.role)) updates.passwordHash = hashPassword(newPin);
+    updates.mustChangePassword = false;
+  }
   const updated = db.updateUser(user.id, updates);
   if (!updated) { res.status(404).json({ error: 'User profile not found.' }); return; }
   invalidateAuthenticatedSnapshot(user.id);
