@@ -74,7 +74,7 @@ test('student registration generates IDs server-side and reuses one normalized g
   const first = await firstResponse.json() as any;
   assert.match(first.studentId, /^S\d{3,}$/);
   assert.notEqual(first.studentId, 'CLIENT-SUPPLIED-001');
-  assert.match(first.initialPin, /^\d{4}$/);
+  assert.match(first.initialPin, /^\d{6}$/);
   const firstStudent = memory.rows('students').find(row => row.student_id === first.studentId);
   assert.ok(firstStudent);
   assert.equal(firstStudent.address, 'Jijiga');
@@ -129,7 +129,7 @@ test('bulk student PIN reset returns one-time PINs and stores hashes for the sel
   assert.equal(result.pinSlips.length, 1);
   assert.equal(result.pinSlips[0].studentId, studentId);
   assert.equal(result.pinSlips[0].studentName, 'Muna Amina Hassan');
-  assert.match(result.pinSlips[0].newPin, /^[0-9]{4}$/);
+  assert.match(result.pinSlips[0].newPin, /^[0-9]{6}$/);
 
   const student = memory.rows('students').find(row => row.student_id === studentId);
   const studentUser = memory.rows('users').find(row => row.student_id === studentId && row.role === 'student');
