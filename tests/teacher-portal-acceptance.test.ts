@@ -200,6 +200,21 @@ test('15.10a parent child directory returns only canonical linked students in th
   assert.equal(payload.data.children.some((child: any) => child.id === otherStudent.id), false);
 });
 
+test('15.10aa teacher attendance writes invalidate the parent child-summary cache', async () => {
+  const beforeResponse = await request('/parent/children', cookies.parent);
+  assert.equal(beforeResponse.status, 200, await beforeResponse.clone().text());
+  const before = (await beforeResponse.json() as any).data.children.find((child: any) => child.id === student.id);
+  assert.ok(before);
+  const saved = await postJson('/attendance', cookies.form, { classId: klass.id, date: today, records: [{ studentId: student.id, status: 'present' }] });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  const afterResponse = await request('/parent/children', cookies.parent);
+  assert.equal(afterResponse.status, 200, await afterResponse.clone().text());
+  const after = (await afterResponse.json() as any).data.children.find((child: any) => child.id === student.id);
+  assert.equal(after.attendanceSummary.present, before.attendanceSummary.present + (before.attendanceSummary.late || before.attendanceSummary.absent ? 1 : 0));
+  assert.equal(after.attendanceSummary.late, 0);
+  assert.equal(after.attendanceSummary.absent, 0);
+});
+
 test('15.10b parent cannot read attendance or homework for an unlinked student', async () => {
   const attendance = await request('/attendance/student?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
   assert.equal(attendance.status, 403);
