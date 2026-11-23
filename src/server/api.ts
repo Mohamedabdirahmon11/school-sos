@@ -706,6 +706,11 @@ async function getParentLinkedStudentIds(schoolId: string, parentId: string): Pr
   return [...new Set(links.items.filter((row: any) => !row.revokedAt).map((row: any) => String(row.studentId || '')).filter(Boolean))];
 }
 
+async function hasParentStudentLink(user: User, studentId: string, schoolId: string): Promise<boolean> {
+  if (user.role !== 'parent' || user.schoolId !== schoolId) return false;
+  return (await getParentLinkedStudentIds(schoolId, user.id)).includes(studentId);
+}
+
 async function getParentSelectedClassId(schoolId: string, parentId: string, studentId: string): Promise<string | null> {
   if (!studentId || !/^[A-Za-z0-9_-]{1,64}$/.test(studentId)) return null;
   const linkedIds = await getParentLinkedStudentIds(schoolId, parentId);

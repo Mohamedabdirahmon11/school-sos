@@ -1720,18 +1720,21 @@ export class ApiClient {
     return this.request<any[]>(`/messages?${query.toString()}`);
   }
 
-  public static async getMessageContacts() {
-    return this.request<any[]>('/messages/contacts');
+  public static async getMessageContacts(params?: { studentId?: string }) {
+    const endpoint = params?.studentId
+      ? '/messages/contacts?studentId=' + encodeURIComponent(params.studentId)
+      : '/messages/contacts';
+    return this.request<any[]>(endpoint);
   }
 
-  public static async markMessagesRead(contactId: string) {
-    return this.request<{ success: boolean }>('/messages/read', { method: 'POST', body: JSON.stringify({ contactId }) });
+  public static async markMessagesRead(contactId: string, studentId?: string) {
+    return this.request<{ success: boolean }>('/messages/read', { method: 'POST', body: JSON.stringify({ contactId, ...(studentId ? { studentId } : {}) }) });
   }
 
-  public static async sendMessage(recipientId: string, recipientName: string, recipientRole: string, content: string) {
+  public static async sendMessage(recipientId: string, recipientName: string, recipientRole: string, content: string, studentId?: string) {
     return this.request<any>('/messages', {
       method: 'POST',
-      body: JSON.stringify({ recipientId, recipientName, recipientRole, content })
+      body: JSON.stringify({ recipientId, recipientName, recipientRole, content, ...(studentId ? { studentId } : {}) })
     });
   }
 
