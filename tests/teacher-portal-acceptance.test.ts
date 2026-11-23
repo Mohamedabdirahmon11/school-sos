@@ -242,12 +242,14 @@ test('15.16 Form Teacher can reset only students in their own class without chan
     mustChangePassword: false
   });
   parentUser.pin = auth.hashPin('876543');
+  await memory.from('classes').update({ class_teacher_id: formTeacherUser.id, is_archived: false }).eq('id', klass.id);
+  await memory.from('students').update({ class_id: klass.id }).eq('id', student.id);
   await db.flush();
 
   const allowed = await request(`/students/${student.id}/reset-pin`, cookies.form, {
     method: 'POST', body: JSON.stringify({})
   });
-  assert.equal(allowed.status, 200);
+  assert.equal(allowed.status, 200, await allowed.clone().text());
   const receipt = await allowed.json() as any;
   assert.match(receipt.newPin, /^\\d{6}$/);
   assert.equal(studentUser.mustChangePassword, true);
