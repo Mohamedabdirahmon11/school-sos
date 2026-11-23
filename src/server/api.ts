@@ -683,8 +683,12 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
     return assignment.items.length > 0;
   }
   if (user.role === 'parent') {
-    const parentPhones = [user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone));
-    return Boolean(user.linkedStudentIds?.includes(student.id) || parentPhones.includes(student.fatherPhone || '') || parentPhones.includes(student.motherPhone || ''));
+    // Never trust a caller-selected child, cached UI state, phone match, or
+    // linkedStudentIds alone. The tenant-scoped relationship table is authoritative.
+    const relationship = await db.queryPage('parent_students', {
+      parent_id: user.id, student_id: student.id, school_id: student.schoolId
+    }, 1, 1, undefined, 'parent_id');
+    return relationship.items.length === 1;
   }
   if (user.role === 'student') return Boolean(user.studentId === student.studentId || student.id === user.id.replace(/^usr-student-/, 'std-'));
   return false;
