@@ -259,6 +259,8 @@ test('15.10a1 parent message contacts are limited to the selected linked child',
   const own = await ownContacts.json() as any[];
   assert.ok(own.some(contact => contact.id === subjectTeacherUser.id && contact.canSend === true));
   assert.equal(own.some(contact => contact.id === otherTeacherUser.id && contact.canSend === true), false);
+  const sent = await postJson('/messages', cookies.parent, { recipientId: subjectTeacherUser.id, studentId: student.id, content: 'Message for my selected child.' });
+  assert.equal(sent.status, 200, await sent.clone().text());
   const unrelated = await request('/messages/contacts?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
   assert.equal(unrelated.status, 403);
 });
