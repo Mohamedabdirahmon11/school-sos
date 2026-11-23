@@ -1919,9 +1919,7 @@ class StorageEngine {
       linkedUser.failedLoginAttempts = 0;
       linkedUser.lockedUntil = null;
       authContextCache.delete(linkedUser.id);
-      const revokedIds = this.data.sessions.filter(session => session.userId === linkedUser.id).map(session => session.id);
-      this.data.sessions = this.data.sessions.filter(session => session.userId !== linkedUser.id);
-      for (const sessionId of revokedIds) authSessionValidationCache.delete(sessionId);
+      await this.revokeUserSessions(linkedUser.id);
     }
 
     this.logAudit({
@@ -1991,9 +1989,7 @@ class StorageEngine {
     });
     if (!updated) return null;
     authContextCache.delete(parent.id);
-    const revokedIds = this.data.sessions.filter(session => session.userId === parent.id).map(session => session.id);
-    this.data.sessions = this.data.sessions.filter(session => session.userId !== parent.id);
-    for (const sessionId of revokedIds) authSessionValidationCache.delete(sessionId);
+    await this.revokeUserSessions(parent.id);
     this.logAudit({
       action: 'PARENT_PIN_RESET',
       category: 'security',
