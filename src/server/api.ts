@@ -1002,7 +1002,7 @@ apiRouter.post('/auth/login', async (req, res) => {
         details: `Student/parent login failed for an unknown school code from IP ${clientIp}.`,
         severity: failed.newlyLocked ? 'critical' : 'warning'
       });
-      res.status(failed.newlyLocked ? 429 : 404).json({ error: failed.newlyLocked ? `Too many failed attempts. Try again in ${durationMins} minutes.` : 'Invalid school code. School does not exist.' });
+      res.status(failed.newlyLocked ? 429 : 401).json({ error: failed.newlyLocked ? `Too many failed attempts. Try again in ${durationMins} minutes.` : 'ID or PIN is incorrect.' });
       return;
     }
 
@@ -1088,7 +1088,7 @@ apiRouter.post('/auth/login', async (req, res) => {
           res.status(429).json({ error: `Too many failed attempts. Account locked for ${durationMins} minutes.` });
           return;
         }
-        res.status(401).json({ error: `Incorrect 4-digit PIN. ${threshold - failedResult.count} attempts remaining.` });
+        res.status(401).json({ error: 'ID or PIN is incorrect.' });
         return;
       }
 
@@ -1179,7 +1179,7 @@ apiRouter.post('/auth/login', async (req, res) => {
         res.status(429).json({ error: `Too many incorrect attempts. Account locked for ${durationMins} minutes.` });
         return;
       }
-      res.status(401).json({ error: `Incorrect PIN. ${threshold - lockResult.attempts} attempts remaining.` });
+      res.status(401).json({ error: 'ID or PIN is incorrect.' });
       return;
     }
 
