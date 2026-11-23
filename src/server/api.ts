@@ -10741,8 +10741,8 @@ async function familyDocumentStudentIds(schoolId:string,user:User):Promise<strin
   try{
     const schoolStudents=await db.getStudents(schoolId);
     if(user.role==='student')return schoolStudents.filter(student=>Boolean(user.studentId)&&student.studentId===user.studentId).map(student=>student.id);
-    const phones=new Set([user.phone,user.parentPhone].filter((value):value is string=>Boolean(value)));
-    return schoolStudents.filter(student=>user.linkedStudentIds?.includes(student.id)||phones.has(student.fatherPhone||'')||phones.has(student.motherPhone||'')).map(student=>student.id);
+    const linkedIds = new Set(await getParentStudentIds(user, schoolId));
+    return schoolStudents.filter(student => linkedIds.has(student.id)).map(student => student.id);
   }catch{return []}
 }
 async function familyDocumentAllowed(schoolId:string,user:User,document:any):Promise<boolean> {
