@@ -1002,6 +1002,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     const ipKey = `ip:${clientIp}`;
     const lockCheck = db.checkLoginLockout(lockKey, threshold, durationMins);
     const ipCheck = db.checkLoginLockout(ipKey, ipThreshold, durationMins);
+    await db.flush();
 
     if (lockCheck.locked || ipCheck.locked) {
       const waitMins = lockCheck.remainingMinutes || ipCheck.remainingMinutes || 15;
@@ -1013,6 +1014,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     if (!school) {
       const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
       db.recordLoginFailure(ipKey, ipThreshold, durationMins);
+      await db.flush();
       db.logAudit({
         action: 'FAILED_LOGIN_UNKNOWN_SCHOOL', category: 'auth', userId: 'unknown',
         userName: 'Unknown account', userRole: role, ipAddress: clientIp,
@@ -1065,6 +1067,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       if (!matchStd) {
         const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
         db.recordLoginFailure(ipKey, ipThreshold, durationMins);
+        await db.flush();
         db.logAudit({
           action: 'FAILED_LOGIN_NOT_FOUND',
           category: 'auth',
@@ -1118,6 +1121,8 @@ apiRouter.post('/auth/login', async (req, res) => {
 
       // Successful verification -> Clear rate limits
       db.clearLoginFailures(lockKey);
+      db.clearLoginFailures(ipKey);
+      await db.flush();
 
       // Find or create user session
       let existingUser = (await db.getUsers(school.id)).find(u => u.role === role && (u.phone === phone || u.parentPhone === phone));
@@ -1196,6 +1201,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     const lockResult = await db.handleFailedLogin(targetUser.id);
       db.recordLoginFailure(lockKey, threshold, durationMins);
       db.recordLoginFailure(ipKey, ipThreshold, durationMins);
+      await db.flush();
       db.logAudit({
         action: 'FAILED_LOGIN_PIN',
         category: 'auth',
@@ -1220,6 +1226,8 @@ apiRouter.post('/auth/login', async (req, res) => {
     // Success -> Clear failed attempts
     db.handleSuccessfulLogin(targetUser.id);
     db.clearLoginFailures(lockKey);
+    db.clearLoginFailures(ipKey);
+    await db.flush();
 
     // Linked children for parent
     let linkedStudents: any[] = [];
