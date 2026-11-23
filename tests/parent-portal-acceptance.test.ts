@@ -26,6 +26,7 @@ test('parent child directory is authenticated, parent-only, school-scoped and li
  const route=api.slice(start,end);
  assert.ok(start>=0&&end>start);
  assert.match(route,/normalizeRole\(user\.role\) !== 'parent'/);
+ assert.match(route,/getParentSelectedClassId\(school\.id, user\.id, selectedStudentId\)/);
  assert.match(route,/school_id: school\.id, parent_id: user\.id/);
  assert.match(route,/school_id: school\.id, id: studentIds/);
  assert.match(route,/currentEnrollments/);
@@ -59,8 +60,8 @@ test('parent homework, attendance, marks, timetable, notices and messages use ca
  assert.match(marks,/publishedAt/);
  assert.match(marks,/getStudentCurrentClassId/);
  assert.match(timetable,/getNoticeClassIds\(school\.id, user\)/);
- assert.match(contacts,/getNoticeClassIds\(school\.id, user\)/);
- assert.match(send,/getNoticeClassIds\(school\.id, user\)/);
+ assert.match(contacts,/getParentSelectedClassId\(school\.id, user\.id, selectedStudentId\)/);
+ assert.match(send,/getParentSelectedClassId\(school\.id, user\.id, selectedStudentId\)/);
  assert.match(send,/getNoticeClassIds\(school\.id, recipient\)/);
 });
 
@@ -92,6 +93,8 @@ test('parent UI shows counts, published score totals, read-only homework and res
  assert.match(portal,/La gudbiyey/);
  assert.match(portal,/aria-current/);
  assert.match(portal,/Dheeraad/);
+ assert.match(portal,/getMessageContacts\(\{studentId:child\?\.id\}\)/);
+ assert.match(portal,/studentId=\$\{encodeURIComponent\(child\?\.id/);
  assert.match(styles,/grid-template-columns:240px/);
  assert.match(styles,/max-width:760px/);
  assert.match(styles,/safe-area-inset-bottom/);
@@ -125,10 +128,11 @@ test('parent can read and mark messages only for teachers currently assigned to 
  const readStart=api.indexOf("apiRouter.post('/messages/read'");
  const readEnd=api.indexOf("apiRouter.get('/support/tickets'",readStart);
  const read=api.slice(readStart,readEnd);
- assert.match(history,/getNoticeClassIds\(school\.id, user\)/);
+ assert.match(history,/getParentSelectedClassId\(school\.id, user\.id, selectedStudentId\)/);
  assert.match(history,/getTeacherAssignedClassIds\(school\.id, contactId\)/);
  assert.match(history,/PARENT_CONTACT_FORBIDDEN/);
  assert.match(read,/normalizeRole\(user\.role\) === 'parent'/);
+ assert.match(read,/getParentSelectedClassId/);
  assert.match(read,/getTeacherAssignedClassIds/);
  assert.match(read,/PARENT_CONTACT_FORBIDDEN/);
 });
