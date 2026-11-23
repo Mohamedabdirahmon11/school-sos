@@ -1698,8 +1698,10 @@ export class ApiClient {
   }
 
   public static async getMessageContacts(params?: { studentId?: string }) {
-    const query = params?.studentId ? `?studentId=${encodeURIComponent(params.studentId)}` : '';
-    return this.request<any[]>(`/messages/contacts${query}`);
+    const endpoint = params?.studentId
+      ? '/messages/contacts?studentId=' + encodeURIComponent(params.studentId)
+      : '/messages/contacts';
+    return this.request<any[]>(endpoint);
   }
 
   public static async markMessagesRead(contactId: string, studentId?: string) {
