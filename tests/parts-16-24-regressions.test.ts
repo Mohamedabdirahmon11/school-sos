@@ -41,11 +41,11 @@ test('parent portal loads all children through canonical server-authorized paren
   const portal = read('../src/components/parent/ParentPortalView.tsx');
   const api = read('../src/server/api.ts');
   const client = read('../src/services/api.ts');
-  assert.match(portal, /ApiClient\\.request<any>\\('\\/parent\\/children'\\)/);
+  assert.match(portal, /ApiClient\.request<any>\('\/parent\/children'\)/);
   assert.match(api, /getParentLinkedStudentIds/);
   assert.match(api, /parent_students/);
-  assert.match(api, /parent_id: user\\.id/);
-  assert.match(client, /for \\(let page = 2; page <= totalPages; page \\+= 1\\)/);
+  assert.match(api, /parent_id: user\.id/);
+  assert.match(client, /for \(let page = 2; page <= totalPages; page \+= 1\)/);
 });
 test('scheduled notices are editable and hidden from recipients until their publish date', () => {
   const ui = read('../src/components/schooladmin/NoticesEventsView.tsx');
