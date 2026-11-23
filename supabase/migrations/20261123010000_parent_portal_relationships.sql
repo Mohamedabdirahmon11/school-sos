@@ -35,6 +35,23 @@ WHERE u.role = 'parent'::public.user_role_enum
   AND u.school_id IS NOT NULL
 ON CONFLICT (parent_id, student_id) DO NOTHING;
 
+-- Preserve legacy parent accounts whose only durable relationship was the
+-- normalized guardian phone stored on the student row.
+INSERT INTO public.parent_students (school_id, parent_id, student_id, relation)
+SELECT u.school_id, u.id, s.id, 'guardian'
+FROM public.users AS u
+JOIN public.students AS s
+  ON s.school_id = u.school_id
+ AND regexp_replace(COALESCE(NULLIF(u.phone, ''), u.parent_phone, ''), '[^0-9]', '', 'g')
+     IN (
+       regexp_replace(COALESCE(s.father_phone, ''), '[^0-9]', '', 'g'),
+       regexp_replace(COALESCE(s.mother_phone, ''), '[^0-9]', '', 'g')
+     )
+WHERE u.role = 'parent'::public.user_role_enum
+  AND u.school_id IS NOT NULL
+  AND regexp_replace(COALESCE(NULLIF(u.phone, ''), u.parent_phone, ''), '[^0-9]', '', 'g') <> ''
+ON CONFLICT (parent_id, student_id) DO NOTHING;
+
 -- Keep the canonical relation synchronized with the legacy admin-managed array.
 -- Removing a link revokes portal access immediately; messages are intentionally retained.
 CREATE OR REPLACE FUNCTION public.schoolos_sync_parent_student_links()
