@@ -2081,6 +2081,7 @@ class StorageEngine {
             pin: parentPin,
             linkedStudentIds: [id],
             isBlocked: false,
+            mustChangePassword: true,
             failedLoginAttempts: 0,
             createdAt: new Date().toISOString()
           };
