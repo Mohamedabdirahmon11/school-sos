@@ -2673,7 +2673,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
           [item.phone, item.parentPhone].some(value => String(value || '').replace(/\D/g, '') === phoneKey)
         );
         const existingPinHash = parent?.pin || (parent as any)?.pinHash;
-        const parentPin = existingPinHash ? undefined : String(100000 + (randomBytes(4).readUInt32BE(0) % 900000));
+        const parentPin = existingPinHash ? undefined : generateTemporaryPin();
         parentRecord = {
           id: parent?.id || ('usr-parent-' + randomUUID()),
           schoolId: school.id,
@@ -5902,13 +5902,13 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
     if (suppliedPin && (!/^\d{6}$/.test(suppliedPin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(suppliedPin))) {
       res.status(400).json({ error: `PIN for ${studentId} must be a strong 6-digit number.` }); return;
     }
-    let pin = suppliedPin || String(randomInt(100000, 1000000));
+    let pin = suppliedPin || generateTemporaryPin();
     if (seenPins.has(pin)) {
       if (suppliedPin) {
         res.status(400).json({ error: 'Each custom PIN in the file must be unique.' }); return;
       }
       let attempts = 0;
-      while (seenPins.has(pin) && attempts < 100) { pin = String(randomInt(100000, 1000000)); attempts += 1; }
+      while (seenPins.has(pin) && attempts < 100) { pin = generateTemporaryPin(); attempts += 1; }
       if (seenPins.has(pin)) { res.status(503).json({ error: 'Could not generate unique PINs. Please retry.' }); return; }
     }
     seenStudents.add(studentId);
