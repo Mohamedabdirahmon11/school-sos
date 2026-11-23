@@ -441,6 +441,11 @@ async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]
   if (user.role !== 'parent') return [];
   const linkedIds = await getParentLinkedStudentIds(schoolId, user.id);
   if (!linkedIds.length) return [];
+  const academicYearId = await getCurrentAcademicYearId(schoolId);
+  if (academicYearId) {
+    const enrollments = await queryAllRows('enrollments', { school_id: schoolId, academic_year_id: academicYearId, status: 'active', student_id: linkedIds }, 'student_id,class_id');
+    return [...new Set(enrollments.map((row: any) => String(row.classId || '')).filter(Boolean))];
+  }
   const students = await db.queryPage('students', { school_id: schoolId, id: linkedIds }, 1, 100, undefined, 'id,class_id');
   return [...new Set(students.items.map((student: any) => String(student.classId || '')).filter(Boolean))];
 }
@@ -5306,7 +5311,13 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   }
   const students = await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined,
     'id,school_id,student_id,first_name,middle_name,last_name,class_id,section,status,admission_date');
-  const classIds = [...new Set(students.items.map((row: any) => String(row.classId || '')).filter(Boolean))];
+  const currentYearId = await getCurrentAcademicYearId(school.id);
+  const currentEnrollments = currentYearId
+    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', student_id: studentIds }, 'student_id,class_id')
+    : [];
+  const currentClassByStudent = new Map(currentEnrollments.map((row: any) => [String(row.studentId), String(row.classId)]));
+  const classIdForStudent = (student: any) => currentYearId ? (currentClassByStudent.get(String(student.id)) || '') : String(student.classId || '');
+  const classIds = [...new Set(students.items.map((row: any) => classIdForStudent(row)).filter(Boolean))];
   const classes = classIds.length
     ? await db.queryPage('classes', { school_id: school.id, id: classIds }, 1, 100, undefined, 'id,name,section,class_teacher_id,academic_year')
     : { items: [] as any[] };
@@ -5348,13 +5359,14 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
     assignmentByClass.get(key)!.push(row);
   }
   const children = students.items.map((student: any) => {
-    const klass = classById.get(String(student.classId));
+    const currentClassId = classIdForStudent(student);
+    const klass = classById.get(currentClassId);
     const teacher = klass?.classTeacherId ? teacherById.get(String(klass.classTeacherId)) : null;
     return {
       id: student.id, studentId: student.studentId,
       fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
       firstName: student.firstName, middleName: student.middleName, lastName: student.lastName,
-      classId: student.classId, className: klass ? [klass.name, klass.section || student.section].filter(Boolean).join(' · ') : 'Fasal lama heli',
+      classId: currentClassId, className: klass ? [klass.name, klass.section || student.section].filter(Boolean).join(' · ') : 'Fasal lama heli',
       section: student.section, status: student.status, admissionDate: student.admissionDate,
       formTeacherName: teacher?.fullName || '', relation: relationByStudent.get(String(student.id)) || 'guardian',
       attendanceSummary: (() => {
@@ -5365,8 +5377,8 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
         const rows = marksByStudent.get(String(student.id)) || [];
         return { total: rows.reduce((sum: number, row: any) => sum + Number(row.totalMarks || 0), 0), max: rows.reduce((sum: number, row: any) => sum + (Array.isArray(row.schemeSnapshot) ? row.schemeSnapshot.reduce((part: number, component: any) => part + Number(component.maxMarks || 0), 0) : 0), 0), subjects: rows.length };
       })(),
-      homeworkPending: (assignmentByClass.get(String(student.classId)) || []).filter((item: any) => !submittedKeys.has(String(student.id) + ':' + String(item.id))).length,
-      unreadNotices: noticeRows.filter((notice: any) => ['all', 'school', 'parents'].includes(String(notice.audience)) || (notice.audience === 'class' && String(notice.classId) === String(student.classId))).filter((notice: any) => String(notice.publishDate || '').slice(0, 10) <= today && !readNoticeIds.has(String(notice.id))).length
+      homeworkPending: (assignmentByClass.get(currentClassId) || []).filter((item: any) => !submittedKeys.has(String(student.id) + ':' + String(item.id))).length,
+      unreadNotices: noticeRows.filter((notice: any) => ['all', 'school', 'parents'].includes(String(notice.audience)) || (notice.audience === 'class' && String(notice.classId) === currentClassId)).filter((notice: any) => String(notice.publishDate || '').slice(0, 10) <= today && !readNoticeIds.has(String(notice.id))).length
     };
   });
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
@@ -6730,7 +6742,7 @@ apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (r
     return;
   }
   const filters: Record<string, string | string[]> = { school_id: school.id, student_id: studentId };
-  if (normalizeRole(user.role) === 'student') {
+  if (['parent', 'student'].includes(normalizeRole(user.role) || '')) {
     const ownStudent = await db.getStudentById(studentId, school.id);
     const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
     if (!currentClassId) { res.json([]); return; }
@@ -7692,7 +7704,7 @@ apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res
     if (['parent', 'student'].includes(normalizeRole(user.role) || '')) {
       marks = marks.filter(mark => Boolean(mark.publishedAt));
     }
-    if (normalizeRole(user.role) === 'student') {
+    if (['parent', 'student'].includes(normalizeRole(user.role) || '')) {
       const ownStudent = await db.getStudentById(studentId as string, school.id);
       const currentClassId = ownStudent ? await getStudentCurrentClassId(school.id, ownStudent.id, ownStudent.classId) : '';
       marks = currentClassId ? marks.filter(mark => mark.classId === currentClassId) : [];
