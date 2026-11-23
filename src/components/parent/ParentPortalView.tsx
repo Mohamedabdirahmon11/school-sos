@@ -1,207 +1,135 @@
-/**
- * Parent Portal View
- * Multi-child sibling switcher, attendance percentage, fee balance & official receipts, exam results, and report cards
- */
-
-import React, { useState } from 'react';
-import { ApiClient } from '../../services/api.ts';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
+import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
-import { formatMoney } from '../../lib/money.ts';
-import { 
-  Users, 
-  CalendarCheck, 
-  CreditCard, 
-  FileSpreadsheet, 
-  Printer, 
-  BellRing,
-  Download
-} from 'lucide-react';
+import { Home, Users, CalendarDays, CalendarCheck, ChartNoAxesColumn, BookOpen, Bell, MessageCircle, UserRound, Menu, Send, Sun, Moon, ChevronRight, RefreshCw, CircleAlert, CheckCircle2 } from 'lucide-react';
+import './parent-portal-design.css';
 
-export const ParentPortalView: React.FC = () => {
-  const { user, school, t } = useAuth();
-  const [selectedChildIndex, setSelectedChildIndex] = useState(0);
-  const [reportCardDownloading, setReportCardDownloading] = useState(false);
-  const [reportCardDownloadError, setReportCardDownloadError] = useState('');
-  const childrenState = useApi(async () => {
-    const all = await ApiClient.getAllStudents();
-    // The API scopes this list to the authenticated parent's linked children.
-    return Array.isArray(all) ? all : [];
-  }, [school?.id, user?.id, user?.phone, user?.parentPhone, user?.linkedStudentIds?.join(',')], Boolean(school));
-  const children: any[] = childrenState.data ?? [];
-  const currentChild = children[selectedChildIndex];
-  const childState = useApi(
-    () => ApiClient.getStudentDetails(currentChild?.id, school?.id, true),
-    [currentChild?.id, school?.id],
-    Boolean(currentChild)
-  );
-  const termReportCardsState = useApi(
-    () => currentChild ? ApiClient.request<any[]>(`/term-marks/report-cards?studentId=${encodeURIComponent(currentChild.id)}`) : Promise.resolve([]),
-    [currentChild?.id, school?.id], Boolean(currentChild)
-  );
-  const termReportCards: any[] = Array.isArray(termReportCardsState.data) ? termReportCardsState.data : [];
-  const timetableState = useApi(
-    () => ApiClient.getTimetable({ classId: currentChild?.classId }),
-    [currentChild?.id, currentChild?.classId, school?.id],
-    Boolean(currentChild)
-  );
-  const noticesState = useApi(() => ApiClient.getNotices(), [school?.id, user?.id], Boolean(school && user));
-  const timetable = Array.isArray(timetableState.data) ? timetableState.data : [];
-  const examSchedulesState = useApi(() => currentChild?.classId ? ApiClient.getPublishedExamSchedules(currentChild.classId) : Promise.resolve([]), [currentChild?.id, currentChild?.classId, school?.id], Boolean(currentChild));
-  const publishedExamSchedules = Array.isArray(examSchedulesState.data) ? examSchedulesState.data : [];
-  const childData = childState.data;
-  const resultNotices = (Array.isArray(noticesState.data) ? noticesState.data : [])
-    .filter((notice: any) => notice.classId === currentChild?.classId && String(notice.title || '').toLowerCase().includes('exam results published'))
-    .slice(0, 3);
+type View = 'home'|'kids'|'tt'|'att'|'marks'|'hw'|'news'|'msg'|'me';
+const NAV: Array<{id:View;label:string;icon:React.ElementType}> = [
+ {id:'home',label:'Hoyga',icon:Home},{id:'kids',label:'Caruurta',icon:Users},{id:'tt',label:'Jadwal',icon:CalendarDays},
+ {id:'att',label:'Imaanshaha',icon:CalendarCheck},{id:'marks',label:'Natiijo',icon:ChartNoAxesColumn},
+ {id:'hw',label:'Hawlo',icon:BookOpen},{id:'news',label:'Ogeysiis',icon:Bell},{id:'msg',label:'Fariimo',icon:MessageCircle},{id:'me',label:'Profile',icon:UserRound}
+];
+const todayLocal=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Addis_Ababa'}).format(new Date());
+const dateLabel=(v:string)=>v?new Intl.DateTimeFormat('so',{day:'numeric',month:'short',year:'numeric'}).format(new Date(v.slice(0,10)+'T12:00:00')):'';
+const unwrap=(v:any)=>v?.data?.children? v.data : v?.data?.items? v.data : v?.data??v;
+function PortalError({error,retry}:{error:any;retry:()=>void}){
+ const status=Number(error?.status||error?.statusCode||0);
+ if(status===423)return <div className="pp-state pp-warning" role="alert"><CircleAlert/><div><b>Dejinta dugsiga weli ma dhammaystirna</b><p>{error?.message||'Maamulka dugsiga waa inuu dhammaystiraa Setup Wizard-ka ka hor inta aan Parent Portal la adeegsan.'}</p>{Array.isArray(error?.missing||error?.data?.missing)&&(error?.missing||error?.data?.missing).map((x:string,i:number)=><p key={i}>• {x}</p>)}</div><button onClick={retry}>Dib u tijaabi</button></div>;
+ return <ErrorState error={error} onRetry={retry}/>;
+}
 
-  const handleSelectChild = (idx: number) => {
-    setSelectedChildIndex(idx);
-    setReportCardDownloadError('');
-  };
+export const ParentPortalView:React.FC=()=>{
+ const {user,school}=useAuth();
+ const [view,setView]=useState<View>('home');
+ const [childId,setChildId]=useState('');
+ const [moreOpen,setMoreOpen]=useState(false);
+ const [theme,setTheme]=useState<'auto'|'light'|'dark'>('auto');
+ const [noticePage,setNoticePage]=useState(1);
+ const [messagePage,setMessagePage]=useState(1);
+ const [contactId,setContactId]=useState('');
+ const [messageDraft,setMessageDraft]=useState('');
+ const [sending,setSending]=useState(false);
+ const [feedback,setFeedback]=useState('');
+ const [homeworkFilter,setHomeworkFilter]=useState<'pending'|'submitted'|'all'>('pending');
 
-  const handleDownloadTermReportCard = async () => {
-    if (!currentChild || reportCardDownloading) return;
-    setReportCardDownloading(true); setReportCardDownloadError('');
-    try { await ApiClient.downloadTermReportCardPdf(currentChild.id); }
-    catch (error) { setReportCardDownloadError(error instanceof Error ? error.message : 'Report Card-ka sannadlaha lama heli karo weli.'); }
-    finally { setReportCardDownloading(false); }
-  };
+ const childrenState=useApi(()=>ApiClient.request<any>('/parent/children'),[school?.id,user?.id],Boolean(school&&user?.role==='parent'));
+ const payload=unwrap(childrenState.data);
+ const parent=payload?.parent;
+ const children:any[]=Array.isArray(payload?.children)?payload.children:[];
+ const child=children.find(x=>x.id===childId)||children[0];
+ const active=Boolean(child?.id);
+ useEffect(()=>{if(children.length&&!children.some(x=>x.id===childId))setChildId(children[0].id);},[children,childId]);
 
-  const handleDownloadAnnualReportCard = async () => {
-    if (!currentChild || reportCardDownloading) return;
-    setReportCardDownloading(true);
-    setReportCardDownloadError('');
-    try {
-      await ApiClient.downloadReportCardPdf(currentChild.id);
-    } catch (error) {
-      setReportCardDownloadError(error instanceof Error ? error.message : 'Annual report card is not available yet.');
-    } finally {
-      setReportCardDownloading(false);
-    }
-  };
+ const home=view==='home';
+ const attendanceState=useApi(()=>child?ApiClient.getStudentAttendance(child.id):Promise.resolve([]),[school?.id,child?.id],active&&(home||view==='att'||view==='kids'));
+ const marksState=useApi(()=>child?ApiClient.getStudentMarks(child.id):Promise.resolve([]),[school?.id,child?.id],active&&(home||view==='marks'||view==='kids'));
+ const timetableState=useApi(()=>child?.classId?ApiClient.getTimetable({classId:child.classId}):Promise.resolve([]),[school?.id,child?.classId],active&&(home||view==='tt'));
+ const examSchedulesState=useApi(()=>child?.classId?ApiClient.getPublishedExamSchedules(child.classId):Promise.resolve([]),[school?.id,child?.id,child?.classId],active&&(home||view==='tt'));
+ const homeworkState=useApi(()=>child?ApiClient.request<any[]>(`/assignments?studentId=${encodeURIComponent(child.id)}`):Promise.resolve([]),[school?.id,child?.id],active&&(home||view==='hw'));
+ const noticesState=useApi(()=>ApiClient.request<any>(`/parent/notices?page=${noticePage}&pageSize=20`),[school?.id,user?.id,noticePage],Boolean(user&&['home','news'].includes(view)));
+ const contactsState=useApi(()=>ApiClient.getMessageContacts({studentId:child?.id}),[school?.id,user?.id,child?.id],Boolean(user&&view==='msg'&&child?.id));
+ const contacts=Array.isArray(contactsState.data)?contactsState.data:[];
+ const contact=contacts.find((x:any)=>x.id===contactId);
+ const messagesState=useApi(()=>contactId?ApiClient.request<any>(`/parent/messages?contactId=${encodeURIComponent(contactId)}&studentId=${encodeURIComponent(child?.id||'')}&page=${messagePage}&pageSize=30`):Promise.resolve([]),[school?.id,user?.id,child?.id,contactId,messagePage],Boolean(user&&view==='msg'&&child?.id&&contactId));
+ useEffect(()=>{if(!contactId&&contacts.length)setContactId(contacts[0].id);else if(contactId&&!contacts.some((x:any)=>x.id===contactId))setContactId(contacts[0]?.id||'');},[contacts,contactId]);
+ useEffect(()=>{setMessagePage(1);},[contactId]);
+ useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId,child?.id).catch(()=>undefined);},[view,contactId,child?.id]);
+ const refresh=()=>{childrenState.retry();attendanceState.retry();marksState.retry();timetableState.retry();examSchedulesState.retry();homeworkState.retry();noticesState.retry();contactsState.retry();if(contactId)messagesState.retry();};
+ useEffect(()=>{const onFocus=()=>{if(document.visibilityState==='visible')refresh();};window.addEventListener('focus',onFocus);document.addEventListener('visibilitychange',onFocus);return()=>{window.removeEventListener('focus',onFocus);document.removeEventListener('visibilitychange',onFocus);};},[view,child?.id,contactId]);
 
-  if (childrenState.loading) return <div className="p-6 space-y-3" aria-label="Loading parent portal"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-32 animate-pulse rounded-xl bg-white" /></div>;
-  if (childrenState.error) return <ErrorState error={childrenState.error} onRetry={childrenState.retry} />;
-  if (!currentChild) return <div className="p-6 text-xs text-[#64748B]">No children are linked to this parent account.</div>;
-  if (childState.loading) return <div className="p-6 space-y-3" aria-label="Loading child details"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
-  if (childState.error) return <ErrorState error={childState.error} onRetry={childState.retry} />;
-  const attendanceRecords = childData?.attendance || [];
-  const presentCount = attendanceRecords.filter((record: any) => record.status === 'present' || record.status === 'late').length;
-  const attendancePercentage = attendanceRecords.length ? Math.round((presentCount / attendanceRecords.length) * 100) : 0;
-  const payments = childData?.payments || [];
-  const balance = payments.reduce((sum: number, payment: any) => sum + (payment.remainingAmount || 0), 0);
-  const publishedMarks: any[] = Array.isArray(childData?.marks) ? childData.marks : [];
-  const hasBothPublishedSemesters = publishedMarks.some(first => first.semester === 'Semester 1' && publishedMarks.some(second => second.semester === 'Semester 2' && second.academicYear === first.academicYear));
+ const attendance=Array.isArray(attendanceState.data)?attendanceState.data:[];
+ const marks=Array.isArray(marksState.data)?marksState.data.filter((m:any)=>Boolean(m.publishedAt)):[];
+ const timetable=Array.isArray(timetableState.data)?timetableState.data:[];
+ const publishedExamSchedules=Array.isArray(examSchedulesState.data)?examSchedulesState.data:[];
+ const homework=Array.isArray(homeworkState.data)?homeworkState.data:[];
+ const noticeData=unwrap(noticesState.data);
+ const notices=Array.isArray(noticeData?.items)?noticeData.items:[];
+ const noticePagination=noticeData?.pagination||{page:noticePage,totalPages:1};
+ const messageData=unwrap(messagesState.data);
+ const messages=Array.isArray(messageData?.items)?messageData.items:Array.isArray(messagesState.data)?messagesState.data:[];
+ const messagePagination=messageData?.pagination||{page:messagePage,totalPages:1};
+ const today=todayLocal(),month=today.slice(0,7);
+ const monthRows=attendance.filter((r:any)=>String(r.date||'').slice(0,7)===month);
+ const counts=useMemo(()=>monthRows.reduce((a:any,r:any)=>{if(r.status==='present')a.present++;else if(r.status==='absent')a.absent++;else if(r.status==='late')a.late++;return a;},{present:0,absent:0,late:0}),[attendance,month]);
+ const scoreTotal=marks.reduce((s:number,m:any)=>s+Number(m.totalMarks||0),0);
+ const scoreMax=marks.reduce((s:number,m:any)=>s+(Array.isArray(m.schemeSnapshot)?m.schemeSnapshot.reduce((n:number,c:any)=>n+Number(c.maxMarks||0),0):0),0);
+ const pending=homework.filter((h:any)=>!h.submission).length;
+ const submitted=homework.length-pending;
+ const todayDay=new Intl.DateTimeFormat('en-US',{weekday:'long',timeZone:'Africa/Addis_Ababa'}).format(new Date());
+ const todaySlots=timetable.filter((s:any)=>s.dayOfWeek===todayDay).sort((a:any,b:any)=>Number(a.periodNumber)-Number(b.periodNumber));
+ const attendanceTotal=Number(child?.attendanceSummary?.total??monthRows.length);
+ const attendanceByDate=new Map(attendance.map((r:any)=>[String(r.date).slice(0,10),r.status]));
+ const monthDays=new Date(Number(today.slice(0,4)),Number(today.slice(5,7)),0).getDate();
+ const firstDay=new Date(month+'-01T12:00:00').getDay();
+ const visibleHomework=homework.filter((h:any)=>homeworkFilter==='all'||(homeworkFilter==='submitted'?Boolean(h.submission):!h.submission)).sort((a:any,b:any)=>String(a.dueDate).localeCompare(String(b.dueDate)));
+ const initials=(name:string)=>String(name||'W').trim().split(/\s+/).slice(0,2).map((x:string)=>x[0]).join('').toUpperCase();
+ const go=(next:View)=>{setView(next);setMoreOpen(false);setFeedback('');if(next==='news')setNoticePage(1);};
+ const markRead=async(id:string)=>{try{await ApiClient.markNoticeRead(id);noticesState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Ogeysiiska lama calaamadin karin.');}};
+ const send=async()=>{const body=messageDraft.trim();if(!body||!contact||!child?.id)return;if(contact.canSend===false){setFeedback('Macallinkan hadda carruurtaada looma qoondeeyo; taariikhda hore oo keliya ayaad akhrin kartaa.');return;}setSending(true);setFeedback('');try{await ApiClient.sendMessage(contact.id,contact.fullName,contact.role,body,child.id);setMessageDraft('');setMessagePage(1);messagesState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Fariinta lama diri karin.');}finally{setSending(false);}};
+ const navButton=(item:typeof NAV[number],mobile=false)=>{const Icon=item.icon;const selected=view===item.id;const badge=item.id==='hw'?pending:item.id==='news'?notices.filter((n:any)=>!n.isRead).length:0;return <button key={item.id} type="button" className={'pp-nav-item '+(selected?'is-active ':'')+(mobile?'is-mobile':'')} onClick={()=>go(item.id)} aria-current={selected?'page':undefined}><Icon size={mobile?19:17}/><span>{item.label}</span>{badge>0&&<i className="pp-badge">{badge>99?'99+':badge}</i>}</button>;};
+ const moreItems=NAV.filter(x=>['tt','att','hw','news','msg','me'].includes(x.id));
+ const moreActive=moreItems.some(x=>x.id===view);
+ const loading=childrenState.loading;
+ const title=NAV.find(x=>x.id===view)?.label||'Hoyga';
+ const gradeText=(m:any)=>{const raw=String(m.grade||'—');const letter=raw.match(/A\+?|B|C|D|F/)?.[0];const labels:Record<string,string>={'A+':'Aad u wanaagsan','A':'Wanaagsan','B':'Fiican','C':'Dhexdhexaad','D':'Hoose','F':'U baahan caawimaad'};return letter?letter+' · '+labels[letter]:raw;};
 
-  return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Sibling Switcher Header */}
-      <div className="bg-white p-4 rounded-xl border border-[#E2E8F0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-[11px] font-mono text-[#0F766E] uppercase font-bold">Parent Guardian Portal</span>
-          <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Welcome, {user?.fullName}
-          </h1>
-          <p className="text-xs text-[#64748B]">
-            Viewing enrolled child details for <strong className="text-[#132A29]">{school?.name}</strong>
-          </p>
-        </div>
+ return <div className={"parent-portal-shell "+(theme==='dark'?'pp-theme-dark':'')} data-theme={theme}>
+  <aside className="pp-sidebar">
+   <div className="pp-brand"><div className="pp-avatar">{initials(parent?.fullName||user?.fullName||'W')}</div><div><b>{parent?.fullName||user?.fullName||'Waalid'}</b><small>Waalid · {children.length} ilmood</small></div></div>
+   {children.length>1&&<><div className="pp-kids-label">Caruurtayda</div><div className="pp-kids">{children.map((x:any)=>{const childBadge=Number(x.homeworkPending||0)+Number(x.unreadNotices||0);return <button key={x.id} className={'pp-child-item '+(x.id===child?.id?'is-active':'')} onClick={()=>setChildId(x.id)} aria-current={x.id===child?.id?'true':undefined}><span className="pp-child-avatar">{initials(x.fullName)}</span><span style={{minWidth:0,flex:1}}><b>{x.fullName}</b><small>{x.className}</small></span>{childBadge>0&&<i className="pp-badge" aria-label={Number(x.homeworkPending||0)+' hawlo, '+Number(x.unreadNotices||0)+' ogeysiis'}>{childBadge}</i>}</button>;})}</div></>}
+   <nav aria-label="Qaybaha waalidka" className="pp-side-nav">{NAV.map(n=>navButton(n))}</nav>
+   <div className="pp-sidebar-foot"><span>SchoolOS</span><small>{school?.name}</small></div>
+  </aside>
+  <div className="pp-content"><main className="pp-main">
+   {children.length>1&&<div className="pp-child-strip">{children.map((x:any)=><button key={x.id} className={x.id===child?.id?'is-active':''} onClick={()=>setChildId(x.id)}>{x.firstName||x.fullName.split(' ')[0]}</button>)}</div>}
+   <header className="pp-page-head"><div><span className="pp-eyebrow">PARENT PORTAL</span><h1>{view==='home'?'Soo dhawoow, '+(parent?.fullName||user?.fullName||'Waalid')+' 👋':title}</h1><p>{school?.name||''}{child?' · '+child.fullName+' · '+child.className:''}</p></div><div className="pp-head-actions"><button className="pp-icon-button" onClick={refresh} aria-label="Cusboonaysii"><RefreshCw size={17}/></button></div></header>
+   {feedback&&<div className="pp-feedback" role="status">{feedback}</div>}
+   {loading&&<div className="pp-card pp-empty">Xogta carruurta waa la soo dejinayaa…</div>}
+   {childrenState.error&&<PortalError error={childrenState.error} retry={childrenState.retry}/>}
+   {!loading&&!childrenState.error&&!children.length&&<div className="pp-state pp-warning"><CircleAlert/><div><b>Weli ilmo laguma xirin akoonkaaga</b><p>La xiriir maamulka dugsiga. Waalidka oo keliya ma xiriirin karo arday.</p></div></div>}
 
-        {/* Multi-Child Switcher Buttons */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[#64748B] font-medium hidden sm:inline">Switch Child:</span>
-          <div className="flex items-center gap-1.5 p-1 bg-[#F1F5F9] rounded-lg">
-            {children.map((child, idx) => (
-              <button
-                key={child.id}
-                onClick={() => handleSelectChild(idx)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
-                  selectedChildIndex === idx
-                    ? 'bg-[#0F766E] text-white shadow-xs'
-                    : 'text-[#334155] hover:bg-[#E2E8F0]'
-                }`}
-              >
-                {child.firstName} ({child.studentId})
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {resultNotices.length > 0 && (
-        <section aria-label="Published exam results notifications" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs text-emerald-950">
-          <div className="flex items-center gap-2 font-bold"><BellRing className="h-4 w-4" /> New exam results are available</div>
-          {resultNotices.map((notice: any) => <div key={notice.id} className="mt-2 border-t border-emerald-100 pt-2"><p className="font-semibold">{notice.title}</p><p className="mt-1 text-emerald-800">{notice.content}</p><p className="mt-1 text-[10px] text-emerald-700">{notice.publishDate}</p></div>)}
-        </section>
-      )}
-
-      {/* Child Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-        <div className="p-4 bg-white rounded-xl border border-[#E2E8F0]">
-          <span className="text-[#64748B]">Enrolled Class</span>
-          <p className="text-lg font-bold text-[#132A29] mt-1">{currentChild.className}</p>
-          <p className="text-[11px] text-[#64748B]">Admission: {currentChild.admissionDate}</p>
-        </div>
-
-        <div className="p-4 bg-white rounded-xl border border-[#E2E8F0]">
-          <span className="text-[#64748B]">Attendance Rate</span>
-          <p className="text-lg font-bold font-mono text-emerald-700 mt-1">{attendancePercentage}% Present</p>
-          <p className="text-[11px] text-[#64748B]">{attendanceRecords.length} recorded days</p>
-        </div>
-
-        <div className="p-4 bg-white rounded-xl border border-[#E2E8F0]">
-          <span className="text-[#64748B]">Tuition Balance Status</span>
-          <p className="text-lg font-bold uppercase text-emerald-700 mt-1">
-            {balance === 0 ? 'PAID' : 'BALANCE DUE'}
-          </p>
-          <p className="text-[11px] text-[#64748B]">{formatMoney(balance, school?.currency)} remaining</p>
-        </div>
-      </div>
-
-      <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
-        <h2 className="text-sm font-bold text-[#132A29]">{t('timetable')} · {currentChild.firstName}</h2>
-        {timetableState.loading ? <div className="h-24 animate-pulse rounded-lg bg-slate-100" /> : timetableState.error ? <ErrorState error={timetableState.error} onRetry={timetableState.retry} /> : timetable.length === 0 ? <p className="text-[#64748B]">{t('timetable_empty')}</p> : <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[...timetable].sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.periodNumber - b.periodNumber).map(slot => <div key={slot.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1]"><p className="font-bold text-[#132A29]">{slot.dayOfWeek} · Period {slot.periodNumber}</p><p className="text-[#334155]">{slot.subjectName || slot.subjectId}</p><p className="text-[#64748B]">{slot.startTime}–{slot.endTime} · {slot.roomNumber}{slot.teacherName ? ` · ${slot.teacherName}` : ''}</p></div>)}</div>}
-      </section>
-
-      <section className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs text-xs">
-        <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold text-[#132A29]">Published Exam Schedule · {currentChild.firstName}</h2><button type="button" onClick={printExamTimetable} className="rounded-lg border border-[#CBD5E1] px-3 py-1.5 text-[11px] font-semibold text-[#334155]">Print timetable</button></div>
-        {examSchedulesState.loading ? <div className="h-16 animate-pulse rounded-lg bg-slate-100" /> : examSchedulesState.error ? <ErrorState error={examSchedulesState.error} onRetry={examSchedulesState.retry} /> : <ExamTimetablePrint schedules={publishedExamSchedules} school={school} classGroup={publishedExamSchedules[0]?.className || currentChild.className || school?.examTimetableClassGroup} />}
-      </section>
-
-      {/* Academic Results & Fee Invoices */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-xs">
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#E2E8F0]">
-            <h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2"><FileSpreadsheet className="w-4 h-4 text-[#0F766E]" /><span>{currentChild.firstName}'s Exam Performance</span></h2>
-            <div className="flex gap-2">
-              <button type="button" onClick={handleDownloadAnnualReportCard} disabled={!hasBothPublishedSemesters || reportCardDownloading} className="rounded border border-[#0F766E] bg-[#0F766E] px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40"><Download className="mr-1 inline h-3.5 w-3.5" />{reportCardDownloading ? 'Preparing PDF…' : 'Download Annual PDF'}</button>
-              <button type="button" onClick={() => window.print()} className="flex items-center gap-1 rounded border border-[#CCFBF1] bg-[#F0FDFA] px-2.5 py-1 text-xs text-[#0F766E]"><Printer className="h-3.5 w-3.5" /><span>Print Card</span></button>
-            </div>
-          </div>
-          {reportCardDownloadError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-[11px] text-rose-700">{reportCardDownloadError}</p>}
-          {termReportCardsState.loading ? <div className="h-12 animate-pulse rounded-lg bg-slate-100" /> : termReportCards.length > 0 ? termReportCards.map((card: any) => (
-            <div key={card.id} className="rounded-lg border border-teal-200 bg-teal-50 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-teal-950">Report Card sannadeedka</p><p className="text-[11px] text-teal-800">Celcelis {card.yearly_average}/100 · Grade {card.overall_grade} · Darajo #{card.rank_in_class}</p></div>
-                <button type="button" onClick={handleDownloadTermReportCard} disabled={reportCardDownloading} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">{reportCardDownloading ? 'Diyaarinaya…' : 'Download Report Card PDF'}</button></div>
-              <div className="mt-2 space-y-1">{(card.subject_results || []).map((subject: any) => <p key={subject.subject_id} className="text-[11px] text-teal-950">{subject.subject}: T1 {subject.term1} · T2 {subject.term2} · Sanad {subject.yearly} · {subject.grade || ''}</p>)}</div>
-            </div>
-          )) : <p className="text-[#64748B]">Report Card-ka sannadlaha wali lama daabicin. Marka dugsigu daabaco ayuu halkan ka muuqanayaa.</p>}
-          <div className="space-y-2">
-            {(Array.isArray(childData?.marks) ? childData.marks : []).length ? childData?.marks?.map((mark: any) => (
-              <div key={mark.id} className="p-2.5 bg-[#F8FAFC] rounded border border-[#E2E8F0] flex justify-between"><span>{mark.subjectId} · {mark.semester}</span><span className="font-mono font-bold">{Number(mark.percentage).toFixed(1)}%</span></div>
-            )) : <p className="text-[#64748B]">No published results are available yet. The School Admin will publish the approved results here.</p>}
-          </div>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-[#E2E8F0] space-y-3 shadow-xs">
-          <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]"><h2 className="text-sm font-bold text-[#132A29] flex items-center gap-2"><CreditCard className="w-4 h-4 text-[#0F766E]" /><span>Tuition Payment Receipts</span></h2></div>
-          <div className="space-y-2">
-            {payments.length ? payments.map((payment: any) => (
-              <div key={payment.id} className="p-3 bg-[#F0FDFA] rounded-lg border border-[#CCFBF1] flex justify-between"><div><span className="font-bold text-[#132A29] block">{payment.feeType} · {payment.month}</span><span className="text-[11px] text-[#64748B]">Cash · Receipt #{payment.receiptNumber}</span></div><span className="font-mono font-bold">{formatMoney(payment.amountPaid, school?.currency)} · {payment.status}</span></div>
-            )) : <p className="text-[#64748B]">No payment receipts are available.</p>}
-          </div>
-        </div>
-      </div>    </div>
-  );
+   {active&&view==='home'&&<>
+    <section className="pp-stat-grid">
+     <div className="pp-card"><span className="pp-muted">Imaanshaha bishan</span><strong>{attendanceState.loading?'—':counts.present+' / '+attendanceTotal}</strong><small>{attendanceState.error?'Imaanshaha lama soo dejin karin':`Wuu yimid ${counts.present} maalmood oo ka mid ah ${monthRows.length} maalmood oo dugsigu furnaa`}</small></div>
+     <div className="pp-card"><span className="pp-muted">Natiijooyinka la daabacay</span><strong>{marksState.loading?'—':scoreTotal+' / '+scoreMax}</strong><small>{marksState.error?'Natiijooyinka lama soo dejin karin':marks.length?marks.length+' diiwaan oo la daabacay':'Weli lama daabicin'}</small></div>
+     <div className="pp-card"><span className="pp-muted">Hawlo harsan</span><strong>{homeworkState.loading?'—':pending}</strong><button className="pp-text-button" onClick={()=>go('hw')}>Fur hawlaha <ChevronRight size={14}/></button></div>
+    </section>
+    <section className="pp-card"><div className="pp-section-title"><h2>Jadwalka maanta</h2><button className="pp-text-button" onClick={()=>go('tt')}>Jadwalka oo dhan <ChevronRight size={14}/></button></div>{timetableState.loading?<div className="pp-empty">Jadwalka waa la soo dejinayaa…</div>:timetableState.error?<PortalError error={timetableState.error} retry={timetableState.retry}/>:todayDay==='Friday'?<div className="pp-empty">Jimce waa fasax.</div>:todaySlots.length?todaySlots.map((s:any)=><div className="pp-row" key={s.id}><span><b>{s.startTime} – {s.endTime} · {s.subjectName||s.subjectId}</b><small>{s.teacherName||'Macallin'}</small></span><em>Cashar {s.periodNumber}</em></div>):<div className="pp-empty">Casharro maanta lama qorin.</div>}</section>
+    <section className="pp-card"><div className="pp-section-title"><h2>Ogeysiisyadii ugu dambeeyey</h2><button className="pp-text-button" onClick={()=>go('news')}>Dhammaan <ChevronRight size={14}/></button></div>{noticesState.loading?<div className="pp-empty">Ogeysiisyada waa la soo dejinayaa…</div>:noticesState.error?<PortalError error={noticesState.error} retry={noticesState.retry}/>:notices.length?notices.slice(0,2).map((n:any)=><div className="pp-row" key={n.id}><span><b>{n.title}</b><small>{dateLabel(n.publishDate)}</small></span>{!n.isRead&&<em className="pp-new">Cusub</em>}</div>):<div className="pp-empty">Ogeysiis cusub ma jiro.</div>}</section>
+   </>}
+   {active&&view==='kids'&&<><div className="pp-stat-grid"><div className="pp-card"><span className="pp-muted">Tirada carruurta</span><strong>{children.length}</strong></div><div className="pp-card"><span className="pp-muted">Hawlo harsan</span><strong>{children.reduce((s:number,x:any)=>s+Number(x.homeworkPending||0),0)}</strong></div><div className="pp-card"><span className="pp-muted">Ogeysiis aan la akhrin</span><strong>{children.reduce((s:number,x:any)=>s+Number(x.unreadNotices||0),0)}</strong></div></div>{children.map((x:any)=><section className="pp-kid-card" key={x.id}><div className="pp-row"><span><b>{x.fullName}</b><small>{x.className} · ID: {x.studentId}</small></span><span className="pp-child-avatar">{initials(x.fullName)}</span></div><div className="pp-row"><span>Form Teacher</span><b>{x.formTeacherName||'Lama qoondeyn'}</b></div><div className="pp-row"><span>Imaanshaha bishan</span><b>{x.attendanceSummary?.present??0} / {x.attendanceSummary?.total??0} maalmood</b></div><div className="pp-row"><span>Natiijooyinka</span><b>{x.marksSummary?.total??0} / {x.marksSummary?.max??0} dhibcood</b></div><div className="pp-row"><span>Hawlo harsan</span><b>{x.homeworkPending??0}</b></div><div className="pp-row"><span>Ogeysiis cusub</span><b>{x.unreadNotices??0}</b></div><div className="pp-kid-actions"><button onClick={()=>{setChildId(x.id);go('home');}}>Fur</button><button onClick={()=>{setChildId(x.id);go('att');}}>Imaanshaha</button><button onClick={()=>{setChildId(x.id);go('marks');}}>Natiijo</button></div></section>)}</>}
+   {active&&view==='tt'&&<><section className="pp-card"><div className="pp-section-title"><h2>Jadwalka fasalka</h2><span className="pp-muted">Sabti – Khamiis · Jimce fasax</span></div>{timetableState.loading?<div className="pp-empty">Jadwalka waa la soo dejinayaa…</div>:timetableState.error?<PortalError error={timetableState.error} retry={timetableState.retry}/>:!timetable.length?<div className="pp-empty">Jadwal lama diiwaangelin fasalka ilmaha.</div>:<div className="pp-table-wrap"><table className="pp-table"><thead><tr><th>Cashar</th>{['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'].map((d,i)=><th key={d}>{['Sabti','Axad','Isniin','Talaado','Arbaco','Khamiis'][i]}</th>)}</tr></thead><tbody>{Array.from({length:Math.max(1,...timetable.map((s:any)=>Number(s.periodNumber||1)))},(_,i)=>i+1).map(p=><tr key={p}><td>{p}</td>{['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'].map(d=>{const s=timetable.find((x:any)=>x.dayOfWeek===d&&Number(x.periodNumber)===p);return <td key={d}>{s?<><b>{s.subjectName||s.subjectId}</b><small>{s.startTime}–{s.endTime}</small><small>{s.teacherName||''}</small></>:'—'}</td>;})}</tr>)}</tbody></table></div>}</section><section className="pp-card"><div className="pp-section-title"><h2>Published Exam Schedule</h2>{publishedExamSchedules.length>0&&<button className="pp-text-button" onClick={()=>printExamTimetable()}>Daabac jadwalka</button>}</div>{examSchedulesState.loading?<div className="pp-empty">Jadwalka imtixaanka waa la soo dejinayaa…</div>:examSchedulesState.error?<PortalError error={examSchedulesState.error} retry={examSchedulesState.retry}/>:publishedExamSchedules.length>0?<ExamTimetablePrint schedules={publishedExamSchedules} school={school}/>:<div className="pp-empty">Weli lama daabicin jadwalka imtixaanka.</div>}</section></>}
+   {active&&view==='att'&&<section className="pp-card"><div className="pp-section-title"><h2>Imaanshaha</h2><span className="pp-muted">{new Intl.DateTimeFormat('so',{month:'long',year:'numeric'}).format(new Date())}</span></div>{attendanceState.loading?<div className="pp-empty">Diiwaanka waa la soo dejinayaa…</div>:attendanceState.error?<PortalError error={attendanceState.error} retry={attendanceState.retry}/>:<><p>Wuu yimid <b>{counts.present}</b> maalmood oo ka mid ah <b>{attendanceTotal}</b> maalmood oo dugsigu furnaa. Wuu maqnaa <b>{counts.absent}</b>, wuuna daahay <b>{counts.late}</b>.</p><div className="pp-stat-grid pp-att-stats"><div><small>Joogay</small><strong>{counts.present}</strong></div><div><small>Maqnaa</small><strong>{counts.absent}</strong></div><div><small>Daahay</small><strong>{counts.late}</strong></div></div><div className="pp-calendar">{['Ax','Is','Ta','Ar','Kh','Jim','Sab'].map(d=><b key={d}>{d}</b>)}{Array.from({length:firstDay},(_,i)=><i key={'blank'+i}/>)}{Array.from({length:monthDays},(_,i)=>{const date=month+'-'+String(i+1).padStart(2,'0');const status=attendanceByDate.get(date);return <span key={date} className={'pp-day '+(status==='present'?'is-present':status==='absent'?'is-absent':status==='late'?'is-late':'')}>{i+1}</span>;})}</div><p className="pp-muted">Cagaar = joogay · Casaan = maqnaa · Huruud = daahay</p></>}</section>}
+   {active&&view==='marks'&&<section className="pp-card"><div className="pp-section-title"><h2>Natiijooyinka</h2><span className="pp-muted">Published oo keliya</span></div>{marksState.loading?<div className="pp-empty">Natiijooyinka waa la soo dejinayaa…</div>:marksState.error?<PortalError error={marksState.error} retry={marksState.retry}/>:!marks.length?<div className="pp-empty">Weli lama daabicin natiijooyinka ilmaha.</div>:<><p>Wadarta dhibcaha: <b>{scoreTotal} / {scoreMax}</b></p><div className="pp-table-wrap"><table className="pp-table"><thead><tr><th>Maaddo</th><th>Semester</th><th>Dhibcood</th><th>Darajo</th></tr></thead><tbody>{marks.map((m:any)=><tr key={m.id}><td><b>{m.subjectName||m.subjectId}</b></td><td>{m.semester}</td><td><b>{m.totalMarks} / {Array.isArray(m.schemeSnapshot)?m.schemeSnapshot.reduce((n:number,c:any)=>n+Number(c.maxMarks||0),0):0}</b></td><td>{gradeText(m)}</td></tr>)}</tbody></table></div></>}</section>}
+   {active&&view==='hw'&&<><div className="pp-filter-tabs">{(['pending','submitted','all'] as const).map(f=><button key={f} className={homeworkFilter===f?'is-selected':''} onClick={()=>setHomeworkFilter(f)}>{f==='pending'?'Harsan ('+pending+')':f==='submitted'?'La gudbiyey ('+submitted+')':'Dhammaan'}</button>)}</div>{homeworkState.loading?<div className="pp-card pp-empty">Hawlaha waa la soo dejinayaa…</div>:homeworkState.error?<PortalError error={homeworkState.error} retry={homeworkState.retry}/>:!visibleHomework.length?<div className="pp-card pp-empty">Hawl halkan kuma jirto.</div>:visibleHomework.map((h:any)=><section className="pp-card" key={h.id}><div className="pp-section-title"><div><b>{h.subjectName||h.subjectId}</b><h3>{h.title}</h3></div><em className={!h.submission&&h.dueDate<today?'pp-overdue':h.submission?'pp-done':'pp-due'}>{!h.submission&&h.dueDate<today?'Dhaafay':h.submission?'La gudbiyey':'Harsan · '+dateLabel(h.dueDate)}</em></div><p>{h.description}</p><div className="pp-submission"><b>{h.submission?<><CheckCircle2 size={14}/> La gudbiyey</>:'Harsan'}</b>{h.submission?.submittedAt&&<small>{dateLabel(h.submission.submittedAt)}</small>}</div></section>)}</>}
+   {active&&view==='news'&&<>{noticesState.loading?<div className="pp-card pp-empty">Ogeysiisyada waa la soo dejinayaa…</div>:noticesState.error?<PortalError error={noticesState.error} retry={noticesState.retry}/>:!notices.length?<div className="pp-card pp-empty">Ogeysiis cusub ma jiro.</div>:notices.map((n:any)=><section className="pp-card" key={n.id}><div className="pp-section-title"><b>{n.title}</b><small>{dateLabel(n.publishDate)}</small></div><span className="pp-muted">{n.audience==='class'?'Fasalka ilmaha': 'Dugsi oo dhan'}</span><p className="pp-notice-body">{n.content}</p>{!n.isRead&&<button className="pp-primary-button" onClick={()=>markRead(n.id)}>Calaamadi akhriyey</button>}</section>)}<div className="pp-pagination"><button disabled={noticePage<=1} onClick={()=>setNoticePage(p=>p-1)}>Hore</button><span>{noticePage} / {noticePagination.totalPages||1}</span><button disabled={noticePage>=(noticePagination.totalPages||1)} onClick={()=>setNoticePage(p=>p+1)}>Xiga</button></div></>}
+   {active&&view==='msg'&&<section className="pp-card"><h2>Fariimaha macallimiinta ilmaha</h2>{contactsState.loading?<div className="pp-empty">Macallimiinta waa la soo dejinayaa…</div>:contactsState.error?<PortalError error={contactsState.error} retry={contactsState.retry}/>:!contacts.length?<div className="pp-empty">Macallin loo qoondeeyey ilmaha weli ma jiro.</div>:<div className="pp-message-layout"><div className="pp-contact-list">{contacts.map((c:any)=><button key={c.id} className={c.id===contactId?'is-selected':''} onClick={()=>setContactId(c.id)}>{c.fullName}<small>Macallin</small></button>)}</div><div className="pp-thread"><b>{contact?.fullName||'Macallin'}</b>{contact?.canSend===false&&<div className="pp-readonly-note">Taariikh hore · Macallinkan hadda carruurtaada looma qoondeeyo. Fariimo cusub lama diri karo.</div>}{messagesState.loading?<div className="pp-empty">Fariimaha waa la soo dejinayaa…</div>:messagesState.error?<PortalError error={messagesState.error} retry={messagesState.retry}/>:<div className="pp-chat-log">{messages.length?messages.map((m:any)=><div key={m.id} className={'pp-chat-bubble '+(m.senderId===user?.id?'mine':'')}>{m.content}<small>{dateLabel(m.timestamp)}</small></div>):<div className="pp-empty">Wada-hadal hore ma jiro. Waxaad fariin u diri kartaa macallinka.</div>}</div>}<div className="pp-pagination"><button disabled={messagePage<=1} onClick={()=>setMessagePage(p=>p-1)}>Hore</button><span>{messagePage} / {messagePagination.totalPages||1}</span><button disabled={messagePage>=(messagePagination.totalPages||1)} onClick={()=>setMessagePage(p=>p+1)}>Xiga</button></div><div className="pp-compose"><input value={messageDraft} onChange={e=>setMessageDraft(e.target.value)} maxLength={5000} disabled={contact?.canSend===false} placeholder={contact?.canSend===false?'Taariikh hore oo keliya':'Qor fariin macallinka…'}/><button disabled={sending||!messageDraft.trim()||contact?.canSend===false} onClick={send} aria-label="Dir fariinta"><Send size={17}/></button></div></div></div>}</section>}
+   {active&&view==='me'&&<section className="pp-profile"><div className="pp-card"><h2>Xogta waalidka</h2><div className="pp-row"><span>Magaca</span><b>{parent?.fullName||user?.fullName}</b></div><div className="pp-row"><span>Telefoon</span><b>{parent?.phone||user?.phone||'—'}</b></div><div className="pp-row"><span>Tirada carruurta</span><b>{children.length}</b></div>{children.map((x:any)=><div className="pp-row" key={x.id}><span>{x.fullName}</span><b>{x.studentId} · {x.className}</b></div>)}</div><div className="pp-card"><h2>Muuqaalka</h2><div className="pp-theme-options">{(['auto','light','dark'] as const).map(v=><button key={v} className={theme===v?'is-selected':''} onClick={()=>setTheme(v)}>{v==='auto'?'Otomaatig':v==='light'?<><Sun size={15}/> Iftiin</>:<><Moon size={15}/> Mugdi</>}</button>)}</div></div></section>}
+  </main></div>
+  <nav className="pp-bottom-nav" aria-label="Menu hoose">{navButton(NAV[0],true)}{navButton(NAV[1],true)}{navButton(NAV[4],true)}<div className="pp-more-wrap"><button className={'pp-nav-item is-mobile '+(moreActive||moreOpen?'is-active':'')} onClick={()=>setMoreOpen(v=>!v)} aria-expanded={moreOpen}><Menu size={19}/><span>Dheeraad</span></button>{moreOpen&&<div className="pp-more-sheet">{moreItems.map(n=>navButton(n))}</div>}</div></nav>
+ </div>;
 };

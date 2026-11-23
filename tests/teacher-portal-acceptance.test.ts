@@ -52,6 +52,8 @@ const student = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-001'
 const otherStudent = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-002', firstName: 'Other', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: otherClass.id, status: 'active' } as any);
 parentUser.linkedStudentIds = [student.id];
 await db.flush();
+await memory.from('parent_students').insert([{ id: 'taccept-parent-student-link', school_id: school.id, parent_id: parentUser.id, student_id: student.id, relation: 'guardian', revoked_at: null }]);
+await db.flush();
 await memory.from('class_subjects').insert([
   { id: 'ta-cs-math', school_id: school.id, class_id: klass.id, subject_id: subject.id, teacher_id: subjectTeacher.id, 'teachers.user_id': subjectTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 3, is_active: true },
   { id: 'ta-cs-other-class', school_id: school.id, class_id: otherClass.id, subject_id: subject.id, teacher_id: otherTeacher.id, 'teachers.user_id': otherTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 2, is_active: true },
@@ -66,6 +68,8 @@ function cookieFor(user: any, label: string) {
   db.createSession({ id: sessionId, userId: user.id, userRole: user.role, schoolId: user.schoolId, ipAddress: '127.0.0.1', userAgent: 'teacher-acceptance-test', createdAt: new Date().toISOString(), expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString() });
   return `schoolos_session=${auth.createSignedSessionToken({ sessionId, userId: user.id, role: user.role, schoolId: user.schoolId, createdAt: Date.now(), expiresAt })}`;
 }
+const studentPortalUser = makeUser(school.id, 'student', 'Student Portal User', { studentId: student.studentId });
+const studentPortalCookie = cookieFor(studentPortalUser, 'student-portal');
 const cookies = {
   form: cookieFor(formTeacherUser, 'form'),
   subject: cookieFor(subjectTeacherUser, 'subject'),
@@ -108,6 +112,15 @@ test('15.0 opening the new-school wizard persists startedAt and incomplete setup
   const payload = await response.json() as any;
   assert.equal(payload.code, 'SCHOOL_SETUP_REQUIRED');
   assert.ok(Array.isArray(payload.missing) && payload.missing.length > 0);
+});
+
+test('15.0b parent portal reads return HTTP 423 while school setup is incomplete', async () => {
+  const setupGateParent = makeUser(setupGateSchool.id, 'parent', 'Setup Gate Parent');
+  const setupGateParentCookie = cookieFor(setupGateParent, 'setup-gate-parent');
+  const response = await request('/parent/children', setupGateParentCookie);
+  assert.equal(response.status, 423, await response.clone().text());
+  const payload = await response.json() as any;
+  assert.equal(payload.code, 'SCHOOL_SETUP_REQUIRED');
 });
 
 test('15.0a wrong role remains HTTP 403 before setup readiness gating', async () => {
@@ -184,8 +197,173 @@ test('15.9 another teacher cannot grade or modify a colleague homework submissio
 });
 
 test('15.10 a parent cannot message a teacher who is not assigned to the linked child class', async () => {
-  const response = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, content: 'Please discuss my child.' });
+  const response = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, studentId: student.id, content: 'Please discuss my child.' });
   assert.equal(response.status, 403);
+});
+
+test('15.10a parent child directory returns only canonical linked students in the current school', async () => {
+  const response = await request('/parent/children', cookies.parent);
+  assert.equal(response.status, 200, await response.clone().text());
+  const payload = await response.json() as any;
+  assert.deepEqual(payload.data.children.map((child: any) => child.id), [student.id]);
+  assert.equal(payload.data.children.some((child: any) => child.id === otherStudent.id), false);
+});
+
+test('15.10ab one-child and three-child summaries stay within the same bounded query count', async () => {
+  const childTwo = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-003', firstName: 'Third', middleName: '', lastName: 'Student', gender: 'female', admissionDate: today, fatherPhone: '', classId: klass.id, status: 'active' } as any);
+  const childThree = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-004', firstName: 'Fourth', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: klass.id, status: 'active' } as any);
+  const oneChildParent = makeUser(school.id, 'parent', 'One Child Parent');
+  const threeChildParent = makeUser(school.id, 'parent', 'Three Child Parent');
+  await db.flush();
+  await memory.from('parent_students').insert([
+    { id: 'taccept-one-child-link', school_id: school.id, parent_id: oneChildParent.id, student_id: student.id, relation: 'guardian', revoked_at: null },
+    { id: 'taccept-three-child-link-1', school_id: school.id, parent_id: threeChildParent.id, student_id: student.id, relation: 'guardian', revoked_at: null },
+    { id: 'taccept-three-child-link-2', school_id: school.id, parent_id: threeChildParent.id, student_id: childTwo.id, relation: 'guardian', revoked_at: null },
+    { id: 'taccept-three-child-link-3', school_id: school.id, parent_id: threeChildParent.id, student_id: childThree.id, relation: 'guardian', revoked_at: null }
+  ]);
+  await db.flush();
+  const oneCookie = cookieFor(oneChildParent, 'one-child-query-count');
+  const threeCookie = cookieFor(threeChildParent, 'three-child-query-count');
+  const original = db.queryPage.bind(db);
+  let queryCount = 0;
+  (db as any).queryPage = (...args: any[]) => { queryCount += 1; return original(...args); };
+  try {
+    const oneResponse = await request('/parent/children', oneCookie);
+    assert.equal(oneResponse.status, 200, await oneResponse.clone().text());
+    const one = await oneResponse.json() as any;
+    const oneCount = queryCount;
+    queryCount = 0;
+    const threeResponse = await request('/parent/children', threeCookie);
+    assert.equal(threeResponse.status, 200, await threeResponse.clone().text());
+    const three = await threeResponse.json() as any;
+    const threeCount = queryCount;
+    assert.equal(one.data.children.length, 1);
+    assert.equal(three.data.children.length, 3);
+    assert.equal(threeCount, oneCount, 'three linked children must not add per-child queries');
+    assert.ok(threeCount <= 16, 'parent summary must remain below the bounded query-count ceiling');
+  } finally {
+    (db as any).queryPage = original;
+  }
+});
+
+test('15.10aa teacher attendance writes invalidate the parent child-summary cache', async () => {
+  const beforeResponse = await request('/parent/children', cookies.parent);
+  assert.equal(beforeResponse.status, 200, await beforeResponse.clone().text());
+  const before = (await beforeResponse.json() as any).data.children.find((child: any) => child.id === student.id);
+  assert.ok(before);
+  const classStudents = (await db.getStudents(school.id)).filter((row: any) => row.classId === klass.id);
+  const saved = await postJson('/attendance', cookies.form, { classId: klass.id, date: today, records: classStudents.map((row: any) => ({ studentId: row.id, status: 'present' })) });
+  assert.equal(saved.status, 200, await saved.clone().text());
+  const afterResponse = await request('/parent/children', cookies.parent);
+  assert.equal(afterResponse.status, 200, await afterResponse.clone().text());
+  const after = (await afterResponse.json() as any).data.children.find((child: any) => child.id === student.id);
+  assert.equal(after.attendanceSummary.present, before.attendanceSummary.present + (before.attendanceSummary.late || before.attendanceSummary.absent ? 1 : 0));
+  assert.equal(after.attendanceSummary.late, 0);
+  assert.equal(after.attendanceSummary.absent, 0);
+});
+
+test('15.10a1 parent message contacts are limited to the selected linked child', async () => {
+  const ownContacts = await request('/messages/contacts?studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(ownContacts.status, 200, await ownContacts.clone().text());
+  const own = await ownContacts.json() as any[];
+  assert.ok(own.some(contact => contact.id === subjectTeacherUser.id && contact.canSend === true));
+  assert.equal(own.some(contact => contact.id === otherTeacherUser.id && contact.canSend === true), false);
+  const sent = await postJson('/messages', cookies.parent, { recipientId: subjectTeacherUser.id, studentId: student.id, content: 'Message for my selected child.' });
+  assert.equal(sent.status, 201, await sent.clone().text());
+  const unrelated = await request('/messages/contacts?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
+  assert.equal(unrelated.status, 403);
+});
+
+test('15.10b parent cannot read attendance or homework for an unlinked student', async () => {
+  const attendance = await request('/attendance/student?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
+  assert.equal(attendance.status, 403);
+  const homework = await request('/assignments?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
+  assert.equal(homework.status, 403);
+});
+
+test('15.10c removed teacher assignments keep old history readable but block new messages', async () => {
+  const allowed = await request('/parent/messages?contactId=' + encodeURIComponent(subjectTeacherUser.id) + '&studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(allowed.status, 200, await allowed.clone().text());
+  await db.sendMessage({
+    recipientId: otherTeacherUser.id, recipientName: otherTeacherUser.fullName, recipientRole: 'teacher',
+    content: 'Historical conversation', schoolId: school.id, senderId: parentUser.id,
+    senderName: parentUser.fullName, senderRole: 'parent'
+  });
+  await db.flush();
+  const history = await request('/parent/messages?contactId=' + encodeURIComponent(otherTeacherUser.id) + '&studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(history.status, 200, await history.clone().text());
+  const markRead = await postJson('/messages/read', cookies.parent, { contactId: otherTeacherUser.id, studentId: student.id });
+  assert.equal(markRead.status, 200, await markRead.clone().text());
+  const sendNew = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, studentId: student.id, content: 'New message after reassignment' });
+  assert.equal(sendNew.status, 403);
+});
+
+test('15.10d parent cannot submit homework or enter student and teacher portals', async () => {
+  const assignment = db.createAssignment({ schoolId: school.id, classId: klass.id, subjectId: subject.id, teacherId: subjectTeacherUser.id, title: 'Parent read-only check', description: 'Read only', dueDate: today, maxPoints: 20 });
+  await db.flush();
+  const submit = await postJson('/assignments/' + assignment.id + '/submissions', cookies.parent, { content: 'Parent must not submit.' });
+  assert.equal(submit.status, 403);
+  assert.equal((await request('/student/me', cookies.parent)).status, 403);
+  assert.equal((await request('/teacher/subject-assignments', cookies.parent)).status, 403);
+  assert.equal((await request('/school/setup-progress', cookies.parent)).status, 403);
+});
+
+test('15.10e student cannot enter the parent portal', async () => {
+  const response = await request('/parent/children', studentPortalCookie);
+  assert.equal(response.status, 403);
+});
+
+test('15.10g student homework submissions appear in the linked parent portal', async () => {
+  const assignment = db.createAssignment({ schoolId: school.id, classId: klass.id, subjectId: subject.id, teacherId: subjectTeacher.id, title: 'Parent-visible homework', description: 'Submit chapter one.', dueDate: tomorrow, maxPoints: 20 } as any);
+  await db.flush();
+  const submitted = await postJson('/assignments/' + assignment.id + '/submissions', studentPortalCookie, { content: 'Student completed chapter one.' });
+  assert.equal(submitted.status, 201, await submitted.clone().text());
+  const response = await request('/assignments?studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(response.status, 200, await response.clone().text());
+  const homework = await response.json() as any[];
+  const visible = homework.find(item => item.id === assignment.id);
+  assert.ok(visible);
+  assert.equal(visible.submission.status, 'submitted');
+  assert.equal(visible.submission.studentId, student.id);
+});
+
+test('15.10h class-only notices are visible only to parents linked to that class', async () => {
+  const otherParent = makeUser(school.id, 'parent', 'Other Class Parent');
+  await db.flush();
+  await memory.from('parent_students').insert([{ id: 'taccept-other-parent-link', school_id: school.id, parent_id: otherParent.id, student_id: otherStudent.id, relation: 'guardian', revoked_at: null }]);
+  await db.flush();
+  const otherParentCookie = cookieFor(otherParent, 'other-class-parent');
+  const created = await postJson('/notices', cookies.admin, { title: 'Grade 7 class-only notice', content: 'This notice is only for Grade 7 parents.', audience: 'class', classId: klass.id, publishDate: today });
+  assert.equal(created.status, 201, await created.clone().text());
+  const notice = await created.json() as any;
+  const ownResponse = await request('/parent/notices?page=1&pageSize=50', cookies.parent);
+  const otherResponse = await request('/parent/notices?page=1&pageSize=50', otherParentCookie);
+  assert.equal(ownResponse.status, 200, await ownResponse.clone().text());
+  assert.equal(otherResponse.status, 200, await otherResponse.clone().text());
+  const ownItems = (await ownResponse.json() as any).data.items;
+  const otherItems = (await otherResponse.json() as any).data.items;
+  assert.ok(ownItems.some((item: any) => item.id === notice.id));
+  assert.equal(otherItems.some((item: any) => item.id === notice.id), false);
+});
+
+test('15.10i parent requests cannot cross the school tenant boundary', async () => {
+  const crossStudent = db.createStudent({ schoolId: otherSchool.id, studentId: 'OTHER-TENANT-001', firstName: 'Tenant', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: tenantClass.id, status: 'active' } as any);
+  await db.flush();
+  const attendance = await request('/attendance/student?studentId=' + encodeURIComponent(crossStudent.id), cookies.parent);
+  const homework = await request('/assignments?studentId=' + encodeURIComponent(crossStudent.id), cookies.parent);
+  assert.equal(attendance.status, 403);
+  assert.equal(homework.status, 403);
+});
+
+test('15.10f removing the canonical parent link immediately revokes child attendance access', async () => {
+  const removed = await memory.from('parent_students').update({ revoked_at: new Date().toISOString() }).eq('school_id', school.id).eq('parent_id', parentUser.id).eq('student_id', student.id);
+  assert.equal(removed.error, null);
+  assert.equal(memory.rows('parent_students').some(row => row.parent_id === parentUser.id && row.student_id === student.id && Boolean(row.revoked_at)), true);
+  const response = await request('/attendance/student?studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(response.status, 403);
+  const children = await request('/parent/children', cookies.parent);
+  assert.equal(children.status, 200);
+  assert.deepEqual((await children.json() as any).data.children, []);
 });
 
 test('15.11 a teacher cannot open another teacher personal payslip', async () => {

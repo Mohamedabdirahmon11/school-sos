@@ -5,7 +5,8 @@ const translate = (key: string) => ({
   payroll_error: 'Unable to load payslips'
 } as Record<string, string>)[key] || key;
 const studentMode = new URLSearchParams(window.location.search).get('component') === 'student';
-const user = studentMode
+const parentMode = new URLSearchParams(window.location.search).get('component') === 'parent';
+const user = parentMode ? { id: 'parent-user-visual-001', role: 'parent', fullName: 'Axmed Cabdi', phone: '+251911000001' } : studentMode
   ? { id: 'student-user-visual-001', role: 'student', fullName: 'Faadumo Axmed Cabdi', studentId: 'ST-0421' }
   : { id: 'teacher-visual-001', role: 'teacher', fullName: 'Amina Teacher', staffId: 'T-001', teacherCode: 'T-001', phone: '+251900000001' };
 const school = { id: 'school-visual-001', name: 'SchoolOS Test Academy', code: 'TEST01', timezone: 'Africa/Addis_Ababa', currency: 'ETB', academicYear: '2026-2027', brandColor: '#0e6a62', subscription: { status: 'active' }, setupData: { calendar: 'ethiopian' }, studentAccessEnabled: true };

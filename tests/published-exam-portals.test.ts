@@ -18,7 +18,7 @@ test('published exam schedules are school-scoped and limited to authorized porta
   assert.ok(storage.includes("schedule.status === 'published'"));
   assert.ok(client.includes('getPublishedExamSchedules(classId?: string)'));
   assert.ok(student.includes('ApiClient.getPublishedExamSchedules(studentRecord.classId)'));
-  assert.ok(parent.includes('ApiClient.getPublishedExamSchedules(currentChild.classId)'));
+  assert.ok(parent.includes('ApiClient.getPublishedExamSchedules(child.classId)'));
   assert.ok(teacher.includes('ApiClient.getPublishedExamSchedules()'));
   assert.ok(student.includes('Published Exam Schedule'));
   assert.ok(parent.includes('Published Exam Schedule'));

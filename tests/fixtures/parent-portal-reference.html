@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parent Portal – Waalidka</title>
+<style>
+:root{--bg:#f3f5fa;--card:#fff;--ink:#17203a;--mut:#62708f;--line:#dde2ee;--nav:#1d2b53;--navink:#e9edf8;--acc:#e8a23a;--accink:#2a1c00;--ok:#1b7f4b;--warn:#a65b00;--bad:#b3261e;--soft:#eaeffa;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1424;--card:#171f36;--ink:#e8ecf8;--mut:#9aa7c7;--line:#2a3555;--nav:#0a0f1d;--navink:#d7ddf0;--acc:#f0b255;--ok:#4cc58a;--warn:#e8a042;--bad:#f2867f;--soft:#1e2846;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1424;--card:#171f36;--ink:#e8ecf8;--mut:#9aa7c7;--line:#2a3555;--nav:#0a0f1d;--navink:#d7ddf0;--acc:#f0b255;--ok:#4cc58a;--warn:#e8a042;--bad:#f2867f;--soft:#1e2846;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Trebuchet MS","Segoe UI",system-ui,sans-serif}
+h1,h2,h3{font-family:Georgia,serif;margin:0}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+aside{background:var(--nav);color:var(--navink);padding:18px 12px;position:sticky;top:0;height:100vh}
+.me{display:flex;gap:10px;align-items:center;padding:6px 8px 16px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--acc);color:var(--accink);display:grid;place-items:center;font-weight:700;flex:none}
+.me small{opacity:.75;display:block}
+#nav{display:flex;flex-direction:column;gap:2px}
+.nb{display:flex;align-items:center;gap:10px;background:none;border:0;color:inherit;font:inherit;padding:10px;border-radius:8px;cursor:pointer;text-align:left;position:relative}
+.nb:hover{background:rgba(255,255,255,.08)}.nb.on{background:rgba(255,255,255,.16);font-weight:700}
+.bd{margin-left:auto;background:var(--acc);color:var(--accink);border-radius:10px;font-size:11px;padding:0 7px;font-weight:700}
+main{padding:22px clamp(14px,4vw,40px) 40px;max-width:980px;width:100%}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:16px}
+.top p{margin:2px 0 0;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.big{font:700 30px Georgia,serif}
+.lbl{color:var(--mut);font-size:13px}
+.bar{height:8px;background:var(--soft);border-radius:4px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--ok)}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}
+.pill{font-size:12px;padding:2px 9px;border-radius:10px;background:var(--soft);white-space:nowrap}
+.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
+.btn{background:var(--acc);color:var(--accink);border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer}
+.btn.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:13px}
+.cal b{color:var(--mut);font-weight:600}
+.d{padding:8px 0;border-radius:8px;background:var(--soft)}.d.P{background:color-mix(in srgb,var(--ok) 25%,transparent)}.d.A{background:color-mix(in srgb,var(--bad) 30%,transparent)}.d.L{background:color-mix(in srgb,var(--warn) 30%,transparent)}.d.x{background:none}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+.tt td.now{background:color-mix(in srgb,var(--acc) 30%,transparent);font-weight:700}
+.chat{max-height:300px;overflow:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.m{max-width:80%;padding:8px 12px;border-radius:12px;background:var(--soft)}.m.me2{align-self:flex-end;background:var(--acc);color:var(--accink)}
+.empty{color:var(--mut);font-style:italic;padding:10px 0}
+#bnav{display:none}.sheet{position:absolute;right:6px;bottom:calc(100% + 6px);background:var(--nav);border:1px solid var(--line);border-radius:12px;padding:6px;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.3)}.sheet .nb{flex-direction:row;font-size:15px;gap:10px;padding:11px 14px;width:100%}.sheet .bd{position:static;margin-left:auto}
+@media(max-width:760px){
+ .app{display:block}
+ aside{position:fixed;bottom:0;left:0;right:0;top:auto;height:auto;z-index:5;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+ .me{display:none}
+ #nav{display:none}
+ #bnav{display:flex;position:relative}#bnav>.nb{flex:1;align-items:center}
+ .nb{flex-direction:column;gap:0;font-size:11px;padding:6px 10px;white-space:nowrap}
+ .nb .ic{font-size:20px}.bd{position:absolute;top:2px;right:2px;margin:0}
+ main{padding-bottom:100px}
+}
+
+.sect{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.65;padding:6px 10px 4px}
+#kl{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+.kb .av{width:30px;height:30px;font-size:12px}.kb small{display:block;opacity:.7;font-size:12px}
+.strip{display:none;gap:8px;overflow-x:auto;margin:0 0 14px;padding-bottom:2px}
+.strip .btn{white-space:nowrap}
+.kid{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.ro{font-size:12px;color:var(--mut);margin:-6px 0 12px}
+@media(max-width:760px){#kl,.sect{display:none}.strip{display:flex}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside><div class="me"><div class="av">AC</div><div><b>Axmed Cabdi</b><small>Waalid · 3 ilmood</small></div></div><div class="sect">Caruurtayda</div><div id="kl"></div><nav id="nav" aria-label="Qaybaha"></nav><nav id="bnav" aria-label="Menu hoose"></nav></aside>
+<main id="main"></main>
+</div>
+<script>
+const KEY='parent-portal-v2',DAYS=['Axad','Isniin','Talaado','Arbaco','Khamiis','Jimce','Sabti'],TIMES=['08:00','08:45','09:30','10:30','11:15','12:00'],WK=[6,0,1,2,3,4];
+const SUBJ=['Xisaab','Soomaali','Ingiriisi','Sayniis','Diin','Carabi'];
+const TEACH={Xisaab:'Axmed Cali',Soomaali:'Hodan Nuur',Ingiriisi:'Cumar Maxamed',Sayniis:'Sacdiyo Yuusuf',Diin:'Shiikh Warsame',Carabi:'Shiikh Warsame'};
+const D=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const KIDS=[
+ {id:'k1',n:'Faadumo Axmed',c:'8A',sid:'ST-0421',ft:'Axmed Cali',seed:11,m:[[18,27,52],[17,24,45],[15,22,41],[19,26,48],[19,28,55],[14,20,38]],pub:[1,1,1,1,1,0]},
+ {id:'k2',n:'Cabdi Axmed',c:'5B',sid:'ST-0388',ft:'Hodan Nuur',seed:7,m:[[12,20,40],[15,22,50],[10,18,35],[16,24,44],[18,25,50],[13,19,36]],pub:[1,1,1,1,1,1]},
+ {id:'k3',n:'Hodan Axmed',c:'2A',sid:'ST-0510',ft:'Cumar Maxamed',seed:5,m:[[19,28,56],[18,27,54],[17,26,50],[19,29,57],[20,30,58],[18,27,52]],pub:[1,1,0,0,0,0]}];
+const HW={k1:[['Xisaab','Layliska 5.2 (1–12)',1,'p'],['Soomaali','Qoraal: Xilligii Roobka (1 bog)',3,'p'],['Sayniis','Sawir unugga dhirta',-1,'s'],['Ingiriisi','Vocabulary unit 6',-2,'p']],k2:[['Xisaab','Isku-dar iyo jarid',2,'p'],['Sayniis','Aqri cutubka 3',-1,'s']],k3:[['Soomaali','Higaadda xarfaha',2,'p']]};
+const NOT=[{id:1,t:'Imtixaanka dhexe: jadwalka cusub',b:'Imtixaanku wuxuu bilaabmayaa toddobaadka dambe. Soo qaad aalado qoraal oo buuxa.',d:D(-1),a:'Dugsi oo dhan'},{id:2,t:'Maalinta Isbeddelka Waalidka',b:'Waalidku waxay la kulmayaan macallimiinta Khamiista, 10:00 – 13:00.',d:D(-3),a:'Dugsi oo dhan'},{id:3,t:'Safar waxbarasho: Fasalka 5B',b:'Fasalka 5B wuxuu booqanayaa matxafka Axaddii. Fadlan ogolaansho soo dir.',d:D(-4),a:'Fasalka 5B',k:'k2'},{id:4,t:'Xirnaanta Jimcaha',b:'Dugsigu wuu xidhan yahay Jimce kasta; Sabtida way furan tahay.',d:D(-8),a:'Dugsi oo dhan'}];
+const def=()=>({view:'home',child:'k1',read:[4],msgs:{k1:{Xisaab:[{f:'t',x:'Fadlan layliska 5.2 si taxadar leh u samee.'}]}},theme:'auto',hwf:'p',mt:'Xisaab'});
+let S;try{S=Object.assign(def(),JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=def()}
+if(!KIDS.some(k=>k.id===S.child))S.child='k1';
+let moreOpen=false;
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+if(S.theme!=='auto')document.documentElement.dataset.theme=S.theme;
+const cur=()=>KIDS.find(k=>k.id===S.child),ini=n=>n.split(' ').map(x=>x[0]).join('');
+const grade=p=>p>=90?['A+','ok']:p>=80?['A','ok']:p>=70?['B','ok']:p>=60?['C','warn']:p>=50?['D','warn']:['F','bad'];
+function att(k){const o={},t=new Date(),y=t.getFullYear(),m=t.getMonth(),n=new Date(y,m+1,0).getDate();for(let i=1;i<=n;i++){const dt=new Date(y,m,i);if(dt.getDay()===5||dt>t)continue;o[i]=(i%k.seed===0)?'A':(i%(k.seed+4)===0)?'L':'P'}return {o,n,y,m}}
+const apct=k=>{const v=Object.values(att(k).o);return Math.round(v.filter(x=>x==='P').length*100/(v.length||1))};
+const avg=k=>{const p=k.m.filter((_,i)=>k.pub[i]);return p.length?Math.round(p.reduce((s,m)=>s+m.reduce((a,b)=>a+b,0)/110*100,0)/p.length):0};
+const acnt=k=>{const v=Object.values(att(k).o);return {p:v.filter(x=>x==='P').length,a:v.filter(x=>x==='A').length,l:v.filter(x=>x==='L').length,t:v.length}};
+const tmk=k=>{const r=k.m.filter((_,i)=>k.pub[i]);return {got:r.reduce((s,m)=>s+m.reduce((a,b)=>a+b,0),0),max:r.length*110,n:r.length}};
+const gw=p=>p>=90?'Aad u wanaagsan':p>=80?'Wanaagsan':p>=70?'Fiican':p>=60?'Dhexdhexaad':p>=50?'Hoose':'U baahan caawimaad';
+const hwOf=k=>(HW[k.id]||[]).map(h=>({s:h[0],t:h[1],due:D(h[2]),st:h[3]}));
+const pend=k=>hwOf(k).filter(h=>h.st==='p').length;
+const nOf=k=>NOT.filter(n=>!n.k||n.k===k.id),unr=k=>nOf(k).filter(n=>!S.read.includes(n.id)).length;
+const ttOf=k=>{const r=KIDS.indexOf(k);return Object.fromEntries(WK.map((d,i)=>[d,SUBJ.map((_,j)=>SUBJ[(j+i+r)%6])]))};
+const NAV=[['home','🏠','Hoyga'],['kids','👨‍👩‍👧','Caruurta'],['tt','🗓️','Jadwal'],['att','✅','Imaanshaha'],['marks','📊','Natiijo'],['hw','📚','Hawlo'],['news','📢','Ogeysiis'],['msg','💬','Fariimo'],['me','👤','Profile']];
+const tot=()=>KIDS.reduce((s,x)=>s+pend(x)+unr(x),0);
+function nav(k){
+ document.getElementById('kl').innerHTML=KIDS.map(x=>{const b=pend(x)+unr(x);return `<button class="nb kb ${x.id===k.id?'on':''}" data-kid="${x.id}" ${x.id===k.id?'aria-current="true"':''}><div class="av">${ini(x.n)}</div><div><b>${esc(x.n.split(' ')[0])}</b><small>Fasalka ${x.c}</small></div>${b?`<span class="bd">${b}</span>`:''}</button>`}).join('');
+ document.getElementById('nav').innerHTML=NAV.map(([v,i,t])=>{const b=v==='hw'?pend(k):v==='news'?unr(k):0;return `<button class="nb ${S.view===v?'on':''}" data-v="${v}" ${S.view===v?'aria-current="page"':''}><span class="ic">${i}</span>${t}${b?`<span class="bd">${b}</span>`:''}</button>`}).join('');
+ const B=n=>NAV.find(x=>x[0]===n),u=unr(k);
+ const bt=(x,bd)=>`<button class="nb ${S.view===x[0]?'on':''}" data-v="${x[0]}"><span class="ic">${x[1]}</span>${x[2]}${bd?`<span class="bd">${bd}</span>`:''}</button>`;
+ const rest=['hw','tt','att','news','msg','me'].map(B),inRest=rest.some(r=>r[0]===S.view);
+ document.getElementById('bnav').innerHTML=['home','kids','marks'].map(B).map(x=>bt(x,x[0]==='kids'?tot():0)).join('')+`<button class="nb ${inRest||moreOpen?'on':''}" data-more="1" aria-expanded="${moreOpen}"><span class="ic">☰</span>Dheeraad${u?`<span class="bd">${u}</span>`:''}</button>`+(moreOpen?`<div class="sheet">${rest.map(x=>bt(x,x[0]==='news'?u:x[0]==='hw'?pend(k):0)).join('')}</div>`:'')}
+const head=(t,s)=>`<div class="top"><div><h1>${t}</h1><p>${s||''}</p></div></div>`;
+const V={
+home(k){const a=att(k),d=new Date().getDay(),ds=ttOf(k)[d]||[],pc=apct(k),ac=acnt(k),av=avg(k),g=grade(av),tm=tmk(k);
+ return head('Soo dhawoow, Axmed 👋',`${DAYS[d]} · ${new Date().toLocaleDateString('so')} · waxaad eegaysaa <b>${esc(k.n)}</b>`)+`<div class="grid">
+ <div class="card"><div class="lbl">Imaanshaha bishan</div><div class="big">${ac.p} / ${ac.t}</div><div class="lbl">Wuu yimid ${ac.p} maalmood oo ka mid ah ${ac.t} maalmood oo dugsigu furnaa</div><div class="bar"><i style="width:${pc}%"></i></div></div>
+ <div class="card"><div class="lbl">Natiijooyinka (dhibcaha)</div><div class="big">${tm.got} / ${tm.max}</div><span class="pill ${g[1]}">${gw(av)}</span><div class="lbl">Wadarta dhibcaha ${tm.n} maaddo oo la daabacay</div></div>
+ <div class="card"><div class="lbl">Hawlo harsan</div><div class="big">${pend(k)}</div><button class="btn sec" data-v="hw">Fur hawlaha</button></div></div>
+ <div class="card"><h3>Jadwalka maanta · ${esc(k.n.split(' ')[0])}</h3>${ds.length?ds.map((s,i)=>`<div class="row"><span>${TIMES[i]} · <b>${s}</b></span><span class="lbl">${TEACH[s]}</span></div>`).join(''):'<div class="empty">Maanta waa maalin fasax ah (Jimce).</div>'}</div>
+ <div class="card"><h3>Ogeysiisyada ugu dambeeyay</h3>${nOf(k).slice(0,2).map(n=>`<div class="row"><span>${esc(n.t)}</span>${S.read.includes(n.id)?'':'<span class="pill warn">cusub</span>'}</div>`).join('')}</div>`},
+kids(k){return head('Caruurtayda',`${KIDS.length} ilmood oo lagu xidhay akoonkaaga`)+`<div class="grid"><div class="card"><div class="lbl">Hawlo harsan (dhammaan)</div><div class="big">${KIDS.reduce((s,x)=>s+pend(x),0)}</div></div><div class="card"><div class="lbl">Ogeysiis aan la akhrin</div><div class="big">${KIDS.reduce((s,x)=>s+unr(x),0)}</div></div></div>`+KIDS.map(x=>{const g=grade(avg(x));return `<div class="card" style="${x.id===k.id?'border-color:var(--acc)':''}"><div class="kid"><div class="av">${ini(x.n)}</div><div style="flex:1"><b>${esc(x.n)}</b><div class="lbl">Fasalka ${x.c} · ${x.sid}</div></div>${x.id===k.id?'<span class="pill ok">la eegayo</span>':''}</div>
+ <div class="row"><span class="lbl">Form Teacher</span><b>${esc(x.ft)}</b></div><div class="row"><span class="lbl">Imaanshaha bishan</span><b>${acnt(x).p} / ${acnt(x).t} maalmood</b></div><div class="row"><span class="lbl">Natiijooyinka</span><span class="pill ${g[1]}">${tmk(x).got} / ${tmk(x).max} dhibcood</span></div><div class="row"><span class="lbl">Hawlo harsan</span><b>${pend(x)}</b></div><div class="row"><span class="lbl">Ogeysiis cusub</span><b>${unr(x)}</b></div>
+ <div class="tabs" style="margin:10px 0 0"><button class="btn" data-pickv="${x.id}|home">Fur ${esc(x.n.split(' ')[0])}</button><button class="btn sec" data-pickv="${x.id}|att">Imaanshaha</button><button class="btn sec" data-pickv="${x.id}|marks">Natiijo</button></div></div>`}).join('')+`<p class="lbl">Ilmo cusub ku darista ama beddelka lambarka waxaa sameeya dugsiga oo keliya.</p>`},
+tt(k){const d=new Date().getDay(),T=ttOf(k);return head('Jadwalka fasalka',`${esc(k.n)} · Fasalka ${k.c} · Sabti – Khamiis`)+`<div class="card wrap"><table class="tt"><tr><th>Waqti</th>${WK.map(x=>`<th>${DAYS[x]}</th>`).join('')}</tr>${TIMES.map((t,i)=>`<tr><td>${t}</td>${WK.map(x=>`<td class="${x===d?'now':''}">${T[x][i]}</td>`).join('')}</tr>`).join('')}</table></div><p class="lbl">Maalinta maanta waa la iftiimiyey. Jimcuhu waa fasax.</p>`},
+att(k){const a=att(k),ac=acnt(k),v=Object.values(a.o),c=q=>v.filter(x=>x===q).length,f=new Date(a.y,a.m,1).getDay();
+ return head('Imaanshaha',`${esc(k.n)} · `+new Date(a.y,a.m).toLocaleDateString('so',{month:'long',year:'numeric'}))+`<div class="card"><div class="big">${ac.p} / ${ac.t}</div><div>Ilmahaagu wuu yimid <b>${ac.p}</b> maalmood oo ka mid ah <b>${ac.t}</b> maalmood oo dugsigu furnaa bishan. Wuu maqnaa <b>${ac.a}</b> maalmood, wuuna daahay <b>${ac.l}</b> maalmood.</div></div><div class="grid"><div class="card"><div class="lbl">Joogay</div><div class="big" style="color:var(--ok)">${c('P')}</div></div><div class="card"><div class="lbl">Maqnaa</div><div class="big" style="color:var(--bad)">${c('A')}</div></div><div class="card"><div class="lbl">Daahay</div><div class="big" style="color:var(--warn)">${c('L')}</div></div></div>
+ <div class="card"><div class="cal">${DAYS.map(d=>`<b>${d.slice(0,3)}</b>`).join('')}${'<div></div>'.repeat(f)}${Array.from({length:a.n},(_,i)=>`<div class="d ${a.o[i+1]||'x'}">${i+1}</div>`).join('')}</div><p class="lbl">Cagaar = joogay · Casaan = maqnaa · Huruud = daahay</p></div>`},
+marks(k){const R=k.m.map((m,i)=>[SUBJ[i],m,k.pub[i]]),P=R.filter(r=>r[2]),U=R.filter(r=>!r[2]);
+ return head('Natiijooyinka',`${esc(k.n)} · kaliya natiijooyinka la daabacay (Published)`)+(P.length?`<div class="card"><div class="lbl">Wadarta dhibcaha</div><div class="big">${tmk(k).got} / ${tmk(k).max}</div><div>${tmk(k).n} maaddo oo la daabacay. Maaddo kasta waa <b>110 dhibcood</b>: Quiz 20 + Dhexe 30 + Final 60.</div></div><div class="card wrap"><table><tr><th>Maaddo</th><th>Quiz /20</th><th>Dhexe /30</th><th>Final /60</th><th>Wadarta</th><th>Darajo</th></tr>${P.map(([s,m])=>{const p=Math.round(m.reduce((a,b)=>a+b,0)*100/110),g=grade(p);return `<tr><td><b>${s}</b></td><td>${m[0]}</td><td>${m[1]}</td><td>${m[2]}</td><td><b>${m.reduce((a,b)=>a+b,0)} / 110</b></td><td><span class="pill ${g[1]}">${g[0]} · ${gw(p)}</span></td></tr>`}).join('')}</table></div>`:'<div class="empty">Weli natiijo lama daabicin.</div>')+(U.length?`<div class="card"><b>Weli lama daabicin:</b> ${U.map(r=>r[0]).join(', ')} <span class="lbl">— macallinku wuu gudbiyey, admin ayaa daabacaya.</span></div>`:'')},
+hw(k){const f=S.hwf,L=hwOf(k).filter(h=>f==='a'||h.st===f).sort((a,b)=>a.due.localeCompare(b.due));
+ return head('Hawlaha guriga',`${esc(k.n)} · ${pend(k)} harsan`)+'<div class="ro">Waalidku wuu eegi karaa kaliya; hawlaha ardayga laftiisa ayaa gudbiya.</div>'+`<div class="tabs">${[['p','Harsan'],['s','La gudbiyey'],['a','Dhammaan']].map(([q,t])=>`<button class="btn ${f===q?'':'sec'}" data-f="${q}">${t}</button>`).join('')}</div>`+
+ (L.length?L.map(h=>{const late=h.st==='p'&&h.due<D(0);return `<div class="card"><div class="row" style="border:0"><div><b>${h.s}</b><div>${esc(h.t)}</div><span class="lbl">Dhammaad: ${h.due}</span> ${late?'<span class="pill bad">dhaafay</span>':''}</div>${h.st==='s'?'<span class="pill ok">✓ la gudbiyey</span>':'<span class="pill warn">harsan</span>'}</div></div>`}).join(''):'<div class="empty">Hawl halkan ma jirto.</div>')},
+news(k){return head('Ogeysiisyada',`${unr(k)} aan la akhrin`)+nOf(k).map(n=>`<div class="card"><div class="row" style="border:0"><b>${esc(n.t)}</b><span class="lbl">${n.d}</span></div><span class="pill">${esc(n.a)}</span><p style="margin:8px 0">${esc(n.b)}</p>${S.read.includes(n.id)?'':`<button class="btn sec" data-nr="${n.id}">Calaamadi akhriyey</button>`}</div>`).join('')},
+msg(k){const t=S.mt,L=((S.msgs[k.id]||{})[t])||[];return head('Fariimaha',`Macallimiinta ${esc(k.n.split(' ')[0])} oo keliya`)+`<div class="tabs">${SUBJ.map(x=>`<button class="btn ${t===x?'':'sec'}" data-mt="${x}">${x}</button>`).join('')}</div><div class="card"><b>${esc(TEACH[t])}</b> <span class="lbl">· ${t}</span><div class="chat" id="chat">${L.length?L.map(m=>`<div class="m ${m.f==='s'?'me2':''}">${esc(m.x)}</div>`).join(''):'<div class="empty">Wada-hadal ma jiro. Weydii su’aal.</div>'}</div><div style="display:flex;gap:8px"><input id="mi" placeholder="Qor fariin…" maxlength="500"><button class="btn" data-send="1">Dir</button></div></div>`},
+me(k){return head('Profile-ka')+`<div class="card">${[['Waalid / Mas’uul','Axmed Cabdi'],['Telefoon','+252 61 000 0000'],['Tirada caruurta',KIDS.length],['Ilmaha la eegayo',k.n+' ('+k.sid+')'],['Fasal',k.c],['Form Teacher',k.ft],['Sanad dugsiyeed','2026/2027']].map(([a,b])=>`<div class="row"><span class="lbl">${a}</span><b>${esc(b)}</b></div>`).join('')}</div>
+ <div class="card"><label class="lbl">Muuqaalka</label><select id="th"><option value="auto">Otomaatig</option><option value="light">Iftiin</option><option value="dark">Mugdi</option></select></div>`}
+};
+function render(){const k=cur();nav(k);
+ document.getElementById('main').innerHTML=`<div class="strip">${KIDS.map(x=>`<button class="btn ${x.id===k.id?'':'sec'}" data-kid="${x.id}">${esc(x.n.split(' ')[0])}${pend(x)+unr(x)?' ('+(pend(x)+unr(x))+')':''}</button>`).join('')}</div>`+V[S.view](k);
+ const th=document.getElementById('th');if(th)th.value=S.theme;const c=document.getElementById('chat');if(c)c.scrollTop=1e6}
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+ if(d.more){moreOpen=!moreOpen;render();return}
+ if(d.v){S.view=d.v;moreOpen=false}
+ else if(d.kid){S.child=d.kid;moreOpen=false}
+ else if(d.pickv){const p=d.pickv.split('|');S.child=p[0];S.view=p[1]}
+ else if(d.f)S.hwf=d.f;
+ else if(d.nr){S.read.push(Number(d.nr))}
+ else if(d.mt)S.mt=d.mt;
+ else if(d.send){const i=document.getElementById('mi'),v=i.value.trim();if(!v)return;const id=S.child;S.msgs[id]=S.msgs[id]||{};(S.msgs[id][S.mt]=S.msgs[id][S.mt]||[]).push({f:'s',x:v})}
+ else return;save();render();if(d.v||d.pickv)scrollTo(0,0)});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='mi')document.querySelector('[data-send]').click()});
+document.addEventListener('change',e=>{if(e.target.id==='th'){S.theme=e.target.value;if(S.theme==='auto')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=S.theme;save()}});
+render();
+</script>
+</body>
+</html>
