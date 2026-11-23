@@ -125,23 +125,23 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F3F6F6] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="schoolos-login-page min-h-screen bg-[#F3F6F6] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="w-12 h-12 rounded-xl bg-[#0B2B2A] text-white flex items-center justify-center font-bold text-2xl mx-auto shadow-md">
           S
         </div>
-        <h2 className="mt-4 text-2xl font-bold tracking-tight text-[#132A29]">
+        <h2 className="schoolos-login-title mt-4 text-2xl font-bold tracking-tight text-[#132A29]">
           SchoolOS Cloud SaaS
         </h2>
-        <p className="mt-1 text-xs text-[#64748B]">
+        <p className="schoolos-login-muted mt-1 text-xs text-[#64748B]">
           Enterprise Multi-School Management & Governance Platform
         </p>
       </div>
 
       {/* Main Login Card */}
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-6 px-4 shadow-sm border border-[#E2E8F0] sm:rounded-xl sm:px-8">
+        <div className="schoolos-login-card bg-white py-6 px-4 shadow-sm border border-[#E2E8F0] sm:rounded-xl sm:px-8">
           
           {pinChangeRequired ? (
             <form className="space-y-4" onSubmit={handleBootstrapPinChange}>
