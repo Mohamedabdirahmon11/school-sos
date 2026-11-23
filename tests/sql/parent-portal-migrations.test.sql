@@ -24,6 +24,7 @@ CREATE TABLE public.students (
   father_phone text,
   mother_phone text
 );
+CREATE TABLE public.notice_reads (id varchar(160) PRIMARY KEY, school_id varchar(64) NOT NULL, notice_id varchar(64) NOT NULL, user_id varchar(64) NOT NULL, read_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE public.direct_messages (
   id varchar(64) PRIMARY KEY,
   school_id varchar(64) NOT NULL,
@@ -39,6 +40,7 @@ INSERT INTO public.students(id,school_id,father_phone,mother_phone) VALUES
 INSERT INTO public.users(id,school_id,role,linked_student_ids,phone,parent_phone) VALUES
  ('parent-array','school-a','parent',ARRAY['student-array'],'+251900000001',''),
  ('parent-phone','school-a','parent',ARRAY[]::text[],'+251900000002','');
+INSERT INTO public.notice_reads(id,school_id,notice_id,user_id) VALUES ('read-backfill','school-a','notice-1','parent-array');
 \ir ../../supabase/migrations/20261123010000_parent_portal_relationships.sql
 \ir ../../supabase/migrations/20261123010000_parent_portal_relationships.sql
 
@@ -53,8 +55,12 @@ BEGIN
   IF NOT has_table_privilege('service_role','public.parent_students','SELECT') THEN
     RAISE EXCEPTION 'Service role must read canonical parent links.';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.notice_reads WHERE id='read-backfill' AND parent_id='parent-array') THEN
+    RAISE EXCEPTION 'Existing parent notice receipts must be backfilled to parent_id.';
+  END IF;
 END $$;
 
+INSERT INTO public.notice_reads(id,school_id,notice_id,user_id) VALUES ('read-trigger','school-a','notice-2','parent-phone');
 INSERT INTO public.direct_messages(id,school_id,sender_id,recipient_id,content)
 VALUES ('message-keep','school-a','parent-array','teacher-a','Keep message history.');
 UPDATE public.users SET linked_student_ids=ARRAY[]::text[] WHERE id='parent-array';
@@ -65,6 +71,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-phone' AND student_id='student-phone') THEN
     RAISE EXCEPTION 'Legacy guardian-phone backfill must be retained.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.notice_reads WHERE id='read-trigger' AND parent_id='parent-phone') THEN
+    RAISE EXCEPTION 'Parent notice read inserts must record parent_id.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.direct_messages WHERE id='message-keep') THEN
     RAISE EXCEPTION 'Revoking a parent link must preserve message history.';
