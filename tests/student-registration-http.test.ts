@@ -143,3 +143,36 @@ test('bulk student PIN reset returns one-time PINs and stores hashes for the sel
   assert.equal(Object.hasOwn(student, 'pin'), false);
   assert.equal(Object.hasOwn(studentUser, 'pin'), false);
 });
+
+
+test('student ID and normalized parent phone logins are school-scoped and require temporary PIN rotation', async () => {
+  const student = memory.rows('students').find(row => row.student_id === 'S001');
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
+  const parentUser = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
+  assert.ok(student && studentUser && parentUser);
+  studentUser.must_change_password = true;
+  parentUser.must_change_password = true;
+
+  const login = (payload: Record<string, unknown>) => fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const studentLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 's001', pin: '123456' });
+  assert.equal(studentLogin.status, 200);
+  const studentResult = await studentLogin.json() as any;
+  assert.equal(studentResult.requirePinChange, true);
+  assert.ok(studentResult.challengeToken);
+
+  const parentLogin = await login({ role: 'parent', schoolCode: 'STU', phone: '+251-911-234-567', pin: '123456' });
+  assert.equal(parentLogin.status, 200);
+  const parentResult = await parentLogin.json() as any;
+  assert.equal(parentResult.requirePinChange, true);
+  assert.ok(parentResult.challengeToken);
+
+  const wrongSchoolLogin = await login({ role: 'student', schoolCode: 'OTH', studentId: 'S001', pin: '123456' });
+  assert.equal(wrongSchoolLogin.status, 401);
+  const invalidPinLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin: '111111' });
+  assert.equal(invalidPinLogin.status, 401);
+});
