@@ -94,11 +94,19 @@ test('student registration generates IDs server-side and reuses one normalized g
   assert.equal(secondResponse.status, 201);
   const second = await secondResponse.json() as any;
   assert.notEqual(second.studentId, first.studentId);
+
+  const thirdResponse = await register('Sahra Yusuf Noor', '+251 911 234 567', 'CLIENT-SUPPLIED-003');
+  assert.equal(thirdResponse.status, 201);
+  const third = await thirdResponse.json() as any;
+  assert.notEqual(third.studentId, first.studentId);
+  assert.notEqual(third.studentId, second.studentId);
+
   const parents = memory.rows('users').filter(row => row.role === 'parent' && row.school_id === 'student-school');
   assert.equal(parents.length, 2);
   assert.equal(parent.pin_hash, originalParentPinHash);
-  assert.equal(parent.linked_student_ids.length, 2);
-  assert.equal(memory.rows('students').filter(row => row.school_id === 'student-school').length, 2);
+  assert.equal(parent.linked_student_ids.length, 3);
+  assert.ok(parent.linked_student_ids.includes(firstStudent.id));
+  assert.equal(memory.rows('students').filter(row => row.school_id === 'student-school').length, 3);
 });
 
 
