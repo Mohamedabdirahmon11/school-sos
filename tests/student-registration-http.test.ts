@@ -214,7 +214,7 @@ test('parent child selection is persisted in the signed session and rejects unli
   parent.must_change_password = false;
   studentUser.must_change_password = false;
 
-  const makeSession = (userId: string, role: string, id: string) => {
+  const makeSession = (userId: string, role: 'student' | 'parent', id: string) => {
     const expiresAt = Date.now() + 60 * 60 * 1000;
     memory.rows('user_sessions').push({
       id, userId, userRole: role, schoolId: 'student-school',
