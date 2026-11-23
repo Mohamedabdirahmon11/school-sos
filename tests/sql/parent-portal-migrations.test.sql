@@ -40,11 +40,11 @@ CREATE TABLE public.direct_messages (
 INSERT INTO public.schools(id) VALUES ('school-a'),('school-b');
 INSERT INTO public.students(id,school_id,father_phone,mother_phone) VALUES
  ('student-array','school-a','+251900000001',''),
- ('student-phone','school-a','+251900000002',''),
+ ('student-phone','school-a','','+251900000002'),
  ('student-cross','school-b','+251900000003','');
 INSERT INTO public.users(id,school_id,role,linked_student_ids,phone,parent_phone) VALUES
  ('parent-array','school-a','parent',ARRAY['student-array'],'+251900000001',''),
- ('parent-phone','school-a','parent',ARRAY[]::text[],'+251900000002','');
+ ('parent-phone','school-a','parent',ARRAY[]::text[],'+251900000009','+251900000002');
 INSERT INTO public.notice_reads(id,school_id,notice_id,user_id) VALUES ('read-backfill','school-a','notice-1','parent-array');
 \ir ../../supabase/migrations/20261123010000_parent_portal_relationships.sql
 \ir ../../supabase/migrations/20261123010000_parent_portal_relationships.sql
