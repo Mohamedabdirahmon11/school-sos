@@ -166,7 +166,7 @@ test('assignment removal keeps old conversation history but disables new parent 
  assert.match(contacts,/canSend/);
  assert.match(parentHistory,/currentlyAssigned/);
  assert.match(parentHistory,/conversationItems\.length === 0/);
- assert.match(send,/Parents may message only teachers assigned to their children/);
+ assert.match(send,/Parents may message only teachers assigned to the selected child/);
  assert.match(portal,/contact\?\.canSend===false/);
 });
 
