@@ -34,7 +34,8 @@ import {
   verify2FACode,
   hashRecoveryCode,
   findRecoveryCodeIndex,
-  generateRecoveryCodes
+  generateRecoveryCodes,
+  generateTemporaryPin
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
@@ -2651,7 +2652,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     const names = splitStudentName(row.data.studentName);
     const id = `std-${randomUUID()}`;
     const studentId = newStudentIds[rowIndex];
-    const pin = String(100000 + (randomBytes(4).readUInt32BE(0) % 900000));
+    const pin = generateTemporaryPin();
     const pinHash = hashPin(pin);
     const classId = classIds.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`)!;
     const klass = classes.find(item => item.id === classId) || classPayload.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`);
@@ -5745,7 +5746,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     res.status(400).json({ error: 'Address must be 500 characters or fewer.' }); return;
   }
 
-  const initialPin = typeof body.pin === 'string' ? body.pin : String(randomInt(100000, 1000000));
+  const initialPin = typeof body.pin === 'string' ? body.pin : generateTemporaryPin();
   let student = await db.createStudentAtomically({
     school_id: school.id,
     branch_id: branchId || null,
@@ -6591,7 +6592,7 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolConte
   // The RPC locks both the pending application and class row, then inserts the
   // student, student login, parent links and audit record in one transaction.
   // The initial PIN is generated and hashed here; only this response exposes it.
-  const initialPin = randomInt(100000, 1000000).toString();
+  const initialPin = generateTemporaryPin();
   const studentId = (await nextSchoolStudentIds(school.id, 1))[0];
   const studentRecordId = randomUUID();
   try {
