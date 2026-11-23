@@ -1569,7 +1569,7 @@ class StorageEngine {
       passwordHash = hashPassword(passwordHash);
     }
     let pin = userData.pin;
-    if (pin && !pin.startsWith('pin_scrypt
+    if (pin && !pin.startsWith('pin_scrypt')) {
       pin = hashPin(pin);
     }
     const user: User = {
@@ -1592,7 +1592,7 @@ class StorageEngine {
     if (payload.passwordHash && !payload.passwordHash.startsWith('scrypt:')) {
       payload.passwordHash = hashPassword(payload.passwordHash);
     }
-    if (payload.pin && !payload.pin.startsWith('pin_scrypt
+    if (payload.pin && !payload.pin.startsWith('pin_scrypt')) {
       payload.pin = hashPin(payload.pin);
     }
     this.data.users[idx] = { ...this.data.users[idx], ...payload };
