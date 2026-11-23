@@ -5367,16 +5367,31 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   const classById = new Map(classes.items.map((row: any) => [String(row.id), row]));
   const teacherById = new Map(teachers.items.map((row: any) => [String(row.id), row]));
   const relationByStudent = new Map(activeLinks.map((row: any) => [String(row.studentId), String(row.relation || 'guardian')]));
-  const [attendanceRows, markRows, assignments, submissions, noticeRows, noticeReads] = await Promise.all([
+  const [attendanceRows, markRows, assignments, submissions, noticeRows, noticeReads, holidayRows] = await Promise.all([
     queryAllRows('attendance_records', { school_id: school.id, student_id: studentIds }, 'student_id,class_id,date,status'),
     queryAllRows('student_marks', { school_id: school.id, student_id: studentIds, status: 'approved' }, 'student_id,class_id,total_marks,status,published_at,scheme_snapshot'),
     classIds.length ? queryAllRows('assignments', { school_id: school.id, class_id: classIds }, 'id,class_id,due_date') : Promise.resolve([] as any[]),
     queryAllRows('assignment_submissions', { school_id: school.id, student_id: studentIds }, 'assignment_id,student_id,status'),
     queryAllRows('school_notices', { school_id: school.id, is_active: 'true' }, 'id,audience,class_id,publish_date'),
-    queryAllRows('notice_reads', { school_id: school.id, parent_id: user.id }, 'notice_id')
+    queryAllRows('notice_reads', { school_id: school.id, parent_id: user.id }, 'notice_id'),
+    queryAllRows('school_events', { school_id: school.id, type: 'holiday' }, 'start_date,end_date')
   ]);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   const monthKey = today.slice(0, 7);
+  const [currentYear, currentMonth] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate();
+  const schoolOpenDays = Array.from({ length: daysInMonth }, (_, index) => index + 1).reduce((count, day) => {
+    const date = monthKey + '-' + String(day).padStart(2, '0');
+    if (date > today) return count;
+    const weekday = new Date(Date.UTC(currentYear, currentMonth - 1, day)).getUTCDay();
+    if (weekday === 5) return count;
+    const isHoliday = holidayRows.some((holiday: any) => {
+      const start = String(holiday.startDate || '').slice(0, 10);
+      const end = String(holiday.endDate || holiday.startDate || '').slice(0, 10);
+      return Boolean(start && date >= start && date <= end);
+    });
+    return count + (isHoliday ? 0 : 1);
+  }, 0);
   const attendanceByStudent = new Map<string, any[]>();
   for (const row of attendanceRows) {
     const key = String((row as any).studentId || '');
@@ -5412,7 +5427,7 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
       formTeacherName: teacher?.fullName || '', relation: relationByStudent.get(String(student.id)) || 'guardian',
       attendanceSummary: (() => {
         const rows = (attendanceByStudent.get(String(student.id)) || []).filter((row: any) => String(row.date || '').slice(0, 7) === monthKey);
-        return { present: rows.filter((row: any) => row.status === 'present').length, absent: rows.filter((row: any) => row.status === 'absent').length, late: rows.filter((row: any) => row.status === 'late').length, total: rows.length };
+        return { present: rows.filter((row: any) => row.status === 'present').length, absent: rows.filter((row: any) => row.status === 'absent').length, late: rows.filter((row: any) => row.status === 'late').length, total: schoolOpenDays };
       })(),
       marksSummary: (() => {
         const rows = marksByStudent.get(String(student.id)) || [];
