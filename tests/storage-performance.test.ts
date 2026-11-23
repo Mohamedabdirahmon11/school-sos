@@ -83,3 +83,12 @@ test('concurrent request contexts coalesce cold settings and plans reads', () =>
   assert.match(storage, /finally\(\(\) => \{ this\.settingsLoadPromise = null; \}\)/);
   assert.match(storage, /finally\(\(\) => \{ this\.plansLoadPromise = null; \}\)/);
 });
+
+
+test('plan configuration is loaded only for Super Admin plan and invoice routes', () => {
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(api, /const includePlans = req\.path === '\/superadmin\/plans'/);
+  assert.match(api, /req\.path\.startsWith\('\/superadmin\/plans\/'\)/);
+  assert.match(api, /req\.method === 'POST' && req\.path === '\/superadmin\/invoices\/generate'/);
+  assert.match(api, /prepareRequestContext\(req\.path === '\/auth\/login', `\$\{req\.method\} \$\{req\.path\}`, includePlans\)/);
+});
