@@ -4384,7 +4384,7 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
         if (classId && currentClassId && classId !== currentClassId) { res.status(403).json({ error: 'Timetable access is limited to your current class.' }); return; }
         classId = currentClassId;
       } else studentIds = [];
-
+    }
     const children = role === 'student'
       ? { items: [] as any[] }
       : studentIds.length ? await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
@@ -4446,7 +4446,7 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
       const ownRow = own.items[0] as any;
       const currentClassId = ownRow ? await getStudentCurrentClassId(school.id, String(ownRow.id), String(ownRow.classId || '')) : '';
       studentCurrentClassIds = currentClassId ? [currentClassId] : [];
-
+    }
     if (role === 'student') {
       classIds = studentCurrentClassIds || [];
     } else {
@@ -9552,7 +9552,7 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
   if (typeof content !== 'string' || !content.trim() || content.length > 5000 || typeof recipientId !== 'string') return res.status(400).json({ error: 'A recipient and a message of 1–5000 characters are required.' });
   const recipient = await db.getUserById(recipientId, school.id);
   if (!recipient || recipient.id === user.id) return res.status(404).json({ error: 'Message recipient was not found in this school.' });
-  const allowed: Record<string, string[]> = { school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent', 'student'], parent: ['teacher', 'student'], student: ['teacher'] };
+  const allowed: Record<string, string[]> = { school_admin: ['teacher', 'parent'], super_admin: ['teacher', 'parent'], teacher: ['parent', 'student'], parent: ['teacher'], student: ['teacher'] };
   if (!(allowed[user.role] || []).includes(recipient.role)) return res.status(403).json({ error: 'This direct-message role pairing is not allowed.' });
   if (user.role === 'student' && recipient.role === 'teacher') {
     const ownStudent = user.studentId
@@ -9575,10 +9575,9 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
   if (user.role === 'parent' && recipient.role === 'student') return res.status(403).json({ error: 'Parents may message only assigned teachers. Student conversations are private.' });
   if (user.role === 'teacher' && recipient.role === 'parent') {
     const assignedClassIds = new Set(await getTeacherAssignedClassIds(school.id, user.id));
-    const linkedIds = new Set(recipient.linkedStudentIds || []);
-    const students = await db.getStudents(school.id);
-    const allowed = students.some(student => assignedClassIds.has(student.classId) && (linkedIds.has(student.id) || [recipient.phone, recipient.parentPhone].includes(student.fatherPhone || '') || [recipient.phone, recipient.parentPhone].includes(student.motherPhone || '')));
-    if (!allowed) return res.status(403).json({ error: 'Teachers may message only parents of students in their assigned classes.' });
+    const linkedIds = await getParentLinkedStudentIds(school.id, recipient.id);
+    const linkedStudents = linkedIds.length ? await db.queryPage('students', { school_id: school.id, id: linkedIds }, 1, 100, undefined, 'id,class_id') : { items: [] as any[] };
+    if (!linkedStudents.items.some((student: any) => assignedClassIds.has(String(student.classId)))) return res.status(403).json({ error: 'Teachers may message only parents of students in their assigned classes.' });
   }
   if (user.role === 'parent' && recipient.role === 'teacher') {
     const linkedIds = await getParentLinkedStudentIds(school.id, user.id);
