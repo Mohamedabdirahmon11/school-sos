@@ -5900,7 +5900,7 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
     if (seenStudents.has(studentId)) {
       res.status(400).json({ error: `Duplicate Student ID: ${studentId}.` }); return;
     }
-    if (suppliedPin && (!/^\d{6}$/.test(suppliedPin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(suppliedPin))) {
+    if (suppliedPin && !isStrongPortalPin(suppliedPin)) {
       res.status(400).json({ error: `PIN for ${studentId} must be a strong 6-digit number.` }); return;
     }
     let pin = suppliedPin || generateTemporaryPin();
