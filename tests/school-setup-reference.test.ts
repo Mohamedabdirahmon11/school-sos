@@ -16,6 +16,10 @@ test('School Setup UI exposes the ten requested steps in order and the responsiv
   assert.ok(source.includes('assignmentEvidence: 0'));
   assert.ok(source.includes('<SchoolSetupInlineEditor step="assign"'));
   assert.ok(source.includes("current.id === 'attendance'"));
+  assert.ok(source.includes("id: 'attendance', title: 'Attendance & Exams', required: true"));
+  assert.ok(source.includes("needs: ['students', 'timetable']"));
+  assert.ok(source.includes('KG 1 iyo KG 2 waa la taageerayaa'));
+  assert.ok(source.includes("!unlockedFor(wizardSteps[referenceStep + 1]?.id || '')"));
   assert.ok(source.includes("current.id === 'fees'"));
   assert.ok(source.includes('REFERENCE_STEP_BY_PROGRESS_ID'));
   assert.ok(source.includes('Tallaabada {referenceStep + 1} ee {wizardSteps.length}'));

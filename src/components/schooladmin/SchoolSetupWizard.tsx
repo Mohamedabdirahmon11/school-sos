@@ -340,7 +340,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
           </div>
           <div className="mt-4"><button className="sw-btn" type="button" disabled={saving} onClick={() => void saveReferenceYear()}>{saving ? 'Kaydinaya…' : 'Kaydi Academic Year & Semesters'}</button></div>
         </section>}
-        {current.id === 'classes' && <SchoolSetupInlineEditor step="classes" onChanged={refreshSetupProgress} />}
+        {current.id === 'classes' && <section className="sw-card"><p className="sw-sub">KG 1 iyo KG 2 waa la taageerayaa: u qor magaca fasalka sida KG 1 ama KG 2, Grade / Heerka-na u dhig 0. Fasallada Grade 1 iyo wixii ka sarreeya geli heerka u dhigma.</p><SchoolSetupInlineEditor step="classes" onChanged={refreshSetupProgress} /></section>}
         {current.id === 'subjects' && <SchoolSetupInlineEditor step="subjects" onChanged={refreshSetupProgress} />}
         {current.id === 'teachers' && <>
           <section className="sw-card">
@@ -423,7 +423,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
           {!setupState?.canFinish && <div className="sw-miss"><strong>Wax ka maqan:</strong><p className="mt-1">Dashboard-ka lama furi karo ilaa Academic Year, School Profile, Classes, Subjects, Teachers & Assignments, Students & Parents, iyo Attendance & Exams la xaqiijiyo; Timetable iyo Fees/Modules waa in la dhammeystiro ama si cad loo skip-gareeyo.</p></div>}
           <button type="button" className="sw-btn" disabled={!setupState?.canFinish || saving || checklistLoading} onClick={() => void finishSetup()}>{saving ? 'Waa la dhammaynayaa…' : 'Dhammee setup-ka oo fur Dashboard'}</button>
         </>}
-        <div className="sw-actions"><button type="button" className="sw-btn secondary" disabled={referenceStep === 0} onClick={() => setReferenceStep(value => Math.max(0, value - 1))}>← Hore</button><button type="button" className="sw-btn" disabled={referenceStep === wizardSteps.length - 1 || (current.required && !readyFor(current.id))} onClick={() => setReferenceStep(value => Math.min(wizardSteps.length - 1, value + 1))}>Xiga →</button></div>
+        <div className="sw-actions"><button type="button" className="sw-btn secondary" disabled={referenceStep === 0} onClick={() => setReferenceStep(value => Math.max(0, value - 1))}>← Hore</button><button type="button" className="sw-btn" disabled={referenceStep === wizardSteps.length - 1 || (current.required && !readyFor(current.id)) || !unlockedFor(wizardSteps[referenceStep + 1]?.id || '')} onClick={() => setReferenceStep(value => Math.min(wizardSteps.length - 1, value + 1))}>Xiga →</button></div>
         <p className="text-xs mt-4" style={{color:'var(--sw-muted)'}}>Horumarka waxaa laga akhriyaa xogta dhabta ah ee SchoolOS. Waxba laguma kaydiyo browser localStorage.</p>
       </main>
     </div>;
