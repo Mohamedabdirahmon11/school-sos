@@ -222,13 +222,22 @@ test('15.10b parent cannot read attendance or homework for an unlinked student',
   assert.equal(homework.status, 403);
 });
 
-test('15.10c parent message history and read receipts require a currently assigned teacher', async () => {
+test('15.10c removed teacher assignments keep old history readable but block new messages', async () => {
   const allowed = await request('/parent/messages?contactId=' + encodeURIComponent(subjectTeacherUser.id), cookies.parent);
   assert.equal(allowed.status, 200, await allowed.clone().text());
-  const denied = await request('/parent/messages?contactId=' + encodeURIComponent(otherTeacherUser.id), cookies.parent);
-  assert.equal(denied.status, 403);
+  await memory.from('direct_messages').insert([{
+    id: 'parent-old-teacher-message', school_id: school.id,
+    sender_id: parentUser.id, sender_name: parentUser.fullName, sender_role: 'parent',
+    recipient_id: otherTeacherUser.id, recipient_name: otherTeacherUser.fullName, recipient_role: 'teacher',
+    content: 'Historical conversation', timestamp: new Date().toISOString(), is_read: false
+  }]);
+  await db.flush();
+  const history = await request('/parent/messages?contactId=' + encodeURIComponent(otherTeacherUser.id), cookies.parent);
+  assert.equal(history.status, 200, await history.clone().text());
   const markRead = await postJson('/messages/read', cookies.parent, { contactId: otherTeacherUser.id });
-  assert.equal(markRead.status, 403);
+  assert.equal(markRead.status, 200, await markRead.clone().text());
+  const sendNew = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, content: 'New message after reassignment' });
+  assert.equal(sendNew.status, 403);
 });
 
 test('15.10d parent cannot submit homework or enter student and teacher portals', async () => {
