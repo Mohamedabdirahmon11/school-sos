@@ -30,7 +30,7 @@ function referenceCard(id: string, title: string, description: string) {
     attendance: '<div class="row"><label>Attendance rule<select><option>Daily class attendance</option></select></label><label>Exam configuration<select><option>Semester examination</option></select></label><button class="btn">Kaydi dejinta</button></div><div class="item"><span>Attendance rules · Exam configuration ready</span></div>',
     fees: '<div class="row"><label>Fee type<input value="Tuition fee"></label><label>Amount<input type="number" value="1500"></label><button class="btn">+ Ku dar fee structure</button></div><div class="item"><span>Library · Inventory · Transport · Discipline · Health</span></div><p>Optional — waa la dhammaystiri karaa ama waa la skip-gareyn karaa.</p>',
     finish: '<div class="stats"><div><b>1</b>Academic Year</div><div><b>1</b>School Profile</div><div><b>3</b>Fasal</div><div><b>2</b>Maaddo</div><div><b>1</b>Macallin & Assignment</div><div><b>3</b>Arday</div></div><p class="good">Attendance & Exams waa diyaar; Timetable iyo Fees waa la dhammaystiray ama la skip-gareeyey.</p><button class="btn">Dhammee setup-ka oo fur Dashboard</button>'
-  };;
+  };
   return '<main><h2>' + title + '</h2><p class="sub">' + description + '</p><div class="miss good"><b>Tallaabadan waa diyaar ✓</b></div><div class="card">' + bodies[id] + '</div><div class="foot"><button class="btn sec">← Hore</button><button class="btn">Xiga →</button></div></main>';
 }
 

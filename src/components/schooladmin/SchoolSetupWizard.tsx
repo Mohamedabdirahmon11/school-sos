@@ -247,7 +247,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
       { id: 'teachers', title: 'Teachers & Teacher Assignment', required: true, evidence: 5, assignmentEvidence: 0, needs: ['subjects'] },
       { id: 'students', title: 'Students & Parents', required: true, evidence: 6, needs: ['teachers'] },
       { id: 'timetable', title: 'Timetable', required: false, evidence: 7, needs: ['students'] },
-      { id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8, needs: ['students'] },
+      { id: 'attendance', title: 'Attendance & Exams', required: true, evidence: 8, needs: ['students', 'timetable'] },
       { id: 'fees', title: 'Fees & Extra Modules', required: false, evidence: 9, needs: ['attendance'] },
       { id: 'finish', title: 'Final Review & Dashboard', required: true, evidence: -1, needs: ['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'timetable', 'attendance', 'fees'] }
     ];
