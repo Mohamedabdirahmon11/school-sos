@@ -75,6 +75,20 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   return false;
 }
 
+const WEAK_TEMPORARY_PINS = new Set([
+  '000000', '111111', '222222', '333333', '444444', '555555',
+  '666666', '777777', '888888', '999999', '123456', '654321',
+  '112233', '121212', '123123', '987654', '101010'
+]);
+
+export function generateTemporaryPin(): string {
+  let pin = '';
+  do {
+    pin = crypto.randomInt(100000, 1000000).toString();
+  } while (WEAK_TEMPORARY_PINS.has(pin) || /^(\\d)\\1{5}$/.test(pin));
+  return pin;
+}
+
 export function hashPin(pin: string): string {
   if (!pin) return '';
   const salt = crypto.randomBytes(16).toString('hex');
