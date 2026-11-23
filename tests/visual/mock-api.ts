@@ -1,4 +1,5 @@
 const studentMode = new URLSearchParams(window.location.search).get('component') === 'student';
+const parentMode = new URLSearchParams(window.location.search).get('component') === 'parent';
 const klass = { id: 'class-4a', name: 'Grade 4', section: 'A', classTeacherId: 'teacher-visual-001', academicYear: '2026-2027' };
 const math = { id: 'subject-math', name: 'Mathematics', code: 'MATH' };
 const science = { id: 'subject-science', name: 'Environmental Science', code: 'ENV' };
@@ -50,8 +51,8 @@ const studentAttendance = [
   { id: 'att-5', date: '2026-11-06', status: 'present' }, { id: 'att-6', date: '2026-11-09', status: 'present' }
 ];
 const studentMarks = [
-  { id: 'mark-1', subjectId: math.id, subjectName: math.name, semester: 'Semester 1', totalMarks: 82, percentage: 82, status: 'approved', publishedAt: '2026-11-01T10:00:00Z', grade: 'A' },
-  { id: 'mark-2', subjectId: science.id, subjectName: science.name, semester: 'Semester 1', totalMarks: 76, percentage: 76, status: 'approved', publishedAt: '2026-11-01T10:00:00Z', grade: 'B' }
+  { id: 'mark-1', subjectId: math.id, subjectName: math.name, semester: 'Semester 1', totalMarks: 82, percentage: 82, status: 'approved', publishedAt: '2026-11-01T10:00:00Z', grade: 'A', schemeSnapshot: [{id:'q',name:'Quiz',maxMarks:20,category:'continuous',order:1},{id:'m',name:'Dhexe',maxMarks:30,category:'continuous',order:2},{id:'f',name:'Final',maxMarks:60,category:'final',order:3}] },
+  { id: 'mark-2', subjectId: science.id, subjectName: science.name, semester: 'Semester 1', totalMarks: 76, percentage: 76, status: 'approved', publishedAt: '2026-11-01T10:00:00Z', grade: 'B', schemeSnapshot: [{id:'q',name:'Quiz',maxMarks:20,category:'continuous',order:1},{id:'m',name:'Dhexe',maxMarks:30,category:'continuous',order:2},{id:'f',name:'Final',maxMarks:60,category:'final',order:3}] }
 ];
 const studentHomework = [
   { id: 'hw-1', classId: klass.id, subjectId: math.id, subjectName: math.name, title: 'Layliska 5.2', description: 'Xalli su’aalaha 1 ilaa 12.', dueDate: '2099-11-29', maxPoints: 20 },
@@ -62,6 +63,16 @@ const studentNotices = [
   { id: 'notice-2', title: 'Kulanka waalidiinta', content: 'Kulanku wuxuu dhacayaa Khamiista.', publishDate: '2026-11-19', authorName: 'Maamulka', isRead: true }
 ];
 const studentContacts = [{ id: 'teacher-user-visual-001', role: 'teacher', fullName: 'Amina Teacher' }];
+const parentChildren = [
+ {id:'student-001',studentId:'ST-0421',fullName:'Faadumo Axmed Cabdi',firstName:'Faadumo',classId:klass.id,className:'Grade 4 · A',formTeacherName:'Amina Teacher',attendanceSummary:{present:18,absent:2,late:2,total:22},marksSummary:{total:258,max:330,subjects:3},homeworkPending:2,unreadNotices:1},
+ {id:'student-002',studentId:'ST-0388',fullName:'Cabdi Axmed Maxamed',firstName:'Cabdi',classId:klass.id,className:'Grade 4 · A',formTeacherName:'Amina Teacher',attendanceSummary:{present:20,absent:1,late:1,total:22},marksSummary:{total:271,max:330,subjects:3},homeworkPending:1,unreadNotices:1},
+ {id:'student-003',studentId:'ST-0510',fullName:'Hodan Axmed Cabdi',firstName:'Hodan',classId:klass.id,className:'Grade 4 · A',formTeacherName:'Amina Teacher',attendanceSummary:{present:21,absent:0,late:1,total:22},marksSummary:{total:296,max:330,subjects:3},homeworkPending:0,unreadNotices:0}
+];
+const parentNotices = [
+ {id:'notice-1',title:'Imtixaanka dhexe: jadwalka cusub',content:'Imtixaanku wuxuu bilaabmayaa toddobaadka dambe. Soo qaad qalabka qoraalka.',publishDate:'2026-11-21',audience:'all',isRead:false},
+ {id:'notice-2',title:'Kulanka waalidiinta',content:'Kulanku wuxuu dhacayaa Khamiista 10:00–13:00.',publishDate:'2026-11-19',audience:'parents',isRead:true}
+];
+const parentMessages = [{id:'msg-parent-1',senderId:'teacher-user-visual-001',recipientId:'parent-user-visual-001',content:'Fadlan la soco layliska guriga ee toddobaadkan.',timestamp:'2026-11-20T08:00:00Z'}];
 const studentMessages = [{ id: 'msg-1', senderId: 'teacher-user-visual-001', recipientId: 'student-user-visual-001', content: 'Ku soo dhawoow fasalka.', timestamp: '2026-11-20T08:00:00Z' }];
 const values: Record<string, (...args: any[]) => Promise<any>> = {
   getStudentProfile: async () => studentProfile,
@@ -70,8 +81,8 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getStudentAttendance: async () => studentAttendance,
   getStudentMarks: async () => studentMarks,
   getAssignments: async () => studentMode ? studentHomework : [],
-  getMessageContacts: async () => studentMode ? studentContacts : [],
-  getMessages: async () => studentMode ? studentMessages : [],
+  getMessageContacts: async () => (studentMode || parentMode) ? studentContacts : [],
+  getMessages: async () => parentMode ? parentMessages : studentMode ? studentMessages : [],
   markMessagesRead: async () => ({ success: true }),
   sendMessage: async () => ({ id: 'msg-new' }),
   markNoticeRead: async () => ({ success: true }),
@@ -99,7 +110,13 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getSchoolSetupProgress: async () => setupState,
   updateSchoolSetupProgress: async () => setupState,
   getTimetableSettings: async () => ({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 }),
-  request: async (endpoint: string) => endpoint === '/teacher-assignments' ? { selectedAcademicYearId: 'year-visual-001', selectedTermId: 'term-visual-001', classes: [klass], subjects: [math, science], teachers: [teacher], assignments, unassigned: [] } : []
+  request: async (endpoint: string) => {
+    if (endpoint === '/teacher-assignments') return { selectedAcademicYearId: 'year-visual-001', selectedTermId: 'term-visual-001', classes: [klass], subjects: [math, science], teachers: [teacher], assignments, unassigned: [] };
+    if (parentMode && endpoint === '/parent/children') return { ok: true, data: { parent: { id: 'parent-user-visual-001', fullName: 'Axmed Cabdi', phone: '+251911000001' }, children: parentChildren }, error: null };
+    if (parentMode && endpoint.startsWith('/parent/notices')) return { ok: true, data: { items: parentNotices, pagination: { page: 1, pageSize: 20, total: 2, totalPages: 1 } }, error: null };
+    if (parentMode && endpoint.startsWith('/assignments?studentId=')) return studentHomework;
+    return [];
+  }
 };
 export const ApiClient: any = new Proxy(values, {
   get(target, property: string) {
