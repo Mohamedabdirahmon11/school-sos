@@ -38,13 +38,13 @@ function auditIdempotency(source: string, label: string) {
       && /grant execute on function public\.delete_school_permanently\s*\(\s*text\s*,\s*text\s*\)\s*to service_role/i.test(source);
     const guardedParentLinkCleanup =
       label === '20261123083200_parent_student_accounts.sql'
-      && /create or replace function public\\.schoolos_sync_parent_student_links\\s*\\(/i.test(source)
-      && /delete from public\\.parent_students[\\s\\S]{0,500}parent_id = (?:old|new)\\.id[\\s\\S]{0,200}school_id = (?:old|new)\\.school_id/i.test(source);
+      && /create or replace function public\.schoolos_sync_parent_student_links\s*\(/i.test(source)
+      && /delete from public\.parent_students[\s\S]{0,500}parent_id = (?:old|new)\.id[\s\S]{0,200}school_id = (?:old|new)\.school_id/i.test(source);
     const guardedPortalSessionInvalidation =
       label === '20261123090000_bulk_pin_reset_rotation.sql'
-      && /create or replace function public\\.schoolos_bulk_reset_student_pins\\s*\\(/i.test(source)
+      && /create or replace function public\.schoolos_bulk_reset_student_pins\s*\(/i.test(source)
       && /security definer/i.test(source)
-      && /delete from public\\.lockout_counters[\\s\\S]{0,500}delete from public\\.user_sessions/i.test(source);
+      && /delete from public\.lockout_counters[\s\S]{0,500}delete from public\.user_sessions/i.test(source);
     if (!guardedSchoolDeletionMigration && !guardedParentLinkCleanup && !guardedPortalSessionInvalidation) {
       violations.push('destructive table/data statement');
     }
