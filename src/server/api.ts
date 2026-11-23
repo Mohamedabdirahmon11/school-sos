@@ -54,7 +54,7 @@ import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/sub
 import { buildSchoolSetupChecklist, canFinishSchoolSetup, evaluateTeacherAssignmentReadiness, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
-import { isSchoolSetupProgressComplete, isSchoolSetupWizardEligible } from '../lib/school-setup-navigation.ts';
+import { isSchoolSetupProgressComplete, isSchoolSetupProgressCompleteWithTeacherAssignment, isSchoolSetupWizardEligible } from '../lib/school-setup-navigation.ts';
 import { sanitizeDocumentHtml } from '../lib/documents/sanitize-html.ts';
 import { replaceDocumentVariables, requiresDocumentGenerationConfirmation } from '../lib/documents/variables.ts';
 import { collectPagedItems } from '../lib/documents/paged-query.ts';
@@ -3063,7 +3063,7 @@ apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (
   res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: visibleTimetable, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } });
 });
 
-apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
+apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, requireSchoolAdminDashboardSetupComplete, async (req, res) => {
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
   if (!['school_admin', 'accountant', 'super_admin', 'teacher'].includes(role || '')) {
@@ -10595,6 +10595,35 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
     next();
   } catch {
     res.status(503).json({ error: 'School setup readiness could not be verified. No changes were made.' });
+  }
+}
+
+
+/**
+ * The shared setup middleware intentionally allows access to Attendance/Exams
+ * so a new School Admin can configure step 8. The dashboard itself has a stricter
+ * gate: eligible School Admins must have a server-validated Final Review marker.
+ */
+async function requireSchoolAdminDashboardSetupComplete(req: any, res: any, next: (error?: unknown) => void) {
+  const school = req.school as School | undefined;
+  if (!school) { res.status(403).json({ error: 'School context is required.' }); return; }
+  if (normalizeRole(req.user?.role) !== 'school_admin' || !isSchoolSetupWizardEligible(school.createdAt)) {
+    next();
+    return;
+  }
+  try {
+    const state = await evaluateReadiness(school.id);
+    if (!isSchoolSetupProgressCompleteWithTeacherAssignment(state.progress)) {
+      res.status(423).json({
+        error: 'Dhammaystir dhammaan tallaabooyinka School Setup ka hor intaadan furin Dashboard-ka.',
+        code: 'SCHOOL_SETUP_REQUIRED',
+        missing: ['Final Review lama xaqiijin.']
+      });
+      return;
+    }
+    next();
+  } catch {
+    res.status(503).json({ error: 'School setup completion could not be verified. No changes were made.' });
   }
 }
 

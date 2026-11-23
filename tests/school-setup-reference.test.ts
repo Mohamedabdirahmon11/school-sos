@@ -56,6 +56,15 @@ test('setup readiness is shared by API reads and writes and protects attendance,
   assert.match(source, /res\.status\(403\)\.json\(\{ error: 'Your role cannot access school setup operations/);
 });
 
+test('eligible School Admin dashboard API requires the full Final Review marker', () => {
+  const source = read('src/server/api.ts');
+  assert.match(source, /async function requireSchoolAdminDashboardSetupComplete/);
+  assert.match(source, /isSchoolSetupProgressCompleteWithTeacherAssignment\(state\.progress\)/);
+  assert.match(source, /apiRouter\.get\('\/school\/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, requireSchoolAdminDashboardSetupComplete,/);
+  assert.match(source, /if \(normalizeRole\(req\.user\?\.role\) !== 'school_admin' \|\| !isSchoolSetupWizardEligible\(school\.createdAt\)\)/);
+  assert.match(source, /Final Review lama xaqiijin/);
+});
+
 test('completed existing schools are grandfathered and are not relocked by setup gates', () => {
   const source = read('src/server/api.ts');
   assert.match(source, /const savedProgress = normalizeSchoolSetupProgress\(school\.setupProgress\)/);
