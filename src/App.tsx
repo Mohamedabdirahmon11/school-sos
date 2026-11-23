@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
