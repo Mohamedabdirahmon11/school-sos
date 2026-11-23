@@ -424,3 +424,36 @@ test('parent PIN rotation issues one replacement session and preserves the serve
   assert.equal(meBody.selectedStudentId, child.id);
   assert.equal(verifyPin('234567', parent.pin_hash), true);
 });
+
+
+test('student portal list is scoped by Student ID and never by a shared guardian phone', async () => {
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.school_id === 'student-school' && row.student_id === 'S001');
+  const student = memory.rows('students').find(row => row.school_id === 'student-school' && row.student_id === 'S001');
+  assert.ok(studentUser && student);
+  studentUser.must_change_password = false;
+  const guardianPhone = String(studentUser.phone || '');
+  const siblings = memory.rows('students').filter(row =>
+    row.school_id === 'student-school' && row.id !== student.id &&
+    String(row.father_phone || '').replace(/[^0-9]/g, '') === guardianPhone.replace(/[^0-9]/g, '')
+  );
+  assert.ok(siblings.length > 0, 'fixture must include a sibling sharing the guardian contact');
+
+  const sessionId = randomUUID();
+  const expiresAt = Date.now() + 60 * 60 * 1000;
+  memory.rows('user_sessions').push({
+    id: sessionId, userId: studentUser.id, userRole: 'student', schoolId: 'student-school',
+    ipAddress: '', userAgent: '', createdAt: new Date().toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString()
+  });
+  const token = createSignedSessionToken({
+    sessionId, userId: studentUser.id, role: 'student', schoolId: 'student-school',
+    createdAt: Date.now(), expiresAt
+  });
+  const response = await fetch(`${baseUrl}/students`, {
+    headers: { Cookie: `schoolos_session=${token}` }
+  });
+  assert.equal(response.status, 200);
+  const rows = await response.json() as any[];
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].studentId, studentUser.student_id);
+});
