@@ -66,7 +66,7 @@ test('parent notices are paginated and track read receipts per parent',()=>{
  const end=api.indexOf("apiRouter.get('/student/me'",start);
  const route=api.slice(start,end);
  assert.match(route,/notice_reads/);
- assert.match(route,/user_id: user\.id/);
+ assert.match(route,/parent_id: user\.id/);
  assert.match(route,/pagination/);
  assert.match(route,/audience\.eq\.parents/);
 });
