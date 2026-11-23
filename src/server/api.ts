@@ -5317,6 +5317,33 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   const classById = new Map(classes.items.map((row: any) => [String(row.id), row]));
   const teacherById = new Map(teachers.items.map((row: any) => [String(row.id), row]));
   const relationByStudent = new Map(links.items.map((row: any) => [String(row.studentId), String(row.relation || 'guardian')]));
+  const [attendanceRows, markRows, assignments, submissions] = await Promise.all([
+    queryAllRows('attendance_records', { school_id: school.id, student_id: studentIds }, 'student_id,date,status'),
+    queryAllRows('student_marks', { school_id: school.id, student_id: studentIds, status: 'approved' }, 'student_id,total_marks,status,published_at,scheme_snapshot'),
+    classIds.length ? queryAllRows('assignments', { school_id: school.id, class_id: classIds }, 'id,class_id,due_date') : Promise.resolve([] as any[]),
+    queryAllRows('assignment_submissions', { school_id: school.id, student_id: studentIds }, 'assignment_id,student_id,status')
+  ]);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
+  const monthKey = today.slice(0, 7);
+  const attendanceByStudent = new Map<string, any[]>();
+  for (const row of attendanceRows) {
+    const key = String((row as any).studentId || '');
+    if (!attendanceByStudent.has(key)) attendanceByStudent.set(key, []);
+    attendanceByStudent.get(key)!.push(row);
+  }
+  const marksByStudent = new Map<string, any[]>();
+  for (const row of markRows.filter((item: any) => Boolean(item.publishedAt))) {
+    const key = String((row as any).studentId || '');
+    if (!marksByStudent.has(key)) marksByStudent.set(key, []);
+    marksByStudent.get(key)!.push(row);
+  }
+  const submittedKeys = new Set(submissions.map((row: any) => String(row.studentId) + ':' + String(row.assignmentId)));
+  const assignmentByClass = new Map<string, any[]>();
+  for (const row of assignments) {
+    const key = String((row as any).classId || '');
+    if (!assignmentByClass.has(key)) assignmentByClass.set(key, []);
+    assignmentByClass.get(key)!.push(row);
+  }
   const children = students.items.map((student: any) => {
     const klass = classById.get(String(student.classId));
     const teacher = klass?.classTeacherId ? teacherById.get(String(klass.classTeacherId)) : null;
@@ -5326,7 +5353,16 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
       firstName: student.firstName, middleName: student.middleName, lastName: student.lastName,
       classId: student.classId, className: klass ? [klass.name, klass.section || student.section].filter(Boolean).join(' · ') : 'Fasal lama heli',
       section: student.section, status: student.status, admissionDate: student.admissionDate,
-      formTeacherName: teacher?.fullName || '', relation: relationByStudent.get(String(student.id)) || 'guardian'
+      formTeacherName: teacher?.fullName || '', relation: relationByStudent.get(String(student.id)) || 'guardian',
+      attendanceSummary: (() => {
+        const rows = (attendanceByStudent.get(String(student.id)) || []).filter((row: any) => String(row.date || '').slice(0, 7) === monthKey);
+        return { present: rows.filter((row: any) => row.status === 'present').length, absent: rows.filter((row: any) => row.status === 'absent').length, late: rows.filter((row: any) => row.status === 'late').length, total: rows.length };
+      })(),
+      marksSummary: (() => {
+        const rows = marksByStudent.get(String(student.id)) || [];
+        return { total: rows.reduce((sum: number, row: any) => sum + Number(row.totalMarks || 0), 0), max: rows.reduce((sum: number, row: any) => sum + (Array.isArray(row.schemeSnapshot) ? row.schemeSnapshot.reduce((part: number, component: any) => part + Number(component.maxMarks || 0), 0) : 0), 0), subjects: rows.length };
+      })(),
+      homeworkPending: (assignmentByClass.get(String(student.classId)) || []).filter((item: any) => String(item.dueDate || '') >= today && !submittedKeys.has(String(student.id) + ':' + String(item.id))).length
     };
   });
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
