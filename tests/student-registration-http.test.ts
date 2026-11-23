@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
 import { createHttpTestStorage, InMemorySupabase } from './support/in-memory-supabase.ts';
 
 process.env.NODE_ENV = 'test';
@@ -214,6 +214,31 @@ test('student ID and normalized parent phone logins are school-scoped and requir
 });
 
 
+test('successful portal login transparently rehashes legacy scrypt PINs with persisted current parameters', async () => {
+  const student = memory.rows('students').find(row => row.student_id === 'S001');
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
+  assert.ok(student && studentUser);
+  const pin = '493827';
+  const legacySalt = randomBytes(16).toString('hex');
+  const legacyKey = scryptSync(pin, legacySalt, 32).toString('hex');
+  const legacyHash = `pin_scrypt:${legacySalt}:${legacyKey}`;
+  student.pin_hash = legacyHash;
+  studentUser.pin_hash = legacyHash;
+  studentUser.must_change_password = false;
+
+  const response = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin })
+  });
+  assert.equal(response.status, 200, await response.clone().text());
+  assert.match(studentUser.pin_hash, /^pin_scrypt\\$16384\\$8\\$1\\$/);
+  assert.match(student.pin_hash, /^pin_scrypt\\$16384\\$8\\$1\\$/);
+  assert.equal(verifyPin(pin, studentUser.pin_hash), true);
+  assert.equal(verifyPin(pin, student.pin_hash), true);
+});
+
+
 test('parent child selection is persisted in the signed session and rejects unlinked children and role mismatches', async () => {
   const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
   const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
@@ -257,6 +282,10 @@ test('parent child selection is persisted in the signed session and rejects unli
   }]);
   const forbiddenChild = await select(parentToken, 'unlinked-student');
   assert.equal(forbiddenChild.status, 403);
+  const tamperedParentRead = await fetch(`${baseUrl}/students/unlinked-student`, {
+    headers: { Cookie: `schoolos_session=${parentToken}` }
+  });
+  assert.equal(tamperedParentRead.status, 403, 'changing a requested student_id must not bypass parent_students membership');
 
   const studentToken = makeSession(studentUser.id, 'student', 'student-selection-session');
   const wrongRole = await select(studentToken, student.id);
@@ -464,4 +493,8 @@ test('student portal list is scoped by Student ID and never by a shared guardian
   const rows = await response.json() as any[];
   assert.equal(rows.length, 1);
   assert.equal(rows[0].studentId, studentUser.student_id);
+  const siblingResponse = await fetch(`${baseUrl}/students/${siblings[0].id}`, {
+    headers: { Cookie: `schoolos_session=${token}` }
+  });
+  assert.equal(siblingResponse.status, 403, 'Student A must not read Student B record even when guardian phone is shared');
 });
