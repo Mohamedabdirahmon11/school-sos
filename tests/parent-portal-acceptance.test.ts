@@ -141,6 +141,7 @@ test('child summary uses batched queries rather than per-child database reads',(
  assert.match(route,/queryAllRows\('school_notices'/);
  assert.doesNotMatch(route,/students\.items\.map\(async/);
  assert.match(route,/Cache-Control.*no-store/);
+});
 
 test('assignment removal keeps old conversation history but disables new parent messages',()=>{
  const contacts=api.slice(api.indexOf("apiRouter.get('/messages/contacts'"),api.indexOf("apiRouter.get('/messages'"));
@@ -160,5 +161,3 @@ test('parent data endpoints are gated by the existing setup 423 readiness check'
  assert.match(api,/requireParentPortalSetupReady/);
  assert.match(api,/SCHOOL_SETUP_REQUIRED/);
 });
-});
-}
