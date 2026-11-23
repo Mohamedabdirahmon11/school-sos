@@ -367,3 +367,60 @@ test('parent cannot change their phone through profile but can change PIN with c
   assert.match(pinChange.headers.get('set-cookie') || '', /schoolos_session=/);
   assert.ok(memory.rows('audit_logs').some(row => row.action === 'PIN_CHANGED' && row.user_id === parent.id));
 });
+
+
+test('parent PIN rotation issues one replacement session and preserves the server-verified selected child', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  const child = memory.rows('students').find(row => row.school_id === 'student-school');
+  assert.ok(parent && child);
+  parent.pin_hash = hashPin('876543');
+  parent.must_change_password = false;
+  await memory.from('parent_students').upsert([{
+    parent_id: parent.id,
+    student_id: child.id,
+    school_id: 'student-school',
+    relation: 'guardian'
+  }], { onConflict: 'parent_id,student_id' });
+
+  const sessionId = randomUUID();
+  const expiresAt = Date.now() + 60 * 60 * 1000;
+  memory.rows('user_sessions').push({
+    id: sessionId,
+    userId: parent.id,
+    userRole: 'parent',
+    schoolId: 'student-school',
+    ipAddress: '',
+    userAgent: '',
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(),
+    lastActivityAt: new Date().toISOString()
+  });
+  const token = createSignedSessionToken({
+    sessionId,
+    userId: parent.id,
+    role: 'parent',
+    schoolId: 'student-school',
+    selectedStudentId: child.id,
+    createdAt: Date.now(),
+    expiresAt
+  });
+
+  const changed = await fetch(`${baseUrl}/auth/change-pin`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPin: '876543', newPin: '234567' })
+  });
+  assert.equal(changed.status, 200, await changed.clone().text());
+  const cookies = (changed.headers as any).getSetCookie?.() || [];
+  assert.equal(cookies.length, 1, 'PIN rotation must issue exactly one replacement session cookie');
+  const sessionToken = /schoolos_session=([^;]+)/.exec(cookies[0])?.[1];
+  assert.ok(sessionToken);
+
+  const me = await fetch(`${baseUrl}/auth/me`, {
+    headers: { Cookie: `schoolos_session=${sessionToken}` }
+  });
+  assert.equal(me.status, 200);
+  const meBody = await me.json() as any;
+  assert.equal(meBody.selectedStudentId, child.id);
+  assert.equal(verifyPin('234567', parent.pin_hash), true);
+});
