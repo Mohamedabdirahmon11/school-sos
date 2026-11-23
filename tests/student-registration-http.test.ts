@@ -293,3 +293,35 @@ test('parent PIN reset and phone replacement are administrator-only and audited'
   assert.ok(memory.rows('audit_logs').some(row => row.action === 'PARENT_PHONE_CHANGED'));
   assert.ok(memory.rows('audit_logs').some(row => row.action === 'PARENT_PIN_RESET'));
 });
+
+
+test('legacy student and parent identifiers without administrator-provisioned accounts cannot auto-create portal users', async () => {
+  await memory.from('students').insert([{
+    id: 'legacy-no-portal-account',
+    school_id: 'student-school',
+    student_id: 'ST-LEGACY-NO-ACCOUNT',
+    first_name: 'Legacy',
+    last_name: 'Student',
+    father_phone: '+251922222222',
+    class_id: 'student-class-1',
+    status: 'active',
+    pin_hash: hashPin('654321')
+  }]);
+  const login = (payload: Record<string, unknown>) => fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const studentBefore = memory.rows('users').filter(row => row.role === 'student' && row.student_id === 'ST-LEGACY-NO-ACCOUNT').length;
+  const studentLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'ST-LEGACY-NO-ACCOUNT', pin: '654321' });
+  assert.equal(studentLogin.status, 401);
+  assert.equal((await studentLogin.json() as any).error, 'ID or PIN is incorrect.');
+  assert.equal(memory.rows('users').filter(row => row.role === 'student' && row.student_id === 'ST-LEGACY-NO-ACCOUNT').length, studentBefore);
+
+  const parentBefore = memory.rows('users').filter(row => row.role === 'parent' && String(row.phone || '').replace(/[^0-9]/g, '') === '251922222222').length;
+  const parentLogin = await login({ role: 'parent', schoolCode: 'STU', phone: '+251-922-222-222', pin: '654321' });
+  assert.equal(parentLogin.status, 401);
+  assert.equal((await parentLogin.json() as any).error, 'ID or PIN is incorrect.');
+  assert.equal(memory.rows('users').filter(row => row.role === 'parent' && String(row.phone || '').replace(/[^0-9]/g, '') === '251922222222').length, parentBefore);
+});
