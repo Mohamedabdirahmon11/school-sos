@@ -1649,8 +1649,8 @@ apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
   if (['school_admin', 'teacher', 'accountant'].includes(user.role) && newPassword) {
     res.status(400).json({ error: 'Staff accounts use a PIN. Enter a new PIN instead of a password.', code: 'PIN_REQUIRED' }); return;
   }
-  if (!['school_admin', 'teacher', 'accountant', 'student', 'parent'].includes(user.role) && newPin) {
-    res.status(400).json({ error: 'PIN changes are not available for this account.' }); return;
+  if (!['school_admin', 'teacher', 'accountant'].includes(user.role) && newPin) {
+    res.status(400).json({ error: 'Portal PIN changes must use the verified current-PIN flow.' }); return;
   }
   if (user.role === 'parent' && typeof phone === 'string') {
     const currentParentPhone = String(user.phone || user.parentPhone || '').replace(/[^0-9]/g, '');
