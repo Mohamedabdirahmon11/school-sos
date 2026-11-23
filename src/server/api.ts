@@ -1039,137 +1039,29 @@ apiRouter.post('/auth/login', async (req, res) => {
     const candidateUsers = matchingUsers.filter(u => normalizeRole(u.role) === role).map(u => ({ ...u, role }));
 
     if (candidateUsers.length === 0) {
-      // Check if student or parent exists in student records
-      const students = await db.getStudents(school.id);
-      let guardianStudentIds: string[] = [];
-      if (role === 'parent') {
-        const client = documentServiceClient(res);
-        if (client) {
-          const normalizedPhone = phone.replace(/[^0-9]/g, '');
-          if (normalizedPhone) {
-            const { data: guardian, error: guardianError } = await client.from('guardians').select('id')
-              .eq('school_id', school.id).eq('phone_normalized', normalizedPhone).maybeSingle();
-            if (guardianError) { res.status(503).json({ error: 'Guardian account could not be checked.' }); return; }
-            if (guardian?.id) {
-              const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
-                .eq('school_id', school.id).eq('guardian_id', guardian.id);
-              if (linksError) { res.status(503).json({ error: 'Guardian student links could not be loaded.' }); return; }
-              guardianStudentIds = (links || []).map((link: any) => String(link.student_id));
-            }
-          }
-        } else if (res.headersSent) return;
-      }
-      const matchedStudents = students.filter(student => role === 'student'
-        ? String(student.studentId || '').trim().toUpperCase() === portalStudentId
-        : String(student.fatherPhone || '').replace(/[^0-9]/g, '') === portalPhone
-          || String(student.motherPhone || '').replace(/[^0-9]/g, '') === portalPhone
-          || guardianStudentIds.includes(student.id));
-      const matchStd = matchedStudents.find(student => verifyPin(pin, student.pinHash || (student as any).pin)) || matchedStudents[0];
-
-      if (!matchStd) {
-        const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
-        db.recordLoginFailure(ipKey, ipThreshold, durationMins);
-        await db.flush();
-        db.logAudit({
-          action: 'FAILED_LOGIN_NOT_FOUND',
-          category: 'auth',
-          schoolId: school.id,
-          schoolName: school.name,
-          userId: 'unknown',
-          userName: 'Unknown account',
-          userRole: role,
-          ipAddress: clientIp,
-          details: `Login failed for non-existent ${role} identifier from IP ${clientIp}.`,
-          severity: 'warning'
-        });
-        if (failed.newlyLocked) {
-          res.status(429).json({ error: `Too many failed attempts. Account locked for ${durationMins} minutes.` });
-          return;
-        }
-        res.status(401).json({ error: 'ID or PIN is incorrect.' });
-        return;
-      }
-
-      if (matchStd.status && matchStd.status !== 'active') {
-        res.status(403).json({ error: 'This student account is disabled. Contact your school administrator.' });
-        return;
-      }
-
-      // Check PIN using scrypt verifyPin
-      const isValidPin = verifyPin(pin, matchStd.pinHash || (matchStd as any).pin);
-      if (!isValidPin) {
-        const failedResult = db.recordLoginFailure(lockKey, threshold, durationMins);
-        db.recordLoginFailure(ipKey, ipThreshold, durationMins);
-        db.logAudit({
-          action: 'FAILED_LOGIN_PIN',
-          category: 'auth',
-          schoolId: school.id,
-          schoolName: school.name,
-          userId: 'unknown',
-          userName: 'Unknown account',
-          userRole: role,
-          ipAddress: clientIp,
-          details: `Incorrect PIN attempt for ${role} (student ${matchStd.studentId}) from IP ${clientIp}. Attempt ${failedResult.count}/${threshold}.`,
-          severity: failedResult.newlyLocked ? 'critical' : 'warning'
-        });
-
-        if (failedResult.newlyLocked) {
-          res.status(429).json({ error: `Too many failed attempts. Account locked for ${durationMins} minutes.` });
-          return;
-        }
-        res.status(401).json({ error: 'ID or PIN is incorrect.' });
-        return;
-      }
-
-      // Successful verification -> Clear rate limits
-      db.clearLoginFailures(lockKey);
-      db.clearLoginFailures(ipKey);
+      // Portal identities must be provisioned by an administrator at registration
+      // or by an explicit admin-issued legacy backfill. Never create an account
+      // from a student record or let a parent authenticate with a child's PIN.
+      const failed = db.recordLoginFailure(lockKey, threshold, durationMins);
+      db.recordLoginFailure(ipKey, ipThreshold, durationMins);
       await db.flush();
-
-      // Find or create user session
-      let existingUser = (await db.getUsers(school.id)).find(u => u.role === role && (u.phone === phone || u.parentPhone === phone));
-      if (!existingUser) {
-        existingUser = db.createUser({
-          schoolId: school.id,
-          role,
-          fullName: role === 'parent' ? `Parent of ${matchStd.firstName}` : `${matchStd.firstName} ${matchStd.lastName}`,
-          phone: role === 'parent' ? phone : (matchStd.studentPhone || matchStd.fatherPhone || ''),
-          studentId: matchStd.studentId,
-          passwordHash: '',
-          pin: matchStd.pinHash,
-          isBlocked: false,
-          mustChangePassword: true,
-          failedLoginAttempts: 0,
-          linkedStudentIds: role === 'parent' ? matchedStudents.map(student => student.id) : [matchStd.id]
-        });
-      }
-
-      if (existingUser.mustChangePassword) {
-        const challengeToken = createSignedSessionToken({ sessionId: `bootstrap-${randomUUID()}`, userId: existingUser.id, role: existingUser.role, schoolId: school.id, createdAt: Date.now(), expiresAt: Date.now() + 5 * 60 * 1000 });
-        res.json({ requirePinChange: true, challengeToken });
-        return;
-      }
-      await issueSessionCookie(res, existingUser, req, school.id, role === 'parent' && matchedStudents.length === 1 ? matchedStudents[0].id : undefined);
       db.logAudit({
-        action: 'USER_LOGIN_SUCCESS',
+        action: 'FAILED_LOGIN_NOT_FOUND',
         category: 'auth',
         schoolId: school.id,
         schoolName: school.name,
-        userId: existingUser.id,
-        userName: existingUser.fullName,
-        userRole: existingUser.role,
+        userId: 'unknown',
+        userName: 'Unknown account',
+        userRole: role,
         ipAddress: clientIp,
-        details: `${role} authenticated successfully via PIN from IP ${clientIp}.`,
-        severity: 'info'
+        details: `Portal login failed because no administrator-provisioned ${role} account matched the supplied identifier. IP ${clientIp}.`,
+        severity: failed.newlyLocked ? 'critical' : 'warning'
       });
-
-      res.json({
-        user: sanitizeUser(existingUser),
-        school,
-        sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
-        linkedStudents: role === 'parent' ? sanitizeStudents(matchedStudents) : undefined,
-        selectedStudentId: role === 'parent' && matchedStudents.length === 1 ? matchedStudents[0].id : null
-      });
+      if (failed.newlyLocked) {
+        res.status(429).json({ error: `Too many failed attempts. Try again in ${durationMins} minutes.` });
+        return;
+      }
+      res.status(401).json({ error: 'ID or PIN is incorrect.' });
       return;
     }
 
