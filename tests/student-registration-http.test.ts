@@ -364,6 +364,6 @@ test('parent cannot change their phone through profile but can change PIN with c
   assert.equal(verifyPin('765432', parent.pin_hash), false);
   assert.equal(parent.must_change_password, false);
   assert.equal(memory.rows('user_sessions').some(row => row.id === sessionId), false);
-  assert.ok(memory.rows('user_sessions').some(row => row.userId === parent.id && row.id !== sessionId));
+  assert.match(pinChange.headers.get('set-cookie') || '', /schoolos_session=/);
   assert.ok(memory.rows('audit_logs').some(row => row.action === 'PIN_CHANGED' && row.user_id === parent.id));
 });
