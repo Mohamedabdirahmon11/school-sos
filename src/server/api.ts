@@ -439,12 +439,9 @@ async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]
     return currentClassId ? [currentClassId] : [];
   }
   if (user.role !== 'parent') return [];
+  const linkedIds = new Set(await getParentStudentIds(user, schoolId));
   const students = await db.getStudents(schoolId);
-  return students.filter(student =>
-    user.linkedStudentIds?.includes(student.id) ||
-    [user.phone, user.parentPhone].includes(student.fatherPhone || '') ||
-    [user.phone, user.parentPhone].includes(student.motherPhone || '')
-  ).map(student => student.classId);
+  return students.filter(student => linkedIds.has(student.id)).map(student => student.classId);
 }
 
 async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promise<User | null> {
@@ -661,6 +658,22 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
     }
   }
   return true;
+}
+
+async function getParentStudentIds(user: User, schoolId: string): Promise<string[]> {
+  if (user.role !== 'parent' || !user.id || user.schoolId !== schoolId) return [];
+  const links = await db.queryPage('parent_students', {
+    parent_id: user.id, school_id: schoolId
+  }, 1, 2000, undefined, 'student_id');
+  return [...new Set(links.items.map((row: any) => String(row.studentId || row.student_id || '')).filter(Boolean))];
+}
+
+async function hasParentStudentLink(user: User, studentId: string, schoolId: string): Promise<boolean> {
+  if (user.role !== 'parent' || user.schoolId !== schoolId) return false;
+  const links = await db.queryPage('parent_students', {
+    parent_id: user.id, student_id: studentId, school_id: schoolId
+  }, 1, 1, undefined, 'parent_id');
+  return links.items.length === 1;
 }
 
 async function canAccessStudentRecord(user: User, studentId: string): Promise<boolean> {
@@ -4425,7 +4438,7 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
     // A client-supplied scope must never widen this server-side filter.
     teacherId = String(own.items[0].id);
   } else if (role === 'parent' || role === 'student') {
-    let studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
+    let studentIds = role === 'parent' ? await getParentStudentIds(user, school.id) : [];
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
       if (own.items[0]) {
@@ -4434,9 +4447,6 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
         if (classId && currentClassId && classId !== currentClassId) { res.status(403).json({ error: 'Timetable access is limited to your current class.' }); return; }
         classId = currentClassId;
       } else studentIds = [];
-    } else if (role === 'parent' && user.phone) {
-      const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id');
-      studentIds = [...new Set([...studentIds, ...phoneChildren.items.map((item: any) => item.id)])];
     }
     const children = role === 'student'
       ? { items: [] as any[] }
@@ -4485,16 +4495,13 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res
     teacherSubjectPairs = new Set(teaching.items.map((item: any) => `${item.classId}::${item.subjectId}`));
     classIds = [...new Set(teaching.items.map((item: any) => item.classId))];
   } else if (role === 'parent' || role === 'student') {
-    studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
+    studentIds = role === 'parent' ? await getParentStudentIds(user, school.id) : [];
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
       studentIds = own.items.map((item: any) => item.id);
       const ownRow = own.items[0] as any;
       const currentClassId = ownRow ? await getStudentCurrentClassId(school.id, String(ownRow.id), String(ownRow.classId || '')) : '';
       studentCurrentClassIds = currentClassId ? [currentClassId] : [];
-    } else if (user.phone) {
-      const phoneChildren = await db.queryPage('students', { school_id: school.id }, 1, 100, `father_phone.eq.${user.phone},mother_phone.eq.${user.phone}`, 'id,class_id');
-      studentIds = [...new Set([...studentIds, ...phoneChildren.items.map((item: any) => item.id)])];
     }
     if (role === 'student') {
       classIds = studentCurrentClassIds || [];
@@ -5415,30 +5422,9 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   } else if (user.role === 'parent') {
-    const ids = (user.linkedStudentIds || []).filter(id => /^[A-Za-z0-9_-]+$/.test(id));
-    const parentPhones = [...new Set([user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone?.trim())))];
-    const guardianStudentIds: string[] = [];
-    if (parentPhones.length) {
-      const client = documentServiceClient(res);
-      if (client) {
-        const normalizedPhones = [...new Set(parentPhones.map(phone => phone.replace(/[^0-9]/g, '')).filter(Boolean))];
-        if (normalizedPhones.length) {
-          const { data: guardianRows, error: guardianError } = await client.from('guardians').select('id')
-            .eq('school_id', school.id).in('phone_normalized', normalizedPhones);
-          if (guardianError) { res.status(503).json({ error: 'Guardian access could not be checked.' }); return; }
-          const guardianIds = (guardianRows || []).map((guardian: any) => guardian.id);
-          if (guardianIds.length) {
-            const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
-              .eq('school_id', school.id).in('guardian_id', guardianIds);
-            if (linksError) { res.status(503).json({ error: 'Guardian student access could not be loaded.' }); return; }
-            guardianStudentIds.push(...(links || []).map((link: any) => String(link.student_id)));
-          }
-        }
-      } else if (res.headersSent) return;
-    }
-    const terms = [...(ids.length ? [`id.in.(${ids.join(',')})`] : []), ...parentPhones.flatMap(phone => [`father_phone.eq.${phone}`, `mother_phone.eq.${phone}`]), ...(guardianStudentIds.length ? [`id.in.(${[...new Set(guardianStudentIds)].join(',')})`] : [])];
-    if (!terms.length) { res.json([]); return; }
-    roleFilter = terms.join(',');
+    const ids = (await getParentStudentIds(user, school.id)).filter(id => /^[A-Za-z0-9_-]+$/.test(id));
+    if (!ids.length) { res.json([]); return; }
+    roleFilter = `id.in.(${ids.join(',')})`;
   }
 
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -8725,7 +8711,7 @@ apiRouter.get('/student-invoices', requireAuth, requireSchoolContext, async (req
   if (user.role === 'parent' || user.role === 'student') {
     const linkedIds = user.role === 'student' && user.studentId
       ? [(await db.getStudents(school.id)).find((student:any)=>student.studentId===user.studentId)?.id].filter(Boolean) as string[]
-      : (user.linkedStudentIds || []);
+      : await getParentStudentIds(user, school.id);
     if (!linkedIds.length) { res.json([]); return; }
     query = query.in('student_id',linkedIds);
   }
@@ -9486,7 +9472,8 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
     }
     if (user.role === 'parent') {
-      const linkedStudents = (await db.getStudents(school.id)).filter(student => user.linkedStudentIds?.includes(student.id) || [user.phone, user.parentPhone].includes(student.fatherPhone || '') || [user.phone, user.parentPhone].includes(student.motherPhone || ''));
+      const linkedIds = new Set(await getParentStudentIds(user, school.id));
+      const linkedStudents = (await db.getStudents(school.id)).filter(student => linkedIds.has(student.id));
       const linkedIds = new Set(linkedStudents.flatMap(student => [student.id, student.studentId]));
       const linkedClasses = new Set(linkedStudents.map(student => student.classId));
       const teacherClassScopes = new Map<string, string[]>();
@@ -9547,24 +9534,24 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
   }
   if (user.role === 'parent' && recipient.role === 'student') {
     const linkedStudent = (await db.getStudents(school.id)).find(student => student.studentId === recipient.studentId || student.id === recipient.studentId);
-    if (!linkedStudent || !(user.linkedStudentIds?.includes(linkedStudent.id) || [user.phone, user.parentPhone].includes(linkedStudent.fatherPhone || '') || [user.phone, user.parentPhone].includes(linkedStudent.motherPhone || ''))) return res.status(403).json({ error: 'Parents may message only their linked students.' });
+    if (!linkedStudent || !await hasParentStudentLink(user, linkedStudent.id, school.id)) return res.status(403).json({ error: 'Parents may message only their linked students.' });
   }
   if (user.role === 'teacher' && recipient.role === 'parent') {
     const assignedClassIds = new Set(await getTeacherAssignedClassIds(school.id, user.id));
-    const linkedIds = new Set(recipient.linkedStudentIds || []);
+    const linkedIds = new Set(await getParentStudentIds(recipient, school.id));
     const students = await db.getStudents(school.id);
-    const allowed = students.some(student => assignedClassIds.has(student.classId) && (linkedIds.has(student.id) || [recipient.phone, recipient.parentPhone].includes(student.fatherPhone || '') || [recipient.phone, recipient.parentPhone].includes(student.motherPhone || '')));
+    const allowed = students.some(student => assignedClassIds.has(student.classId) && linkedIds.has(student.id));
     if (!allowed) return res.status(403).json({ error: 'Teachers may message only parents of students in their assigned classes.' });
   }
   if (user.role === 'parent' && recipient.role === 'teacher') {
-    const linkedIds = new Set(user.linkedStudentIds || []);
-    const linkedStudents = (await db.getStudents(school.id)).filter(student => linkedIds.has(student.id) || [user.phone, user.parentPhone].includes(student.fatherPhone || '') || [user.phone, user.parentPhone].includes(student.motherPhone || ''));
+    const linkedIds = new Set(await getParentStudentIds(user, school.id));
+    const linkedStudents = (await db.getStudents(school.id)).filter(student => linkedIds.has(student.id));
     const teacherClasses = new Set(await getTeacherAssignedClassIds(school.id, recipient.id));
     if (!linkedStudents.some(student => teacherClasses.has(student.classId))) return res.status(403).json({ error: 'Parents may message only teachers assigned to their children.' });
   }
   if (user.role === 'student' && recipient.role === 'parent') {
     const student = (await db.getStudents(school.id)).find(item => item.studentId === user.studentId || item.id === user.id.replace(/^usr-student-/, 'std-'));
-    if (!student || !(recipient.linkedStudentIds?.includes(student.id) || [recipient.phone, recipient.parentPhone].includes(student.fatherPhone || '') || [recipient.phone, recipient.parentPhone].includes(student.motherPhone || ''))) return res.status(403).json({ error: 'Students may message only their linked parent.' });
+    if (!student || !await hasParentStudentLink(recipient, student.id, school.id)) return res.status(403).json({ error: 'Students may message only their linked parent.' });
   }
   const msg = await db.sendMessage({
     recipientId: recipient.id,
