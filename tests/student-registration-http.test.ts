@@ -178,6 +178,27 @@ test('student ID and normalized parent phone logins are school-scoped and requir
   assert.equal(parentResult.requirePinChange, true);
   assert.ok(parentResult.challengeToken);
 
+  const changePin = (challengeToken: string, newPin: string) => fetch(`${baseUrl}/auth/change-pin`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${challengeToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPin })
+  });
+  const weakPin = await changePin(studentResult.challengeToken, '123456');
+  assert.equal(weakPin.status, 400);
+  const unchangedPin = await changePin(studentResult.challengeToken, temporaryPin);
+  assert.equal(unchangedPin.status, 400);
+  const studentPinChanged = await changePin(studentResult.challengeToken, '765432');
+  assert.equal(studentPinChanged.status, 200);
+  assert.equal(studentUser.must_change_password, false);
+  assert.equal(verifyPin('765432', studentUser.pin_hash), true);
+  assert.equal(verifyPin('765432', student.pin_hash), true);
+
+  const parentPinChanged = await changePin(parentResult.challengeToken, '876543');
+  assert.equal(parentPinChanged.status, 200);
+  assert.equal(parentUser.must_change_password, false);
+  assert.equal(verifyPin('876543', parentUser.pin_hash), true);
+  assert.equal(verifyPin('765432', parentUser.pin_hash), false);
+
   const wrongSchoolLogin = await login({ role: 'student', schoolCode: 'OTH', studentId: 'S001', pin: temporaryPin });
   assert.equal(wrongSchoolLogin.status, 401);
   const invalidPinLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin: '000000' });
