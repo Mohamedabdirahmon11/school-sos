@@ -14,9 +14,6 @@ test('session expiry fails closed for malformed or missing database timestamps',
   for (const value of [null, undefined, '', 'not-a-date', 'NaN', 0, {}, []]) {
     assert.equal(isSessionExpiryValid(value, now), false, `rejected ${String(value)}`);
   }
-  for (const pin of ['000000', '123456', '654321', '111111', '112233', '121212', '123123', '987654', '101010']) {
-    assert.equal(isStrongPortalPin(pin), false, `rejected weak PIN ${pin}`);
-  }
 });
 
 test('Super Admin routes require an authenticated Super Admin', () => {
@@ -189,5 +186,8 @@ test('temporary portal PIN generator always returns non-obvious six-digit values
     assert.equal(weak.has(pin), false);
     assert.equal(/^(\d)\1{5}$/.test(pin), false);
     assert.equal(isStrongPortalPin(pin), true);
+  }
+  for (const pin of ['000000', '123456', '654321', '111111', '112233', '121212', '123123', '987654', '101010']) {
+    assert.equal(isStrongPortalPin(pin), false, `rejected weak PIN ${pin}`);
   }
 });
