@@ -328,7 +328,7 @@ test('legacy student and parent identifiers without administrator-provisioned ac
 
 
 test('parent cannot change their phone through profile but can change PIN with current PIN verification', async () => {
-  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && Boolean(row.phone || row.parent_phone));
   assert.ok(parent);
   parent.pin_hash = hashPin('765432');
   parent.must_change_password = false;
@@ -349,7 +349,7 @@ test('parent cannot change their phone through profile but can change PIN with c
   const phoneChange = await fetch(`${baseUrl}/auth/profile`, {
     method: 'PUT',
     headers: { Cookie: `schoolos_session=${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fullName: parent.full_name, email: parent.email || '', phone: '+251922222222' })
+    body: JSON.stringify({ fullName: parent.full_name, email: parent.email || '', phone: String(parent.phone || parent.parent_phone) === '+251922222222' ? '+251933333333' : '+251922222222' })
   });
   assert.equal(phoneChange.status, 403);
   assert.equal(parent.phone, originalPhone);
