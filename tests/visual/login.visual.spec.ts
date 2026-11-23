@@ -31,8 +31,9 @@ for (const width of widths) for (const theme of themes) {
     await page.screenshot({ path: path.join(folder, 'change-pin.png'), fullPage: true });
 
     await page.goto('http://127.0.0.1:4173/login-visual.html?component=parent&theme=' + theme);
-    await expect(page.getByRole('heading', { name: 'Dooro ilmaha' })).toBeVisible();
-    await expect(page.getByText('Ayaan Student')).toBeVisible();
+    await expect(page.locator('.parent-portal-shell')).toBeVisible();
+    await expect(page.locator('.pp-brand b')).toContainText('Axmed Cabdi');
+    await expect(page.locator('.pp-child-item')).toHaveCount(3);
     await page.screenshot({ path: path.join(folder, 'child-switcher.png'), fullPage: true });
     await context.close();
   });
