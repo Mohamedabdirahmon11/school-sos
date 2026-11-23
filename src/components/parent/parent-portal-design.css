@@ -23,3 +23,5 @@
 .parent-portal-shell .pp-kid-actions button{border:1px solid var(--pp-line);border-radius:8px;padding:7px 11px;background:transparent;color:var(--pp-ink);font-size:11px;cursor:pointer}
 .parent-portal-shell .pp-kid-actions button:first-child{background:var(--pp-accent);border-color:var(--pp-accent);color:#2a1c00;font-weight:800}
 @media(max-width:760px){.parent-portal-shell .pp-child-strip{display:flex}.parent-portal-shell .pp-kids{display:none}.parent-portal-shell .pp-kids-label{display:none}}
+
+.parent-portal-shell .pp-readonly-note{margin:10px 0;padding:9px 11px;border-radius:8px;background:var(--pp-soft);color:var(--pp-muted);font-size:12px}
