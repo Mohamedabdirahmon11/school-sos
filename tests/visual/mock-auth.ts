@@ -14,5 +14,11 @@ const user = parentMode
   : { id: 'teacher-visual-001', role: 'teacher', fullName: 'Amina Teacher', staffId: 'T-001', teacherCode: 'T-001', phone: '+251900000001' };
 const school = { id: 'school-visual-001', name: 'SchoolOS Test Academy', code: 'TEST01', timezone: 'Africa/Addis_Ababa', currency: 'ETB', academicYear: '2026-2027', brandColor: '#0e6a62', subscription: { status: 'active' }, setupData: { calendar: 'ethiopian' }, studentAccessEnabled: true };
 export function useAuth() {
-  return { user, school, isReadOnly: false, language: 'en', t: translate } as any;
+  return {
+    user, school, selectedStudentId: null, isReadOnly: false, language: 'en', t: translate,
+    login: async () => visualParams.get('mode') === 'pin-change'
+      ? { requirePinChange: true, challengeToken: 'visual-bootstrap-token' }
+      : { user, school },
+    refreshUser: async () => ({ user, school, selectedStudentId: null })
+  } as any;
 }
