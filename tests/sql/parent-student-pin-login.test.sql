@@ -4,7 +4,7 @@ DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL;
 DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TYPE public.user_role_enum AS ENUM ('super_admin','school_admin','teacher','accountant','student','parent');
-CREATE TABLE public.schools (id VARCHAR(64) PRIMARY KEY, name TEXT);
+CREATE TABLE public.schools (id VARCHAR(64) PRIMARY KEY, name TEXT, code TEXT);
 CREATE TABLE public.students (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id),
@@ -50,7 +50,7 @@ CREATE TABLE public.audit_logs (
   user_id VARCHAR(64), user_name TEXT, user_role public.user_role_enum, ip_address TEXT, details TEXT, severity TEXT
 );
 
-INSERT INTO public.schools(id,name) VALUES ('pin-school-a','PIN School A'), ('pin-school-b','PIN School B');
+INSERT INTO public.schools(id,name,code) VALUES ('pin-school-a','PIN School A','PINA'), ('pin-school-b','PIN School B','PINB');
 INSERT INTO public.students(id,school_id,student_id,first_name,pin_hash)
 VALUES ('legacy-child','pin-school-a','ST-0001','Legacy Student','scrypt:legacy');
 INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,must_change_password)
@@ -119,6 +119,7 @@ BEGIN
 
   INSERT INTO public.students(id,school_id,student_id,first_name,pin_hash)
   VALUES ('missing-account-child','pin-school-a','ST-0004','Backfill Student','scrypt:old');
+  INSERT INTO public.lockout_counters(id,attempt_count) VALUES ('sp:PINA:ST-0002',5), ('sp:PINA:ST-0004',2);
   INSERT INTO public.user_sessions(user_id) VALUES ('new-student-user');
   INSERT INTO public.users(id,school_id,role,full_name,phone,student_id,pin_hash,must_change_password)
   VALUES ('parent-pin-untouched','pin-school-a','parent','Parent','+251911111111',NULL,'scrypt:parent-before',false);
@@ -137,6 +138,9 @@ BEGIN
   IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'Bulk reset did not force existing student account PIN rotation.'; END IF;
   IF EXISTS (SELECT 1 FROM public.user_sessions WHERE user_id='new-student-user') THEN
     RAISE EXCEPTION 'Bulk reset did not invalidate student sessions.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.lockout_counters WHERE id IN ('sp:PINA:ST-0002','sp:PINA:ST-0004')) THEN
+    RAISE EXCEPTION 'Bulk reset did not clear student account lockouts.';
   END IF;
   SELECT count(*) INTO v_count FROM public.users
    WHERE school_id='pin-school-a' AND role='student'::public.user_role_enum AND student_id='ST-0004';
