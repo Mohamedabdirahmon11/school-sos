@@ -112,9 +112,9 @@ export function verifyPin(pin: string, storedHash: string): boolean {
   if (typeof pin !== 'string' || !pin || typeof storedHash !== 'string' || !storedHash) return false;
   let salt = '';
   let key = '';
-  let N = PORTAL_PIN_SCRYPT.N;
-  let r = PORTAL_PIN_SCRYPT.r;
-  let p = PORTAL_PIN_SCRYPT.p;
+  let N: number = PORTAL_PIN_SCRYPT.N;
+  let r: number = PORTAL_PIN_SCRYPT.r;
+  let p: number = PORTAL_PIN_SCRYPT.p;
   if (storedHash.startsWith('pin_scrypt|')) {
     const parts = storedHash.split('|');
     if (parts.length !== 6) return false;
