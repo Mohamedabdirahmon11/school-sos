@@ -94,6 +94,19 @@ export const ParentsView: React.FC = () => {
     setPage(1);
   };
 
+  const handleChangeParentPhone = async (contact: ParentContact) => {
+    const nextPhone = window.prompt('Enter the new international phone number for this parent:', contact.phone);
+    if (!nextPhone || nextPhone.trim() === contact.phone) return;
+    setResetPinError(null);
+    try {
+      await ApiClient.updateParentPhone(contact.id, nextPhone.trim());
+      setResetPinSlip(null);
+      setReloadCount(count => count + 1);
+    } catch (error) {
+      setResetPinError(error instanceof Error ? error.message : 'Could not update this parent phone number.');
+    }
+  };
+
   const handleResetParentPin = async (contact: ParentContact) => {
     if (resettingParentId) return;
     if (!window.confirm(`Reset the PIN for ${contact.name || contact.phone}? Their current sessions will be signed out.`)) return;
@@ -221,6 +234,7 @@ export const ParentsView: React.FC = () => {
                         <button type="button" onClick={() => void handleResetParentPin(contact)} disabled={Boolean(resettingParentId)} className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#334155] disabled:opacity-50">
                           <KeyRound className="h-3 w-3" /> {resettingParentId === contact.id ? 'Resetting…' : 'Reset PIN'}
                         </button>
+                        <button type="button" onClick={() => void handleChangeParentPhone(contact)} className="mt-1 block rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#334155]">Change phone</button>
                       </td>
                     </tr>
                   ))}
