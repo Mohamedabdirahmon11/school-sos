@@ -1347,6 +1347,13 @@ apiRouter.post('/auth/login', async (req, res) => {
     await linkLegacyLoginToSupabaseAuth(user, password);
   }
 
+  // Upgrade legacy staff PIN hashes after successful verification as well.
+  if (user.role !== 'super_admin' && submittedPin && pinHashNeedsRehash(String(user.pin || ''))) {
+    const upgraded = db.updateUser(user.id, { pin: hashPin(submittedPin) });
+    if (upgraded) Object.assign(user, upgraded);
+    await db.flush();
+  }
+
   // Success -> Reset failed attempts
   await db.handleSuccessfulLogin(user.id);
   db.clearLoginFailures(staffLockKey);
