@@ -142,6 +142,9 @@ test('child summary uses batched queries rather than per-child database reads',(
  assert.match(route,/queryAllRows\('school_notices'/);
  assert.doesNotMatch(route,/students\.items\.map\(async/);
  assert.match(route,/Cache-Control.*no-store/);
+ assert.match(api,/PARENT_PORTAL_SUMMARY_TTL_MS = 5_000/);
+ assert.match(api,/invalidateParentPortalSummaryCache/);
+ assert.match(api,/res\.on\('finish'/);
 });
 
 test('assignment removal keeps old conversation history but disables new parent messages',()=>{
