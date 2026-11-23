@@ -112,7 +112,7 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getTimetableSettings: async () => ({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 }),
   request: async (endpoint: string) => {
     if (endpoint === '/teacher-assignments') return { selectedAcademicYearId: 'year-visual-001', selectedTermId: 'term-visual-001', classes: [klass], subjects: [math, science], teachers: [teacher], assignments, unassigned: [] };
-    if (parentMode && endpoint === '/parent/children') return { ok: true, data: { parent: { id: 'parent-user-visual-001', fullName: 'Axmed Cabdi', phone: '+251911000001' }, children: parentChildren }, error: null };
+    if (parentMode && endpoint === '/parent/children') return { ok: true, data: { parent: { id: 'parent-user-visual-001', fullName: 'Axmed Cabdi', phone: '+251911000001' }, children: new URLSearchParams(window.location.search).get('oneChild') === '1' ? parentChildren.slice(0,1) : parentChildren }, error: null };
     if (parentMode && endpoint.startsWith('/parent/notices')) return { ok: true, data: { items: parentNotices, pagination: { page: 1, pageSize: 20, total: 2, totalPages: 1 } }, error: null };
     if (parentMode && endpoint.startsWith('/assignments?studentId=')) return studentHomework;
     return [];
