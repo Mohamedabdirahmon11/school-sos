@@ -95,7 +95,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; schoolId?: str
       const result = await ApiClient.bulkResetStudentPins(rows);
       const returned: PinSlip[] = (Array.isArray(result?.pinSlips) ? result.pinSlips : [])
         .map(item => ({ studentId: String(item?.studentId || ''), studentName: String(item?.studentName || ''), newPin: String(item?.newPin ?? '').trim() }))
-        .filter(item => item.studentId && /^\d{4}$/.test(item.newPin));
+        .filter(item => item.studentId && /^\d{6}$/.test(item.newPin));
       // The server has already changed the PINs at this point. Show every PIN it
       // returned instead of discarding them, and flag any that are missing.
       if (!returned.length) {
@@ -155,7 +155,7 @@ export const BulkStudentPinResetWizard: React.FC<{ open: boolean; schoolId?: str
       <div className="bulk-pin-dialog fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
         <section role="dialog" aria-modal="true" aria-label="Bulk student PIN reset" className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-6">
           <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
-            <div><h2 className="text-lg font-bold text-slate-900">Bulk student PIN reset</h2><p className="mt-1 text-xs text-slate-500">Choose a class, select one or more students, then generate a unique four-digit PIN for each.</p></div>
+            <div><h2 className="text-lg font-bold text-slate-900">Bulk student PIN reset</h2><p className="mt-1 text-xs text-slate-500">Choose a class, select one or more students, then generate a unique six-digit PIN for each.</p></div>
             <button type="button" onClick={close} disabled={loading} aria-label="Close" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"><X className="h-5 w-5"/></button>
           </header>
           {error && <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
