@@ -36,7 +36,8 @@ import {
   findRecoveryCodeIndex,
   generateRecoveryCodes,
   generateTemporaryPin,
-  isStrongPortalPin
+  isStrongPortalPin,
+  pinHashNeedsRehash
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
@@ -1125,6 +1126,19 @@ apiRouter.post('/auth/login', async (req, res) => {
       }
       res.status(401).json({ error: 'ID or PIN is incorrect.' });
       return;
+    }
+
+    // Upgrade legacy or outdated hashes only after successful verification.
+    // The submitted PIN is never logged or returned by this path.
+    if (pinHashNeedsRehash(String(targetUser.pin || ''))) {
+      const upgradedPinHash = hashPin(String(pin));
+      const upgradedUser = db.updateUser(targetUser.id, { pin: upgradedPinHash });
+      if (upgradedUser) Object.assign(targetUser, upgradedUser);
+      if (role === 'student') {
+        const studentRecord = (await db.getStudents(school.id)).find(student => student.studentId === targetUser.studentId);
+        if (studentRecord) await db.updateStudent(studentRecord.id, { pinHash: upgradedPinHash }, school.id);
+      }
+      await db.flush();
     }
 
     // Success -> Clear failed attempts
