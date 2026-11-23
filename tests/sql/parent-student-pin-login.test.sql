@@ -116,6 +116,12 @@ BEGIN
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
    WHERE n.nspname='public' AND c.relname='parent_students';
   IF v_rls IS DISTINCT FROM true THEN RAISE EXCEPTION 'parent_students RLS must be enabled.'; END IF;
+  IF has_table_privilege('anon', 'public.parent_students', 'SELECT') OR has_table_privilege('authenticated', 'public.parent_students', 'SELECT') THEN
+    RAISE EXCEPTION 'Untrusted anon/authenticated roles must not read parent-child links directly.';
+  END IF;
+  IF NOT has_table_privilege('service_role', 'public.parent_students', 'SELECT') THEN
+    RAISE EXCEPTION 'Service role must retain access for server-verified relationship checks.';
+  END IF;
   SELECT c.relrowsecurity INTO v_rls
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
    WHERE n.nspname='public' AND c.relname='lockout_counters';
