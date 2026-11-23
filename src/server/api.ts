@@ -9574,9 +9574,9 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
       const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
       const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
       const parentLinks = assignedStudentIds.size
-        ? await queryAllRows('parent_students', { school_id: school.id, student_id: [...assignedStudentIds] }, 'parent_id', undefined, 'revoked_at.is.null')
+        ? await queryAllRows('parent_students', { school_id: school.id, student_id: [...assignedStudentIds] }, 'parent_id,revoked_at')
         : [];
-      const assignedParentIds = new Set(parentLinks.map((link: any) => String(link.parentId || '')));
+      const assignedParentIds = new Set(parentLinks.filter((link: any) => !link.revokedAt).map((link: any) => String(link.parentId || '')));
       contacts = contacts.filter(contact => contact.role === 'parent'
         ? assignedParentIds.has(String(contact.id))
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
