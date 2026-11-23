@@ -2769,3 +2769,20 @@ body { font-family: var(--schoolos-font-body); }
   .school-students-page table,
   .school-teachers-page table { min-width:700px; }
 }
+
+
+/* Student and Parent login follows the active SchoolOS light/dark theme. */
+.dark .schoolos-login-page { background: #0d141b !important; color: #e5eeee; }
+.dark .schoolos-login-page .schoolos-login-card { background: #142027 !important; border-color: #2c4148 !important; }
+.dark .schoolos-login-page .schoolos-login-title,
+.dark .schoolos-login-page h3 { color: #e5eeee !important; }
+.dark .schoolos-login-page .schoolos-login-muted,
+.dark .schoolos-login-page label,
+.dark .schoolos-login-page p { color: #a9bdc3 !important; }
+.dark .schoolos-login-page input,
+.dark .schoolos-login-page select,
+.dark .schoolos-login-page textarea { background: #1b2a31 !important; border-color: #3a5058 !important; color: #edf5f5 !important; }
+.dark .schoolos-login-page input::placeholder { color: #80959c !important; }
+.dark .schoolos-login-page [role="tablist"] { background: #1b2a31 !important; }
+.dark .schoolos-login-page [role="tab"][aria-selected="true"] { background: #263a41 !important; color: #8de1d4 !important; }
+.dark .schoolos-login-page button:not([type="submit"]) { border-color: #3a5058; }
