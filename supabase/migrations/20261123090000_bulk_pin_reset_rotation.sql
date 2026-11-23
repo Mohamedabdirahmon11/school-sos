@@ -146,7 +146,7 @@ BEGIN
 
   INSERT INTO public.audit_logs (
     id, action, category, school_id, school_name, user_id, user_name,
-    user_role, details, severity
+    user_role, ip_address, details, severity
   )
   SELECT 'audit-' || gen_random_uuid()::text,
          'STUDENT_BULK_PIN_RESET',
@@ -156,6 +156,7 @@ BEGIN
          v_changed_by,
          v_changed_by_name,
          v_changed_by_role,
+         NULLIF(p_payload->>'changed_by_ip', ''),
          'Bulk reset of ' || v_requested_count || ' student PINs; next login requires PIN rotation. Parent account PINs were unchanged.',
          'warning'
     FROM public.schools AS school
