@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { isSessionExpiryValid, passwordPolicyError, generateTemporaryPin } from '../src/server/auth-security.ts';
+import { isSessionExpiryValid, passwordPolicyError, generateTemporaryPin, isStrongPortalPin } from '../src/server/auth-security.ts';
 
 test('session expiry accepts only a valid future ISO timestamp', () => {
   const now = Date.parse('2026-11-03T12:00:00.000Z');
@@ -13,6 +13,9 @@ test('session expiry fails closed for malformed or missing database timestamps',
   const now = Date.parse('2026-11-03T12:00:00.000Z');
   for (const value of [null, undefined, '', 'not-a-date', 'NaN', 0, {}, []]) {
     assert.equal(isSessionExpiryValid(value, now), false, `rejected ${String(value)}`);
+  }
+  for (const pin of ['000000', '123456', '654321', '111111', '112233', '121212', '123123', '987654', '101010']) {
+    assert.equal(isStrongPortalPin(pin), false, `rejected weak PIN ${pin}`);
   }
 });
 
@@ -185,5 +188,6 @@ test('temporary portal PIN generator always returns non-obvious six-digit values
     assert.match(pin, /^\d{6}$/);
     assert.equal(weak.has(pin), false);
     assert.equal(/^(\d)\1{5}$/.test(pin), false);
+    assert.equal(isStrongPortalPin(pin), true);
   }
 });
