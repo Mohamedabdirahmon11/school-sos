@@ -83,16 +83,31 @@ SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
-  IF NEW.role = 'parent'::public.user_role_enum
-     AND NEW.school_id IS NOT NULL
-     AND COALESCE(array_length(NEW.linked_student_ids, 1), 0) > 0 THEN
-    INSERT INTO public.parent_students (parent_id, student_id, school_id, relation)
-    SELECT NEW.id, s.id, NEW.school_id, 'guardian'
-      FROM unnest(COALESCE(NEW.linked_student_ids, ARRAY[]::TEXT[])) AS linked(student_pk)
-      JOIN public.students AS s
-        ON s.id = linked.student_pk
-       AND s.school_id = NEW.school_id
-    ON CONFLICT (parent_id, student_id) DO NOTHING;
+  -- A removed child link, changed tenant, or changed role must revoke the old
+  -- relationship row immediately; otherwise a parent could retain stale access.
+  IF TG_OP = 'UPDATE' AND (
+    NEW.role IS DISTINCT FROM 'parent'::public.user_role_enum
+    OR NEW.school_id IS DISTINCT FROM OLD.school_id
+  ) THEN
+    DELETE FROM public.parent_students
+     WHERE parent_id = OLD.id AND school_id = OLD.school_id;
+  END IF;
+
+  IF NEW.role = 'parent'::public.user_role_enum AND NEW.school_id IS NOT NULL THEN
+    DELETE FROM public.parent_students
+     WHERE parent_id = NEW.id
+       AND school_id = NEW.school_id
+       AND NOT (student_id = ANY(COALESCE(NEW.linked_student_ids, ARRAY[]::TEXT[])));
+
+    IF COALESCE(array_length(NEW.linked_student_ids, 1), 0) > 0 THEN
+      INSERT INTO public.parent_students (parent_id, student_id, school_id, relation)
+      SELECT NEW.id, s.id, NEW.school_id, 'guardian'
+        FROM unnest(COALESCE(NEW.linked_student_ids, ARRAY[]::TEXT[])) AS linked(student_pk)
+        JOIN public.students AS s
+          ON s.id = linked.student_pk
+         AND s.school_id = NEW.school_id
+      ON CONFLICT (parent_id, student_id) DO NOTHING;
+    END IF;
   END IF;
   RETURN NEW;
 END;
