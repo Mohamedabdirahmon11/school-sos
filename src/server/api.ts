@@ -1219,7 +1219,8 @@ apiRouter.post('/auth/login', async (req, res) => {
     let linkedStudents: any[] = [];
     if (role === 'parent') {
       const allStudents = await db.getStudents(school.id);
-      linkedStudents = allStudents.filter(s => Array.isArray(targetUser.linkedStudentIds) && targetUser.linkedStudentIds.includes(s.id));
+      const linkedParentStudentIds = new Set(await getParentStudentIds(targetUser, school.id));
+      linkedStudents = allStudents.filter(s => linkedParentStudentIds.has(s.id));
     }
 
     if (targetUser.mustChangePassword) {
