@@ -45,6 +45,37 @@ SELECT u.id, s.id, u.school_id, 'guardian'
    AND u.school_id IS NOT NULL
 ON CONFLICT (parent_id, student_id) DO NOTHING;
 
+CREATE OR REPLACE FUNCTION public.schoolos_validate_parent_student_link()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $
+DECLARE
+  v_parent_school VARCHAR(64);
+  v_parent_role public.user_role_enum;
+  v_student_school VARCHAR(64);
+BEGIN
+  SELECT school_id, role INTO v_parent_school, v_parent_role
+    FROM public.users WHERE id = NEW.parent_id;
+  SELECT school_id INTO v_student_school
+    FROM public.students WHERE id = NEW.student_id;
+  IF v_parent_role IS DISTINCT FROM 'parent'::public.user_role_enum
+     OR v_parent_school IS DISTINCT FROM NEW.school_id
+     OR v_student_school IS DISTINCT FROM NEW.school_id THEN
+    RAISE EXCEPTION 'Parent and student relationship must stay within one school and use a parent account.'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS trg_schoolos_validate_parent_student_link ON public.parent_students;
+CREATE TRIGGER trg_schoolos_validate_parent_student_link
+BEFORE INSERT OR UPDATE ON public.parent_students
+FOR EACH ROW
+EXECUTE FUNCTION public.schoolos_validate_parent_student_link();
+
 CREATE OR REPLACE FUNCTION public.schoolos_sync_parent_student_links()
 RETURNS TRIGGER
 LANGUAGE plpgsql
