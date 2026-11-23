@@ -5466,7 +5466,7 @@ apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireScho
     return;
   }
   res.set({ 'Cache-Control': 'private, no-store, max-age=0' });
-  res.json({ ok: true, data: { items: conversationItems, pagination: { page: result.page, pageSize: result.pageSize, total: conversationItems.length, totalPages: Math.max(1, Math.ceil(conversationItems.length / result.pageSize)) } }, error: null });
+  res.json({ ok: true, data: { items: conversationItems, pagination: { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / result.pageSize)) } }, error: null });
 });
 
 apiRouter.get('/parent/notices', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
