@@ -2786,3 +2786,8 @@ body { font-family: var(--schoolos-font-body); }
 .dark .schoolos-login-page [role="tablist"] { background: #1b2a31 !important; }
 .dark .schoolos-login-page [role="tab"][aria-selected="true"] { background: #263a41 !important; color: #8de1d4 !important; }
 .dark .schoolos-login-page button:not([type="submit"]) { border-color: #3a5058; }
+
+.schoolos-login-page .schoolos-login-card { border-radius: 12px; }
+.schoolos-login-page .schoolos-login-title,
+.schoolos-login-page h3 { font-family: Georgia, 'Times New Roman', serif; }
+.dark .schoolos-login-page .schoolos-login-card { border-radius: 12px; }
