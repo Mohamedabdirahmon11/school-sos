@@ -91,7 +91,7 @@ export const ParentPortalView:React.FC=()=>{
  const title=NAV.find(x=>x.id===view)?.label||'Hoyga';
  const gradeText=(m:any)=>{const raw=String(m.grade||'—');const letter=raw.match(/A\+?|B|C|D|F/)?.[0];const labels:Record<string,string>={'A+':'Aad u wanaagsan','A':'Wanaagsan','B':'Fiican','C':'Dhexdhexaad','D':'Hoose','F':'U baahan caawimaad'};return letter?letter+' · '+labels[letter]:raw;};
 
- return <div className="parent-portal-shell" data-theme={theme}>
+ return <div className={"parent-portal-shell "+(theme==='dark'?'pp-theme-dark':'')} data-theme={theme}>
   <aside className="pp-sidebar">
    <div className="pp-brand"><div className="pp-avatar">{initials(parent?.fullName||user?.fullName||'W')}</div><div><b>{parent?.fullName||user?.fullName||'Waalid'}</b><small>Waalid · {children.length} ilmood</small></div></div>
    {children.length>1&&<><div className="pp-kids-label">Caruurtayda</div><div className="pp-kids">{children.map((x:any)=><button key={x.id} className={'pp-child-item '+(x.id===child?.id?'is-active':'')} onClick={()=>setChildId(x.id)} aria-current={x.id===child?.id?'true':undefined}><span className="pp-child-avatar">{initials(x.fullName)}</span><span style={{minWidth:0,flex:1}}><b>{x.fullName}</b><small>{x.className}</small></span>{(x.homeworkPending||0)>0&&<i className="pp-badge">{x.homeworkPending}</i>}</button>)}</div></>}
