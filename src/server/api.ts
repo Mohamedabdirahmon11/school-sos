@@ -201,7 +201,12 @@ apiRouter.use((req, res, next) => {
     const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
     console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
   });
-  void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
+  // Plans are only consumed by Super Admin plan management and invoice generation.
+  // Avoid adding a cold global plans query to every school/teacher/parent request.
+  const includePlans = req.path === '/superadmin/plans'
+    || req.path.startsWith('/superadmin/plans/')
+    || (req.method === 'POST' && req.path === '/superadmin/invoices/generate');
+  void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`, includePlans).then((context: any) => {
     storage.runWithRequestContext(context, next);
   }).catch(() => {
     if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });

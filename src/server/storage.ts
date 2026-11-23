@@ -394,6 +394,11 @@ class StorageEngine {
   private testClient: any = null;
   private settingsCache: { expiresAt: number; value: SuperAdminSettings } | null = null;
   private plansCache: { expiresAt: number; value: PlanConfig[] } | null = null;
+  // Coalesce cold-cache reads across concurrent HTTP request contexts. Each
+  // request still receives its own isolated StorageContext and persistence
+  // baseline; only the immutable settings/plan snapshots are shared.
+  private settingsLoadPromise: Promise<SuperAdminSettings> | null = null;
+  private plansLoadPromise: Promise<PlanConfig[]> | null = null;
 
   constructor() {
     this.data = this.createEmptySchema();
@@ -663,23 +668,41 @@ class StorageEngine {
     await this.contexts.run(context, async () => {
       const settingsTask = async () => {
         if (this.settingsCache && this.settingsCache.expiresAt > Date.now()) {
-          this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.settingsCache.value }]);
+          this.data.settings = { ...DEFAULT_SETTINGS, ...this.settingsCache.value };
+          this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.data.settings }]);
           return;
         }
-        const rows = await this.queryRows<SuperAdminSettings>('super_admin_settings', { id: 'default' });
-        if (rows[0]) this.data.settings = { ...DEFAULT_SETTINGS, ...rows[0] };
-        this.settingsCache = { value: { ...this.data.settings }, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+        if (!this.settingsLoadPromise) {
+          this.settingsLoadPromise = (async () => {
+            const rows = await this.queryRows<SuperAdminSettings>('super_admin_settings', { id: 'default' });
+            const value = rows[0] ? { ...DEFAULT_SETTINGS, ...rows[0] } : { ...this.data.settings };
+            this.settingsCache = { value, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+            return value;
+          })().finally(() => { this.settingsLoadPromise = null; });
+        }
+        const value = await this.settingsLoadPromise;
+        this.data.settings = { ...DEFAULT_SETTINGS, ...value };
+        // queryRows populated the initiating request context. Populate this
+        // request's own context too, including its write-diff baseline.
+        this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.data.settings }]);
       };
       const plansTask = async () => {
         if (this.plansCache && this.plansCache.expiresAt > Date.now()) {
           this.cacheQueryRows('plans', this.plansCache.value.map(plan => ({ ...plan })));
           return;
         }
-        // queryRows already merges persisted plan fields over built-in defaults
-        // and records the matching persistence baseline. Do not replace that
-        // merged state with raw rows, or unrelated writes will upsert it again.
-        await this.queryRows<PlanConfig>('plans', {});
-        this.plansCache = { value: this.data.plans.map(plan => ({ ...plan })), expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+        if (!this.plansLoadPromise) {
+          this.plansLoadPromise = (async () => {
+            // queryRows merges persisted plan fields over built-in defaults.
+            // Keep that merged snapshot so unrelated writes never upsert defaults.
+            await this.queryRows<PlanConfig>('plans', {});
+            const value = this.data.plans.map(plan => ({ ...plan }));
+            this.plansCache = { value, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+            return value;
+          })().finally(() => { this.plansLoadPromise = null; });
+        }
+        const value = await this.plansLoadPromise;
+        this.cacheQueryRows('plans', value.map(plan => ({ ...plan })));
       };
       await Promise.all(includePlans ? [settingsTask(), plansTask()] : [settingsTask()]);
       if (includeLockouts) {

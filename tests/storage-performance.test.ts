@@ -72,3 +72,23 @@ test('class attendance reads avoid exact-count pagination and select only regist
   assert.match(method, /\.range\(offset, offset \+ 999\)/);
   assert.doesNotMatch(method, /count:\s*'exact'/);
 });
+
+
+test('concurrent request contexts coalesce cold settings and plans reads', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(storage, /private settingsLoadPromise: Promise<SuperAdminSettings> \| null = null/);
+  assert.match(storage, /private plansLoadPromise: Promise<PlanConfig\[\]> \| null = null/);
+  assert.match(storage, /if \(!this\.settingsLoadPromise\)\s*\{[\s\S]*?this\.settingsLoadPromise =/);
+  assert.match(storage, /if \(!this\.plansLoadPromise\)\s*\{[\s\S]*?this\.plansLoadPromise =/);
+  assert.match(storage, /finally\(\(\) => \{ this\.settingsLoadPromise = null; \}\)/);
+  assert.match(storage, /finally\(\(\) => \{ this\.plansLoadPromise = null; \}\)/);
+});
+
+
+test('plan configuration is loaded only for Super Admin plan and invoice routes', () => {
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(api, /const includePlans = req\.path === '\/superadmin\/plans'/);
+  assert.match(api, /req\.path\.startsWith\('\/superadmin\/plans\/'\)/);
+  assert.match(api, /req\.method === 'POST' && req\.path === '\/superadmin\/invoices\/generate'/);
+  assert.match(api, /prepareRequestContext\(req\.path === '\/auth\/login', `\$\{req\.method\} \$\{req\.path\}`, includePlans\)/);
+});
