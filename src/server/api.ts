@@ -439,12 +439,10 @@ async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]
     return currentClassId ? [currentClassId] : [];
   }
   if (user.role !== 'parent') return [];
-  const students = await db.getStudents(schoolId);
-  return students.filter(student =>
-    user.linkedStudentIds?.includes(student.id) ||
-    [user.phone, user.parentPhone].includes(student.fatherPhone || '') ||
-    [user.phone, user.parentPhone].includes(student.motherPhone || '')
-  ).map(student => student.classId);
+  const linkedIds = await getParentLinkedStudentIds(schoolId, user.id);
+  if (!linkedIds.length) return [];
+  const students = await db.queryPage('students', { school_id: schoolId, id: linkedIds }, 1, 100, undefined, 'id,class_id');
+  return [...new Set(students.items.map((student: any) => String(student.classId || '')).filter(Boolean))];
 }
 
 async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promise<User | null> {
@@ -659,6 +657,11 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
   return true;
 }
 
+async function getParentLinkedStudentIds(schoolId: string, parentId: string): Promise<string[]> {
+  const links = await db.queryPage('parent_students', { school_id: schoolId, parent_id: parentId }, 1, 100, undefined, 'student_id');
+  return [...new Set(links.items.map((row: any) => String(row.studentId || '')).filter(Boolean))];
+}
+
 async function canAccessStudentRecord(user: User, studentId: string): Promise<boolean> {
   const student = await db.getStudentById(studentId, user.schoolId);
   if (!student || (user.schoolId && student.schoolId !== user.schoolId)) return false;
@@ -679,10 +682,7 @@ async function canAccessStudentRecord(user: User, studentId: string): Promise<bo
     }, 1, 1, undefined, 'id');
     return assignment.items.length > 0;
   }
-  if (user.role === 'parent') {
-    const parentPhones = [user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone));
-    return Boolean(user.linkedStudentIds?.includes(student.id) || parentPhones.includes(student.fatherPhone || '') || parentPhones.includes(student.motherPhone || ''));
-  }
+  if (user.role === 'parent') return (await getParentLinkedStudentIds(student.schoolId, user.id)).includes(student.id);
   if (user.role === 'student') return Boolean(user.studentId === student.studentId || student.id === user.id.replace(/^usr-student-/, 'std-'));
   return false;
 }
@@ -4375,7 +4375,7 @@ apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAss
     // A client-supplied scope must never widen this server-side filter.
     teacherId = String(own.items[0].id);
   } else if (role === 'parent' || role === 'student') {
-    let studentIds = role === 'parent' ? user.linkedStudentIds || [] : [];
+    let studentIds = role === 'parent' ? await getParentLinkedStudentIds(school.id, user.id) : [];
     if (role === 'student') {
       const own = await db.queryPage('students', { school_id: school.id, student_id: user.studentId || '' }, 1, 1, undefined, 'id,class_id');
       if (own.items[0]) {
@@ -5287,6 +5287,49 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
     'X-Total-Pages': String(Math.ceil(total / pageSize))
   });
   res.json(items);
+});
+
+apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'parent') {
+    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_ONLY', message: 'Parent accounts only.' } });
+    return;
+  }
+  const links = await db.queryPage('parent_students', { school_id: school.id, parent_id: user.id }, 1, 100, undefined, 'student_id,relation');
+  const studentIds = [...new Set(links.items.map((row: any) => String(row.studentId || '')).filter(Boolean))];
+  if (!studentIds.length) {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.json({ ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children: [] }, error: null });
+    return;
+  }
+  const students = await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined,
+    'id,school_id,student_id,first_name,middle_name,last_name,class_id,section,status,admission_date');
+  const classIds = [...new Set(students.items.map((row: any) => String(row.classId || '')).filter(Boolean))];
+  const classes = classIds.length
+    ? await db.queryPage('classes', { school_id: school.id, id: classIds }, 1, 100, undefined, 'id,name,section,class_teacher_id,academic_year')
+    : { items: [] as any[] };
+  const teacherIds = [...new Set(classes.items.map((row: any) => String((row as any).classTeacherId || '')).filter(Boolean))];
+  const teachers = teacherIds.length
+    ? await db.queryPage('users', { school_id: school.id, id: teacherIds, role: 'teacher' }, 1, 100, undefined, 'id,full_name')
+    : { items: [] as any[] };
+  const classById = new Map(classes.items.map((row: any) => [String(row.id), row]));
+  const teacherById = new Map(teachers.items.map((row: any) => [String(row.id), row]));
+  const relationByStudent = new Map(links.items.map((row: any) => [String(row.studentId), String(row.relation || 'guardian')]));
+  const children = students.items.map((student: any) => {
+    const klass = classById.get(String(student.classId));
+    const teacher = klass?.classTeacherId ? teacherById.get(String(klass.classTeacherId)) : null;
+    return {
+      id: student.id, studentId: student.studentId,
+      fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+      firstName: student.firstName, middleName: student.middleName, lastName: student.lastName,
+      classId: student.classId, className: klass ? [klass.name, klass.section || student.section].filter(Boolean).join(' · ') : 'Fasal lama heli',
+      section: student.section, status: student.status, admissionDate: student.admissionDate,
+      formTeacherName: teacher?.fullName || '', relation: relationByStudent.get(String(student.id)) || 'guardian'
+    };
+  });
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  res.json({ ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children }, error: null });
 });
 
 apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res) => {
