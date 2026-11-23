@@ -1013,7 +1013,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       db.recordLoginFailure(ipKey, ipThreshold, durationMins);
       db.logAudit({
         action: 'FAILED_LOGIN_UNKNOWN_SCHOOL', category: 'auth', userId: 'unknown',
-        userName: 'Unknown account', userRole: role,
+        userName: 'Unknown account', userRole: role, ipAddress: clientIp,
         details: `Student/parent login failed for an unknown school code from IP ${clientIp}.`,
         severity: failed.newlyLocked ? 'critical' : 'warning'
       });
@@ -1071,6 +1071,7 @@ apiRouter.post('/auth/login', async (req, res) => {
           userId: 'unknown',
           userName: 'Unknown account',
           userRole: role,
+          ipAddress: clientIp,
           details: `Login failed for non-existent ${role} identifier from IP ${clientIp}.`,
           severity: 'warning'
         });
@@ -1100,6 +1101,7 @@ apiRouter.post('/auth/login', async (req, res) => {
           userId: 'unknown',
           userName: 'Unknown account',
           userRole: role,
+          ipAddress: clientIp,
           details: `Incorrect PIN attempt for ${role} (student ${matchStd.studentId}) from IP ${clientIp}. Attempt ${failedResult.count}/${threshold}.`,
           severity: failedResult.newlyLocked ? 'critical' : 'warning'
         });
@@ -1200,6 +1202,7 @@ apiRouter.post('/auth/login', async (req, res) => {
         userId: targetUser.id,
         userName: targetUser.fullName,
         userRole: targetUser.role,
+        ipAddress: clientIp,
         details: `Incorrect PIN for ${role} account from IP ${clientIp}.`,
         severity: lockResult.locked ? 'critical' : 'warning'
       });
