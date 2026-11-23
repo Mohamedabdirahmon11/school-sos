@@ -1893,7 +1893,7 @@ class StorageEngine {
     return { ...student, pin: rawPin };
   }
 
-  public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
+  public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string, actor?: { id: string; name: string; role: UserRole; ipAddress?: string }): Promise<{ student: Student; newPin: string } | null> {
     if (customPin !== undefined && (typeof customPin !== 'string' || !/^\\d{6}$/.test(customPin) || ['000000', '123456', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'].includes(customPin))) {
       throw new Error('Student PIN must be a strong 6-digit number.');
     }
@@ -1926,9 +1926,10 @@ class StorageEngine {
       action: 'STUDENT_PIN_RESET',
       category: 'security',
       schoolId: student.schoolId,
-      userId: student.id,
-      userName: `${student.firstName} ${student.lastName}`,
-      userRole: 'student',
+      userId: actor?.id || student.id,
+      userName: actor?.name || 'School administrator',
+      userRole: actor?.role || 'school_admin',
+      ipAddress: actor?.ipAddress,
       details: `6-digit PIN reset for student ${student.studentId}; next login requires PIN rotation.`,
       severity: 'warning'
     });
@@ -1940,7 +1941,7 @@ class StorageEngine {
 
   public async linkParentToStudent(
     parentId: string, studentId: string, schoolId: string,
-    relation = 'guardian', createdBy?: string
+    relation = 'guardian', createdBy?: string, createdByRole: UserRole = 'school_admin', ipAddress?: string
   ): Promise<void> {
     const [parent, student] = await Promise.all([
       this.getUserById(parentId, schoolId),
@@ -1970,14 +1971,15 @@ class StorageEngine {
       schoolId,
       userId: createdBy || parent.id,
       userName: createdBy ? 'School administrator' : parent.fullName,
-      userRole: createdBy ? 'school_admin' : 'parent',
+      userRole: createdBy ? createdByRole : 'parent',
+      ipAddress,
       details: `Linked parent account ${parent.id} to student ${student.studentId} (${relation}).`,
       severity: 'info'
     });
     await this.flush();
   }
 
-  public async resetParentPin(parentId: string, schoolId: string): Promise<{ parent: User; newPin: string } | null> {
+  public async resetParentPin(parentId: string, schoolId: string, actor?: { id: string; name: string; role: UserRole; ipAddress?: string }): Promise<{ parent: User; newPin: string } | null> {
     const parent = await this.getUserById(parentId, schoolId);
     if (!parent || parent.role !== 'parent') return null;
     const newPin = randomInt(100000, 1000000).toString();
@@ -1994,10 +1996,11 @@ class StorageEngine {
       action: 'PARENT_PIN_RESET',
       category: 'security',
       schoolId,
-      userId: parent.id,
-      userName: parent.fullName,
-      userRole: 'parent',
-      details: 'Parent PIN reset by school administrator; next login requires PIN rotation.',
+      userId: actor?.id || parent.id,
+      userName: actor?.name || 'School administrator',
+      userRole: actor?.role || 'school_admin',
+      ipAddress: actor?.ipAddress,
+      details: `Parent PIN reset for account ${parent.id}; next login requires PIN rotation.`,
       severity: 'warning'
     });
     this.save();
