@@ -215,9 +215,11 @@ test('student creation whitelists profile fields, enforces capacity and protects
     pin: '654321', isBlocked: false, failedLoginAttempts: 0
   } as any);
   await storage.db.flush();
-  const { verifyPin } = await import('../src/server/auth-security.ts');
-  const reset = await storage.db.resetStudentPin(response.id, school.id, '864209');
-  assert.equal(reset?.newPin, '864209');
+  const { verifyPin, generateTemporaryPin, isStrongPortalPin } = await import('../src/server/auth-security.ts');
+  const resetPin = generateTemporaryPin();
+  assert.equal(isStrongPortalPin(resetPin), true);
+  const reset = await storage.db.resetStudentPin(response.id, school.id, resetPin);
+  assert.equal(reset?.newPin, resetPin);
   await storage.db.flush();
   const unchangedParent = await storage.db.getUserById(otherSchoolParent.id, secondSchool.id);
   assert.ok(unchangedParent?.pin && verifyPin('654321', unchangedParent.pin));
