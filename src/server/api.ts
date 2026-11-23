@@ -4363,7 +4363,7 @@ apiRouter.post('/timetable/copy-term', requireAuth, requireSchoolAdminOrSuperAdm
   res.json({ success: true, copiedClasses, skipped, copiedSlots: copiedClasses.reduce((total, id) => total + (sourceByClass.get(id)?.length || 0), 0) });
 });
 
-apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAssignmentsReady, requireSchoolSetupReady, async (req, res) => {
+apiRouter.get('/timetable', requireAuth, requireSchoolContext, requireTeacherAssignmentsReady, requireParentPortalSetupReady, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
@@ -9449,7 +9449,7 @@ apiRouter.get('/notices/unread-count', requireAuth, requireSchoolContext, async 
   res.json({ count: await db.getNoticeUnreadCount(schoolId, user.id, user.role, classIds, user) });
 });
 
-apiRouter.post('/notices/read-batch', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.post('/notices/read-batch', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const user = (req as any).user as User;
   const schoolId = (req as any).school.id;
   const noticeIds = req.body?.noticeIds;
@@ -9462,7 +9462,7 @@ apiRouter.post('/notices/read-batch', requireAuth, requireSchoolContext, async (
   res.json({ success: true, count });
 });
 
-apiRouter.post('/notices/:id/read', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.post('/notices/:id/read', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const user = (req as any).user as User;
   const schoolId = (req as any).school.id;
   const school = (req as any).school as School;
