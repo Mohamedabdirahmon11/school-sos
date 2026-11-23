@@ -792,7 +792,7 @@ async function requireSchoolContextForSupportWrite(req: Request, res: Response, 
 // Helper: Issue signed cookie session
 async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string): Promise<void> {
   const settings = db.getSettings();
-  const timeoutMinutes = settings.sessionTimeoutMinutes || 60;
+  const timeoutMinutes = ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : settings.sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
 
   const sessionId = randomUUID();
@@ -830,7 +830,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
 
 async function refreshSessionCookie(res: Response, user: User, previous: ReturnType<typeof verifySignedSessionToken>): Promise<void> {
   if (!previous) return;
-  const timeoutMinutes = db.getSettings().sessionTimeoutMinutes || 60;
+  const timeoutMinutes = ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : db.getSettings().sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
   await db.touchSession(previous.sessionId, new Date(expiresAt).toISOString());
   const token = createSignedSessionToken({ ...previous, role: user.role, schoolId: user.schoolId || previous.schoolId, expiresAt });
