@@ -41,7 +41,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       setError('PINs do not match.');
       return;
     }
-    if (isPortalPinRole && newPin && (!/^\\d{6}$/.test(newPin) || ['000000', '123456', '654321', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '112233', '121212', '123123', '987654', '101010'].includes(newPin))) {
+    if (isPortalPinRole && newPin && (!/^\d{6}$/.test(newPin) || ['000000', '123456', '654321', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '112233', '121212', '123123', '987654', '101010'].includes(newPin))) {
       setError('PIN-ku waa inuu noqdaa 6 lambar oo adag.');
       return;
     }
@@ -183,9 +183,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <>
                 <label className="block text-xs font-bold text-slate-800 mb-2">Beddel PIN-ka (ikhtiyaari)</label>
                 <div className="space-y-2">
-                  <input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="PIN-ka hadda" autoComplete="current-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
-                  <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="PIN cusub (6 lambar)" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
-                  <input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="Ku celi PIN-ka cusub" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="PIN-ka hadda" autoComplete="current-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="PIN cusub (6 lambar)" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
+                  <input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Ku celi PIN-ka cusub" autoComplete="new-password" className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#0F766E] focus:outline-none" />
                   <p className="text-[11px] text-slate-500">Beddelidda PIN-ka waxay cusboonaysiinaysaa dhammaan sessions-ka amniga dartii.</p>
                 </div>
               </>
