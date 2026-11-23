@@ -40,7 +40,7 @@ CREATE TABLE public.users (
 CREATE TABLE public.user_sessions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id VARCHAR(64));
 CREATE TABLE public.audit_logs (
   id TEXT PRIMARY KEY, action TEXT, category TEXT, school_id VARCHAR(64), school_name TEXT,
-  user_id VARCHAR(64), user_name TEXT, user_role public.user_role_enum, details TEXT, severity TEXT
+  user_id VARCHAR(64), user_name TEXT, user_role public.user_role_enum, ip_address TEXT, details TEXT, severity TEXT
 );
 
 INSERT INTO public.schools(id,name) VALUES ('pin-school-a','PIN School A'), ('pin-school-b','PIN School B');
@@ -108,6 +108,7 @@ BEGIN
     'changed_by','school-admin-test',
     'changed_by_name','School Admin',
     'changed_by_role','school_admin',
+    'changed_by_ip','192.0.2.1',
     'students',jsonb_build_array(
       jsonb_build_object('student_id','ST-0002','pin_hash','scrypt:rotated'),
       jsonb_build_object('student_id','ST-0004','pin_hash','scrypt:backfill')
