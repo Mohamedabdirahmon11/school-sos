@@ -38,6 +38,13 @@ CREATE TABLE public.users (
   locked_until TIMESTAMPTZ
 );
 CREATE TABLE public.user_sessions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id VARCHAR(64));
+CREATE TABLE public.lockout_counters (
+  id TEXT PRIMARY KEY,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  first_failed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  locked_until TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE public.audit_logs (
   id TEXT PRIMARY KEY, action TEXT, category TEXT, school_id VARCHAR(64), school_name TEXT,
   user_id VARCHAR(64), user_name TEXT, user_role public.user_role_enum, ip_address TEXT, details TEXT, severity TEXT
@@ -98,6 +105,14 @@ BEGIN
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
    WHERE n.nspname='public' AND c.relname='parent_students';
   IF v_rls IS DISTINCT FROM true THEN RAISE EXCEPTION 'parent_students RLS must be enabled.'; END IF;
+  SELECT c.relrowsecurity INTO v_rls
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname='public' AND c.relname='lockout_counters';
+  IF v_rls IS DISTINCT FROM true THEN RAISE EXCEPTION 'lockout_counters RLS must be enabled.'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema='public' AND table_name='lockout_counters' AND column_name='lockout_count'
+  ) THEN RAISE EXCEPTION 'Exponential lockout count must persist in the database.'; END IF;
 
   SELECT pg_get_functiondef('public.schoolos_bulk_reset_student_pins(jsonb)'::regprocedure) INTO v_function;
   IF position('must_change_password = true' IN v_function) = 0 THEN RAISE EXCEPTION 'Bulk student PIN reset must require PIN rotation.'; END IF;
