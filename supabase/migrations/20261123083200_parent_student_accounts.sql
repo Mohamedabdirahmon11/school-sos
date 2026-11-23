@@ -7,6 +7,7 @@ ALTER TABLE public.lockout_counters
   ADD COLUMN IF NOT EXISTS lockout_count INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE public.lockout_counters ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.lockout_counters FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.lockout_counters TO service_role;
 DROP POLICY IF EXISTS lockout_counters_service_role_all ON public.lockout_counters;
 CREATE POLICY lockout_counters_service_role_all ON public.lockout_counters
   FOR ALL TO service_role USING (true) WITH CHECK (true);
