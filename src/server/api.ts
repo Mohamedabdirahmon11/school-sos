@@ -1172,12 +1172,10 @@ apiRouter.post('/auth/login', async (req, res) => {
     // Linked children for parent
     let linkedStudents: any[] = [];
     if (role === 'parent') {
-      const allStudents = await db.getStudents(school.id);
-      linkedStudents = allStudents.filter(s => 
-        (targetUser.linkedStudentIds && targetUser.linkedStudentIds.includes(s.id)) ||
-        s.fatherPhone === phone || 
-        s.motherPhone === phone
-      );
+      const linkedIds = await getParentLinkedStudentIds(school.id, targetUser.id);
+      const allStudents = linkedIds.length ? await db.queryPage('students', { school_id: school.id, id: linkedIds }, 1, 100, undefined,
+        'id,school_id,student_id,first_name,middle_name,last_name,class_id,section,status') : { items: [] as any[] };
+      linkedStudents = allStudents.items as any[];
     }
 
     await issueSessionCookie(res, targetUser, req, school.id);
