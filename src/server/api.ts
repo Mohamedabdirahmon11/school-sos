@@ -541,6 +541,7 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
     return;
   }
   if (payload && !isBootstrap) await refreshSessionCookie(res, user, payload);
+  (req as any).sessionPayload = payload;
   (req as any).user = user;
   next();
 }
@@ -790,7 +791,7 @@ async function requireSchoolContextForSupportWrite(req: Request, res: Response, 
 }
 
 // Helper: Issue signed cookie session
-async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string): Promise<void> {
+async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string, selectedStudentId?: string): Promise<void> {
   const settings = db.getSettings();
   const timeoutMinutes = ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : settings.sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
@@ -802,6 +803,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
     userId: user.id,
     role: user.role,
     schoolId: user.schoolId || schoolId,
+    ...(selectedStudentId ? { selectedStudentId } : {}),
     createdAt,
     expiresAt
   });
@@ -1118,7 +1120,7 @@ apiRouter.post('/auth/login', async (req, res) => {
         res.json({ requirePinChange: true, challengeToken });
         return;
       }
-      await issueSessionCookie(res, existingUser, req, school.id);
+      await issueSessionCookie(res, existingUser, req, school.id, role === 'parent' && matchedStudents.length === 1 ? matchedStudents[0].id : undefined);
       db.logAudit({
         action: 'USER_LOGIN_SUCCESS',
         category: 'auth',
@@ -1199,7 +1201,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       res.json({ requirePinChange: true, challengeToken });
       return;
     }
-    await issueSessionCookie(res, targetUser, req, school.id);
+    await issueSessionCookie(res, targetUser, req, school.id, role === 'parent' && linkedStudents.length === 1 ? linkedStudents[0].id : undefined);
     db.logAudit({
       action: 'USER_LOGIN_SUCCESS',
       category: 'auth',
@@ -1644,7 +1646,29 @@ apiRouter.get('/auth/me', requireAuth, async (req, res) => {
   const sessionUser = user.role === 'accountant'
     ? { ...user, permissions: staff?.status === 'active' && Array.isArray(staff.permissions) ? staff.permissions : [] }
     : user;
-  res.json({ user: sanitizeUser(sessionUser), school, sessionTimeoutMinutes: db.getSettings().sessionTimeoutMinutes || 60 });
+  res.json({ user: sanitizeUser(sessionUser), school, sessionTimeoutMinutes: ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : db.getSettings().sessionTimeoutMinutes || 60, selectedStudentId: (req as any).sessionPayload?.selectedStudentId || null });
+});
+
+apiRouter.post('/parent/select-child', requireAuth, requireSchoolContext, async (req, res) => {
+  const user = (req as any).user as User;
+  if (user.role !== 'parent') { res.status(403).json({ error: 'Only parent accounts can select a child.' }); return; }
+  const payload = (req as any).sessionPayload;
+  if (!payload) { res.status(401).json({ error: 'Your session has expired. Sign in again.' }); return; }
+  const requestedStudentId = typeof req.body?.studentId === 'string' ? req.body.studentId.trim() : '';
+  const { selectedStudentId: _previousSelection, ...basePayload } = payload;
+  if (requestedStudentId && !await canAccessStudentRecord(user, requestedStudentId)) {
+    res.status(403).json({ error: 'This child is not linked to your parent account.' });
+    return;
+  }
+  const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const nextPayload = { ...basePayload, ...(requestedStudentId ? { selectedStudentId: requestedStudentId } : {}), expiresAt };
+  const token = createSignedSessionToken(nextPayload);
+  await db.touchSession(payload.sessionId, new Date(expiresAt).toISOString());
+  res.cookie('schoolos_session', token, {
+    httpOnly: true, secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60 * 1000
+  });
+  res.json({ success: true, selectedStudentId: requestedStudentId || null });
 });
 
 apiRouter.put('/auth/profile', requireAuth, async (req, res) => {
