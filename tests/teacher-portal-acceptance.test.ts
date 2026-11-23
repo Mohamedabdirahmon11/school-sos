@@ -242,7 +242,8 @@ test('15.10aa teacher attendance writes invalidate the parent child-summary cach
   assert.equal(beforeResponse.status, 200, await beforeResponse.clone().text());
   const before = (await beforeResponse.json() as any).data.children.find((child: any) => child.id === student.id);
   assert.ok(before);
-  const saved = await postJson('/attendance', cookies.form, { classId: klass.id, date: today, records: [{ studentId: student.id, status: 'present' }] });
+  const classStudents = (await db.getStudents(school.id)).filter((row: any) => row.classId === klass.id);
+  const saved = await postJson('/attendance', cookies.form, { classId: klass.id, date: today, records: classStudents.map((row: any) => ({ studentId: row.id, status: 'present' })) });
   assert.equal(saved.status, 200, await saved.clone().text());
   const afterResponse = await request('/parent/children', cookies.parent);
   assert.equal(afterResponse.status, 200, await afterResponse.clone().text());
