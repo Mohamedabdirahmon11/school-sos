@@ -5516,30 +5516,9 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     if (!terms.length) { res.json([]); return; }
     roleFilter = terms.join(',');
   } else if (user.role === 'parent') {
-    const ids = (user.linkedStudentIds || []).filter(id => /^[A-Za-z0-9_-]+$/.test(id));
-    const parentPhones = [...new Set([user.phone, user.parentPhone].filter((phone): phone is string => Boolean(phone?.trim())))];
-    const guardianStudentIds: string[] = [];
-    if (parentPhones.length) {
-      const client = documentServiceClient(res);
-      if (client) {
-        const normalizedPhones = [...new Set(parentPhones.map(phone => phone.replace(/[^0-9]/g, '')).filter(Boolean))];
-        if (normalizedPhones.length) {
-          const { data: guardianRows, error: guardianError } = await client.from('guardians').select('id')
-            .eq('school_id', school.id).in('phone_normalized', normalizedPhones);
-          if (guardianError) { res.status(503).json({ error: 'Guardian access could not be checked.' }); return; }
-          const guardianIds = (guardianRows || []).map((guardian: any) => guardian.id);
-          if (guardianIds.length) {
-            const { data: links, error: linksError } = await client.from('student_guardians').select('student_id')
-              .eq('school_id', school.id).in('guardian_id', guardianIds);
-            if (linksError) { res.status(503).json({ error: 'Guardian student access could not be loaded.' }); return; }
-            guardianStudentIds.push(...(links || []).map((link: any) => String(link.student_id)));
-          }
-        }
-      } else if (res.headersSent) return;
-    }
-    const terms = [...(ids.length ? [`id.in.(${ids.join(',')})`] : []), ...parentPhones.flatMap(phone => [`father_phone.eq.${phone}`, `mother_phone.eq.${phone}`]), ...(guardianStudentIds.length ? [`id.in.(${[...new Set(guardianStudentIds)].join(',')})`] : [])];
-    if (!terms.length) { res.json([]); return; }
-    roleFilter = terms.join(',');
+    const ids = await getParentLinkedStudentIds(school.id, user.id);
+    if (!ids.length) { res.json([]); return; }
+    roleFilter = `id.in.(${ids.join(',')})`;
   }
 
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -8788,7 +8767,7 @@ apiRouter.get('/student-invoices', requireAuth, requireSchoolContext, async (req
   if (user.role === 'parent' || user.role === 'student') {
     const linkedIds = user.role === 'student' && user.studentId
       ? [(await db.getStudents(school.id)).find((student:any)=>student.studentId===user.studentId)?.id].filter(Boolean) as string[]
-      : (user.linkedStudentIds || []);
+      : await getParentLinkedStudentIds(school.id, user.id);
     if (!linkedIds.length) { res.json([]); return; }
     query = query.in('student_id',linkedIds);
   }
@@ -9543,9 +9522,12 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
           : await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone');
       const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
       const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
-      const phones = new Set(assignedStudents.flatMap((student: any) => [student.fatherPhone, student.motherPhone]).filter(Boolean));
+      const parentLinks = assignedStudentIds.size
+        ? await db.queryPage('parent_students', { school_id: school.id, student_id: [...assignedStudentIds] }, 1, 100, undefined, 'parent_id')
+        : { items: [] as any[] };
+      const assignedParentIds = new Set(parentLinks.items.map((link: any) => String(link.parentId || '')));
       contacts = contacts.filter(contact => contact.role === 'parent'
-        ? (contact.linkedStudentIds || []).some((id: string) => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone))
+        ? assignedParentIds.has(String(contact.id))
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
     }
     if (user.role === 'parent') {
@@ -10815,10 +10797,9 @@ async function hasDocumentGrant(client: any, schoolId: string, user: User, docum
 async function familyDocumentStudentIds(schoolId:string,user:User):Promise<string[]> {
   if(user.role!=='parent'&&user.role!=='student')return [];
   try{
+    if(user.role==='parent')return await getParentLinkedStudentIds(schoolId,user.id);
     const schoolStudents=await db.getStudents(schoolId);
-    if(user.role==='student')return schoolStudents.filter(student=>Boolean(user.studentId)&&student.studentId===user.studentId).map(student=>student.id);
-    const phones=new Set([user.phone,user.parentPhone].filter((value):value is string=>Boolean(value)));
-    return schoolStudents.filter(student=>user.linkedStudentIds?.includes(student.id)||phones.has(student.fatherPhone||'')||phones.has(student.motherPhone||'')).map(student=>student.id);
+    return schoolStudents.filter(student=>Boolean(user.studentId)&&student.studentId===user.studentId).map(student=>student.id);
   }catch{return []}
 }
 async function familyDocumentAllowed(schoolId:string,user:User,document:any):Promise<boolean> {
