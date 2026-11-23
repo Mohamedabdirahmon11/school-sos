@@ -829,7 +829,7 @@ class StorageEngine {
   }
 
   private getLockoutEntry(key: string): { count: number; firstFailedAt: number; lockedUntil: number | null; lockoutCount?: number } | undefined {
-    let entry = this.getLockoutEntry(key);
+    let entry = this.data.lockoutCounters[key];
     if (!entry) {
       const row = this.data.lockoutCounterRows.find((item: any) => String(item.id) === key);
       if (row) {
@@ -886,7 +886,7 @@ class StorageEngine {
 
   public recordLoginFailure(key: string, threshold = 5, durationMinutes = 15) {
     const now = Date.now();
-    let entry = this.data.lockoutCounters[key];
+    let entry = this.getLockoutEntry(key);
     if (!entry || now - entry.firstFailedAt > 30 * 60 * 1000) {
       entry = { count: 0, firstFailedAt: now, lockedUntil: null, lockoutCount: entry?.lockoutCount || 0 };
     }
