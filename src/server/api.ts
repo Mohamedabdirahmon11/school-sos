@@ -5933,10 +5933,12 @@ apiRouter.post('/parents/:id/phone', requireAuth, requireSchoolAdminOrSuperAdmin
   const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
   if (!validImportPhone(phone)) { res.status(400).json({ error: 'Enter a valid international phone number.' }); return; }
   const normalized = phone.replace(/[^0-9]/g, '');
+  const oldNormalized = String(parent.phone || parent.parentPhone || '').replace(/[^0-9]/g, '');
   const duplicate = (await db.getParents(school.id)).some(row => row.id !== parent.id
     && String(row.phone || row.parentPhone || '').replace(/[^0-9]/g, '') === normalized);
   if (duplicate) { res.status(409).json({ error: 'This phone number is already used by another parent account in this school.' }); return; }
   const updated = db.updateUser(parent.id, { phone, parentPhone: phone });
+  if (oldNormalized && school.code) db.clearLoginFailures(`sp:${school.code.trim().toUpperCase()}:${oldNormalized}`);
   if (!updated) { res.status(404).json({ error: 'Parent account was not updated.' }); return; }
   db.logAudit({
     action: 'PARENT_PHONE_CHANGED', category: 'auth', schoolId: school.id,
