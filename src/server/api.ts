@@ -978,6 +978,7 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
 
 // STUDENT & PARENT LOGIN — school code + Student ID or normalized phone + PIN.
 apiRouter.post('/auth/login', async (req, res) => {
+  // STUDENT & PARENT LOGIN — independent SchoolOS portal credentials.
   const { email, phone, schoolCode, studentId, pin, password } = req.body;
   const requestedRole = normalizeRole(req.body?.role);
   const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
