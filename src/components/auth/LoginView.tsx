@@ -34,8 +34,10 @@ export const LoginView: React.FC = () => {
   const [parentStudentMode, setParentStudentMode] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [schoolCode, setSchoolCode] = useState('');
   const [pin, setPin] = useState('');
+  const [showPortalPin, setShowPortalPin] = useState(false);
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export const LoginView: React.FC = () => {
         role: isSuperAdminLogin ? 'super_admin' : activeTab,
         email: email.trim(),
         phone,
+        studentId,
         schoolCode,
         pin: isSuperAdminLogin ? undefined : pin,
         password: isSuperAdminLogin ? password : undefined
@@ -101,7 +104,8 @@ export const LoginView: React.FC = () => {
 
   const handleBootstrapPinChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^\d{4,6}$/.test(newAdminPin)) { setError('PIN must contain 4 to 6 digits.'); return; }
+    const portalPinChange = activeTab === 'student' || activeTab === 'parent';
+    if (!(portalPinChange ? /^\d{6}$/.test(newAdminPin) : /^\d{4,6}$/.test(newAdminPin)) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(newAdminPin)) { setError(portalPinChange ? 'Choose a strong 6-digit PIN.' : 'PIN must contain 4 to 6 digits.'); return; }
     if (newAdminPin !== confirmAdminPin) { setError('PINs do not match.'); return; }
     if (!bootstrapToken) { setError('This setup session expired. Sign in again.'); return; }
     setIsLoading(true);
@@ -141,10 +145,10 @@ export const LoginView: React.FC = () => {
           
           {pinChangeRequired ? (
             <form className="space-y-4" onSubmit={handleBootstrapPinChange}>
-              <h3 className="text-base font-semibold text-[#132A29]">Set your School Admin PIN</h3>
-              <p className="text-xs text-[#64748B]">Create a new 4–6 digit PIN. Use this PIN with your School ID or Admin ID whenever you sign in.</p>
-              <PasswordInput label="new PIN" required minLength={4} autoComplete="new-password" value={newAdminPin} onChange={e => setNewAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="4–6 digit PIN" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
-              <PasswordInput label="confirm new PIN" required minLength={4} autoComplete="new-password" value={confirmAdminPin} onChange={e => setConfirmAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm PIN" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
+              <h3 className="text-base font-semibold text-[#132A29]">Change your temporary PIN</h3>
+              <p className="text-xs text-[#64748B]">{activeTab === 'student' || activeTab === 'parent' ? 'Create a strong 6-digit PIN to protect your portal.' : 'Create a new 4–6 digit PIN for your School Admin account.'}</p>
+              <PasswordInput label="new PIN" required minLength={activeTab === 'student' || activeTab === 'parent' ? 6 : 4} autoComplete="new-password" value={newAdminPin} onChange={e => setNewAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder={activeTab === 'student' || activeTab === 'parent' ? '6-digit PIN' : '4–6 digit PIN'} className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
+              <PasswordInput label="confirm new PIN" required minLength={activeTab === 'student' || activeTab === 'parent' ? 6 : 4} autoComplete="new-password" value={confirmAdminPin} onChange={e => setConfirmAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Confirm PIN" className="w-full rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
               {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
               <button disabled={isLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white">{isLoading ? 'Saving…' : 'Set PIN and continue'}</button>
             </form>
@@ -226,98 +230,46 @@ export const LoginView: React.FC = () => {
               </>
             )}
 
-            {/* PARENT LOGIN: School Code + Phone + PIN */}
+            {/* PARENT LOGIN: School Code + Phone + 6-digit PIN */}
             {activeTab === 'parent' && (
               <>
                 <div>
                   <label className="block text-xs font-medium text-[#334155]">{t('school_code')}</label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      required
-                      value={schoolCode}
-                      onChange={e => setSchoolCode(e.target.value.toUpperCase())}
-                      placeholder="e.g. MOG01"
-                      className="w-full px-3 py-2 text-xs font-mono uppercase border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
+                  <input type="text" required value={schoolCode} onChange={e => setSchoolCode(e.target.value.toUpperCase())} placeholder="e.g. MOG01" className="mt-1 w-full px-3 py-2 text-xs font-mono uppercase border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Registered Phone Number</label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      required
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      placeholder="+252615000000"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
+                  <label className="block text-xs font-medium text-[#334155]">Parent phone number</label>
+                  <input type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+252615000000" className="mt-1 w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">4-Digit Parent PIN</label>
-                  <div className="mt-1">
-                    <input
-                      type="password"
-                      maxLength={4}
-                      required
-                      value={pin}
-                      onChange={e => setPin(e.target.value)}
-                      placeholder="1234"
-                      className="w-full px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
+                  <label className="block text-xs font-medium text-[#334155]">6-digit PIN</label>
+                  <div className="mt-1 flex gap-2">
+                    <input type={showPortalPin ? 'text' : 'password'} inputMode="numeric" autoComplete="current-password" maxLength={6} required value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit PIN" className="min-w-0 flex-1 px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                    <button type="button" onClick={() => setShowPortalPin(value => !value)} className="rounded-lg border border-[#CBD5E1] px-3 text-xs">{showPortalPin ? 'Hide' : 'Show'}</button>
                   </div>
+                  <p className="mt-1 text-[11px] text-[#64748B]">PIN illoobay? La xidhiidh dugsigaaga.</p>
                 </div>
               </>
             )}
 
-            {/* STUDENT LOGIN: School Code + Phone + PIN */}
+            {/* STUDENT LOGIN: School Code + Student ID + 6-digit PIN */}
             {activeTab === 'student' && (
               <>
                 <div>
                   <label className="block text-xs font-medium text-[#334155]">{t('school_code')}</label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      required
-                      value={schoolCode}
-                      onChange={e => setSchoolCode(e.target.value.toUpperCase())}
-                      placeholder="e.g. MOG01"
-                      className="w-full px-3 py-2 text-xs font-mono uppercase border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
+                  <input type="text" required value={schoolCode} onChange={e => setSchoolCode(e.target.value.toUpperCase())} placeholder="e.g. MOG01" className="mt-1 w-full px-3 py-2 text-xs font-mono uppercase border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Student Phone (or Parent Phone)</label>
-                  <div className="mt-1">
-                    <input
-                      type="text"
-                      required
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      placeholder="+252615000000"
-                      className="w-full px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
-                  </div>
+                  <label className="block text-xs font-medium text-[#334155]">Student ID</label>
+                  <input type="text" required autoComplete="username" value={studentId} onChange={e => setStudentId(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 40))} placeholder="e.g. ST-0421" className="mt-1 w-full px-3 py-2 text-xs font-mono border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-medium text-[#334155]">Student PIN</label>
-                  <div className="mt-1">
-                    <input
-                      type="password"
-                      maxLength={4}
-                      required
-                      value={pin}
-                      onChange={e => setPin(e.target.value)}
-                      placeholder="4-digit PIN"
-                      className="w-full px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    />
+                  <label className="block text-xs font-medium text-[#334155]">6-digit PIN</label>
+                  <div className="mt-1 flex gap-2">
+                    <input type={showPortalPin ? 'text' : 'password'} inputMode="numeric" autoComplete="current-password" maxLength={6} required value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit PIN" className="min-w-0 flex-1 px-3 py-2 text-xs font-mono tracking-widest border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
+                    <button type="button" onClick={() => setShowPortalPin(value => !value)} className="rounded-lg border border-[#CBD5E1] px-3 text-xs">{showPortalPin ? 'Hide' : 'Show'}</button>
                   </div>
+                  <p className="mt-1 text-[11px] text-[#64748B]">PIN illoobay? La xidhiidh Form Teacher-kaaga.</p>
                 </div>
               </>
             )}
