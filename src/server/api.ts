@@ -35,7 +35,8 @@ import {
   hashRecoveryCode,
   findRecoveryCodeIndex,
   generateRecoveryCodes,
-  generateTemporaryPin
+  generateTemporaryPin,
+  isStrongPortalPin
 } from './auth-security.ts';
 import { hashPin } from './auth-security.ts';
 import { classGradeMismatchError } from './class-grade-validation.ts';
@@ -1501,7 +1502,7 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     return;
   }
   const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
-  if (!(user.role === 'school_admin' ? /^\d{4,6}$/.test(newPin) : /^\d{6}$/.test(newPin)) || ['000000', '123456', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'].includes(newPin)) {
+  if (user.role === 'school_admin' ? (!/^\d{4,6}$/.test(newPin) || ['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '1234', '4321'].includes(newPin)) : !isStrongPortalPin(newPin)) {
     res.status(400).json({ error: 'Choose a strong 6-digit PIN (School Admin may use 4–6 digits).', code: 'PIN_POLICY_FAILED' });
     return;
   }
