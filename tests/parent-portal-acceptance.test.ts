@@ -27,6 +27,8 @@ test('parent child directory is authenticated, parent-only, school-scoped and li
  assert.ok(start>=0&&end>start);
  assert.match(route,/normalizeRole\(user\.role\) !== 'parent'/);
  assert.match(route,/school_id: school\.id, parent_id: user\.id/);
+ assert.match(route,/sender_id: \\[user\\.id, contactId\\]/);
+ assert.match(route,/recipient_id: \\[user\\.id, contactId\\]/);
  assert.match(route,/school_id: school\.id, id: studentIds/);
  assert.match(route,/currentEnrollments/);
  assert.match(route,/attendanceSummary/);
@@ -112,7 +114,6 @@ test('parent message history is paginated and scoped to the authenticated parent
  assert.ok(start>=0&&end>start);
  assert.match(route,/normalizeRole\(user\.role\) !== 'parent'/);
  assert.match(route,/school_id: school\.id/);
- assert.match(route,/sender_id\.eq\.' \+ user\.id/);
  assert.match(route,/pagination/);
  assert.match(route,/pageSize = Math\.min\(50/);
 });
