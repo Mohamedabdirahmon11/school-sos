@@ -52,6 +52,8 @@ const student = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-001'
 const otherStudent = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-002', firstName: 'Other', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: otherClass.id, status: 'active' } as any);
 parentUser.linkedStudentIds = [student.id];
 await db.flush();
+await memory.from('parent_students').insert([{ id: 'taccept-parent-student-link', school_id: school.id, parent_id: parentUser.id, student_id: student.id, relation: 'guardian' }]);
+await db.flush();
 await memory.from('class_subjects').insert([
   { id: 'ta-cs-math', school_id: school.id, class_id: klass.id, subject_id: subject.id, teacher_id: subjectTeacher.id, 'teachers.user_id': subjectTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 3, is_active: true },
   { id: 'ta-cs-other-class', school_id: school.id, class_id: otherClass.id, subject_id: subject.id, teacher_id: otherTeacher.id, 'teachers.user_id': otherTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 2, is_active: true },
