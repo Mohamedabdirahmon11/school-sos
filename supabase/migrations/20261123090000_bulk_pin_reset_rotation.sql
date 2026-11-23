@@ -74,6 +74,38 @@ BEGIN
    WHERE s.school_id = v_school_id
      AND s.student_id = item.student_id;
 
+  -- Admin-triggered bulk reset is also the explicit backfill path for legacy
+  -- students without a portal user. It creates only the selected accounts and
+  -- returns one-time PIN slips from the API; it never auto-provisions at migration time.
+  INSERT INTO public.users (
+    id, school_id, branch_id, role, full_name, phone, student_id,
+    password_hash, pin_hash, is_blocked, failed_login_attempts, must_change_password
+  )
+  SELECT
+    'usr-student-' || s.id,
+    s.school_id,
+    s.branch_id,
+    'student'::public.user_role_enum,
+    btrim(concat_ws(' ', s.first_name, s.middle_name, s.last_name)),
+    COALESCE(NULLIF(btrim(s.student_phone), ''), s.father_phone),
+    s.student_id,
+    '',
+    item.pin_hash,
+    false,
+    0,
+    true
+  FROM public.students AS s
+  JOIN jsonb_to_recordset(p_payload->'students') AS item(student_id TEXT, pin_hash TEXT)
+    ON item.student_id = s.student_id
+  WHERE s.school_id = v_school_id
+    AND NOT EXISTS (
+      SELECT 1 FROM public.users AS existing
+       WHERE existing.school_id = s.school_id
+         AND existing.role = 'student'::public.user_role_enum
+         AND existing.student_id = s.student_id
+    )
+  ON CONFLICT (id) DO NOTHING;
+
   UPDATE public.users AS u
      SET pin_hash = item.pin_hash,
          must_change_password = true,
