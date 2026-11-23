@@ -7,6 +7,7 @@ import './harness.css';
 const params = new URLSearchParams(window.location.search);
 const theme = params.get('theme') || 'light';
 document.documentElement.setAttribute('data-theme', theme);
+document.documentElement.classList.toggle('dark', theme === 'dark');
 
 function Harness() {
   if (params.get('component') === 'parent') return <ParentPortalView />;
