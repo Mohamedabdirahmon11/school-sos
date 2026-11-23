@@ -58,6 +58,12 @@ BEGIN
   IF NOT has_table_privilege('service_role','public.parent_students','SELECT') THEN
     RAISE EXCEPTION 'Service role must read canonical parent links.';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_assignments_school_class_due') THEN
+    RAISE EXCEPTION 'Class homework due-date index is missing.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_student_marks_school_student_published') THEN
+    RAISE EXCEPTION 'Published marks lookup index is missing.';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM public.notice_reads WHERE id='read-backfill' AND parent_id='parent-array') THEN
     RAISE EXCEPTION 'Existing parent notice receipts must be backfilled to parent_id.';
   END IF;
