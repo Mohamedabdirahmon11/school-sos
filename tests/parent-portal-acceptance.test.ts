@@ -55,8 +55,8 @@ test('parent homework, attendance, marks, timetable, notices and messages use ca
  assert.match(attendance,/getStudentCurrentClassId/);
  assert.match(marks,/publishedAt/);
  assert.match(marks,/getStudentCurrentClassId/);
- assert.match(timetable,/getParentLinkedStudentIds/);
- assert.match(contacts,/getParentLinkedStudentIds/);
+ assert.match(timetable,/getNoticeClassIds\\(school\\.id, user\\)/);
+ assert.match(contacts,/getNoticeClassIds\\(school\\.id, user\\)/);
  assert.match(send,/getNoticeClassIds\(school\.id, user\)/);
  assert.match(send,/getNoticeClassIds\(school\.id, recipient\)/);
 });
