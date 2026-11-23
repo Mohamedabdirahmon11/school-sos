@@ -212,15 +212,15 @@ test('student creation whitelists profile fields, enforces capacity and protects
   const otherSchoolParent = storage.db.createUser({
     schoolId: secondSchool.id, role: 'parent', fullName: 'Other School Parent',
     phone: '+15550007111', parentPhone: '+15550007111', passwordHash: '',
-    pin: '4321', isBlocked: false, failedLoginAttempts: 0
+    pin: '654321', isBlocked: false, failedLoginAttempts: 0
   } as any);
   await storage.db.flush();
   const { verifyPin } = await import('../src/server/auth-security.ts');
-  const reset = await storage.db.resetStudentPin(response.id, school.id, '5678');
-  assert.equal(reset?.newPin, '5678');
+  const reset = await storage.db.resetStudentPin(response.id, school.id, '765432');
+  assert.equal(reset?.newPin, '765432');
   await storage.db.flush();
   const unchangedParent = await storage.db.getUserById(otherSchoolParent.id, secondSchool.id);
-  assert.ok(unchangedParent?.pin && verifyPin('4321', unchangedParent.pin));
+  assert.ok(unchangedParent?.pin && verifyPin('654321', unchangedParent.pin));
 
   const fullClass = storage.db.createClass({
     schoolId: school.id, name: 'Full Class', gradeLevel: 2, section: 'A',
