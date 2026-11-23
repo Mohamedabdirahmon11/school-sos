@@ -12,6 +12,7 @@ interface AuthContextType {
   user: User | null;
   school: School | null;
   currentRole: UserRole | null;
+  selectedStudentId: string | null;
   language: LanguageCode;
   setLanguage: (lang: LanguageCode) => void;
   t: (key: keyof TranslationDict) => string;
@@ -42,6 +43,7 @@ function getBrandForeground(color: string): string {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [school, setSchool] = useState<School | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [inspectedSchool, setInspectedSchool] = useState<School | null>(null);
   const [language, setLanguageState] = useState<LanguageCode>('en');
   const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(60);
@@ -63,10 +65,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data && data.user) {
         setUser(data.user);
         setSchool(data.school);
+        setSelectedStudentId(data.selectedStudentId || null);
         setSessionTimeoutMinutes(data.sessionTimeoutMinutes || 60);
       } else {
         setUser(null);
         setSchool(null);
+        setSelectedStudentId(null);
       }
     } catch {
       // Not authenticated or session expired
@@ -94,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if ((event as CustomEvent<{ status: number }>).detail?.status !== 401) return;
       setUser(null);
       setSchool(null);
+      setSelectedStudentId(null);
       setInspectedSchool(null);
     };
     window.addEventListener('schoolos:api-error', handleUnauthorized);
@@ -139,6 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (res.user) {
       setUser(res.user);
       setSchool(res.school);
+      setSelectedStudentId(res.selectedStudentId || null);
       setSessionTimeoutMinutes(res.sessionTimeoutMinutes || 60);
     } else {
       await refreshUser();
@@ -151,6 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearPendingPinSlips();
     setUser(null);
     setSchool(null);
+    setSelectedStudentId(null);
     setInspectedSchool(null);
   };
 
@@ -200,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         school: activeSchool,
         currentRole: user?.role || null,
+        selectedStudentId,
         language,
         setLanguage,
         t,
