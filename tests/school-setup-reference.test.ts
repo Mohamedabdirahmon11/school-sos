@@ -5,16 +5,18 @@ import path from 'node:path';
 
 const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), 'utf8');
 
-test('School Setup UI exposes the nine reference steps in order and the responsive 290px/860px layout', () => {
+test('School Setup UI exposes the ten requested steps in order and the responsive 290px/860px layout', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  const ids = ['profile', 'year', 'classes', 'subjects', 'teachers', 'assign', 'students', 'timetable', 'finish'];
+  const ids = ['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'timetable', 'attendance', 'fees', 'finish'];
   const positions = ids.map(id => source.indexOf("id: '" + id + "'"));
-  assert.ok(positions.every(position => position >= 0), 'all nine setup steps must exist');
+  assert.ok(positions.every(position => position >= 0), 'all ten setup steps must exist');
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'steps must follow the requested order');
   assert.ok(source.includes("view: 'sch_setup_academics'"));
   assert.ok(source.includes("view: 'sch_settings'"));
-  assert.ok(source.includes("id: 'assign'"));
-  assert.ok(source.includes("<SchoolSetupInlineEditor step=\"assign\""));
+  assert.ok(source.includes('assignmentEvidence: 0'));
+  assert.ok(source.includes('<SchoolSetupInlineEditor step="assign"'));
+  assert.ok(source.includes("current.id === 'attendance'"));
+  assert.ok(source.includes("current.id === 'fees'"));
   assert.ok(source.includes('REFERENCE_STEP_BY_PROGRESS_ID'));
   assert.ok(source.includes('Tallaabada {referenceStep + 1} ee {wizardSteps.length}'));
   assert.ok(source.includes('{completedCount}/{wizardSteps.length} diyaar'));
@@ -25,8 +27,9 @@ test('School Setup UI exposes the nine reference steps in order and the responsi
   assert.ok(source.includes('Wax ka maqan'));
   assert.ok(source.includes('prefers-color-scheme:dark'));
   assert.ok(source.includes("id: 'finish'"));
-  assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'assign', 'students'\]/);
-  assert.ok(source.includes('Dashboard-ka lama furi karo ilaa dhammaan toddobada tallaabo ee aasaasiga ah la xaqiijiyo.'));
+  assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'timetable', 'attendance', 'fees'\]/);
+  assert.ok(source.includes('Dashboard-ka lama furi karo ilaa Academic Year, School Profile, Classes, Subjects, Teachers & Assignments, Students & Parents, iyo Attendance & Exams la xaqiijiyo; Timetable iyo Fees/Modules waa in la dhammeystiro ama si cad loo skip-gareeyo.'));
+  assert.doesNotMatch(source, /Dabagal ayaa dhiman; Dashboard ma xannibayo/);
 });
 
 test('setup readiness is shared by API reads and writes and protects attendance, marks, and timetable routes', () => {
@@ -61,9 +64,10 @@ test('completed existing schools are grandfathered and are not relocked by setup
 
 test('legacy setup checklist identifiers remain mapped to the new wizard evidence', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  for (const evidence of ['evidence: 1', 'evidence: 2', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'evidence: 0', 'evidence: 6', 'evidence: 7']) {
+  for (const evidence of ['evidence: 1', 'evidence: 2', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'evidence: 6', 'evidence: 7', 'evidence: 8', 'evidence: 9']) {
     assert.ok(source.includes(evidence), `legacy checklist mapping missing: ${evidence}`);
   }
+  assert.ok(source.includes('assignmentEvidence: 0'), 'teacher assignment remains a required part of the teacher step');
 });
 
 
