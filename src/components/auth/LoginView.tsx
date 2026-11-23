@@ -162,8 +162,16 @@ export const LoginView: React.FC = () => {
               <button disabled={isLoading} className="w-full rounded-lg bg-[#0F766E] py-2.5 text-xs font-semibold text-white">{isLoading ? 'Updating…' : 'Set password and continue'}</button>
             </form>
           ) : <>
-          <div className="mb-5 text-right text-xs">
-            {parentStudentMode ? <><button type="button" className="text-[#0F766E] underline" onClick={() => { setParentStudentMode(false); setActiveTab('school_admin'); setError(null); }}>Staff sign in</button><span className="mx-2 text-slate-300">|</span><button type="button" className="text-[#64748B]" onClick={() => setActiveTab(activeTab === 'parent' ? 'student' : 'parent')}>Switch to {activeTab === 'parent' ? 'Student' : 'Parent'}</button></> : <button type="button" className="text-[#0F766E] underline" onClick={() => { setParentStudentMode(true); setActiveTab('parent'); setError(null); }}>Parent / Student sign in</button>}
+          <div className="mb-5 flex items-center justify-between gap-3 text-xs">
+            {parentStudentMode ? (
+              <>
+                <div role="tablist" aria-label="Portal login type" className="grid flex-1 grid-cols-2 rounded-xl bg-slate-100 p-1">
+                  <button type="button" role="tab" aria-selected={activeTab === 'student'} onClick={() => { setActiveTab('student'); setPin(''); setShowPortalPin(false); setError(null); }} className={`rounded-lg px-3 py-2 font-semibold transition ${activeTab === 'student' ? 'bg-white text-[#0F766E] shadow-sm' : 'text-slate-500'}`}>Arday</button>
+                  <button type="button" role="tab" aria-selected={activeTab === 'parent'} onClick={() => { setActiveTab('parent'); setPin(''); setShowPortalPin(false); setError(null); }} className={`rounded-lg px-3 py-2 font-semibold transition ${activeTab === 'parent' ? 'bg-white text-[#0F766E] shadow-sm' : 'text-slate-500'}`}>Waalid</button>
+                </div>
+                <button type="button" className="shrink-0 text-[#0F766E] underline" onClick={() => { setParentStudentMode(false); setActiveTab('school_admin'); setError(null); }}>Staff</button>
+              </>
+            ) : <button type="button" className="ml-auto text-[#0F766E] underline" onClick={() => { setParentStudentMode(true); setActiveTab('student'); setError(null); }}>Arday / Waalid</button>}
           </div>
 
           {/* Error Message */}
