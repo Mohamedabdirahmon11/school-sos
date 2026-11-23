@@ -1,16 +1,16 @@
 \set ON_ERROR_STOP on
-DO $$ BEGIN
+DO $roles$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role BYPASSRLS; END IF;
-END $;
+END $roles$;
 ALTER ROLE authenticated NOSUPERUSER NOBYPASSRLS;
 REVOKE service_role FROM authenticated;
-DO $ BEGIN
+DO $types$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname='user_role_enum') THEN
     CREATE TYPE public.user_role_enum AS ENUM ('parent','student','teacher','school_admin','super_admin');
   END IF;
-END $$;
+END $types$;
 CREATE TABLE public.schools (id varchar(64) PRIMARY KEY);
 CREATE TABLE public.users (
   id varchar(64) PRIMARY KEY,
