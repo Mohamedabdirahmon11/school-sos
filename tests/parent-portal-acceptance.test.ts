@@ -39,7 +39,7 @@ test('student record access for parents requires a current parent_students link'
  const helper=api.slice(api.indexOf('async function getParentLinkedStudentIds'),api.indexOf('async function canAccessStudentRecord'));
  const access=api.slice(api.indexOf('async function canAccessStudentRecord'),api.indexOf('// Middleware: Require School Tenant Context'));
  assert.match(helper,/parent_students/);
- assert.match(helper,/revoked_at\.is\.null/);
+ assert.match(helper,/filter\(\(row: any\) => !row\.revokedAt\)/);
  assert.match(helper,/school_id: schoolId, parent_id: parentId/);
  assert.match(access,/getParentLinkedStudentIds\(student\.schoolId, user\.id\)/);
  assert.doesNotMatch(access,/fatherPhone|motherPhone|linkedStudentIds/);
