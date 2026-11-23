@@ -143,6 +143,9 @@ test('child summary uses batched queries rather than per-child database reads',(
  assert.match(route,/queryAllRows\('assignments'/);
  assert.match(route,/queryAllRows\('assignment_submissions'/);
  assert.match(route,/queryAllRows\('school_notices'/);
+ assert.match(route,/queryAllRows\('school_events'/);
+ assert.match(route,/schoolOpenDays/);
+ assert.match(portal,/attendanceTotal/);
  assert.doesNotMatch(route,/students\.items\.map\(async/);
  assert.match(route,/Cache-Control.*no-store/);
  assert.match(api,/PARENT_PORTAL_SUMMARY_TTL_MS = 5_000/);
