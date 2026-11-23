@@ -687,8 +687,8 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
 }
 
 async function getParentLinkedStudentIds(schoolId: string, parentId: string): Promise<string[]> {
-  const links = await db.queryPage('parent_students', { school_id: schoolId, parent_id: parentId }, 1, 100, 'revoked_at.is.null', 'student_id');
-  return [...new Set(links.items.map((row: any) => String(row.studentId || '')).filter(Boolean))];
+  const links = await db.queryPage('parent_students', { school_id: schoolId, parent_id: parentId }, 1, 100, undefined, 'student_id,revoked_at');
+  return [...new Set(links.items.filter((row: any) => !row.revokedAt).map((row: any) => String(row.studentId || '')).filter(Boolean))];
 }
 
 async function canAccessStudentRecord(user: User, studentId: string): Promise<boolean> {
@@ -5330,8 +5330,9 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
     res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_ONLY', message: 'Parent accounts only.' } });
     return;
   }
-  const links = await db.queryPage('parent_students', { school_id: school.id, parent_id: user.id }, 1, 100, 'revoked_at.is.null', 'student_id,relation');
-  const studentIds = [...new Set(links.items.map((row: any) => String(row.studentId || '')).filter(Boolean))];
+  const links = await db.queryPage('parent_students', { school_id: school.id, parent_id: user.id }, 1, 100, undefined, 'student_id,relation,revoked_at');
+  const activeLinks = links.items.filter((row: any) => !row.revokedAt);
+  const studentIds = [...new Set(activeLinks.map((row: any) => String(row.studentId || '')).filter(Boolean))];
   const cacheKey = school.id + ':' + user.id + ':' + studentIds.slice().sort().join(',');
   const cached = parentPortalSummaryCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
@@ -5365,7 +5366,7 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
     : { items: [] as any[] };
   const classById = new Map(classes.items.map((row: any) => [String(row.id), row]));
   const teacherById = new Map(teachers.items.map((row: any) => [String(row.id), row]));
-  const relationByStudent = new Map(links.items.map((row: any) => [String(row.studentId), String(row.relation || 'guardian')]));
+  const relationByStudent = new Map(activeLinks.map((row: any) => [String(row.studentId), String(row.relation || 'guardian')]));
   const [attendanceRows, markRows, assignments, submissions, noticeRows, noticeReads] = await Promise.all([
     queryAllRows('attendance_records', { school_id: school.id, student_id: studentIds }, 'student_id,class_id,date,status'),
     queryAllRows('student_marks', { school_id: school.id, student_id: studentIds, status: 'approved' }, 'student_id,class_id,total_marks,status,published_at,scheme_snapshot'),
@@ -5455,7 +5456,7 @@ apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireScho
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 30));
   const result = await db.queryPage('direct_messages', { school_id: school.id }, page, pageSize,
-    'or(and(sender_id.eq.' + user.id + ',recipient_id.eq.' + contactId + '),and(sender_id.eq.' + contactId + ',recipient_id.eq.' + user.id + '))',
+    'and(sender_id.eq.' + user.id + ',recipient_id.eq.' + contactId + '),and(sender_id.eq.' + contactId + ',recipient_id.eq.' + user.id + ')',
     'id,school_id,sender_id,sender_name,sender_role,recipient_id,recipient_name,recipient_role,content,timestamp,is_read',
     'timestamp', true);
   if (!currentlyAssigned && result.items.length === 0) {
@@ -9593,7 +9594,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         ...classRows.items.map((row: any) => String(row.classTeacherId || '')).filter(Boolean),
         ...profiles.items.map((row: any) => String((row as any).userId || '')).filter(Boolean)
       ]);
-      const historyRows = await queryAllRows('direct_messages', { school_id: school.id }, 'sender_id,recipient_id', 'timestamp', 'or(sender_id.eq.' + user.id + ',recipient_id.eq.' + user.id + ')');
+      const historyRows = await queryAllRows('direct_messages', { school_id: school.id }, 'sender_id,recipient_id', 'timestamp', 'sender_id.eq.' + user.id + ',recipient_id.eq.' + user.id);
       const historyTeacherIds = new Set(historyRows.flatMap((row: any) => {
         if (String(row.senderId) === String(user.id)) return [String(row.recipientId)];
         if (String(row.recipientId) === String(user.id)) return [String(row.senderId)];
@@ -9692,7 +9693,7 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, requireParen
     const currentlyAssigned = assignedClassIds.some(classId => linkedClassIds.includes(classId));
     if (!currentlyAssigned) {
       const history = await db.queryPage('direct_messages', { school_id: (req as any).school.id }, 1, 1,
-        'or(and(sender_id.eq.' + user.id + ',recipient_id.eq.' + contactId + '),and(sender_id.eq.' + contactId + ',recipient_id.eq.' + user.id + '))',
+        'and(sender_id.eq.' + user.id + ',recipient_id.eq.' + contactId + '),and(sender_id.eq.' + contactId + ',recipient_id.eq.' + user.id + ')',
         'id', 'timestamp', true);
       if (!history.items.length) return res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Wada-hadal hore looma hayo macallinkan.' } });
     }
