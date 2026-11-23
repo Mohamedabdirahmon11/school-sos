@@ -1733,6 +1733,15 @@ class StorageEngine {
     return true;
   }
 
+  public async revokeUserSessions(userId: string): Promise<number> {
+    const sessions = await this.queryRows<UserSession>('user_sessions', { user_id: userId });
+    let revoked = 0;
+    for (const session of sessions) {
+      if (await this.revokeSession(session.id)) revoked += 1;
+    }
+    return revoked;
+  }
+
   public getSession(id: string): UserSession | null {
     return this.data.sessions.find(s => s.id === id) || null;
   }
