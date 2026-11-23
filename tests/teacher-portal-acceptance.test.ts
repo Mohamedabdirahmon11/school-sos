@@ -303,6 +303,39 @@ test('15.10e student cannot enter the parent portal', async () => {
   assert.equal(response.status, 403);
 });
 
+test('15.10g student homework submissions appear in the linked parent portal', async () => {
+  const assignment = db.createAssignment({ schoolId: school.id, classId: klass.id, subjectId: subject.id, teacherId: subjectTeacher.id, title: 'Parent-visible homework', description: 'Submit chapter one.', dueDate: tomorrow, maxPoints: 20 } as any);
+  await db.flush();
+  const submitted = await postJson('/assignments/' + assignment.id + '/submissions', studentPortalCookie, { content: 'Student completed chapter one.' });
+  assert.equal(submitted.status, 201, await submitted.clone().text());
+  const response = await request('/assignments?studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(response.status, 200, await response.clone().text());
+  const homework = await response.json() as any[];
+  const visible = homework.find(item => item.id === assignment.id);
+  assert.ok(visible);
+  assert.equal(visible.submission.status, 'submitted');
+  assert.equal(visible.submission.studentId, student.id);
+});
+
+test('15.10h class-only notices are visible only to parents linked to that class', async () => {
+  const otherParent = makeUser(school.id, 'parent', 'Other Class Parent');
+  await db.flush();
+  await memory.from('parent_students').insert([{ id: 'taccept-other-parent-link', school_id: school.id, parent_id: otherParent.id, student_id: otherStudent.id, relation: 'guardian', revoked_at: null }]);
+  await db.flush();
+  const otherParentCookie = cookieFor(otherParent, 'other-class-parent');
+  const created = await postJson('/notices', cookies.admin, { title: 'Grade 7 class-only notice', content: 'This notice is only for Grade 7 parents.', audience: 'class', classId: klass.id, publishDate: today });
+  assert.equal(created.status, 201, await created.clone().text());
+  const notice = await created.json() as any;
+  const ownResponse = await request('/parent/notices?page=1&pageSize=50', cookies.parent);
+  const otherResponse = await request('/parent/notices?page=1&pageSize=50', otherParentCookie);
+  assert.equal(ownResponse.status, 200, await ownResponse.clone().text());
+  assert.equal(otherResponse.status, 200, await otherResponse.clone().text());
+  const ownItems = (await ownResponse.json() as any).data.items;
+  const otherItems = (await otherResponse.json() as any).data.items;
+  assert.ok(ownItems.some((item: any) => item.id === notice.id));
+  assert.equal(otherItems.some((item: any) => item.id === notice.id), false);
+});
+
 test('15.10f removing the canonical parent link immediately revokes child attendance access', async () => {
   const removed = await memory.from('parent_students').update({ revoked_at: new Date().toISOString() }).eq('school_id', school.id).eq('parent_id', parentUser.id).eq('student_id', student.id);
   assert.equal(removed.error, null);
