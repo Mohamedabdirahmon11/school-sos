@@ -325,3 +325,45 @@ test('legacy student and parent identifiers without administrator-provisioned ac
   assert.equal((await parentLogin.json() as any).error, 'ID or PIN is incorrect.');
   assert.equal(memory.rows('users').filter(row => row.role === 'parent' && String(row.phone || '').replace(/[^0-9]/g, '') === '251922222222').length, parentBefore);
 });
+
+
+test('parent cannot change their phone through profile but can change PIN with current PIN verification', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  assert.ok(parent);
+  parent.pin_hash = hashPin('765432');
+  parent.must_change_password = false;
+  const originalPhone = parent.phone;
+  const sessionId = 'parent-profile-security-session';
+  const createdAt = Date.now();
+  const expiresAt = createdAt + 30 * 24 * 60 * 60 * 1000;
+  memory.rows('user_sessions').push({
+    id: sessionId, userId: parent.id, userRole: 'parent', schoolId: 'student-school',
+    ipAddress: '127.0.0.1', userAgent: 'test', createdAt: new Date(createdAt).toISOString(),
+    expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date(createdAt).toISOString()
+  });
+  const token = createSignedSessionToken({
+    sessionId, userId: parent.id, role: 'parent', schoolId: 'student-school',
+    createdAt, expiresAt
+  });
+
+  const phoneChange = await fetch(`${baseUrl}/auth/profile`, {
+    method: 'PUT',
+    headers: { Cookie: `schoolos_session=${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fullName: parent.full_name, email: parent.email || '', phone: '+251922222222' })
+  });
+  assert.equal(phoneChange.status, 403);
+  assert.equal(parent.phone, originalPhone);
+
+  const pinChange = await fetch(`${baseUrl}/auth/change-pin`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPin: '765432', newPin: '876543' })
+  });
+  assert.equal(pinChange.status, 200, await pinChange.clone().text());
+  assert.equal(verifyPin('876543', parent.pin_hash), true);
+  assert.equal(verifyPin('765432', parent.pin_hash), false);
+  assert.equal(parent.must_change_password, false);
+  assert.equal(memory.rows('user_sessions').some(row => row.id === sessionId), false);
+  assert.ok(memory.rows('user_sessions').some(row => row.userId === parent.id && row.id !== sessionId));
+  assert.ok(memory.rows('audit_logs').some(row => row.action === 'PIN_CHANGED' && row.user_id === parent.id));
+});
