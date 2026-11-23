@@ -5408,6 +5408,14 @@ apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireScho
     res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Waalidku wuxuu fariin u diri karaa macallimiinta dugsigiisa oo keliya.' } });
     return;
   }
+  const [linkedClassIds, assignedClassIds] = await Promise.all([
+    getNoticeClassIds(school.id, user),
+    getTeacherAssignedClassIds(school.id, contactId)
+  ]);
+  if (!assignedClassIds.some(classId => linkedClassIds.includes(classId))) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Fariimaha waxaa la arki karaa oo keliya macallimiinta hadda loo qoondeeyey carruurtaada.' } });
+    return;
+  }
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 30));
   const result = await db.queryPage('direct_messages', { school_id: school.id }, page, pageSize,
@@ -9632,6 +9640,15 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, requireParen
   const contactId = String(req.body?.contactId || '');
   const contact = await db.getUserById(contactId, (req as any).school.id);
   if (!contact) return res.status(404).json({ error: 'Message contact was not found in this school.' });
+  if (normalizeRole(user.role) === 'parent' && normalizeRole(contact.role) === 'teacher') {
+    const [linkedClassIds, assignedClassIds] = await Promise.all([
+      getNoticeClassIds((req as any).school.id, user),
+      getTeacherAssignedClassIds((req as any).school.id, contactId)
+    ]);
+    if (!assignedClassIds.some(classId => linkedClassIds.includes(classId))) {
+      return res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Ma calaamadin kartid fariimaha macallin aan hadda carruurtaada loo qoondeyn.' } });
+    }
+  }
   await db.markMessagesRead((req as any).school.id, user.id, contactId);
   res.json({ success: true });
 });
