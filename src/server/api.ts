@@ -5393,6 +5393,28 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   res.json({ ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children }, error: null });
 });
 
+apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
+  const school = (req as any).school as School;
+  const user = (req as any).user as User;
+  if (normalizeRole(user.role) !== 'parent') {
+    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_ONLY', message: 'Parent accounts only.' } });
+    return;
+  }
+  const contactId = typeof req.query.contactId === 'string' ? req.query.contactId.trim() : '';
+  if (!contactId || contactId === user.id) {
+    res.status(400).json({ ok: false, data: null, error: { code: 'INVALID_CONTACT', message: 'Dooro macallin aad hore ula hadashay.' } });
+    return;
+  }
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 30));
+  const result = await db.queryPage('direct_messages', { school_id: school.id }, page, pageSize,
+    'or(and(sender_id.eq.' + user.id + ',recipient_id.eq.' + contactId + '),and(sender_id.eq.' + contactId + ',recipient_id.eq.' + user.id + '))',
+    'id,school_id,sender_id,sender_name,sender_role,recipient_id,recipient_name,recipient_role,content,timestamp,is_read',
+    'timestamp', true);
+  res.set({ 'Cache-Control': 'private, no-store, max-age=0' });
+  res.json({ ok: true, data: { items: result.items, pagination: { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: Math.ceil(result.total / result.pageSize) } }, error: null });
+});
+
 apiRouter.get('/parent/notices', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
