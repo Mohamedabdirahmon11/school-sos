@@ -185,13 +185,13 @@ test('student creation whitelists profile fields, enforces capacity and protects
     studentId: 'STU-CLEAN-001',
     guardianName: 'Clean Student Guardian',
     guardianPhone: '+15550007111',
-    pin: '1234'
+    pin: '654321'
   });
   assert.equal(created.status, 201, await created.clone().text());
   const response = await created.json();
   assert.equal(response.id === 'attacker-controlled-id', false);
   assert.equal(response.schoolId, school.id);
-  assert.equal(response.initialPin, '1234');
+  assert.equal(response.initialPin, '654321');
   assert.equal('passwordHash' in response, false);
   assert.equal('twoFactorSecret' in response, false);
   const storedStudent = memory.rows('students').find(row => row.id === response.id);
