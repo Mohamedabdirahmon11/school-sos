@@ -5412,16 +5412,17 @@ apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireScho
     getNoticeClassIds(school.id, user),
     getTeacherAssignedClassIds(school.id, contactId)
   ]);
-  if (!assignedClassIds.some(classId => linkedClassIds.includes(classId))) {
-    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Fariimaha waxaa la arki karaa oo keliya macallimiinta hadda loo qoondeeyey carruurtaada.' } });
-    return;
-  }
+  const currentlyAssigned = assignedClassIds.some(classId => linkedClassIds.includes(classId));
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 30));
   const result = await db.queryPage('direct_messages', { school_id: school.id }, page, pageSize,
     'or(and(sender_id.eq.' + user.id + ',recipient_id.eq.' + contactId + '),and(sender_id.eq.' + contactId + ',recipient_id.eq.' + user.id + '))',
     'id,school_id,sender_id,sender_name,sender_role,recipient_id,recipient_name,recipient_role,content,timestamp,is_read',
     'timestamp', true);
+  if (!currentlyAssigned && result.items.length === 0) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Macallinkan hadda carruurtaada looma qoondeeyo, mana jiro wada-hadal hore.' } });
+    return;
+  }
   res.set({ 'Cache-Control': 'private, no-store, max-age=0' });
   res.json({ ok: true, data: { items: result.items, pagination: { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: Math.ceil(result.total / result.pageSize) } }, error: null });
 });
@@ -9542,10 +9543,6 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
     }
     if (user.role === 'parent') {
-      const linkedIds = await getParentLinkedStudentIds(school.id, user.id);
-      const linkedStudents = linkedIds.length
-        ? await db.queryPage('students', { school_id: school.id, id: linkedIds }, 1, 100, undefined, 'id,class_id,student_id')
-        : { items: [] as any[] };
       const linkedClasses = await getNoticeClassIds(school.id, user);
       const [classRows, assignments] = await Promise.all([
         linkedClasses.length ? db.queryPage('classes', { school_id: school.id, id: linkedClasses }, 1, 100, undefined, 'id,class_teacher_id') : Promise.resolve({ items: [] as any[] }),
@@ -9557,10 +9554,18 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         ...classRows.items.map((row: any) => String(row.classTeacherId || '')).filter(Boolean),
         ...profiles.items.map((row: any) => String((row as any).userId || '')).filter(Boolean)
       ]);
-      contacts = contacts.filter(contact => contact.role === 'teacher' && allowedTeacherIds.has(String(contact.id)));
+      const historyRows = await queryAllRows('direct_messages', { school_id: school.id }, 'sender_id,recipient_id');
+      const historyTeacherIds = new Set(historyRows.flatMap((row: any) => {
+        if (String(row.senderId) === String(user.id)) return [String(row.recipientId)];
+        if (String(row.recipientId) === String(user.id)) return [String(row.senderId)];
+        return [];
+      }));
+      contacts = contacts
+        .filter(contact => contact.role === 'teacher' && (allowedTeacherIds.has(String(contact.id)) || historyTeacherIds.has(String(contact.id))))
+        .map(contact => ({ ...contact, canSend: allowedTeacherIds.has(String(contact.id)), historyOnly: !allowedTeacherIds.has(String(contact.id)) }));
     }
   }
-  res.json(contacts.map(({ id, role, fullName, email, phone }) => ({ id, role, fullName, email, phone })));
+  res.json(contacts.map(({ id, role, fullName, email, phone, canSend, historyOnly }) => ({ id, role, fullName, email, phone, ...(user.role === 'parent' ? { canSend: Boolean(canSend), historyOnly: Boolean(historyOnly) } : {}) })));
 });
 
 apiRouter.get('/messages', requireAuth, requireSchoolContext, (req, res) => {
@@ -9645,8 +9650,12 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, requireParen
       getNoticeClassIds((req as any).school.id, user),
       getTeacherAssignedClassIds((req as any).school.id, contactId)
     ]);
-    if (!assignedClassIds.some(classId => linkedClassIds.includes(classId))) {
-      return res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Ma calaamadin kartid fariimaha macallin aan hadda carruurtaada loo qoondeyn.' } });
+    const currentlyAssigned = assignedClassIds.some(classId => linkedClassIds.includes(classId));
+    if (!currentlyAssigned) {
+      const history = await db.queryPage('direct_messages', { school_id: (req as any).school.id }, 1, 1,
+        'or(and(sender_id.eq.' + user.id + ',recipient_id.eq.' + contactId + '),and(sender_id.eq.' + contactId + ',recipient_id.eq.' + user.id + '))',
+        'id', 'timestamp', true);
+      if (!history.items.length) return res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Wada-hadal hore looma hayo macallinkan.' } });
     }
   }
   await db.markMessagesRead((req as any).school.id, user.id, contactId);
