@@ -232,8 +232,8 @@ test('successful portal login transparently rehashes legacy scrypt PINs with per
     body: JSON.stringify({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin })
   });
   assert.equal(response.status, 200, await response.clone().text());
-  assert.ok(studentUser.pin_hash.startsWith('pin_scrypt$16384$8$1$'));
-  assert.ok(student.pin_hash.startsWith('pin_scrypt$16384$8$1$'));
+  assert.ok(studentUser.pin_hash.startsWith('pin_scrypt|16384|8|1|'));
+  assert.ok(student.pin_hash.startsWith('pin_scrypt|16384|8|1|'));
   assert.equal(verifyPin(pin, studentUser.pin_hash), true);
   assert.equal(verifyPin(pin, student.pin_hash), true);
 });
