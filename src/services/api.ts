@@ -307,7 +307,7 @@ export class ApiClient {
   }
 
   public static async getMe() {
-    return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number }>('/auth/me');
+    return this.request<{ user: User; school: School | null; sessionTimeoutMinutes: number; selectedStudentId?: string | null }>('/auth/me');
   }
 
   public static async uploadSchoolLogo(file: File): Promise<{ logoUrl: string }> {
