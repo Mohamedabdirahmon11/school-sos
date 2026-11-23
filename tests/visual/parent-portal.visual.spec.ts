@@ -49,3 +49,12 @@ test('write Parent Portal screenshot comparison overview',async()=>{
  fs.writeFileSync(path.join(folder,'index.html'),'<!doctype html><meta charset="utf-8"><title>Parent Portal screenshot matrix</title><h1>Parent Portal · Reference and SchoolOS</h1><p>9 sections × 4 viewport widths × 2 themes · seeded parent with 3 children.</p><ul>'+links+'</ul>');
  expect(fs.existsSync(path.join(folder,'index.html'))).toBeTruthy();
 });
+
+test('Parent Portal with one child hides the child switcher and opens that child directly',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('http://127.0.0.1:4173/parent-portal-visual.html?component=parent&oneChild=1');
+ await expect(page.locator('.pp-brand small')).toContainText('1 ilmood');
+ await expect(page.locator('.pp-kids')).toHaveCount(0);
+ await expect(page.locator('.pp-child-strip')).toHaveCount(0);
+ await expect(page.locator('.pp-page-head')).toContainText('Faadumo Axmed Cabdi');
+});
