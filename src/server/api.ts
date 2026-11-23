@@ -6000,6 +6000,7 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
       changed_by: user.id,
       changed_by_name: user.fullName,
       changed_by_role: user.role,
+      changed_by_ip: req.ip,
       students: rows
     });
     const updatedStudents = Array.isArray(result.students) ? result.students : [];
