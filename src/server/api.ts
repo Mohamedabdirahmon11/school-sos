@@ -9722,11 +9722,11 @@ apiRouter.post('/messages/read', requireAuth, requireSchoolContext, requireParen
   const contact = await db.getUserById(contactId, (req as any).school.id);
   if (!contact) return res.status(404).json({ error: 'Message contact was not found in this school.' });
   if (normalizeRole(user.role) === 'parent' && normalizeRole(contact.role) === 'teacher') {
-    const [linkedClassIds, assignedClassIds] = await Promise.all([
-      getNoticeClassIds((req as any).school.id, user),
-      getTeacherAssignedClassIds((req as any).school.id, contactId)
-    ]);
-    const currentlyAssigned = assignedClassIds.some(classId => linkedClassIds.includes(classId));
+    const selectedStudentId = typeof req.body?.studentId === 'string' ? req.body.studentId.trim() : '';
+    const selectedClassId = await getParentSelectedClassId((req as any).school.id, user.id, selectedStudentId);
+    if (!selectedClassId) return res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CHILD_FORBIDDEN', message: 'Dooro ilmo ku xiran akoonkaaga.' } });
+    const assignedClassIds = await getTeacherAssignedClassIds((req as any).school.id, contactId);
+    const currentlyAssigned = assignedClassIds.includes(selectedClassId);
     if (!currentlyAssigned) {
       const history = await db.queryPage('direct_messages', { school_id: (req as any).school.id, sender_id: [user.id, contactId], recipient_id: [user.id, contactId] }, 1, 100, undefined,
         'id,sender_id,recipient_id', 'timestamp', true);
