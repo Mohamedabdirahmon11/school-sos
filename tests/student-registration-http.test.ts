@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { createHttpTestStorage, InMemorySupabase } from './support/in-memory-supabase.ts';
 
 process.env.NODE_ENV = 'test';
@@ -370,7 +370,7 @@ test('parent cannot change their phone through profile but can change PIN with c
 
 
 test('parent PIN rotation issues one replacement session and preserves the server-verified selected child', async () => {
-  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
   const child = memory.rows('students').find(row => row.school_id === 'student-school');
   assert.ok(parent && child);
   parent.pin_hash = hashPin('876543');
