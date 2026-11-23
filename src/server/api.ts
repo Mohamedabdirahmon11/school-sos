@@ -5335,8 +5335,8 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   const teacherById = new Map(teachers.items.map((row: any) => [String(row.id), row]));
   const relationByStudent = new Map(links.items.map((row: any) => [String(row.studentId), String(row.relation || 'guardian')]));
   const [attendanceRows, markRows, assignments, submissions, noticeRows, noticeReads] = await Promise.all([
-    queryAllRows('attendance_records', { school_id: school.id, student_id: studentIds }, 'student_id,date,status'),
-    queryAllRows('student_marks', { school_id: school.id, student_id: studentIds, status: 'approved' }, 'student_id,total_marks,status,published_at,scheme_snapshot'),
+    queryAllRows('attendance_records', { school_id: school.id, student_id: studentIds }, 'student_id,class_id,date,status'),
+    queryAllRows('student_marks', { school_id: school.id, student_id: studentIds, status: 'approved' }, 'student_id,class_id,total_marks,status,published_at,scheme_snapshot'),
     classIds.length ? queryAllRows('assignments', { school_id: school.id, class_id: classIds }, 'id,class_id,due_date') : Promise.resolve([] as any[]),
     queryAllRows('assignment_submissions', { school_id: school.id, student_id: studentIds }, 'assignment_id,student_id,status'),
     queryAllRows('school_notices', { school_id: school.id, is_active: 'true' }, 'id,audience,class_id,publish_date'),
@@ -5347,12 +5347,14 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   const attendanceByStudent = new Map<string, any[]>();
   for (const row of attendanceRows) {
     const key = String((row as any).studentId || '');
+    if (String((row as any).classId || '') !== classIdForStudent(students.items.find((student: any) => String(student.id) === key) || {})) continue;
     if (!attendanceByStudent.has(key)) attendanceByStudent.set(key, []);
     attendanceByStudent.get(key)!.push(row);
   }
   const marksByStudent = new Map<string, any[]>();
   for (const row of markRows.filter((item: any) => Boolean(item.publishedAt))) {
     const key = String((row as any).studentId || '');
+    if (String((row as any).classId || '') !== classIdForStudent(students.items.find((student: any) => String(student.id) === key) || {})) continue;
     if (!marksByStudent.has(key)) marksByStudent.set(key, []);
     marksByStudent.get(key)!.push(row);
   }
