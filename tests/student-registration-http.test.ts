@@ -83,16 +83,19 @@ test('student registration generates IDs server-side and reuses one normalized g
   assert.equal(verifyPin(first.initialPin, firstStudent.pin_hash), true);
   assert.equal(String(firstStudent.pin_hash).includes(first.initialPin), false);
 
-  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
-  assert.ok(parent);
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  const motherParent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251912345678');
+  assert.ok(parent && motherParent);
   const originalParentPinHash = parent.pin_hash;
+  assert.equal(motherParent.linked_student_ids.length, 1);
+  assert.equal(motherParent.linked_student_ids[0], firstStudent.id);
 
   const secondResponse = await register('Abdi Yusuf Noor', '+251-911-234-567', 'CLIENT-SUPPLIED-002');
   assert.equal(secondResponse.status, 201);
   const second = await secondResponse.json() as any;
   assert.notEqual(second.studentId, first.studentId);
   const parents = memory.rows('users').filter(row => row.role === 'parent' && row.school_id === 'student-school');
-  assert.equal(parents.length, 1);
+  assert.equal(parents.length, 2);
   assert.equal(parent.pin_hash, originalParentPinHash);
   assert.equal(parent.linked_student_ids.length, 2);
   assert.equal(memory.rows('students').filter(row => row.school_id === 'student-school').length, 2);
