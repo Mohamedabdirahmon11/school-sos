@@ -1,0 +1,106 @@
+\set ON_ERROR_STOP on
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+CREATE TYPE public.user_role_enum AS ENUM ('super_admin','school_admin','teacher','accountant','student','parent');
+CREATE TABLE public.schools (id VARCHAR(64) PRIMARY KEY);
+CREATE TABLE public.students (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id),
+  student_id VARCHAR(64) NOT NULL,
+  first_name TEXT,
+  middle_name TEXT,
+  last_name TEXT,
+  father_phone TEXT,
+  mother_phone TEXT,
+  pin_hash TEXT,
+  status TEXT DEFAULT 'active'
+);
+CREATE TABLE public.users (
+  id VARCHAR(64) PRIMARY KEY,
+  school_id VARCHAR(64) REFERENCES public.schools(id),
+  role public.user_role_enum NOT NULL,
+  full_name TEXT,
+  phone TEXT,
+  parent_phone TEXT,
+  student_id VARCHAR(64),
+  linked_student_ids TEXT[] DEFAULT ARRAY[]::TEXT[],
+  pin_hash TEXT,
+  must_change_password BOOLEAN NOT NULL DEFAULT false,
+  failed_login_attempts INTEGER DEFAULT 0,
+  locked_until TIMESTAMPTZ
+);
+CREATE TABLE public.user_sessions (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id VARCHAR(64));
+CREATE TABLE public.audit_logs (
+  id TEXT PRIMARY KEY, action TEXT, category TEXT, school_id VARCHAR(64), school_name TEXT,
+  user_id VARCHAR(64), user_name TEXT, user_role public.user_role_enum, details TEXT, severity TEXT
+);
+
+INSERT INTO public.schools(id) VALUES ('pin-school-a'), ('pin-school-b');
+INSERT INTO public.students(id,school_id,student_id,first_name,pin_hash)
+VALUES ('legacy-child','pin-school-a','ST-0001','Legacy Student','scrypt:legacy');
+INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,must_change_password)
+VALUES ('legacy-parent','pin-school-a','parent','Legacy Parent',ARRAY['legacy-child'],false);
+
+\i supabase/migrations/20261123083200_parent_student_accounts.sql
+\i supabase/migrations/20261123090000_bulk_pin_reset_rotation.sql
+-- Re-running both migrations must be safe and must not duplicate relationship rows.
+\i supabase/migrations/20261123083200_parent_student_accounts.sql
+\i supabase/migrations/20261123090000_bulk_pin_reset_rotation.sql
+
+DO $$
+DECLARE
+  v_count INTEGER;
+  v_rotation BOOLEAN;
+  v_rls BOOLEAN;
+  v_function TEXT;
+BEGIN
+  SELECT count(*) INTO v_count FROM public.parent_students
+   WHERE parent_id='legacy-parent' AND student_id='legacy-child' AND school_id='pin-school-a';
+  IF v_count <> 1 THEN RAISE EXCEPTION 'Legacy explicit parent links were not backfilled exactly once.'; END IF;
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE id='legacy-parent';
+  IF v_rotation IS DISTINCT FROM false THEN RAISE EXCEPTION 'Migration unexpectedly forced existing parent accounts to rotate.'; END IF;
+
+  INSERT INTO public.students(id,school_id,student_id,first_name,pin_hash)
+  VALUES ('new-child-1','pin-school-a','ST-0002','New Student','scrypt:hash'),
+         ('new-child-2','pin-school-a','ST-0003','Sibling','scrypt:hash');
+  INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,pin_hash)
+  VALUES ('new-parent','pin-school-a','parent','New Parent',ARRAY['new-child-1'],'scrypt:hash');
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-parent';
+  IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'New parent account must require first-login PIN rotation.'; END IF;
+  UPDATE public.users SET linked_student_ids=ARRAY['new-child-1','new-child-2'] WHERE id='new-parent';
+  INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,pin_hash)
+  VALUES ('second-parent','pin-school-a','parent','Second Parent',ARRAY['new-child-1'],'scrypt:hash');
+  SELECT count(*) INTO v_count FROM public.parent_students
+   WHERE school_id='pin-school-a' AND student_id='new-child-1';
+  IF v_count <> 2 THEN RAISE EXCEPTION 'One student must support two separate parent accounts.'; END IF;
+  SELECT count(*) INTO v_count FROM public.parent_students
+   WHERE parent_id='new-parent' AND school_id='pin-school-a';
+  IF v_count <> 2 THEN RAISE EXCEPTION 'One parent account must link to multiple children.'; END IF;
+
+  INSERT INTO public.users(id,school_id,role,full_name,student_id,pin_hash)
+  VALUES ('new-student-user','pin-school-a','student','New Student','ST-0002','scrypt:hash');
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-student-user';
+  IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'New student account must require first-login PIN rotation.'; END IF;
+
+  SELECT c.relrowsecurity INTO v_rls
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname='public' AND c.relname='parent_students';
+  IF v_rls IS DISTINCT FROM true THEN RAISE EXCEPTION 'parent_students RLS must be enabled.'; END IF;
+
+  SELECT pg_get_functiondef('public.schoolos_bulk_reset_student_pins(jsonb)'::regprocedure) INTO v_function;
+  IF position('must_change_password = true' IN v_function) = 0 THEN RAISE EXCEPTION 'Bulk student PIN reset must require PIN rotation.'; END IF;
+END $$;
+
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO public.parent_students(parent_id,student_id,school_id)
+    VALUES ('new-parent','legacy-child','pin-school-b');
+    RAISE EXCEPTION 'Cross-school parent-child link was accepted.';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+END $$;
+
+SELECT 'parent/student PIN migration tests passed' AS result;
