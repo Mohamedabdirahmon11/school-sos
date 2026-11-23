@@ -1541,7 +1541,6 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     && await hasParentStudentLink(user, String(currentSession.selectedStudentId), String(user.schoolId || ''))
       ? String(currentSession.selectedStudentId)
       : undefined;
-  await issueSessionCookie(res, updated, req, user.schoolId, retainedChildId);
   db.logAudit({
     action: 'PIN_CHANGED',
     category: 'auth',
@@ -1554,7 +1553,9 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     severity: 'info'
   });
   await db.flush();
-  await issueSessionCookie(res, updated, req);
+  // Issue exactly one replacement session after revoking the old sessions.
+  // Preserve the already-verified selected child for multi-child parents.
+  await issueSessionCookie(res, updated, req, user.schoolId, retainedChildId);
   res.json({ success: true, message: 'PIN set successfully.' });
 });
 
