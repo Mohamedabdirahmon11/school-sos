@@ -92,7 +92,7 @@ test('bulk reset assigns unique six-digit PINs atomically and updates student ac
   assert.equal(body.updatedCount, 2);
   assert.equal(body.pinSlips.length, 2);
   assert.equal(body.pinSlips[0].newPin, '246810');
-  assert.match(body.pinSlips[1].newPin, /^\d{4}$/);
+  assert.match(body.pinSlips[1].newPin, /^\d{6}$/);
   assert.notEqual(body.pinSlips[0].newPin, body.pinSlips[1].newPin);
   const studentOne = memory.rows('students').find(row => row.studentId === 'STD-PIN-001');
   const studentTwo = memory.rows('students').find(row => row.studentId === 'STD-PIN-002');
@@ -105,7 +105,7 @@ test('bulk reset assigns unique six-digit PINs atomically and updates student ac
   assert.equal(memory.rows('users').find(row => row.id === 'usr-parent-pin-1')?.pinHash, parentPinBefore);
   assert.equal(memory.rows('audit_logs').filter(row => row.action === 'STUDENT_BULK_PIN_RESET').length, 1);
   assert.equal(memory.rows('students').every(row => !Object.prototype.hasOwnProperty.call(row, 'pin')), true);
-  assert.notEqual(studentOne?.pinHash, '2468');
+  assert.notEqual(studentOne?.pinHash, '246810');
 });
 
 test('bulk reset rejects invalid PINs, duplicate IDs, and students from another school without partial changes', async () => {
@@ -117,7 +117,7 @@ test('bulk reset rejects invalid PINs, duplicate IDs, and students from another 
     { studentId: 'STD-PIN-001', pin: '567890' }
   ]);
   assert.equal(duplicate.response.status, 400);
-  const crossSchool = await reset(admin, [{ studentId: 'STD-OTHER-001', pin: '5678' }]);
+  const crossSchool = await reset(admin, [{ studentId: 'STD-OTHER-001', pin: '567890' }]);
   assert.equal(crossSchool.response.status, 400);
   assert.equal(memory.rows('students').find(row => row.studentId === 'STD-PIN-001')?.pinHash, before);
   assert.equal(verifyPin('4444', String(memory.rows('students').find(row => row.studentId === 'STD-OTHER-001')?.pinHash || '')), true);
@@ -142,8 +142,8 @@ test('one-time PINs survive a remount of the Students screen and are cleared on 
   const store = await import('../src/lib/bulk-pin-results.ts');
   store.clearPendingPinSlips();
   assert.deepEqual(store.getPendingPinSlips('school-a'), []);
-  store.setPendingPinSlips('school-a', [{ studentId: 'S001', studentName: 'Ayaan Ali', newPin: '2468' }]);
-  assert.equal(store.getPendingPinSlips('school-a')[0].newPin, '2468');
+  store.setPendingPinSlips('school-a', [{ studentId: 'S001', studentName: 'Ayaan Ali', newPin: '246810' }]);
+  assert.equal(store.getPendingPinSlips('school-a')[0].newPin, '246810');
   assert.deepEqual(store.getPendingPinSlips('school-b'), [], 'another school never sees these PINs');
   store.clearPendingPinSlips();
   assert.deepEqual(store.getPendingPinSlips('school-a'), []);
