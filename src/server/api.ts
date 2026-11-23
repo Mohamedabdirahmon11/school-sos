@@ -539,7 +539,15 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
     });
     return;
   }
-  if (payload && !isBootstrap) await refreshSessionCookie(res, user, payload);
+  // Credential changes and logout-all replace or revoke the current session
+  // themselves. Do not emit an intermediate refreshed cookie before those routes
+  // issue the replacement session or clear the cookie.
+  const sessionMutationRoutes = new Set([
+    '/auth/change-password', '/auth/change-pin', '/auth/change-teacher-pin', '/auth/logout-all'
+  ]);
+  if (payload && !isBootstrap && !sessionMutationRoutes.has(req.path)) {
+    await refreshSessionCookie(res, user, payload);
+  }
   (req as any).sessionPayload = payload;
   (req as any).user = user;
   next();
