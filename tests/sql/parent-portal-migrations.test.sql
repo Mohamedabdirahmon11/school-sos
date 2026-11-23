@@ -24,6 +24,9 @@ CREATE TABLE public.students (
   father_phone text,
   mother_phone text
 );
+CREATE TABLE public.attendance_records (school_id varchar(64),student_id varchar(64),class_id varchar(64),date date);
+CREATE TABLE public.assignments (school_id varchar(64),class_id varchar(64),due_date date);
+CREATE TABLE public.student_marks (school_id varchar(64),student_id varchar(64),published_at timestamptz);
 CREATE TABLE public.notice_reads (id varchar(160) PRIMARY KEY, school_id varchar(64) NOT NULL, notice_id varchar(64) NOT NULL, user_id varchar(64) NOT NULL, read_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE public.direct_messages (
   id varchar(64) PRIMARY KEY,
