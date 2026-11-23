@@ -84,6 +84,10 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.parent_students
    WHERE parent_id='new-parent' AND school_id='pin-school-a';
   IF v_count <> 2 THEN RAISE EXCEPTION 'One parent account must link to multiple children.'; END IF;
+  UPDATE public.users SET linked_student_ids=ARRAY['new-child-1'] WHERE id='new-parent';
+  SELECT count(*) INTO v_count FROM public.parent_students
+   WHERE parent_id='new-parent' AND student_id='new-child-2' AND school_id='pin-school-a';
+  IF v_count <> 0 THEN RAISE EXCEPTION 'Removed child relationship must be revoked immediately.'; END IF;
 
   INSERT INTO public.users(id,school_id,role,full_name,student_id,pin_hash)
   VALUES ('new-student-user','pin-school-a','student','New Student','ST-0002','scrypt:hash');
