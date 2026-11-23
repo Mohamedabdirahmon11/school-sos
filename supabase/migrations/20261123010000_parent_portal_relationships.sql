@@ -43,14 +43,20 @@ SELECT u.school_id, u.id, s.id, 'guardian'
 FROM public.users AS u
 JOIN public.students AS s
   ON s.school_id = u.school_id
- AND regexp_replace(COALESCE(NULLIF(u.phone, ''), u.parent_phone, ''), '[^0-9]', '', 'g')
-     IN (
-       regexp_replace(COALESCE(s.father_phone, ''), '[^0-9]', '', 'g'),
-       regexp_replace(COALESCE(s.mother_phone, ''), '[^0-9]', '', 'g')
+ AND (
+       regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g')
+         IN (regexp_replace(COALESCE(s.father_phone, ''), '[^0-9]', '', 'g'),
+             regexp_replace(COALESCE(s.mother_phone, ''), '[^0-9]', '', 'g'))
+       OR regexp_replace(COALESCE(u.parent_phone, ''), '[^0-9]', '', 'g')
+         IN (regexp_replace(COALESCE(s.father_phone, ''), '[^0-9]', '', 'g'),
+             regexp_replace(COALESCE(s.mother_phone, ''), '[^0-9]', '', 'g'))
      )
 WHERE u.role = 'parent'::public.user_role_enum
   AND u.school_id IS NOT NULL
-  AND regexp_replace(COALESCE(NULLIF(u.phone, ''), u.parent_phone, ''), '[^0-9]', '', 'g') <> ''
+  AND (
+    regexp_replace(COALESCE(u.phone, ''), '[^0-9]', '', 'g') <> ''
+    OR regexp_replace(COALESCE(u.parent_phone, ''), '[^0-9]', '', 'g') <> ''
+  )
 ON CONFLICT (parent_id, student_id) DO NOTHING;
 
 -- Keep the canonical relation synchronized with the legacy admin-managed array.
