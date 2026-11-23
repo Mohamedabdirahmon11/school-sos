@@ -103,6 +103,14 @@ CREATE INDEX IF NOT EXISTS parent_published_marks_student_idx
   ON public.student_marks (school_id, student_id, published_at)
   WHERE published_at IS NOT NULL;
 
+-- Additive indexes for the high-volume parent dashboard joins. Attendance already
+-- has idx_attendance_student(school_id, student_id, date) in the base schema.
+CREATE INDEX IF NOT EXISTS idx_assignments_school_class_due
+  ON public.assignments (school_id, class_id, due_date);
+CREATE INDEX IF NOT EXISTS idx_student_marks_school_student_published
+  ON public.student_marks (school_id, student_id, published_at)
+  WHERE published_at IS NOT NULL;
+
 -- Reuse the existing notice_reads table and expose an explicit parent key.
 ALTER TABLE public.notice_reads
   ADD COLUMN IF NOT EXISTS parent_id varchar(64) REFERENCES public.users(id) ON DELETE CASCADE;
