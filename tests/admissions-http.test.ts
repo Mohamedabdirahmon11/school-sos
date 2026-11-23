@@ -195,13 +195,13 @@ test('student creation whitelists profile fields, enforces capacity and protects
   assert.equal('passwordHash' in response, false);
   assert.equal('twoFactorSecret' in response, false);
   const storedStudent = memory.rows('students').find(row => row.id === response.id);
-  assert.ok(String(storedStudent?.pin_hash || storedStudent?.pinHash || '').startsWith('pin_scrypt:'));
+  assert.ok(String(storedStudent?.pin_hash || storedStudent?.pinHash || '').startsWith('pin_scrypt|'));
   assert.equal('pin' in (storedStudent as any), false, 'Plaintext student PIN must never be persisted.');
   assert.equal('password_hash' in (storedStudent as any), false);
   assert.equal('two_factor_secret' in (storedStudent as any), false);
   const parent = (await storage.db.getUsers(school.id, 'parent')).find(user => user.phone === '+15550007111');
   assert.ok(parent?.linkedStudentIds?.includes(response.id));
-  assert.ok(parent?.pin?.startsWith('pin_scrypt:'));
+  assert.ok(parent?.pin?.startsWith('pin_scrypt|'));
 
   const secondSchool = storage.db.createSchool({
     name: 'Other School', code: 'OTHER', address: '', city: '', phone: '',
@@ -293,7 +293,7 @@ test('teacher creation generates a unique system-issued ID and ignores forged ac
   assert.equal('twoFactorSecret' in (storedTeacher as any), false);
   const teacherUser = await storage.db.getUserById(result.userId, school.id);
   assert.equal(teacherUser?.role, 'teacher');
-  assert.ok(teacherUser?.pin?.startsWith('pin_scrypt:'));
+  assert.ok(teacherUser?.pin?.startsWith('pin_scrypt|'));
 
   // Prime the shared list cache as an administrator, then request the same
   // list as a student to ensure salary fields cannot leak across cache roles.
