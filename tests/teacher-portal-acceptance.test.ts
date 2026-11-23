@@ -188,7 +188,7 @@ test('15.9 another teacher cannot grade or modify a colleague homework submissio
 });
 
 test('15.10 a parent cannot message a teacher who is not assigned to the linked child class', async () => {
-  const response = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, content: 'Please discuss my child.' });
+  const response = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, studentId: student.id, content: 'Please discuss my child.' });
   assert.equal(response.status, 403);
 });
 
@@ -253,6 +253,16 @@ test('15.10aa teacher attendance writes invalidate the parent child-summary cach
   assert.equal(after.attendanceSummary.absent, 0);
 });
 
+test('15.10a1 parent message contacts are limited to the selected linked child', async () => {
+  const ownContacts = await request('/messages/contacts?studentId=' + encodeURIComponent(student.id), cookies.parent);
+  assert.equal(ownContacts.status, 200, await ownContacts.clone().text());
+  const own = await ownContacts.json() as any[];
+  assert.ok(own.some(contact => contact.id === subjectTeacherUser.id && contact.canSend === true));
+  assert.equal(own.some(contact => contact.id === otherTeacherUser.id && contact.canSend === true), false);
+  const unrelated = await request('/messages/contacts?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
+  assert.equal(unrelated.status, 403);
+});
+
 test('15.10b parent cannot read attendance or homework for an unlinked student', async () => {
   const attendance = await request('/attendance/student?studentId=' + encodeURIComponent(otherStudent.id), cookies.parent);
   assert.equal(attendance.status, 403);
@@ -261,7 +271,7 @@ test('15.10b parent cannot read attendance or homework for an unlinked student',
 });
 
 test('15.10c removed teacher assignments keep old history readable but block new messages', async () => {
-  const allowed = await request('/parent/messages?contactId=' + encodeURIComponent(subjectTeacherUser.id), cookies.parent);
+  const allowed = await request('/parent/messages?contactId=' + encodeURIComponent(subjectTeacherUser.id) + '&studentId=' + encodeURIComponent(student.id), cookies.parent);
   assert.equal(allowed.status, 200, await allowed.clone().text());
   await db.sendMessage({
     recipientId: otherTeacherUser.id, recipientName: otherTeacherUser.fullName, recipientRole: 'teacher',
@@ -269,11 +279,11 @@ test('15.10c removed teacher assignments keep old history readable but block new
     senderName: parentUser.fullName, senderRole: 'parent'
   });
   await db.flush();
-  const history = await request('/parent/messages?contactId=' + encodeURIComponent(otherTeacherUser.id), cookies.parent);
+  const history = await request('/parent/messages?contactId=' + encodeURIComponent(otherTeacherUser.id) + '&studentId=' + encodeURIComponent(student.id), cookies.parent);
   assert.equal(history.status, 200, await history.clone().text());
-  const markRead = await postJson('/messages/read', cookies.parent, { contactId: otherTeacherUser.id });
+  const markRead = await postJson('/messages/read', cookies.parent, { contactId: otherTeacherUser.id, studentId: student.id });
   assert.equal(markRead.status, 200, await markRead.clone().text());
-  const sendNew = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, content: 'New message after reassignment' });
+  const sendNew = await postJson('/messages', cookies.parent, { recipientId: otherTeacherUser.id, studentId: student.id, content: 'New message after reassignment' });
   assert.equal(sendNew.status, 403);
 });
 
