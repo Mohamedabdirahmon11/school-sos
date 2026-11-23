@@ -196,8 +196,10 @@ test('temporary portal PIN generator always returns non-obvious six-digit values
 test('portal PIN scrypt hashes persist parameters, use unique salts, and transparently verify legacy hashes for rehash', () => {
   const first = hashPin('583920');
   const second = hashPin('583920');
-  assert.match(first, /^pin_scrypt\\$16384\\$8\\$1\\$[a-f0-9]{32}\\$[a-f0-9]{64}$/);
-  assert.notEqual(first, second, 'each PIN hash must use an independent random salt');
+  assert.ok(first.startsWith('pin_scrypt$16384$8$1$'));
+  assert.notEqual(first.split('$')[4], second.split('$')[4], 'each PIN hash must use an independent random salt');
+  assert.match(first.split('$')[4], /^[a-f0-9]{32}$/);
+  assert.match(first.split('$')[5], /^[a-f0-9]{64}$/);
   assert.equal(verifyPin('583920', first), true);
   assert.equal(verifyPin('000000', first), false);
   assert.equal(pinHashNeedsRehash(first), false);
