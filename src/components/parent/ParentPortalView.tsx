@@ -156,7 +156,7 @@ export const ParentPortalView: React.FC = () => {
           </p>
         </div>
 
-        {children.length > 1 && <button type="button" onClick={() => void handleChangeChild()} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs font-semibold text-[#334155] hover:border-[#0F766E]">Beddel ilmaha</button>}
+        {children.length > 0 && <button type="button" onClick={() => void handleChangeChild()} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs font-semibold text-[#334155] hover:border-[#0F766E]">Beddel ilmaha</button>}
       </div>
 
       {resultNotices.length > 0 && (
