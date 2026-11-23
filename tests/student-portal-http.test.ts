@@ -47,6 +47,7 @@ const studentUser=makeUser(school.id,'student','Faadumo Axmed',{studentId:studen
 const sameClassStudentUser=makeUser(school.id,'student','Other Student',{studentId:sameClassStudent.studentId});
 const wrongTenantLink=makeUser(school.id,'student','Wrong Tenant Link',{studentId:tenantStudent.studentId});
 parentUser.linkedStudentIds=[student.id];
+await memory.from('parent_students').insert([{ parent_id: parentUser.id, student_id: student.id, school_id: school.id, relation: 'guardian' }]);
 await db.flush();
 await memory.from('class_subjects').insert([
  {id:'sp-cs-math',school_id:school.id,class_id:klass.id,subject_id:subject.id,teacher_id:subjectTeacher.id,'teachers.user_id':subjectUser.id,'teachers.school_id':school.id,periods_per_week:3,is_active:true},
