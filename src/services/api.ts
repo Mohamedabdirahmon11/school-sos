@@ -254,6 +254,12 @@ export class ApiClient {
     });
   }
 
+  public static async updateParentPhone(id: string, phone: string) {
+    return this.request<{ success: boolean; parent: any }>(`/parents/${encodeURIComponent(id)}/phone`, {
+      method: 'POST', body: JSON.stringify({ phone })
+    });
+  }
+
   public static async resetParentPin(id: string) {
     return this.request<{ success: boolean; newPin: string; parent: any }>(`/parents/${encodeURIComponent(id)}/reset-pin`, {
       method: 'POST'
