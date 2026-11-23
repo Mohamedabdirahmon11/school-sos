@@ -4,22 +4,25 @@ DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL;
 DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE ROLE service_role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TYPE public.user_role_enum AS ENUM ('super_admin','school_admin','teacher','accountant','student','parent');
-CREATE TABLE public.schools (id VARCHAR(64) PRIMARY KEY);
+CREATE TABLE public.schools (id VARCHAR(64) PRIMARY KEY, name TEXT);
 CREATE TABLE public.students (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) NOT NULL REFERENCES public.schools(id),
+  branch_id VARCHAR(64),
   student_id VARCHAR(64) NOT NULL,
   first_name TEXT,
   middle_name TEXT,
   last_name TEXT,
   father_phone TEXT,
   mother_phone TEXT,
+  student_phone TEXT,
   pin_hash TEXT,
   status TEXT DEFAULT 'active'
 );
 CREATE TABLE public.users (
   id VARCHAR(64) PRIMARY KEY,
   school_id VARCHAR(64) REFERENCES public.schools(id),
+  branch_id VARCHAR(64),
   role public.user_role_enum NOT NULL,
   full_name TEXT,
   phone TEXT,
@@ -27,6 +30,9 @@ CREATE TABLE public.users (
   student_id VARCHAR(64),
   linked_student_ids TEXT[] DEFAULT ARRAY[]::TEXT[],
   pin_hash TEXT,
+  password_hash TEXT DEFAULT '',
+  is_blocked BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
   must_change_password BOOLEAN NOT NULL DEFAULT false,
   failed_login_attempts INTEGER DEFAULT 0,
   locked_until TIMESTAMPTZ
@@ -37,7 +43,7 @@ CREATE TABLE public.audit_logs (
   user_id VARCHAR(64), user_name TEXT, user_role public.user_role_enum, details TEXT, severity TEXT
 );
 
-INSERT INTO public.schools(id) VALUES ('pin-school-a'), ('pin-school-b');
+INSERT INTO public.schools(id,name) VALUES ('pin-school-a','PIN School A'), ('pin-school-b','PIN School B');
 INSERT INTO public.students(id,school_id,student_id,first_name,pin_hash)
 VALUES ('legacy-child','pin-school-a','ST-0001','Legacy Student','scrypt:legacy');
 INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,must_change_password)
@@ -91,6 +97,35 @@ BEGIN
 
   SELECT pg_get_functiondef('public.schoolos_bulk_reset_student_pins(jsonb)'::regprocedure) INTO v_function;
   IF position('must_change_password = true' IN v_function) = 0 THEN RAISE EXCEPTION 'Bulk student PIN reset must require PIN rotation.'; END IF;
+
+  INSERT INTO public.students(id,school_id,student_id,first_name,pin_hash)
+  VALUES ('missing-account-child','pin-school-a','ST-0004','Backfill Student','scrypt:old');
+  INSERT INTO public.user_sessions(user_id) VALUES ('new-student-user');
+  INSERT INTO public.users(id,school_id,role,full_name,phone,student_id,pin_hash,must_change_password)
+  VALUES ('parent-pin-untouched','pin-school-a','parent','Parent','+251911111111',NULL,'scrypt:parent-before',false);
+  PERFORM public.schoolos_bulk_reset_student_pins(jsonb_build_object(
+    'school_id','pin-school-a',
+    'changed_by','school-admin-test',
+    'changed_by_name','School Admin',
+    'changed_by_role','school_admin',
+    'students',jsonb_build_array(
+      jsonb_build_object('student_id','ST-0002','pin_hash','scrypt:rotated'),
+      jsonb_build_object('student_id','ST-0004','pin_hash','scrypt:backfill')
+    )
+  ));
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-student-user';
+  IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'Bulk reset did not force existing student account PIN rotation.'; END IF;
+  IF EXISTS (SELECT 1 FROM public.user_sessions WHERE user_id='new-student-user') THEN
+    RAISE EXCEPTION 'Bulk reset did not invalidate student sessions.';
+  END IF;
+  SELECT count(*) INTO v_count FROM public.users
+   WHERE school_id='pin-school-a' AND role='student'::public.user_role_enum AND student_id='ST-0004';
+  IF v_count <> 1 THEN RAISE EXCEPTION 'Admin-selected legacy backfill did not create exactly one student account.'; END IF;
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE student_id='ST-0004' AND school_id='pin-school-a';
+  IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'Backfilled student account must require first-login PIN rotation.'; END IF;
+  IF (SELECT pin_hash FROM public.users WHERE id='parent-pin-untouched') <> 'scrypt:parent-before' THEN
+    RAISE EXCEPTION 'Student bulk reset unexpectedly changed a parent PIN.';
+  END IF;
 END $$;
 
 DO $$
