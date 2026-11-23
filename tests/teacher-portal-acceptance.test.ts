@@ -52,7 +52,7 @@ const student = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-001'
 const otherStudent = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-002', firstName: 'Other', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: otherClass.id, status: 'active' } as any);
 parentUser.linkedStudentIds = [student.id];
 await db.flush();
-await memory.from('parent_students').insert([{ id: 'taccept-parent-student-link', school_id: school.id, parent_id: parentUser.id, student_id: student.id, relation: 'guardian' }]);
+await memory.from('parent_students').insert([{ id: 'taccept-parent-student-link', school_id: school.id, parent_id: parentUser.id, student_id: student.id, relation: 'guardian', revoked_at: null }]);
 await db.flush();
 await memory.from('class_subjects').insert([
   { id: 'ta-cs-math', school_id: school.id, class_id: klass.id, subject_id: subject.id, teacher_id: subjectTeacher.id, 'teachers.user_id': subjectTeacherUser.id, 'teachers.school_id': school.id, periods_per_week: 3, is_active: true },
@@ -246,8 +246,9 @@ test('15.10e student cannot enter the parent portal', async () => {
 });
 
 test('15.10f removing the canonical parent link immediately revokes child attendance access', async () => {
-  const removed = await memory.from('parent_students').delete().eq('school_id', school.id).eq('parent_id', parentUser.id).eq('student_id', student.id);
+  const removed = await memory.from('parent_students').update({ revoked_at: new Date().toISOString() }).eq('school_id', school.id).eq('parent_id', parentUser.id).eq('student_id', student.id);
   assert.equal(removed.error, null);
+  assert.equal(memory.rows('parent_students').some(row => row.parent_id === parentUser.id && row.student_id === student.id && Boolean(row.revoked_at)), true);
   const response = await request('/attendance/student?studentId=' + encodeURIComponent(student.id), cookies.parent);
   assert.equal(response.status, 403);
   const children = await request('/parent/children', cookies.parent);
