@@ -4420,7 +4420,7 @@ async function canManageAssignment(schoolId: string, user: User, assignment: any
   return Boolean(assigned.total);
 }
 
-apiRouter.get('/assignments', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/assignments', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const role = normalizeRole(user.role);
@@ -5490,7 +5490,7 @@ apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res)
   });
 });
 
-apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const classId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
@@ -6741,7 +6741,7 @@ apiRouter.get('/attendance/school/absences', requireAuth, requireSchoolContext, 
   }).filter(Boolean));
 });
 
-apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/attendance/student', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const studentId = req.query.studentId as string;
@@ -7703,7 +7703,7 @@ apiRouter.post('/exams/term-periods/:periodId/publish', requireAuth, requireScho
   }
 });
 
-apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/exams/marks', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { classId, subjectId, semester, studentId } = req.query;
@@ -9361,7 +9361,7 @@ apiRouter.get('/student/notices', requireAuth, requireSchoolContext, async (req,
   res.json({ ok: true, data: { items: result.items.map((notice: any) => ({ ...notice, isRead: readIds.has(String(notice.id)) })), pagination: { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: Math.ceil(result.total / result.pageSize) } }, error: null });
 });
 
-apiRouter.get('/notices', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/notices', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school as School;
   const user = (req as any).user as User;
   const filters: Record<string, any> = { school_id: school.id, is_active: true };
@@ -9479,7 +9479,7 @@ apiRouter.post('/notices/:id/read', requireAuth, requireSchoolContext, async (re
   res.json({ success: await db.markNoticeRead(schoolId, notice.id, user.id) });
 });
 
-apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const user = (req as any).user as User;
   const school = (req as any).school;
   const allowedRoles: Record<string, string[]> = {
@@ -9572,7 +9572,7 @@ apiRouter.get('/messages', requireAuth, requireSchoolContext, (req, res) => {
   void sendDatabasePage(req, res, 'direct_messages', { school_id: school.id }, 'sender_id.eq.' + user.id + ',recipient_id.eq.' + user.id);
 });
 
-apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.post('/messages', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
   const { recipientId, content } = req.body || {};
@@ -9627,7 +9627,7 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, async (req, res) 
   res.status(201).json(msg);
 });
 
-apiRouter.post('/messages/read', requireAuth, requireSchoolContext, async (req, res) => {
+apiRouter.post('/messages/read', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const user = (req as any).user as User;
   const contactId = String(req.body?.contactId || '');
   const contact = await db.getUserById(contactId, (req as any).school.id);
@@ -10311,7 +10311,7 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   // Writes remain gated by setup readiness.
   if (role === 'teacher' && req.method === 'GET' && req.path === '/attendance' && typeof req.query.classId === 'string' && req.query.classId.trim()) { next(); return; }
   const studentReadOnly = role === 'student' && req.method === 'GET' && req.path === '/timetable';
-  const parentPortalReadOnly = role === 'parent' && req.method === 'GET' && String(req.path || '').startsWith('/parent/');
+  const parentPortalReadOnly = role === 'parent' && (req.parentPortalSetupGate === true || (req.method === 'GET' && String(req.path || '').startsWith('/parent/')));
   if (role !== 'school_admin' && role !== 'teacher' && role !== 'super_admin' && !studentReadOnly && !parentPortalReadOnly) {
     res.status(403).json({ error: 'Your role cannot access school setup operations.' }); return;
   }
@@ -10334,6 +10334,12 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   } catch {
     res.status(503).json({ error: 'School setup readiness could not be verified. No changes were made.' });
   }
+}
+
+function requireParentPortalSetupReady(req: any, res: any, next: (error?: unknown) => void) {
+  if (normalizeRole(req.user?.role) !== 'parent') { next(); return; }
+  req.parentPortalSetupGate = true;
+  return requireSchoolSetupReady(req, res, next);
 }
 
 
