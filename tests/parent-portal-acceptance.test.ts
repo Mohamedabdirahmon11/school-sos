@@ -141,5 +141,24 @@ test('child summary uses batched queries rather than per-child database reads',(
  assert.match(route,/queryAllRows\('school_notices'/);
  assert.doesNotMatch(route,/students\.items\.map\(async/);
  assert.match(route,/Cache-Control.*no-store/);
+
+test('assignment removal keeps old conversation history but disables new parent messages',()=>{
+ const contacts=api.slice(api.indexOf("apiRouter.get('/messages/contacts'"),api.indexOf("apiRouter.get('/messages'"));
+ const parentHistory=api.slice(api.indexOf("apiRouter.get('/parent/messages'"),api.indexOf("apiRouter.get('/parent/notices'"));
+ const send=api.slice(api.indexOf("apiRouter.post('/messages'"),api.indexOf("apiRouter.post('/messages/read'"));
+ assert.match(contacts,/historyTeacherIds/);
+ assert.match(contacts,/historyOnly/);
+ assert.match(contacts,/canSend/);
+ assert.match(parentHistory,/currentlyAssigned/);
+ assert.match(parentHistory,/result\.items\.length === 0/);
+ assert.match(send,/Parents may message only teachers assigned to their children/);
+ assert.match(portal,/contact\?\.canSend===false/);
+});
+
+test('parent data endpoints are gated by the existing setup 423 readiness check',()=>{
+ assert.match(api,/parentPortalSetupGate/);
+ assert.match(api,/requireParentPortalSetupReady/);
+ assert.match(api,/SCHOOL_SETUP_REQUIRED/);
+});
 });
 }
