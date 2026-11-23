@@ -981,9 +981,10 @@ apiRouter.post('/auth/login', async (req, res) => {
   const requestedRole = normalizeRole(req.body?.role);
   const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
   const settings = db.getSettings();
-  const threshold = settings.lockoutThreshold || 5;
-  const ipThreshold = ['student', 'parent'].includes(requestedRole || '') ? threshold : threshold * 10;
-  const durationMins = settings.lockoutDurationMinutes || 15;
+  const isPortalLogin = ['student', 'parent'].includes(requestedRole || '');
+  const threshold = isPortalLogin ? 5 : settings.lockoutThreshold || 5;
+  const ipThreshold = isPortalLogin ? 5 : threshold * 10;
+  const durationMins = isPortalLogin ? 15 : settings.lockoutDurationMinutes || 15;
 
   // A. STUDENT (school code + Student ID + PIN) and PARENT (school code + phone + PIN).
   if (requestedRole === 'student' || requestedRole === 'parent') {
@@ -996,7 +997,8 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     // Rate Limiting & Lockout for Student/Parent
-    const lockKey = role === 'student' ? `sp:${schoolCode}:${portalStudentId}` : `sp:${schoolCode}:${portalPhone}`;
+    const normalizedSchoolCode = String(schoolCode).trim().toUpperCase();
+    const lockKey = role === 'student' ? `sp:${normalizedSchoolCode}:${portalStudentId}` : `sp:${normalizedSchoolCode}:${portalPhone}`;
     const ipKey = `ip:${clientIp}`;
     const lockCheck = db.checkLoginLockout(lockKey, threshold, durationMins);
     const ipCheck = db.checkLoginLockout(ipKey, ipThreshold, durationMins);
