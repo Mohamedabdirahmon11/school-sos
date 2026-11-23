@@ -11,6 +11,8 @@ const migration=read('../supabase/migrations/20261123010000_parent_portal_relati
 test('parent_students is the canonical tenant-scoped relationship with revocation',()=>{
  assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.parent_students/);
  assert.match(migration,/UNIQUE \(parent_id, student_id\)/);
+ assert.match(migration,/revoked_at timestamptz/);
+ assert.doesNotMatch(migration,/DELETE FROM/i);
  assert.match(migration,/FOREIGN KEY \(parent_id, school_id\)/);
  assert.match(migration,/FOREIGN KEY \(student_id, school_id\)/);
  assert.match(migration,/users_sync_parent_student_links/);
@@ -37,7 +39,7 @@ test('student record access for parents requires a current parent_students link'
  const helper=api.slice(api.indexOf('async function getParentLinkedStudentIds'),api.indexOf('async function canAccessStudentRecord'));
  const access=api.slice(api.indexOf('async function canAccessStudentRecord'),api.indexOf('// Middleware: Require School Tenant Context'));
  assert.match(helper,/parent_students/);
- assert.match(helper,/revoked_at\\.is\\.null/);
+ assert.match(helper,/revoked_at\.is\.null/);
  assert.match(helper,/school_id: schoolId, parent_id: parentId/);
  assert.match(access,/getParentLinkedStudentIds\(student\.schoolId, user\.id\)/);
  assert.doesNotMatch(access,/fatherPhone|motherPhone|linkedStudentIds/);
