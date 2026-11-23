@@ -9610,10 +9610,12 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
     }
     if (user.role === 'parent') {
-      const linkedClasses = await getNoticeClassIds(school.id, user);
+      const selectedStudentId = typeof req.query.studentId === 'string' ? req.query.studentId.trim() : '';
+      const selectedClassId = await getParentSelectedClassId(school.id, user.id, selectedStudentId);
+      if (!selectedClassId) return res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CHILD_FORBIDDEN', message: 'Dooro ilmo ku xiran akoonkaaga.' } });
       const [classRows, assignments] = await Promise.all([
-        linkedClasses.length ? db.queryPage('classes', { school_id: school.id, id: linkedClasses }, 1, 100, undefined, 'id,class_teacher_id') : Promise.resolve({ items: [] as any[] }),
-        linkedClasses.length ? db.queryPage('class_subjects', { school_id: school.id, class_id: linkedClasses, is_active: 'true' }, 1, 100, undefined, 'class_id,teacher_id') : Promise.resolve({ items: [] as any[] })
+        db.queryPage('classes', { school_id: school.id, id: selectedClassId }, 1, 1, undefined, 'id,class_teacher_id'),
+        db.queryPage('class_subjects', { school_id: school.id, class_id: selectedClassId, is_active: 'true' }, 1, 100, undefined, 'class_id,teacher_id')
       ]);
       const profileIds = [...new Set(assignments.items.map((row: any) => String(row.teacherId || '')).filter(Boolean))];
       const profiles = profileIds.length ? await db.queryPage('teachers', { school_id: school.id, id: profileIds }, 1, 100, undefined, 'id,user_id') : { items: [] as any[] };
