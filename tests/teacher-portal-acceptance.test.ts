@@ -114,6 +114,15 @@ test('15.0 opening the new-school wizard persists startedAt and incomplete setup
   assert.ok(Array.isArray(payload.missing) && payload.missing.length > 0);
 });
 
+test('15.0b parent portal reads return HTTP 423 while school setup is incomplete', async () => {
+  const setupGateParent = makeUser(setupGateSchool.id, 'parent', 'Setup Gate Parent');
+  const setupGateParentCookie = cookieFor(setupGateParent, 'setup-gate-parent');
+  const response = await request('/parent/children', setupGateParentCookie);
+  assert.equal(response.status, 423, await response.clone().text());
+  const payload = await response.json() as any;
+  assert.equal(payload.code, 'SCHOOL_SETUP_REQUIRED');
+});
+
 test('15.0a wrong role remains HTTP 403 before setup readiness gating', async () => {
   const response = await request('/attendance', cookies.parent);
   assert.equal(response.status, 403);
@@ -296,6 +305,7 @@ test('15.10d parent cannot submit homework or enter student and teacher portals'
   assert.equal(submit.status, 403);
   assert.equal((await request('/student/me', cookies.parent)).status, 403);
   assert.equal((await request('/teacher/subject-assignments', cookies.parent)).status, 403);
+  assert.equal((await request('/school/setup-progress', cookies.parent)).status, 403);
 });
 
 test('15.10e student cannot enter the parent portal', async () => {
@@ -334,6 +344,15 @@ test('15.10h class-only notices are visible only to parents linked to that class
   const otherItems = (await otherResponse.json() as any).data.items;
   assert.ok(ownItems.some((item: any) => item.id === notice.id));
   assert.equal(otherItems.some((item: any) => item.id === notice.id), false);
+});
+
+test('15.10i parent requests cannot cross the school tenant boundary', async () => {
+  const crossStudent = db.createStudent({ schoolId: otherSchool.id, studentId: 'OTHER-TENANT-001', firstName: 'Tenant', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: tenantClass.id, status: 'active' } as any);
+  await db.flush();
+  const attendance = await request('/attendance/student?studentId=' + encodeURIComponent(crossStudent.id), cookies.parent);
+  const homework = await request('/assignments?studentId=' + encodeURIComponent(crossStudent.id), cookies.parent);
+  assert.equal(attendance.status, 403);
+  assert.equal(homework.status, 403);
 });
 
 test('15.10f removing the canonical parent link immediately revokes child attendance access', async () => {
