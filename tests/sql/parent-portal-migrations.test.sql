@@ -69,8 +69,8 @@ VALUES ('message-keep','school-a','parent-array','teacher-a','Keep message histo
 UPDATE public.users SET linked_student_ids=ARRAY[]::text[] WHERE id='parent-array';
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-array' AND student_id='student-array') THEN
-    RAISE EXCEPTION 'Removing an admin-managed link must revoke the parent relation.';
+  IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-array' AND student_id='student-array' AND revoked_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'Removing an admin-managed link must revoke the parent relation without deleting history.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.parent_students WHERE parent_id='parent-phone' AND student_id='student-phone') THEN
     RAISE EXCEPTION 'Legacy guardian-phone backfill must be retained.';
