@@ -251,7 +251,7 @@ test('15.16 Form Teacher can reset only students in their own class without chan
   });
   assert.equal(allowed.status, 200, await allowed.clone().text());
   const receipt = await allowed.json() as any;
-  assert.match(receipt.newPin, /^\\d{6}$/);
+  assert.match(receipt.newPin, /^[0-9]{6}$/);
   assert.equal(studentUser.mustChangePassword, true);
   assert.equal(auth.verifyPin(receipt.newPin, studentUser.pin), true);
   assert.equal(auth.verifyPin('876543', parentUser.pin), true);
