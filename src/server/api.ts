@@ -5340,7 +5340,7 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
     classIds.length ? queryAllRows('assignments', { school_id: school.id, class_id: classIds }, 'id,class_id,due_date') : Promise.resolve([] as any[]),
     queryAllRows('assignment_submissions', { school_id: school.id, student_id: studentIds }, 'assignment_id,student_id,status'),
     queryAllRows('school_notices', { school_id: school.id, is_active: 'true' }, 'id,audience,class_id,publish_date'),
-    queryAllRows('notice_reads', { school_id: school.id, user_id: user.id }, 'notice_id')
+    queryAllRows('notice_reads', { school_id: school.id, parent_id: user.id }, 'notice_id')
   ]);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: school.timezone || 'Africa/Addis_Ababa' }).format(new Date());
   const monthKey = today.slice(0, 7);
@@ -5411,7 +5411,7 @@ apiRouter.get('/parent/notices', requireAuth, requireSchoolContext, requireSchoo
     'id,school_id,title,content,audience,class_id,is_pinned,publish_date,author_name,author_role,is_active', 'publish_date', false);
   const noticeIds = result.items.map((notice: any) => String(notice.id));
   const reads = noticeIds.length
-    ? await db.queryPage('notice_reads', { school_id: school.id, user_id: user.id, notice_id: noticeIds }, 1, 50, undefined, 'notice_id')
+    ? await db.queryPage('notice_reads', { school_id: school.id, parent_id: user.id, notice_id: noticeIds }, 1, 50, undefined, 'notice_id')
     : { items: [] as any[] };
   const readIds = new Set(reads.items.map((row: any) => String(row.noticeId)));
   res.set({ 'Cache-Control': 'private, no-store, max-age=0' });
