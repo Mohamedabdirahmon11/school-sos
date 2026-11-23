@@ -47,7 +47,7 @@ import { assignSemesterRanks, getMarkSchemeMaximums } from '../lib/exam-results.
 import { getGradeLabel } from '../lib/grading.ts';
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
-import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid } from './auth-security.ts';
+import { hashPassword, hashPin, verifyPassword, verifyPin, isSessionExpiryValid, generateTemporaryPin } from './auth-security.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 interface DatabaseSchema {
@@ -1940,7 +1940,7 @@ class StorageEngine {
     const school = await this.getSchoolById(student.schoolId);
     const schoolCode = String(school?.code || '').trim().toUpperCase();
     if (schoolCode) this.clearLoginFailures(`sp:${schoolCode}:${student.studentId}`);
-    const newPin = customPin || randomInt(100000, 1000000).toString();
+    const newPin = customPin || generateTemporaryPin();
     const pinHash = hashPin(newPin);
     student.pinHash = pinHash;
     delete student.pin;
@@ -2024,7 +2024,7 @@ class StorageEngine {
     const school = await this.getSchoolById(schoolId);
     const schoolCode = String(school?.code || '').trim().toUpperCase();
     if (schoolCode) this.clearLoginFailures(`sp:${schoolCode}:${String(parent.phone || parent.parentPhone || '').replace(/[^0-9]/g, '')}`);
-    const newPin = randomInt(100000, 1000000).toString();
+    const newPin = generateTemporaryPin();
     const updated = this.updateUser(parent.id, {
       pin: hashPin(newPin),
       mustChangePassword: true,
