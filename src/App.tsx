@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
@@ -192,6 +193,17 @@ const AppContent: React.FC = () => {
           {!setupRequired && !['student', 'parent'].includes(user.role) && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
           <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6">
+            <div className="sticky top-2 z-40 flex h-0 justify-end px-4 pointer-events-none">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                title="Refresh this page"
+                aria-label="Refresh this page"
+                className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white/95 text-[#64748B] shadow-sm transition-colors hover:border-[#99F6E4] hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
             {setupRequired && activeView !== 'sch_setup' && (
               <div className="mx-auto w-full max-w-6xl px-4 pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">
