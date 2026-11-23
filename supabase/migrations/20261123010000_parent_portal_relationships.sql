@@ -94,5 +94,45 @@ GRANT ALL ON public.parent_students TO service_role;
 REVOKE ALL ON FUNCTION public.schoolos_sync_parent_student_links() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_sync_parent_student_links() TO service_role;
 
+-- Reuse the existing notice_reads table and expose an explicit parent key.
+ALTER TABLE public.notice_reads
+  ADD COLUMN IF NOT EXISTS parent_id varchar(64) REFERENCES public.users(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS notice_reads_parent_notice_idx
+  ON public.notice_reads (school_id, parent_id, notice_id)
+  WHERE parent_id IS NOT NULL;
+
+UPDATE public.notice_reads AS nr
+SET parent_id = nr.user_id
+FROM public.users AS u
+WHERE u.id = nr.user_id
+  AND u.role = 'parent'::public.user_role_enum
+  AND nr.parent_id IS NULL;
+
+CREATE OR REPLACE FUNCTION public.schoolos_set_parent_notice_read_key()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.users AS u
+    WHERE u.id = NEW.user_id AND u.role = 'parent'::public.user_role_enum
+  ) THEN
+    NEW.parent_id := NEW.user_id;
+  ELSE
+    NEW.parent_id := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS notice_reads_set_parent_key ON public.notice_reads;
+CREATE TRIGGER notice_reads_set_parent_key
+BEFORE INSERT OR UPDATE OF user_id ON public.notice_reads
+FOR EACH ROW EXECUTE FUNCTION public.schoolos_set_parent_notice_read_key();
+REVOKE ALL ON FUNCTION public.schoolos_set_parent_notice_read_key() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schoolos_set_parent_notice_read_key() TO service_role;
+
 NOTIFY pgrst, 'reload schema';
 COMMIT;
