@@ -51,13 +51,13 @@ export const ParentPortalView:React.FC=()=>{
  const examSchedulesState=useApi(()=>child?.classId?ApiClient.getPublishedExamSchedules(child.classId):Promise.resolve([]),[school?.id,child?.id,child?.classId],active&&(home||view==='tt'));
  const homeworkState=useApi(()=>child?ApiClient.request<any[]>(`/assignments?studentId=${encodeURIComponent(child.id)}`):Promise.resolve([]),[school?.id,child?.id],active&&(home||view==='hw'));
  const noticesState=useApi(()=>ApiClient.request<any>(`/parent/notices?page=${noticePage}&pageSize=20`),[school?.id,user?.id,noticePage],Boolean(user&&['home','news'].includes(view)));
- const contactsState=useApi(()=>ApiClient.getMessageContacts(),[school?.id,user?.id],Boolean(user&&view==='msg'));
+ const contactsState=useApi(()=>ApiClient.getMessageContacts({studentId:child?.id}),[school?.id,user?.id,child?.id],Boolean(user&&view==='msg'&&child?.id));
  const contacts=Array.isArray(contactsState.data)?contactsState.data:[];
  const contact=contacts.find((x:any)=>x.id===contactId);
- const messagesState=useApi(()=>contactId?ApiClient.request<any>(`/parent/messages?contactId=${encodeURIComponent(contactId)}&page=${messagePage}&pageSize=30`):Promise.resolve([]),[school?.id,user?.id,contactId,messagePage],Boolean(user&&view==='msg'&&contactId));
+ const messagesState=useApi(()=>contactId?ApiClient.request<any>(`/parent/messages?contactId=${encodeURIComponent(contactId)}&studentId=${encodeURIComponent(child?.id||'')}&page=${messagePage}&pageSize=30`):Promise.resolve([]),[school?.id,user?.id,child?.id,contactId,messagePage],Boolean(user&&view==='msg'&&child?.id&&contactId));
  useEffect(()=>{if(!contactId&&contacts.length)setContactId(contacts[0].id);else if(contactId&&!contacts.some((x:any)=>x.id===contactId))setContactId(contacts[0]?.id||'');},[contacts,contactId]);
  useEffect(()=>{setMessagePage(1);},[contactId]);
- useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId).catch(()=>undefined);},[view,contactId]);
+ useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId,child?.id).catch(()=>undefined);},[view,contactId,child?.id]);
  const refresh=()=>{childrenState.retry();attendanceState.retry();marksState.retry();timetableState.retry();examSchedulesState.retry();homeworkState.retry();noticesState.retry();contactsState.retry();if(contactId)messagesState.retry();};
  useEffect(()=>{const onFocus=()=>{if(document.visibilityState==='visible')refresh();};window.addEventListener('focus',onFocus);document.addEventListener('visibilitychange',onFocus);return()=>{window.removeEventListener('focus',onFocus);document.removeEventListener('visibilitychange',onFocus);};},[view,child?.id,contactId]);
 
@@ -89,7 +89,7 @@ export const ParentPortalView:React.FC=()=>{
  const initials=(name:string)=>String(name||'W').trim().split(/\s+/).slice(0,2).map((x:string)=>x[0]).join('').toUpperCase();
  const go=(next:View)=>{setView(next);setMoreOpen(false);setFeedback('');if(next==='news')setNoticePage(1);};
  const markRead=async(id:string)=>{try{await ApiClient.markNoticeRead(id);noticesState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Ogeysiiska lama calaamadin karin.');}};
- const send=async()=>{const body=messageDraft.trim();if(!body||!contact)return;if(contact.canSend===false){setFeedback('Macallinkan hadda carruurtaada looma qoondeeyo; taariikhda hore oo keliya ayaad akhrin kartaa.');return;}setSending(true);setFeedback('');try{await ApiClient.sendMessage(contact.id,contact.fullName,contact.role,body);setMessageDraft('');setMessagePage(1);messagesState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Fariinta lama diri karin.');}finally{setSending(false);}};
+ const send=async()=>{const body=messageDraft.trim();if(!body||!contact||!child?.id)return;if(contact.canSend===false){setFeedback('Macallinkan hadda carruurtaada looma qoondeeyo; taariikhda hore oo keliya ayaad akhrin kartaa.');return;}setSending(true);setFeedback('');try{await ApiClient.sendMessage(contact.id,contact.fullName,contact.role,body,child.id);setMessageDraft('');setMessagePage(1);messagesState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Fariinta lama diri karin.');}finally{setSending(false);}};
  const navButton=(item:typeof NAV[number],mobile=false)=>{const Icon=item.icon;const selected=view===item.id;const badge=item.id==='hw'?pending:item.id==='news'?notices.filter((n:any)=>!n.isRead).length:0;return <button key={item.id} type="button" className={'pp-nav-item '+(selected?'is-active ':'')+(mobile?'is-mobile':'')} onClick={()=>go(item.id)} aria-current={selected?'page':undefined}><Icon size={mobile?19:17}/><span>{item.label}</span>{badge>0&&<i className="pp-badge">{badge>99?'99+':badge}</i>}</button>;};
  const moreItems=NAV.filter(x=>['tt','att','hw','news','msg','me'].includes(x.id));
  const moreActive=moreItems.some(x=>x.id===view);
