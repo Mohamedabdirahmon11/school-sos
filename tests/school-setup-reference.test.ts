@@ -63,7 +63,7 @@ test('eligible School Admin dashboard API requires the full Final Review marker'
   assert.match(source, /apiRouter\.get\('\/school\/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, requireSchoolAdminDashboardSetupComplete,/);
   assert.match(source, /if \(normalizeRole\(req\.user\?\.role\) !== 'school_admin' \|\| !isSchoolSetupWizardEligible\(school\.createdAt\)\)/);
   assert.match(source, /Final Review lama xaqiijin/);
-  assert.match(source, /const requiredIds = \\[1, 2, 3, 4, 5, 0, 6\\]/, 'Attendance/Exams APIs must stay reachable while the wizard is in progress');
+  assert.ok(source.includes('const requiredIds = [1, 2, 3, 4, 5, 0, 6]'), 'Attendance/Exams APIs must stay reachable while the wizard is in progress');
 });
 
 test('completed existing schools are grandfathered and are not relocked by setup gates', () => {
