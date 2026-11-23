@@ -1937,6 +1937,9 @@ class StorageEngine {
     if (!student) return null;
     await this.getUsers(schoolId, 'student');
 
+    const school = await this.getSchoolById(student.schoolId);
+    const schoolCode = String(school?.code || '').trim().toUpperCase();
+    if (schoolCode) this.clearLoginFailures(`sp:${schoolCode}:${student.studentId}`);
     const newPin = customPin || randomInt(100000, 1000000).toString();
     const pinHash = hashPin(newPin);
     student.pinHash = pinHash;
@@ -2018,6 +2021,9 @@ class StorageEngine {
   public async resetParentPin(parentId: string, schoolId: string, actor?: { id: string; name: string; role: UserRole; ipAddress?: string }): Promise<{ parent: User; newPin: string } | null> {
     const parent = await this.getUserById(parentId, schoolId);
     if (!parent || parent.role !== 'parent') return null;
+    const school = await this.getSchoolById(schoolId);
+    const schoolCode = String(school?.code || '').trim().toUpperCase();
+    if (schoolCode) this.clearLoginFailures(`sp:${schoolCode}:${String(parent.phone || parent.parentPhone || '').replace(/[^0-9]/g, '')}`);
     const newPin = randomInt(100000, 1000000).toString();
     const updated = this.updateUser(parent.id, {
       pin: hashPin(newPin),
