@@ -263,12 +263,11 @@ test('15.10b parent cannot read attendance or homework for an unlinked student',
 test('15.10c removed teacher assignments keep old history readable but block new messages', async () => {
   const allowed = await request('/parent/messages?contactId=' + encodeURIComponent(subjectTeacherUser.id), cookies.parent);
   assert.equal(allowed.status, 200, await allowed.clone().text());
-  await memory.from('direct_messages').insert([{
-    id: 'parent-old-teacher-message', school_id: school.id,
-    sender_id: parentUser.id, sender_name: parentUser.fullName, sender_role: 'parent',
-    recipient_id: otherTeacherUser.id, recipient_name: otherTeacherUser.fullName, recipient_role: 'teacher',
-    content: 'Historical conversation', timestamp: new Date().toISOString(), is_read: false
-  }]);
+  await db.sendMessage({
+    recipientId: otherTeacherUser.id, recipientName: otherTeacherUser.fullName, recipientRole: 'teacher',
+    content: 'Historical conversation', schoolId: school.id, senderId: parentUser.id,
+    senderName: parentUser.fullName, senderRole: 'parent'
+  });
   await db.flush();
   const history = await request('/parent/messages?contactId=' + encodeURIComponent(otherTeacherUser.id), cookies.parent);
   assert.equal(history.status, 200, await history.clone().text());
