@@ -56,6 +56,46 @@ SELECT u.id, s.id, u.school_id, 'guardian'
    AND u.school_id IS NOT NULL
 ON CONFLICT (parent_id, student_id) DO NOTHING;
 
+CREATE OR REPLACE FUNCTION public.schoolos_enforce_parent_phone_unique()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $
+DECLARE
+  v_phone TEXT;
+BEGIN
+  IF NEW.role = 'parent'::public.user_role_enum AND NEW.school_id IS NOT NULL THEN
+    v_phone := regexp_replace(COALESCE(NULLIF(btrim(NEW.phone), ''), NULLIF(btrim(NEW.parent_phone), ''), ''), '[^0-9]', '', 'g');
+    IF v_phone <> '' THEN
+      PERFORM pg_advisory_xact_lock(hashtextextended(NEW.school_id || ':' || v_phone, 0));
+      IF EXISTS (
+        SELECT 1
+          FROM public.users AS existing
+         WHERE existing.school_id = NEW.school_id
+           AND existing.role = 'parent'::public.user_role_enum
+           AND existing.id <> NEW.id
+           AND regexp_replace(
+                 COALESCE(NULLIF(btrim(existing.phone), ''), NULLIF(btrim(existing.parent_phone), ''), ''),
+                 '[^0-9]', '', 'g'
+               ) = v_phone
+      ) THEN
+        RAISE EXCEPTION 'A parent account already exists for this phone number in this school.'
+          USING ERRCODE = '23505';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS trg_schoolos_parent_phone_unique ON public.users;
+CREATE TRIGGER trg_schoolos_parent_phone_unique
+BEFORE INSERT OR UPDATE OF phone, parent_phone, school_id, role
+ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.schoolos_enforce_parent_phone_unique();
+
 CREATE OR REPLACE FUNCTION public.schoolos_validate_parent_student_link()
 RETURNS TRIGGER
 LANGUAGE plpgsql
