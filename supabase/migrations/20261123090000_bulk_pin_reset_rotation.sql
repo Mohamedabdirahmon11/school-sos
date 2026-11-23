@@ -10,6 +10,7 @@ SET search_path = ''
 AS $$
 DECLARE
   v_school_id VARCHAR(64);
+  v_school_code TEXT;
   v_changed_by VARCHAR(64);
   v_changed_by_name TEXT;
   v_changed_by_role public.user_role_enum;
@@ -25,6 +26,7 @@ BEGIN
   END IF;
 
   v_school_id := p_payload->>'school_id';
+  SELECT upper(code) INTO v_school_code FROM public.schools WHERE id = v_school_id;
   v_changed_by := p_payload->>'changed_by';
   v_changed_by_name := COALESCE(NULLIF(p_payload->>'changed_by_name', ''), 'School Administrator');
   v_changed_by_role := COALESCE(NULLIF(p_payload->>'changed_by_role', ''), 'school_admin')::public.user_role_enum;
@@ -118,6 +120,12 @@ BEGIN
      AND u.school_id = v_school_id
      AND u.role = 'student'::public.user_role_enum
      AND (u.student_id = s.student_id OR u.id = 'usr-student-' || s.id);
+
+  DELETE FROM public.lockout_counters AS lockout
+   WHERE lockout.id IN (
+     SELECT 'sp:' || v_school_code || ':' || item.student_id
+       FROM jsonb_to_recordset(p_payload->'students') AS item(student_id TEXT, pin_hash TEXT)
+   );
 
   DELETE FROM public.user_sessions AS session
    WHERE session.user_id IN (
