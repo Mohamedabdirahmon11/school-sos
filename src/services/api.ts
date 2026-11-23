@@ -260,6 +260,12 @@ export class ApiClient {
     });
   }
 
+  public static async selectParentChild(studentId?: string) {
+    return this.request<{ success: boolean; selectedStudentId: string | null }>('/parent/select-child', {
+      method: 'POST', body: JSON.stringify({ studentId: studentId || null })
+    });
+  }
+
   public static async resetParentPin(id: string) {
     return this.request<{ success: boolean; newPin: string; parent: any }>(`/parents/${encodeURIComponent(id)}/reset-pin`, {
       method: 'POST'
