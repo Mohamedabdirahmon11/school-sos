@@ -1930,7 +1930,7 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string, actor?: { id: string; name: string; role: UserRole; ipAddress?: string }): Promise<{ student: Student; newPin: string } | null> {
-    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\\d{6}$/.test(customPin) || ['000000', '123456', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'].includes(customPin))) {
+    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\d{6}$/.test(customPin) || ['000000', '123456', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'].includes(customPin))) {
       throw new Error('Student PIN must be a strong 6-digit number.');
     }
     const student = await this.getStudentById(studentId, schoolId);
