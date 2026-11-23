@@ -204,3 +204,57 @@ test('student ID and normalized parent phone logins are school-scoped and requir
   const invalidPinLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin: '000000' });
   assert.equal(invalidPinLogin.status, 401);
 });
+
+
+test('parent child selection is persisted in the signed session and rejects unlinked children and role mismatches', async () => {
+  const parent = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school' && String(row.phone || '').replace(/[^0-9]/g, '') === '251911234567');
+  const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
+  const student = memory.rows('students').find(row => row.student_id === 'S001');
+  assert.ok(parent && studentUser && student);
+  parent.must_change_password = false;
+  studentUser.must_change_password = false;
+
+  const makeSession = (userId: string, role: string, id: string) => {
+    const expiresAt = Date.now() + 60 * 60 * 1000;
+    memory.rows('user_sessions').push({
+      id, userId, userRole: role, schoolId: 'student-school',
+      ipAddress: '', userAgent: '', createdAt: new Date().toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(), lastActivityAt: new Date().toISOString()
+    });
+    return createSignedSessionToken({ sessionId: id, userId, role, schoolId: 'student-school', createdAt: Date.now(), expiresAt });
+  };
+  const parentToken = makeSession(parent.id, 'parent', 'parent-selection-session');
+  const select = (token: string, studentId: string) => fetch(`${baseUrl}/parent/select-child`, {
+    method: 'POST',
+    headers: { Cookie: `schoolos_session=${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentId })
+  });
+
+  const selected = await select(parentToken, student.id);
+  assert.equal(selected.status, 200);
+  const selectedBody = await selected.json() as any;
+  assert.equal(selectedBody.selectedStudentId, student.id);
+  const setCookies = (selected.headers as any).getSetCookie?.() || [];
+  const latestCookie = setCookies.at(-1) || '';
+  const sessionToken = /schoolos_session=([^;]+)/.exec(latestCookie)?.[1];
+  assert.ok(sessionToken);
+  const me = await fetch(`${baseUrl}/auth/me`, { headers: { Cookie: `schoolos_session=${sessionToken}` } });
+  assert.equal(me.status, 200);
+  const meBody = await me.json() as any;
+  assert.equal(meBody.selectedStudentId, student.id);
+
+  await memory.from('students').insert([{
+    id: 'unlinked-student', school_id: 'student-school', student_id: 'ST-UNLINKED',
+    first_name: 'Unlinked', last_name: 'Student', class_id: 'student-class-1', status: 'active'
+  }]);
+  const forbiddenChild = await select(parentToken, 'unlinked-student');
+  assert.equal(forbiddenChild.status, 403);
+
+  const studentToken = makeSession(studentUser.id, 'student', 'student-selection-session');
+  const wrongRole = await select(studentToken, student.id);
+  assert.equal(wrongRole.status, 403);
+  const parentOnStudentEndpoint = await fetch(`${baseUrl}/student/me`, {
+    headers: { Cookie: `schoolos_session=${parentToken}` }
+  });
+  assert.equal(parentOnStudentEndpoint.status, 403);
+});
