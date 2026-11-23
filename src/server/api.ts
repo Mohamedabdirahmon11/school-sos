@@ -9540,22 +9540,26 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
           : await queryAllRows('students', { school_id: school.id, class_id: assignedClassIds }, 'id,student_id,class_id,father_phone,mother_phone');
       const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
       const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
-      const phones = new Set(assignedStudents.flatMap((student: any) => [student.fatherPhone, student.motherPhone]).filter(Boolean));
+      const eligibleParentIds = new Set<string>();
+      for (const parent of contacts.filter(contact => contact.role === 'parent')) {
+        const parentStudentIds = await getParentStudentIds(parent, school.id);
+        if (parentStudentIds.some(id => assignedStudentIds.has(id))) eligibleParentIds.add(parent.id);
+      }
       contacts = contacts.filter(contact => contact.role === 'parent'
-        ? (contact.linkedStudentIds || []).some((id: string) => assignedStudentIds.has(id)) || Boolean(contact.phone && phones.has(contact.phone)) || Boolean(contact.parentPhone && phones.has(contact.parentPhone))
+        ? eligibleParentIds.has(contact.id)
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
     }
     if (user.role === 'parent') {
       const linkedIds = new Set(await getParentStudentIds(user, school.id));
       const linkedStudents = (await db.getStudents(school.id)).filter(student => linkedIds.has(student.id));
-      const linkedIds = new Set(linkedStudents.flatMap(student => [student.id, student.studentId]));
+      const linkedStudentIdentifiers = new Set(linkedStudents.flatMap(student => [student.id, student.studentId]));
       const linkedClasses = new Set(linkedStudents.map(student => student.classId));
       const teacherClassScopes = new Map<string, string[]>();
       for (const contact of contacts.filter(item => item.role === 'teacher')) {
         teacherClassScopes.set(contact.id, await getTeacherAssignedClassIds(school.id, contact.id));
       }
       contacts = contacts.filter(contact => contact.role === 'student'
-        ? Boolean(contact.studentId && linkedIds.has(contact.studentId))
+        ? Boolean(contact.studentId && linkedStudentIdentifiers.has(contact.studentId))
         : contact.role !== 'teacher' || Boolean((teacherClassScopes.get(contact.id) || []).some(classId => linkedClasses.has(classId))));
     }
   }
