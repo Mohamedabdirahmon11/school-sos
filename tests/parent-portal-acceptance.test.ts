@@ -100,6 +100,7 @@ test('parent profile and child list use server data and one-child mode hides sib
  assert.match(portal,/children\.length>1&&<div className="pp-child-strip"/);
  assert.match(portal,/parent\?\.fullName/);
  assert.match(portal,/x\.studentId/);
+});
 
 test('parent message history is paginated and scoped to the authenticated parent conversation',()=>{
  const start=api.indexOf("apiRouter.get('/parent/messages'");
@@ -126,4 +127,4 @@ test('child summary uses batched queries rather than per-child database reads',(
  assert.doesNotMatch(route,/students\.items\.map\(async/);
  assert.match(route,/Cache-Control.*no-store/);
 });
-});
+}
