@@ -482,7 +482,7 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
   if (!normalizedRole) return null;
   const user: User = { ...storedUser, role: normalizedRole };
   const isBootstrap = !session && allowBootstrap && payload.sessionId.startsWith('bootstrap-')
-    && ['super_admin', 'school_admin'].includes(user.role)
+    && ['super_admin', 'school_admin', 'student', 'parent'].includes(user.role)
     && user.mustChangePassword === true
     && payload.role === user.role;
   if (!session && !isBootstrap) return null;
@@ -976,6 +976,7 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
 // 1. AUTHENTICATION & LOGIN (PASSWORD, STAFF FIRST-LOGIN, STUDENT/PARENT PIN)
 // ==============================================================================
 
+// STUDENT & PARENT LOGIN — school code + Student ID or normalized phone + PIN.
 apiRouter.post('/auth/login', async (req, res) => {
   const { email, phone, schoolCode, studentId, pin, password } = req.body;
   const requestedRole = normalizeRole(req.body?.role);
