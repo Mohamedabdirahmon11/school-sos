@@ -85,7 +85,7 @@ export function generateTemporaryPin(): string {
   let pin = '';
   do {
     pin = crypto.randomInt(100000, 1000000).toString();
-  } while (WEAK_TEMPORARY_PINS.has(pin) || /^(\\d)\\1{5}$/.test(pin));
+  } while (WEAK_TEMPORARY_PINS.has(pin) || /^(\d)\1{5}$/.test(pin));
   return pin;
 }
 
