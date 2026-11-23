@@ -200,6 +200,43 @@ test('15.10a parent child directory returns only canonical linked students in th
   assert.equal(payload.data.children.some((child: any) => child.id === otherStudent.id), false);
 });
 
+test('15.10ab one-child and three-child summaries stay within the same bounded query count', async () => {
+  const childTwo = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-003', firstName: 'Third', middleName: '', lastName: 'Student', gender: 'female', admissionDate: today, fatherPhone: '', classId: klass.id, status: 'active' } as any);
+  const childThree = db.createStudent({ schoolId: school.id, studentId: 'TACCEPT-004', firstName: 'Fourth', middleName: '', lastName: 'Student', gender: 'male', admissionDate: today, fatherPhone: '', classId: klass.id, status: 'active' } as any);
+  const oneChildParent = makeUser(school.id, 'parent', 'One Child Parent');
+  const threeChildParent = makeUser(school.id, 'parent', 'Three Child Parent');
+  await db.flush();
+  await memory.from('parent_students').insert([
+    { id: 'taccept-one-child-link', school_id: school.id, parent_id: oneChildParent.id, student_id: student.id, relation: 'guardian', revoked_at: null },
+    { id: 'taccept-three-child-link-1', school_id: school.id, parent_id: threeChildParent.id, student_id: student.id, relation: 'guardian', revoked_at: null },
+    { id: 'taccept-three-child-link-2', school_id: school.id, parent_id: threeChildParent.id, student_id: childTwo.id, relation: 'guardian', revoked_at: null },
+    { id: 'taccept-three-child-link-3', school_id: school.id, parent_id: threeChildParent.id, student_id: childThree.id, relation: 'guardian', revoked_at: null }
+  ]);
+  await db.flush();
+  const oneCookie = cookieFor(oneChildParent, 'one-child-query-count');
+  const threeCookie = cookieFor(threeChildParent, 'three-child-query-count');
+  const original = db.queryPage.bind(db);
+  let queryCount = 0;
+  (db as any).queryPage = (...args: any[]) => { queryCount += 1; return original(...args); };
+  try {
+    const oneResponse = await request('/parent/children', oneCookie);
+    assert.equal(oneResponse.status, 200, await oneResponse.clone().text());
+    const one = await oneResponse.json() as any;
+    const oneCount = queryCount;
+    queryCount = 0;
+    const threeResponse = await request('/parent/children', threeCookie);
+    assert.equal(threeResponse.status, 200, await threeResponse.clone().text());
+    const three = await threeResponse.json() as any;
+    const threeCount = queryCount;
+    assert.equal(one.data.children.length, 1);
+    assert.equal(three.data.children.length, 3);
+    assert.equal(threeCount, oneCount, 'three linked children must not add per-child queries');
+    assert.ok(threeCount <= 16, 'parent summary must remain below the bounded query-count ceiling');
+  } finally {
+    (db as any).queryPage = original;
+  }
+});
+
 test('15.10aa teacher attendance writes invalidate the parent child-summary cache', async () => {
   const beforeResponse = await request('/parent/children', cookies.parent);
   assert.equal(beforeResponse.status, 200, await beforeResponse.clone().text());
