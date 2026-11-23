@@ -687,7 +687,7 @@ async function canAccessTeachingClass(req: Request, res: Response, classId: stri
 }
 
 async function getParentLinkedStudentIds(schoolId: string, parentId: string): Promise<string[]> {
-  const links = await db.queryPage('parent_students', { school_id: schoolId, parent_id: parentId }, 1, 100, undefined, 'student_id');
+  const links = await db.queryPage('parent_students', { school_id: schoolId, parent_id: parentId }, 1, 100, 'revoked_at.is.null', 'student_id');
   return [...new Set(links.items.map((row: any) => String(row.studentId || '')).filter(Boolean))];
 }
 
@@ -5330,7 +5330,7 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
     res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_ONLY', message: 'Parent accounts only.' } });
     return;
   }
-  const links = await db.queryPage('parent_students', { school_id: school.id, parent_id: user.id }, 1, 100, undefined, 'student_id,relation');
+  const links = await db.queryPage('parent_students', { school_id: school.id, parent_id: user.id }, 1, 100, 'revoked_at.is.null', 'student_id,relation');
   const studentIds = [...new Set(links.items.map((row: any) => String(row.studentId || '')).filter(Boolean))];
   const cacheKey = school.id + ':' + user.id + ':' + studentIds.slice().sort().join(',');
   const cached = parentPortalSummaryCache.get(cacheKey);
@@ -9574,7 +9574,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
       const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
       const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
       const parentLinks = assignedStudentIds.size
-        ? await queryAllRows('parent_students', { school_id: school.id, student_id: [...assignedStudentIds] }, 'parent_id')
+        ? await queryAllRows('parent_students', { school_id: school.id, student_id: [...assignedStudentIds] }, 'parent_id', undefined, 'revoked_at.is.null')
         : [];
       const assignedParentIds = new Set(parentLinks.map((link: any) => String(link.parentId || '')));
       contacts = contacts.filter(contact => contact.role === 'parent'
