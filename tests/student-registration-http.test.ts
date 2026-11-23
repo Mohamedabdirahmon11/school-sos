@@ -150,6 +150,10 @@ test('student ID and normalized parent phone logins are school-scoped and requir
   const studentUser = memory.rows('users').find(row => row.role === 'student' && row.student_id === 'S001');
   const parentUser = memory.rows('users').find(row => row.role === 'parent' && row.school_id === 'student-school');
   assert.ok(student && studentUser && parentUser);
+  const temporaryPin = '654321';
+  student.pin_hash = hashPin(temporaryPin);
+  studentUser.pin_hash = hashPin(temporaryPin);
+  parentUser.pin_hash = hashPin(temporaryPin);
   studentUser.must_change_password = true;
   parentUser.must_change_password = true;
 
@@ -159,20 +163,20 @@ test('student ID and normalized parent phone logins are school-scoped and requir
     body: JSON.stringify(payload)
   });
 
-  const studentLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 's001', pin: '123456' });
+  const studentLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 's001', pin: temporaryPin });
   assert.equal(studentLogin.status, 200);
   const studentResult = await studentLogin.json() as any;
   assert.equal(studentResult.requirePinChange, true);
   assert.ok(studentResult.challengeToken);
 
-  const parentLogin = await login({ role: 'parent', schoolCode: 'STU', phone: '+251-911-234-567', pin: '123456' });
+  const parentLogin = await login({ role: 'parent', schoolCode: 'STU', phone: '+251-911-234-567', pin: temporaryPin });
   assert.equal(parentLogin.status, 200);
   const parentResult = await parentLogin.json() as any;
   assert.equal(parentResult.requirePinChange, true);
   assert.ok(parentResult.challengeToken);
 
-  const wrongSchoolLogin = await login({ role: 'student', schoolCode: 'OTH', studentId: 'S001', pin: '123456' });
+  const wrongSchoolLogin = await login({ role: 'student', schoolCode: 'OTH', studentId: 'S001', pin: temporaryPin });
   assert.equal(wrongSchoolLogin.status, 401);
-  const invalidPinLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin: '111111' });
+  const invalidPinLogin = await login({ role: 'student', schoolCode: 'STU', studentId: 'S001', pin: '000000' });
   assert.equal(invalidPinLogin.status, 401);
 });
