@@ -1874,31 +1874,34 @@ class StorageEngine {
   }
 
   public async resetStudentPin(studentId: string, schoolId?: string, customPin?: string): Promise<{ student: Student; newPin: string } | null> {
-    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\d{4}$/.test(customPin))) {
-      throw new Error('Student PIN must contain exactly four digits.');
+    if (customPin !== undefined && (typeof customPin !== 'string' || !/^\\d{6}$/.test(customPin) || ['000000', '123456', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'].includes(customPin))) {
+      throw new Error('Student PIN must be a strong 6-digit number.');
     }
     const student = await this.getStudentById(studentId, schoolId);
     if (!student) return null;
-    await Promise.all([
-      this.getUsers(schoolId, 'student'), this.getUsers(schoolId, 'parent')
-    ]);
+    await this.getUsers(schoolId, 'student');
 
-    const newPin = customPin || randomInt(1000, 10000).toString();
+    const newPin = customPin || randomInt(100000, 1000000).toString();
     const pinHash = hashPin(newPin);
     student.pinHash = pinHash;
     delete student.pin;
 
-    // The PIN is the shared credential for a student's and their linked parent's login.
-    const familyPhones = [student.studentPhone, student.fatherPhone, student.motherPhone].filter((phone): phone is string => Boolean(phone));
+    // A student reset affects only that student's credential. Parent accounts
+    // are independent and must never inherit a student's reset PIN.
     const linkedUsers = this.data.users.filter(user =>
       user.schoolId === student.schoolId &&
-      ['student', 'parent'].includes(user.role) &&
-      (user.studentId === student.studentId || user.id === `usr-student-${student.id}` || user.linkedStudentIds?.includes(student.id) || familyPhones.includes(user.phone || ''))
+      user.role === 'student' &&
+      (user.studentId === student.studentId || user.id === `usr-student-${student.id}`)
     );
     for (const linkedUser of linkedUsers) {
       linkedUser.pin = pinHash;
+      linkedUser.mustChangePassword = true;
       linkedUser.failedLoginAttempts = 0;
       linkedUser.lockedUntil = null;
+      authContextCache.delete(linkedUser.id);
+      const revokedIds = this.data.sessions.filter(session => session.userId === linkedUser.id).map(session => session.id);
+      this.data.sessions = this.data.sessions.filter(session => session.userId !== linkedUser.id);
+      for (const sessionId of revokedIds) authSessionValidationCache.delete(sessionId);
     }
 
     this.logAudit({
@@ -1908,11 +1911,12 @@ class StorageEngine {
       userId: student.id,
       userName: `${student.firstName} ${student.lastName}`,
       userRole: 'student',
-      details: `4-digit PIN reset for student ${student.studentId}.`,
+      details: `6-digit PIN reset for student ${student.studentId}; next login requires PIN rotation.`,
       severity: 'warning'
     });
 
     this.save();
+    await this.flush();
     return { student, newPin };
   }
 
