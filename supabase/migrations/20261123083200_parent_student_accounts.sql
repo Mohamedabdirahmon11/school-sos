@@ -61,7 +61,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public
-AS $
+AS $$
 DECLARE
   v_phone TEXT;
 BEGIN
@@ -87,7 +87,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS trg_schoolos_parent_phone_unique ON public.users;
 CREATE TRIGGER trg_schoolos_parent_phone_unique
@@ -101,7 +101,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public
-AS $
+AS $$
 DECLARE
   v_parent_school VARCHAR(64);
   v_parent_role public.user_role_enum;
@@ -119,7 +119,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS trg_schoolos_validate_parent_student_link ON public.parent_students;
 CREATE TRIGGER trg_schoolos_validate_parent_student_link
