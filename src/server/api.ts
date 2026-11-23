@@ -963,7 +963,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
   const settings = db.getSettings();
   const threshold = settings.lockoutThreshold || 5;
-  const ipThreshold = threshold * 10;
+  const ipThreshold = ['student', 'parent'].includes(requestedRole || '') ? threshold : threshold * 10;
   const durationMins = settings.lockoutDurationMinutes || 15;
 
   // A. STUDENT (school code + Student ID + PIN) and PARENT (school code + phone + PIN).
@@ -5768,8 +5768,8 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   if (!validImportPhone(guardianPhone) || typeof studentPhone !== 'string' || studentPhone.length > 30 || (studentPhone.trim() && !validImportPhone(studentPhone.trim())) || typeof motherPhone !== 'string' || motherPhone.length > 30 || (motherPhone.trim() && !validImportPhone(motherPhone.trim()))) {
     res.status(400).json({ error: 'Guardian and student phone numbers must be valid international numbers.' }); return;
   }
-  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{4}$/.test(body.pin))) {
-    res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
+  if (body.pin !== undefined && (typeof body.pin !== 'string' || !/^\d{6}$/.test(body.pin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(body.pin))) {
+    res.status(400).json({ error: 'Student PIN must be a strong 6-digit number.' }); return;
   }
   const isDate = (value: unknown) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
@@ -5779,7 +5779,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     res.status(400).json({ error: 'Address must be 500 characters or fewer.' }); return;
   }
 
-  const initialPin = typeof body.pin === 'string' ? body.pin : String(randomInt(1000, 10000));
+  const initialPin = typeof body.pin === 'string' ? body.pin : String(randomInt(100000, 1000000));
   const student = await db.createStudentAtomically({
     school_id: school.id,
     branch_id: branchId || null,
@@ -5806,8 +5806,8 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
 
 apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\d{4}$/.test(req.body.customPin))) {
-    res.status(400).json({ error: 'Student PIN must contain exactly four digits.' }); return;
+  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\d{6}$/.test(req.body.customPin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(req.body.customPin))) {
+    res.status(400).json({ error: 'Student PIN must be a strong 6-digit number.' }); return;
   }
   const result = await db.resetStudentPin(req.params.id, school.id, req.body?.customPin);
   if (!result) {
@@ -5842,16 +5842,16 @@ apiRouter.post('/students/bulk-reset-pin', requireAuth, requireSchoolAdminOrSupe
     if (seenStudents.has(studentId)) {
       res.status(400).json({ error: `Duplicate Student ID: ${studentId}.` }); return;
     }
-    if (suppliedPin && !/^\d{4}$/.test(suppliedPin)) {
-      res.status(400).json({ error: `PIN for ${studentId} must contain exactly four digits.` }); return;
+    if (suppliedPin && (!/^\d{6}$/.test(suppliedPin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(suppliedPin))) {
+      res.status(400).json({ error: `PIN for ${studentId} must be a strong 6-digit number.` }); return;
     }
-    let pin = suppliedPin || String(randomInt(1000, 10000));
+    let pin = suppliedPin || String(randomInt(100000, 1000000));
     if (seenPins.has(pin)) {
       if (suppliedPin) {
         res.status(400).json({ error: 'Each custom PIN in the file must be unique.' }); return;
       }
       let attempts = 0;
-      while (seenPins.has(pin) && attempts < 100) { pin = String(randomInt(1000, 10000)); attempts += 1; }
+      while (seenPins.has(pin) && attempts < 100) { pin = String(randomInt(100000, 1000000)); attempts += 1; }
       if (seenPins.has(pin)) { res.status(503).json({ error: 'Could not generate unique PINs. Please retry.' }); return; }
     }
     seenStudents.add(studentId);
@@ -6534,7 +6534,7 @@ apiRouter.post('/school/admissions/:id/approve', requireAuth, requireSchoolConte
   // The RPC locks both the pending application and class row, then inserts the
   // student, student login, parent links and audit record in one transaction.
   // The initial PIN is generated and hashed here; only this response exposes it.
-  const initialPin = randomInt(1000, 10000).toString();
+  const initialPin = randomInt(100000, 1000000).toString();
   const studentId = (await nextSchoolStudentIds(school.id, 1))[0];
   const studentRecordId = randomUUID();
   try {
