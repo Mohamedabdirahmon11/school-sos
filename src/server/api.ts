@@ -5399,8 +5399,13 @@ apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireScho
     return;
   }
   const contactId = typeof req.query.contactId === 'string' ? req.query.contactId.trim() : '';
-  if (!contactId || contactId === user.id) {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(contactId) || contactId === user.id) {
     res.status(400).json({ ok: false, data: null, error: { code: 'INVALID_CONTACT', message: 'Dooro macallin aad hore ula hadashay.' } });
+    return;
+  }
+  const teacher = await db.queryPage('users', { school_id: school.id, id: contactId, role: 'teacher' }, 1, 1, undefined, 'id');
+  if (!teacher.items.length) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Waalidku wuxuu fariin u diri karaa macallimiinta dugsigiisa oo keliya.' } });
     return;
   }
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -9521,9 +9526,9 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, async (re
       const assignedStudentIds = new Set(assignedStudents.map((student: any) => String(student.id)));
       const schoolStudentIds = new Set(assignedStudents.map((student: any) => String(student.studentId)));
       const parentLinks = assignedStudentIds.size
-        ? await db.queryPage('parent_students', { school_id: school.id, student_id: [...assignedStudentIds] }, 1, 100, undefined, 'parent_id')
-        : { items: [] as any[] };
-      const assignedParentIds = new Set(parentLinks.items.map((link: any) => String(link.parentId || '')));
+        ? await queryAllRows('parent_students', { school_id: school.id, student_id: [...assignedStudentIds] }, 'parent_id')
+        : [];
+      const assignedParentIds = new Set(parentLinks.map((link: any) => String(link.parentId || '')));
       contacts = contacts.filter(contact => contact.role === 'parent'
         ? assignedParentIds.has(String(contact.id))
         : contact.role === 'student' && schoolStudentIds.has(String(contact.studentId || '')));
