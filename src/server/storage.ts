@@ -1920,6 +1920,45 @@ class StorageEngine {
     return { student, newPin };
   }
 
+  public async linkParentToStudent(
+    parentId: string, studentId: string, schoolId: string,
+    relation = 'guardian', createdBy?: string
+  ): Promise<void> {
+    const [parent, student] = await Promise.all([
+      this.getUserById(parentId, schoolId),
+      this.getStudentById(studentId, schoolId)
+    ]);
+    if (!parent || parent.role !== 'parent' || !student || parent.schoolId !== student.schoolId || student.schoolId !== schoolId) {
+      throw new Error('Parent and student must belong to the same school.');
+    }
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Parent-student relationship storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('parent_students').upsert({
+      parent_id: parent.id,
+      student_id: student.id,
+      school_id: schoolId,
+      relation: relation.slice(0, 40),
+      created_by: createdBy || null
+    }, { onConflict: 'parent_id,student_id' });
+    this.recordQuery('parent_students', 'upsert', startedAt);
+    if (error) throw new Error(error.message || 'Parent-student link could not be saved.');
+    if (!parent.linkedStudentIds?.includes(student.id)) {
+      this.updateUser(parent.id, { linkedStudentIds: [...(parent.linkedStudentIds || []), student.id] });
+    }
+    this.logAudit({
+      action: 'PARENT_STUDENT_LINK_CREATED',
+      category: 'security',
+      schoolId,
+      userId: createdBy || parent.id,
+      userName: createdBy ? 'School administrator' : parent.fullName,
+      userRole: createdBy ? 'school_admin' : 'parent',
+      details: `Linked parent account ${parent.id} to student ${student.studentId} (${relation}).`,
+      severity: 'info'
+    });
+    await this.flush();
+  }
+
   public async resetParentPin(parentId: string, schoolId: string): Promise<{ parent: User; newPin: string } | null> {
     const parent = await this.getUserById(parentId, schoolId);
     if (!parent || parent.role !== 'parent') return null;
