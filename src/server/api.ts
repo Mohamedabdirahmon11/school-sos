@@ -1147,6 +1147,7 @@ apiRouter.post('/auth/login', async (req, res) => {
         userId: existingUser.id,
         userName: existingUser.fullName,
         userRole: existingUser.role,
+        ipAddress: clientIp,
         details: `${role} authenticated successfully via PIN from IP ${clientIp}.`,
         severity: 'info'
       });
@@ -1237,6 +1238,7 @@ apiRouter.post('/auth/login', async (req, res) => {
       userId: targetUser.id,
       userName: targetUser.fullName,
       userRole: targetUser.role,
+      ipAddress: clientIp,
       details: `${role} signed in successfully via PIN from IP ${clientIp}.`,
       severity: 'info'
     });
@@ -1433,6 +1435,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
+    ipAddress: clientIp,
     details: `${user.role} user logged in successfully from IP ${clientIp}.`,
     severity: 'info'
   });
@@ -1622,6 +1625,7 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     userId: user.id,
     userName: user.fullName,
     userRole: user.role,
+    ipAddress: req.ip,
     details: `${user.role} completed first-login PIN setup.`,
     severity: 'info'
   });
@@ -5858,7 +5862,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     const guardianAccount = parentAccounts.find(parent =>
       normalizeGuardianPhone(String(parent.phone || parent.parentPhone || '')) === normalizeGuardianPhone(guardianPhone)
     );
-    if (guardianAccount) await db.linkParentToStudent(guardianAccount.id, student.id, school.id, 'guardian', user.id);
+    if (guardianAccount) await db.linkParentToStudent(guardianAccount.id, student.id, school.id, 'guardian', user.id, user.role, req.ip);
 
     if (motherPhone.trim() && normalizeGuardianPhone(motherPhone) !== normalizeGuardianPhone(guardianPhone)) {
       let motherAccount = parentAccounts.find(parent =>
@@ -5879,7 +5883,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
           linkedStudentIds: []
         });
       }
-      await db.linkParentToStudent(motherAccount.id, student.id, school.id, 'mother', user.id);
+      await db.linkParentToStudent(motherAccount.id, student.id, school.id, 'mother', user.id, user.role, req.ip);
     }
     await db.flush();
   } catch (error) {
@@ -5910,7 +5914,7 @@ apiRouter.post('/parents/:id/phone', requireAuth, requireSchoolAdminOrSuperAdmin
   if (!updated) { res.status(404).json({ error: 'Parent account was not updated.' }); return; }
   db.logAudit({
     action: 'PARENT_PHONE_CHANGED', category: 'auth', schoolId: school.id,
-    userId: actor.id, userName: actor.fullName, userRole: actor.role,
+    userId: actor.id, userName: actor.fullName, userRole: actor.role, ipAddress: req.ip,
     details: `Parent phone number updated for parent account ${parent.id}.`, severity: 'warning'
   });
   await db.flush();
@@ -5919,7 +5923,8 @@ apiRouter.post('/parents/:id/phone', requireAuth, requireSchoolAdminOrSuperAdmin
 
 apiRouter.post('/parents/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
-  const result = await db.resetParentPin(String(req.params.id || ''), school.id);
+  const actor = (req as any).user as User;
+  const result = await db.resetParentPin(String(req.params.id || ''), school.id, { id: actor.id, name: actor.fullName, role: actor.role, ipAddress: req.ip });
   if (!result) { res.status(404).json({ error: 'Parent account was not found in this school.' }); return; }
   res.json({ success: true, newPin: result.newPin, parent: sanitizeUser(result.parent) });
 });
@@ -5945,7 +5950,7 @@ apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolContext, asy
   if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\d{6}$/.test(req.body.customPin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(req.body.customPin))) {
     res.status(400).json({ error: 'Student PIN must be a strong 6-digit number.' }); return;
   }
-  const result = await db.resetStudentPin(student.id, school.id, req.body?.customPin);
+  const result = await db.resetStudentPin(student.id, school.id, req.body?.customPin, { id: user.id, name: user.fullName, role: user.role, ipAddress: req.ip });
   if (!result) { res.status(404).json({ error: 'Student not found.' }); return; }
   res.json({ success: true, newPin: result.newPin, student: sanitizeStudent(result.student) });
 });
