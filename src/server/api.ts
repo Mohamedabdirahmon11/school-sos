@@ -1603,8 +1603,13 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     mustChangePassword: false
   });
   if (!updated) {
-    res.status(404).json({ error: 'School Admin account not found; PIN was not changed.' });
+    res.status(404).json({ error: 'Account not found; PIN was not changed.' });
     return;
+  }
+  if (user.role === 'student' && user.studentId && user.schoolId) {
+    const studentRecord = (await db.getStudents(user.schoolId)).find(student => student.studentId === user.studentId);
+    if (!studentRecord) { res.status(403).json({ error: 'Student record is not linked to this account.' }); return; }
+    await db.updateStudent(studentRecord.id, { pinHash: hashPin(newPin) }, user.schoolId);
   }
   invalidateAuthenticatedSnapshot(user.id);
   await db.flush();
