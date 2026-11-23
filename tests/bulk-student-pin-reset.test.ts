@@ -81,25 +81,25 @@ async function reset(user: typeof admin | typeof teacher, rows: any[], headers: 
   return { response, body: await response.json() as any };
 }
 
-test('bulk reset assigns unique four-digit PINs atomically and updates student accounts only', async () => {
+test('bulk reset assigns unique six-digit PINs atomically and updates student accounts only', async () => {
   const parentPinBefore = memory.rows('users').find(row => row.id === 'usr-parent-pin-1')?.pinHash;
   const { response, body } = await reset(admin, [
-    { studentId: 'STD-PIN-001', pin: '2468' },
+    { studentId: 'STD-PIN-001', pin: '246810' },
     { studentId: 'STD-PIN-002' }
   ]);
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.updatedCount, 2);
   assert.equal(body.pinSlips.length, 2);
-  assert.equal(body.pinSlips[0].newPin, '2468');
+  assert.equal(body.pinSlips[0].newPin, '246810');
   assert.match(body.pinSlips[1].newPin, /^\d{4}$/);
   assert.notEqual(body.pinSlips[0].newPin, body.pinSlips[1].newPin);
   const studentOne = memory.rows('students').find(row => row.studentId === 'STD-PIN-001');
   const studentTwo = memory.rows('students').find(row => row.studentId === 'STD-PIN-002');
-  assert.equal(verifyPin('2468', String(studentOne?.pinHash || '')), true);
+  assert.equal(verifyPin('246810', String(studentOne?.pinHash || '')), true);
   assert.equal(verifyPin(body.pinSlips[1].newPin, String(studentTwo?.pinHash || '')), true);
   const studentUser = memory.rows('users').find(row => row.id === 'usr-student-std-pin-1');
-  assert.equal(verifyPin('2468', String(studentUser?.pinHash || '')), true);
+  assert.equal(verifyPin('246810', String(studentUser?.pinHash || '')), true);
   assert.equal(studentUser?.failedLoginAttempts, 0);
   assert.equal(studentUser?.lockedUntil, null);
   assert.equal(memory.rows('users').find(row => row.id === 'usr-parent-pin-1')?.pinHash, parentPinBefore);
@@ -113,8 +113,8 @@ test('bulk reset rejects invalid PINs, duplicate IDs, and students from another 
   const invalid = await reset(admin, [{ studentId: 'STD-PIN-001', pin: '12' }]);
   assert.equal(invalid.response.status, 400);
   const duplicate = await reset(admin, [
-    { studentId: 'STD-PIN-001', pin: '1234' },
-    { studentId: 'STD-PIN-001', pin: '5678' }
+    { studentId: 'STD-PIN-001', pin: '123456' },
+    { studentId: 'STD-PIN-001', pin: '567890' }
   ]);
   assert.equal(duplicate.response.status, 400);
   const crossSchool = await reset(admin, [{ studentId: 'STD-OTHER-001', pin: '5678' }]);
