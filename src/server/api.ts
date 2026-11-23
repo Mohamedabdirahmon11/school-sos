@@ -2722,7 +2722,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     const names = splitStudentName(row.data.studentName);
     const id = `std-${randomUUID()}`;
     const studentId = newStudentIds[rowIndex];
-    const pin = String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
+    const pin = String(100000 + (randomBytes(4).readUInt32BE(0) % 900000));
     const pinHash = hashPin(pin);
     const classId = classIds.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`)!;
     const klass = classes.find(item => item.id === classId) || classPayload.get(`${row.data.className.trim().toLowerCase()}\u0000${row.data.section.trim().toLowerCase()}`);
@@ -2743,7 +2743,7 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
           [item.phone, item.parentPhone].some(value => String(value || '').replace(/\D/g, '') === phoneKey)
         );
         const existingPinHash = parent?.pin || (parent as any)?.pinHash;
-        const parentPin = existingPinHash ? undefined : String(1000 + (randomBytes(4).readUInt32BE(0) % 9000));
+        const parentPin = existingPinHash ? undefined : String(100000 + (randomBytes(4).readUInt32BE(0) % 900000));
         parentRecord = {
           id: parent?.id || ('usr-parent-' + randomUUID()),
           schoolId: school.id,
