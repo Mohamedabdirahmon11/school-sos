@@ -1857,7 +1857,7 @@ class StorageEngine {
 
   public createStudent(studentData: Omit<Student, 'id' | 'createdAt'>): Student {
     const id = `std-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const rawPin = studentData.pin || randomInt(1000, 10000).toString();
+    const rawPin = studentData.pin || generateTemporaryPin();
     const pinHash = hashPin(rawPin);
     // Keep the plaintext PIN out of the persisted student row. It is returned
     // separately once to the authorized creator, never stored in the database.
@@ -1881,6 +1881,7 @@ class StorageEngine {
       studentId: student.studentId,
       passwordHash: '',
       pin: pinHash,
+      mustChangePassword: true,
       isBlocked: false,
       failedLoginAttempts: 0,
       createdAt: new Date().toISOString()
@@ -1917,6 +1918,7 @@ class StorageEngine {
           parentPhone,
           passwordHash: '',
           pin: pinHash,
+          mustChangePassword: true,
           linkedStudentIds: [id],
           isBlocked: false,
           failedLoginAttempts: 0,
