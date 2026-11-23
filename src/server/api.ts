@@ -1137,7 +1137,8 @@ apiRouter.post('/auth/login', async (req, res) => {
         user: sanitizeUser(existingUser),
         school,
         sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
-        linkedStudents: role === 'parent' ? sanitizeStudents(matchedStudents) : undefined
+        linkedStudents: role === 'parent' ? sanitizeStudents(matchedStudents) : undefined,
+        selectedStudentId: role === 'parent' && matchedStudents.length === 1 ? matchedStudents[0].id : null
       });
       return;
     }
@@ -1218,7 +1219,8 @@ apiRouter.post('/auth/login', async (req, res) => {
       user: sanitizeUser(targetUser),
       school,
       sessionTimeoutMinutes: settings.sessionTimeoutMinutes || 60,
-      linkedStudents: role === 'parent' ? sanitizeStudents(linkedStudents) : undefined
+      linkedStudents: role === 'parent' ? sanitizeStudents(linkedStudents) : undefined,
+      selectedStudentId: role === 'parent' && linkedStudents.length === 1 ? linkedStudents[0].id : null
     });
     return;
   }
