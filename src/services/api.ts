@@ -254,6 +254,12 @@ export class ApiClient {
     });
   }
 
+  public static async resetParentPin(id: string) {
+    return this.request<{ success: boolean; newPin: string; parent: any }>(`/parents/${encodeURIComponent(id)}/reset-pin`, {
+      method: 'POST'
+    });
+  }
+
   public static async bulkResetStudentPins(rows: Array<{ studentId: string; pin?: string }>) {
     return this.request<{ success: boolean; updatedCount: number; pinSlips: Array<{ studentId: string; studentName: string; newPin: string }> }>('/students/bulk-reset-pin', {
       method: 'POST',
