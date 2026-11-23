@@ -31,6 +31,7 @@ export interface SessionPayload {
   role: string;
   schoolId?: string;
   studentId?: string;
+  selectedStudentId?: string;
   createdAt: number;
   expiresAt: number;
 }
