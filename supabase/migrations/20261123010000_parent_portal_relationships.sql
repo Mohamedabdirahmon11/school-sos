@@ -94,15 +94,6 @@ GRANT ALL ON public.parent_students TO service_role;
 REVOKE ALL ON FUNCTION public.schoolos_sync_parent_student_links() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schoolos_sync_parent_student_links() TO service_role;
 
--- Bounded access paths for parent attendance, published marks and class homework.
-CREATE INDEX IF NOT EXISTS parent_attendance_student_date_idx
-  ON public.attendance_records (school_id, student_id, date);
-CREATE INDEX IF NOT EXISTS parent_assignments_class_due_idx
-  ON public.assignments (school_id, class_id, due_date);
-CREATE INDEX IF NOT EXISTS parent_published_marks_student_idx
-  ON public.student_marks (school_id, student_id, published_at)
-  WHERE published_at IS NOT NULL;
-
 -- Additive indexes for the high-volume parent dashboard joins. Attendance already
 -- has idx_attendance_student(school_id, student_id, date) in the base schema.
 CREATE INDEX IF NOT EXISTS idx_assignments_school_class_due
