@@ -62,6 +62,30 @@ import { allocateMixedRoomSeating, buildManhajGroups } from '../lib/term-exam-sc
 
 export const apiRouter = Router();
 
+type ParentPortalSummaryCacheEntry = { expiresAt: number; payload: any };
+const parentPortalSummaryCache = new Map<string, ParentPortalSummaryCacheEntry>();
+const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
+
+function invalidateParentPortalSummaryCache(schoolId: string) {
+  const prefix = schoolId + ':';
+  for (const key of parentPortalSummaryCache.keys()) {
+    if (key.startsWith(prefix)) parentPortalSummaryCache.delete(key);
+  }
+}
+
+// All successful tenant mutations invalidate the short-lived parent summary cache.
+// This deliberately errs on the side of freshness for attendance, marks, homework,
+// notices, enrollment and teacher-assignment changes.
+apiRouter.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    res.on('finish', () => {
+      const schoolId = String((req as any).school?.id || '');
+      if (schoolId && res.statusCode >= 200 && res.statusCode < 400) invalidateParentPortalSummaryCache(schoolId);
+    });
+  }
+  next();
+});
+
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
   classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,normal_exam_shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
@@ -5308,9 +5332,19 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
   }
   const links = await db.queryPage('parent_students', { school_id: school.id, parent_id: user.id }, 1, 100, undefined, 'student_id,relation');
   const studentIds = [...new Set(links.items.map((row: any) => String(row.studentId || '')).filter(Boolean))];
-  if (!studentIds.length) {
+  const cacheKey = school.id + ':' + user.id + ':' + studentIds.slice().sort().join(',');
+  const cached = parentPortalSummaryCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
     res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-    res.json({ ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children: [] }, error: null });
+    res.json(cached.payload);
+    return;
+  }
+  if (cached) parentPortalSummaryCache.delete(cacheKey);
+  if (!studentIds.length) {
+    const payload = { ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children: [] }, error: null };
+    parentPortalSummaryCache.set(cacheKey, { expiresAt: Date.now() + PARENT_PORTAL_SUMMARY_TTL_MS, payload });
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.json(payload);
     return;
   }
   const students = await db.queryPage('students', { school_id: school.id, id: studentIds }, 1, 100, undefined,
@@ -5387,8 +5421,13 @@ apiRouter.get('/parent/children', requireAuth, requireSchoolContext, requireScho
       unreadNotices: noticeRows.filter((notice: any) => ['all', 'school', 'parents'].includes(String(notice.audience)) || (notice.audience === 'class' && String(notice.classId) === currentClassId)).filter((notice: any) => String(notice.publishDate || '').slice(0, 10) <= today && !readNoticeIds.has(String(notice.id))).length
     };
   });
+  const payload = { ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children }, error: null };
+  // Keep the in-process cache bounded; expired entries are discarded on insert.
+  for (const [key, entry] of parentPortalSummaryCache) if (entry.expiresAt <= Date.now()) parentPortalSummaryCache.delete(key);
+  if (parentPortalSummaryCache.size >= 1000) parentPortalSummaryCache.delete(parentPortalSummaryCache.keys().next().value as string);
+  parentPortalSummaryCache.set(cacheKey, { expiresAt: Date.now() + PARENT_PORTAL_SUMMARY_TTL_MS, payload });
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-  res.json({ ok: true, data: { parent: { id: user.id, fullName: user.fullName, phone: user.phone || user.parentPhone || '' }, children }, error: null });
+  res.json(payload);
 });
 
 apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
