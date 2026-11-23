@@ -26,9 +26,9 @@ for(const width of widths) for(const theme of themes) {
   for(const [section,label] of sections) {
    await reference.goto(referenceUrl+'?theme='+theme);
    if(width>760) {
-    if(section!=='home') await reference.locator('#nav .nb').filter({hasText:label}).click();
+    await reference.locator('#nav .nb').filter({hasText:label}).click();
    } else if(['home','kids','marks'].includes(section)) {
-    if(section!=='home') await reference.locator('#bnav > .nb').filter({hasText:label}).click();
+    await reference.locator('#bnav > .nb').filter({hasText:label}).click();
    } else {
     await reference.locator('#bnav [data-more]').click();
     await reference.locator('#bnav .sheet .nb').filter({hasText:label}).click();
