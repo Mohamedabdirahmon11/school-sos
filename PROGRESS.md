@@ -1,3 +1,9 @@
+## Global page refresh control — in progress (2026-11-23)
+
+- ADDED: a compact, accessible refresh icon in the shared authenticated-page viewport, so School Admin, Super Admin, Accountant, Teacher, Parent, Student, and setup screens can reload the current page and its latest data without adding separate controls to each module.
+- DESIGN: icon-only 32px control with tooltip/accessible label, neutral border, and SchoolOS teal hover/focus styling; no route, API, database, or tenant data behavior is changed.
+- VERIFICATION: pending GitHub Actions typecheck, tests, and production build. Browser visual review and checking refresh behavior on each role still need local testing.
+
 ## School sidebar navigation and appearance — in progress (2026-11-16)
 
 - IMPLEMENTED ON `feature/sidebar-theme`: The sidebar has its own English-default language preference (independent of school-wide app language) and can switch menu labels to Somali or Amharic; the preference is remembered per user. Existing menu permission filtering and route IDs are preserved.
