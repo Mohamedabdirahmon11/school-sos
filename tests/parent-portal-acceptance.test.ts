@@ -114,6 +114,21 @@ test('parent message history is paginated and scoped to the authenticated parent
  assert.match(route,/pageSize = Math\.min\(50/);
 });
 
+test('parent can read and mark messages only for teachers currently assigned to a linked child',()=>{
+ const start=api.indexOf("apiRouter.get('/parent/messages'");
+ const end=api.indexOf("apiRouter.get('/parent/notices'",start);
+ const history=api.slice(start,end);
+ const readStart=api.indexOf("apiRouter.post('/messages/read'");
+ const readEnd=api.indexOf("apiRouter.get('/support/tickets'",readStart);
+ const read=api.slice(readStart,readEnd);
+ assert.match(history,/getNoticeClassIds\(school\.id, user\)/);
+ assert.match(history,/getTeacherAssignedClassIds\(school\.id, contactId\)/);
+ assert.match(history,/PARENT_CONTACT_FORBIDDEN/);
+ assert.match(read,/normalizeRole\(user\.role\) === 'parent'/);
+ assert.match(read,/getTeacherAssignedClassIds/);
+ assert.match(read,/PARENT_CONTACT_FORBIDDEN/);
+});
+
 test('child summary uses batched queries rather than per-child database reads',()=>{
  const start=api.indexOf("apiRouter.get('/parent/children'");
  const end=api.indexOf("apiRouter.get('/parent/messages'",start);
