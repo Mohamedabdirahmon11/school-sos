@@ -1920,6 +1920,36 @@ class StorageEngine {
     return { student, newPin };
   }
 
+  public async resetParentPin(parentId: string, schoolId: string): Promise<{ parent: User; newPin: string } | null> {
+    const parent = await this.getUserById(parentId, schoolId);
+    if (!parent || parent.role !== 'parent') return null;
+    const newPin = randomInt(100000, 1000000).toString();
+    const updated = this.updateUser(parent.id, {
+      pin: hashPin(newPin),
+      mustChangePassword: true,
+      failedLoginAttempts: 0,
+      lockedUntil: null
+    });
+    if (!updated) return null;
+    authContextCache.delete(parent.id);
+    const revokedIds = this.data.sessions.filter(session => session.userId === parent.id).map(session => session.id);
+    this.data.sessions = this.data.sessions.filter(session => session.userId !== parent.id);
+    for (const sessionId of revokedIds) authSessionValidationCache.delete(sessionId);
+    this.logAudit({
+      action: 'PARENT_PIN_RESET',
+      category: 'security',
+      schoolId,
+      userId: parent.id,
+      userName: parent.fullName,
+      userRole: 'parent',
+      details: 'Parent PIN reset by school administrator; next login requires PIN rotation.',
+      severity: 'warning'
+    });
+    this.save();
+    await this.flush();
+    return { parent: updated, newPin };
+  }
+
   public async updateStudent(id: string, updates: Partial<Student>, schoolId?: string): Promise<Student | null> {
     let current = this.data.students.find(student => student.id === id && (!schoolId || student.schoolId === schoolId));
     if (!current) current = await this.getStudentById(id, schoolId || updates.schoolId) || undefined;
