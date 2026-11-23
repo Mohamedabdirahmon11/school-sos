@@ -9662,7 +9662,7 @@ apiRouter.get('/messages', requireAuth, requireSchoolContext, (req, res) => {
 apiRouter.post('/messages', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
-  const { recipientId, content } = req.body || {};
+  const { recipientId, content, studentId } = req.body || {};
   if (typeof content !== 'string' || !content.trim() || content.length > 5000 || typeof recipientId !== 'string') return res.status(400).json({ error: 'A recipient and a message of 1–5000 characters are required.' });
   const recipient = await db.getUserById(recipientId, school.id);
   if (!recipient || recipient.id === user.id) return res.status(404).json({ error: 'Message recipient was not found in this school.' });
@@ -9693,9 +9693,11 @@ apiRouter.post('/messages', requireAuth, requireSchoolContext, requireParentPort
     if (!parentClassIds.some(classId => assignedClassIds.has(classId))) return res.status(403).json({ error: 'Teachers may message only parents of students in their assigned classes.' });
   }
   if (user.role === 'parent' && recipient.role === 'teacher') {
-    const linkedClasses = new Set(await getNoticeClassIds(school.id, user));
-    const teacherClasses = new Set(await getTeacherAssignedClassIds(school.id, recipient.id));
-    if (![...teacherClasses].some(classId => linkedClasses.has(classId))) return res.status(403).json({ error: 'Parents may message only teachers assigned to their children.' });
+    const selectedStudentId = typeof studentId === 'string' ? studentId.trim() : '';
+    const selectedClassId = await getParentSelectedClassId(school.id, user.id, selectedStudentId);
+    if (!selectedClassId) return res.status(403).json({ error: 'Choose a child linked to your parent account before messaging.' });
+    const teacherClasses = await getTeacherAssignedClassIds(school.id, recipient.id);
+    if (!teacherClasses.includes(selectedClassId)) return res.status(403).json({ error: 'Parents may message only teachers assigned to the selected child.' });
   }
   if (user.role === 'student' && recipient.role === 'parent') {
     const student = (await db.getStudents(school.id)).find(item => item.studentId === user.studentId || item.id === user.id.replace(/^usr-student-/, 'std-'));
