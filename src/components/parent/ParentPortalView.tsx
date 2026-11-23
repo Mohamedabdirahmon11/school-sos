@@ -89,7 +89,7 @@ export const ParentPortalView:React.FC=()=>{
  const moreActive=moreItems.some(x=>x.id===view);
  const loading=childrenState.loading;
  const title=NAV.find(x=>x.id===view)?.label||'Hoyga';
- const gradeText=(m:any)=>{const raw=String(m.grade||'—');const letter=raw.match(/A\\+?|B|C|D|F/)?.[0];const labels:Record<string,string>={'A+':'Aad u wanaagsan','A':'Wanaagsan','B':'Fiican','C':'Dhexdhexaad','D':'Hoose','F':'U baahan caawimaad'};return letter?letter+' · '+labels[letter]:raw;};
+ const gradeText=(m:any)=>{const raw=String(m.grade||'—');const letter=raw.match(/A\+?|B|C|D|F/)?.[0];const labels:Record<string,string>={'A+':'Aad u wanaagsan','A':'Wanaagsan','B':'Fiican','C':'Dhexdhexaad','D':'Hoose','F':'U baahan caawimaad'};return letter?letter+' · '+labels[letter]:raw;};
 
  return <div className="parent-portal-shell" data-theme={theme}>
   <aside className="pp-sidebar">
