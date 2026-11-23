@@ -1082,6 +1082,11 @@ apiRouter.post('/auth/login', async (req, res) => {
         return;
       }
 
+      if (matchStd.status && matchStd.status !== 'active') {
+        res.status(403).json({ error: 'This student account is disabled. Contact your school administrator.' });
+        return;
+      }
+
       // Check PIN using scrypt verifyPin
       const isValidPin = verifyPin(pin, matchStd.pinHash || (matchStd as any).pin);
       if (!isValidPin) {
@@ -1162,6 +1167,13 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     const targetUser = candidateUsers[0];
+    if (role === 'student') {
+      const studentRecord = (await db.getStudents(school.id)).find(student => student.studentId === targetUser.studentId);
+      if (!studentRecord || (studentRecord.status && studentRecord.status !== 'active')) {
+        res.status(403).json({ error: 'This student account is disabled. Contact your school administrator.' });
+        return;
+      }
+    }
 
     // Check user record lockout
     if (targetUser.isBlocked) {
