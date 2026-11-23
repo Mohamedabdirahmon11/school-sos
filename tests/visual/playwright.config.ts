@@ -21,4 +21,4 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000
   }
-}
+});
