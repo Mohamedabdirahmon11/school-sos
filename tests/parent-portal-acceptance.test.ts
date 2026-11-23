@@ -106,24 +106,24 @@ test('parent message history is paginated and scoped to the authenticated parent
  const end=api.indexOf("apiRouter.get('/parent/notices'",start);
  const route=api.slice(start,end);
  assert.ok(start>=0&&end>start);
- assert.match(route,/normalizeRole\\(user\\.role\\) !== 'parent'/);
- assert.match(route,/school_id: school\\.id/);
- assert.match(route,/sender_id\\.eq\\.' \\+ user\\.id/);
+ assert.match(route,/normalizeRole\(user\.role\) !== 'parent'/);
+ assert.match(route,/school_id: school\.id/);
+ assert.match(route,/sender_id\.eq\.' \+ user\.id/);
  assert.match(route,/pagination/);
- assert.match(route,/pageSize = Math\\.min\\(50/);
+ assert.match(route,/pageSize = Math\.min\(50/);
 });
 
 test('child summary uses batched queries rather than per-child database reads',()=>{
  const start=api.indexOf("apiRouter.get('/parent/children'");
  const end=api.indexOf("apiRouter.get('/parent/messages'",start);
  const route=api.slice(start,end);
- assert.match(route,/Promise\\.all/);
- assert.match(route,/queryAllRows\\('attendance_records'/);
- assert.match(route,/queryAllRows\\('student_marks'/);
- assert.match(route,/queryAllRows\\('assignments'/);
- assert.match(route,/queryAllRows\\('assignment_submissions'/);
- assert.match(route,/queryAllRows\\('school_notices'/);
- assert.doesNotMatch(route,/students\\.items\\.map\\(async/);
+ assert.match(route,/Promise\.all/);
+ assert.match(route,/queryAllRows\('attendance_records'/);
+ assert.match(route,/queryAllRows\('student_marks'/);
+ assert.match(route,/queryAllRows\('assignments'/);
+ assert.match(route,/queryAllRows\('assignment_submissions'/);
+ assert.match(route,/queryAllRows\('school_notices'/);
+ assert.doesNotMatch(route,/students\.items\.map\(async/);
  assert.match(route,/Cache-Control.*no-store/);
 });
 });
