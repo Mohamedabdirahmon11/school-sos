@@ -91,7 +91,7 @@ interface DatabaseSchema {
   promotionHistory: any[];
   restoreTestRecords: any[];
   lockoutCounterRows: any[];
-  lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null }>;
+  lockoutCounters: Record<string, { count: number; firstFailedAt: number; lockedUntil: number | null; lockoutCount?: number }>;
   libraryBooks: any[];
   libraryLoans: any[];
   transportRoutes: any[];
@@ -835,7 +835,13 @@ class StorageEngine {
     if (entry.lockedUntil && entry.lockedUntil > now) {
       return { locked: true, remainingMinutes: Math.ceil((entry.lockedUntil - now) / 60000) };
     }
-    if ((entry.lockedUntil && entry.lockedUntil <= now) || now - entry.firstFailedAt > 30 * 60 * 1000) {
+    if (entry.lockedUntil && entry.lockedUntil <= now) {
+      entry.lockedUntil = null;
+      entry.count = 0;
+      entry.firstFailedAt = now;
+      entry.lockoutCount = (entry.lockoutCount || 0) + 1;
+      this.save();
+    } else if (now - entry.firstFailedAt > 30 * 60 * 1000) {
       delete this.data.lockoutCounters[key];
       this.save();
     }
@@ -845,10 +851,15 @@ class StorageEngine {
   public recordLoginFailure(key: string, threshold = 5, durationMinutes = 15) {
     const now = Date.now();
     let entry = this.data.lockoutCounters[key];
-    if (!entry || now - entry.firstFailedAt > 30 * 60 * 1000) entry = { count: 0, firstFailedAt: now, lockedUntil: null };
+    if (!entry || now - entry.firstFailedAt > 30 * 60 * 1000) {
+      entry = { count: 0, firstFailedAt: now, lockedUntil: null, lockoutCount: entry?.lockoutCount || 0 };
+    }
     entry.count += 1;
     const newlyLocked = entry.count >= threshold;
-    if (newlyLocked) entry.lockedUntil = now + durationMinutes * 60 * 1000;
+    if (newlyLocked) {
+      const backoffMinutes = Math.min(durationMinutes * (2 ** Math.min(entry.lockoutCount || 0, 6)), 24 * 60);
+      entry.lockedUntil = now + backoffMinutes * 60 * 1000;
+    }
     this.data.lockoutCounters[key] = entry;
     this.save();
     return { newlyLocked, count: entry.count };
