@@ -91,6 +91,17 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.parent_students
    WHERE parent_id='new-parent' AND school_id='pin-school-a';
   IF v_count <> 2 THEN RAISE EXCEPTION 'One parent account must link to multiple children.'; END IF;
+
+  INSERT INTO public.users(id,school_id,role,full_name,phone,parent_phone,pin_hash)
+  VALUES ('phone-parent-a','pin-school-a','parent','Phone Parent A','+251 911 222 333','+251 911 222 333','scrypt:hash');
+  BEGIN
+    INSERT INTO public.users(id,school_id,role,full_name,phone,parent_phone,pin_hash)
+    VALUES ('phone-parent-duplicate','pin-school-a','parent','Duplicate Phone Parent','+251911222333',NULL,'scrypt:hash');
+    RAISE EXCEPTION 'Duplicate normalized parent phone was accepted in one school.';
+  EXCEPTION WHEN unique_violation THEN NULL;
+  END;
+  INSERT INTO public.users(id,school_id,role,full_name,phone,pin_hash)
+  VALUES ('phone-parent-other-school','pin-school-b','parent','Other School Phone Parent','+251911222333','scrypt:hash');
   UPDATE public.users SET linked_student_ids=ARRAY['new-child-1'] WHERE id='new-parent';
   SELECT count(*) INTO v_count FROM public.parent_students
    WHERE parent_id='new-parent' AND student_id='new-child-2' AND school_id='pin-school-a';
