@@ -5464,6 +5464,12 @@ apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireScho
     return;
   }
   const contactId = typeof req.query.contactId === 'string' ? req.query.contactId.trim() : '';
+  const selectedStudentId = typeof req.query.studentId === 'string' ? req.query.studentId.trim() : '';
+  const selectedClassId = await getParentSelectedClassId(school.id, user.id, selectedStudentId);
+  if (!selectedClassId) {
+    res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CHILD_FORBIDDEN', message: 'Dooro ilmo ku xiran akoonkaaga.' } });
+    return;
+  }
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(contactId) || contactId === user.id) {
     res.status(400).json({ ok: false, data: null, error: { code: 'INVALID_CONTACT', message: 'Dooro macallin aad hore ula hadashay.' } });
     return;
@@ -5473,11 +5479,8 @@ apiRouter.get('/parent/messages', requireAuth, requireSchoolContext, requireScho
     res.status(403).json({ ok: false, data: null, error: { code: 'PARENT_CONTACT_FORBIDDEN', message: 'Waalidku wuxuu fariin u diri karaa macallimiinta dugsigiisa oo keliya.' } });
     return;
   }
-  const [linkedClassIds, assignedClassIds] = await Promise.all([
-    getNoticeClassIds(school.id, user),
-    getTeacherAssignedClassIds(school.id, contactId)
-  ]);
-  const currentlyAssigned = assignedClassIds.some(classId => linkedClassIds.includes(classId));
+  const assignedClassIds = await getTeacherAssignedClassIds(school.id, contactId);
+  const currentlyAssigned = assignedClassIds.includes(selectedClassId);
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(50, Math.max(1, Number(req.query.pageSize) || 30));
   const result = await db.queryPage('direct_messages', { school_id: school.id, sender_id: [user.id, contactId], recipient_id: [user.id, contactId] }, page, pageSize, undefined,
