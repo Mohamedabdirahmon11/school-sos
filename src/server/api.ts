@@ -5399,9 +5399,12 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, async (req, res) =
     if (!assigned.length) { res.json([]); return; }
     filters.class_id = classId || assigned;
   } else if (user.role === 'student') {
-    const terms = [user.studentId ? `student_id.eq.${user.studentId}` : '', user.phone ? `student_phone.eq.${user.phone}` : ''].filter(Boolean);
-    if (!terms.length) { res.json([]); return; }
-    roleFilter = terms.join(',');
+    // Student identity is the school-scoped Student ID only. A phone number
+    // may be shared by siblings or fall back to a guardian contact, so it must
+    // never broaden an individual student's record scope.
+    const studentId = String(user.studentId || '').trim();
+    if (!studentId) { res.json([]); return; }
+    roleFilter = `student_id.eq.${studentId}`;
   } else if (user.role === 'parent') {
     const ids = (await getParentStudentIds(user, school.id)).filter(id => /^[A-Za-z0-9_-]+$/.test(id));
     if (!ids.length) { res.json([]); return; }
