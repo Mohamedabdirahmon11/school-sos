@@ -5796,7 +5796,7 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   }
 
   const initialPin = typeof body.pin === 'string' ? body.pin : String(randomInt(100000, 1000000));
-  const student = await db.createStudentAtomically({
+  let student = await db.createStudentAtomically({
     school_id: school.id,
     branch_id: branchId || null,
     first_name: body.firstName.trim(),
@@ -5817,6 +5817,55 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
     created_by_role: user.role,
     school_name: school.name
   });
+
+  // Keep the second guardian phone as a separate school-scoped parent identity.
+  // Existing normalized phone accounts are reused; a new mother account receives
+  // the same one-time temporary PIN as the student and must rotate it on first use.
+  try {
+    if (motherPhone.trim()) {
+      const updatedStudent = await db.updateStudent(student.id, { motherPhone: motherPhone.trim() }, school.id);
+      if (!updatedStudent) throw new Error('Student was created but the mother phone could not be saved.');
+      student = updatedStudent;
+    }
+    const normalizeGuardianPhone = (value: string) => value.replace(/[^0-9]/g, '');
+    const parentAccounts = await db.getParents(school.id);
+    const guardianAccount = parentAccounts.find(parent =>
+      normalizeGuardianPhone(String(parent.phone || parent.parentPhone || '')) === normalizeGuardianPhone(guardianPhone)
+    );
+    if (guardianAccount) await db.linkParentToStudent(guardianAccount.id, student.id, school.id, 'guardian', user.id);
+
+    if (motherPhone.trim() && normalizeGuardianPhone(motherPhone) !== normalizeGuardianPhone(guardianPhone)) {
+      let motherAccount = parentAccounts.find(parent =>
+        normalizeGuardianPhone(String(parent.phone || parent.parentPhone || '')) === normalizeGuardianPhone(motherPhone)
+      );
+      if (!motherAccount) {
+        motherAccount = db.createUser({
+          schoolId: school.id,
+          role: 'parent',
+          fullName: `Parent of ${student.firstName}`,
+          phone: motherPhone.trim(),
+          parentPhone: motherPhone.trim(),
+          passwordHash: '',
+          pin: hashPin(initialPin),
+          isBlocked: false,
+          mustChangePassword: true,
+          failedLoginAttempts: 0,
+          linkedStudentIds: []
+        });
+      }
+      await db.linkParentToStudent(motherAccount.id, student.id, school.id, 'mother', user.id);
+    }
+    await db.flush();
+  } catch (error) {
+    console.error('[auth] Parent-student relationship setup failed after student registration:', error instanceof Error ? error.message : 'unknown error');
+    res.status(503).json({
+      error: 'Student was registered, but a parent link could not be completed. Do not register the student again; contact the school administrator.',
+      student: sanitizeStudent(student),
+      initialPin
+    });
+    return;
+  }
+
   res.status(201).json({ ...sanitizeStudent(student), initialPin });
 });
 
