@@ -209,6 +209,7 @@ export class ApiClient {
     role: UserRole;
     email?: string;
     phone?: string;
+    studentId?: string;
     schoolCode?: string;
     pin?: string;
     password?: string;
