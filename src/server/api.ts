@@ -4465,10 +4465,10 @@ apiRouter.get('/assignments', requireAuth, requireSchoolContext, requireParentPo
   }
 
   if (classIds && !classIds.length) { res.json([]); return; }
-  const assignments = await db.queryPage('assignments', { school_id: school.id, class_id: classIds || undefined }, 1, 100, undefined, '*');
+  const assignments = await db.queryPage('assignments', { school_id: school.id, class_id: classIds || undefined }, 1, 100, undefined, 'id,school_id,class_id,subject_id,teacher_id,title,description,due_date,max_points,created_at');
   const visibleAssignments = teacherSubjectPairs ? assignments.items.filter((item: any) => teacherSubjectPairs!.has(`${item.classId}::${item.subjectId}`)) : assignments.items;
   const submissions = studentIds?.length
-    ? await db.queryPage('assignment_submissions', { school_id: school.id, student_id: studentIds }, 1, 100, undefined, '*')
+    ? await db.queryPage('assignment_submissions', { school_id: school.id, student_id: studentIds }, 1, 100, undefined, 'id,school_id,assignment_id,student_id,student_name,content,submitted_at,status,grade,feedback')
     : { items: [] as any[] };
   const submissionByAssignment = new Map<string, any>();
   for (const submission of [...submissions.items].sort((a: any, b: any) => String(b.submittedAt).localeCompare(String(a.submittedAt)))) {
