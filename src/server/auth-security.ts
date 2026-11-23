@@ -83,9 +83,9 @@ const WEAK_TEMPORARY_PINS = new Set([
 
 export function isStrongPortalPin(pin: unknown): pin is string {
   return typeof pin === 'string'
-    && /^\\d{6}$/.test(pin)
+    && /^\d{6}$/.test(pin)
     && !WEAK_TEMPORARY_PINS.has(pin)
-    && !/^(\\d)\\1{5}$/.test(pin);
+    && !/^(\d)\1{5}$/.test(pin);
 }
 
 export function generateTemporaryPin(): string {
