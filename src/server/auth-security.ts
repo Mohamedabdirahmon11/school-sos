@@ -413,9 +413,9 @@ export function generateRecoveryCodes(count = 8): string[] {
     if (parts.length !== 6) return false;
     N = Number(parts[1]); r = Number(parts[2]); p = Number(parts[3]);
     salt = parts[4]; key = parts[5];
-    if (!Number.isSafeInteger(N) || N < 2 || (N & (N - 1)) !== 0
-      || !Number.isSafeInteger(r) || r < 1 || r > 32
-      || !Number.isSafeInteger(p) || p < 1 || p > 16) return false;
+    if (!Number.isSafeInteger(N) || N < 2 || N > 32768 || (N & (N - 1)) !== 0
+      || !Number.isSafeInteger(r) || r < 1 || r > 16
+      || !Number.isSafeInteger(p) || p < 1 || p > 4) return false;
   } else if (storedHash.startsWith('pin_scrypt:')) {
     // Previous SchoolOS PIN hashes used Node's scrypt defaults (N=16384,r=8,p=1).
     const parts = storedHash.split(':');
