@@ -523,10 +523,13 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
   const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout'];
   const schoolAdminCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
   const teacherCredentialRoutes = ['/auth/me', '/auth/change-teacher-pin', '/auth/logout'];
-  const allowedCredentialRoutes = user.role === 'school_admin' ? schoolAdminCredentialRoutes : user.role === 'teacher' ? teacherCredentialRoutes : superAdminCredentialRoutes;
+  const portalCredentialRoutes = ['/auth/me', '/auth/change-pin', '/auth/logout'];
+  const allowedCredentialRoutes = ['student', 'parent'].includes(user.role) ? portalCredentialRoutes
+    : user.role === 'school_admin' ? schoolAdminCredentialRoutes
+    : user.role === 'teacher' ? teacherCredentialRoutes : superAdminCredentialRoutes;
   if (isBootstrap) {
     if (!user.mustChangePassword || !allowedCredentialRoutes.includes(req.path)
-      || !['super_admin', 'school_admin'].includes(user.role)) {
+      || !['super_admin', 'school_admin', 'student', 'parent'].includes(user.role)) {
       res.status(403).json({ error: 'Complete the required credential setup before continuing.' }); return;
     }
   }
@@ -955,7 +958,7 @@ async function linkLegacyLoginToSupabaseAuth(user: User, password: string): Prom
 // ==============================================================================
 
 apiRouter.post('/auth/login', async (req, res) => {
-  const { email, phone, schoolCode, pin, password } = req.body;
+  const { email, phone, schoolCode, studentId, pin, password } = req.body;
   const requestedRole = normalizeRole(req.body?.role);
   const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
   const settings = db.getSettings();
@@ -963,16 +966,18 @@ apiRouter.post('/auth/login', async (req, res) => {
   const ipThreshold = threshold * 10;
   const durationMins = settings.lockoutDurationMinutes || 15;
 
-  // A. STUDENT & PARENT LOGIN (School Code + Phone Number + PIN)
+  // A. STUDENT (school code + Student ID + PIN) and PARENT (school code + phone + PIN).
   if (requestedRole === 'student' || requestedRole === 'parent') {
     const role = requestedRole;
-    if (!schoolCode || !phone || !pin) {
-      res.status(400).json({ error: 'School code, phone number, and PIN are required.' });
+    const portalStudentId = typeof studentId === 'string' ? studentId.trim().toUpperCase() : '';
+    const portalPhone = typeof phone === 'string' ? phone.replace(/[^0-9]/g, '') : '';
+    if (!schoolCode || !pin || (role === 'student' ? !portalStudentId : !portalPhone) || !/^\d{6}$/.test(String(pin))) {
+      res.status(400).json({ error: role === 'student' ? 'School code, Student ID and 6-digit PIN are required.' : 'School code, phone number and 6-digit PIN are required.' });
       return;
     }
 
     // Rate Limiting & Lockout for Student/Parent
-    const lockKey = `sp:${schoolCode}:${phone.trim()}`;
+    const lockKey = role === 'student' ? `sp:${schoolCode}:${portalStudentId}` : `sp:${schoolCode}:${portalPhone}`;
     const ipKey = `ip:${clientIp}`;
     const lockCheck = db.checkLoginLockout(lockKey, threshold, durationMins);
     const ipCheck = db.checkLoginLockout(ipKey, ipThreshold, durationMins);
@@ -1003,7 +1008,9 @@ apiRouter.post('/auth/login', async (req, res) => {
       return;
     }
 
-    const matchingUsers = await db.findUsersByPhoneInSchool(phone, school.id);
+    const matchingUsers = role === 'student'
+      ? (await db.getUsers(school.id)).filter(u => normalizeRole(u.role) === 'student' && String(u.studentId || '').trim().toUpperCase() === portalStudentId)
+      : (await db.getParents(school.id)).filter(u => String(u.phone || u.parentPhone || '').replace(/[^0-9]/g, '') === portalPhone);
     const candidateUsers = matchingUsers.filter(u => normalizeRole(u.role) === role).map(u => ({ ...u, role }));
 
     if (candidateUsers.length === 0) {
@@ -1028,8 +1035,10 @@ apiRouter.post('/auth/login', async (req, res) => {
         } else if (res.headersSent) return;
       }
       const matchedStudents = students.filter(student => role === 'student'
-        ? student.studentPhone === phone || student.fatherPhone === phone
-        : student.fatherPhone === phone || student.motherPhone === phone || guardianStudentIds.includes(student.id));
+        ? String(student.studentId || '').trim().toUpperCase() === portalStudentId
+        : String(student.fatherPhone || '').replace(/[^0-9]/g, '') === portalPhone
+          || String(student.motherPhone || '').replace(/[^0-9]/g, '') === portalPhone
+          || guardianStudentIds.includes(student.id));
       const matchStd = matchedStudents.find(student => verifyPin(pin, student.pinHash || (student as any).pin)) || matchedStudents[0];
 
       if (!matchStd) {
@@ -1043,14 +1052,14 @@ apiRouter.post('/auth/login', async (req, res) => {
           userId: 'unknown',
           userName: 'Unknown account',
           userRole: role,
-          details: `Login failed for non-existent ${role} with phone ${phone} from IP ${clientIp}.`,
+          details: `Login failed for non-existent ${role} identifier from IP ${clientIp}.`,
           severity: 'warning'
         });
         if (failed.newlyLocked) {
           res.status(429).json({ error: `Too many failed attempts. Account locked for ${durationMins} minutes.` });
           return;
         }
-        res.status(401).json({ error: `No ${role} record found for phone ${phone} at school ${school.name}.` });
+        res.status(401).json({ error: 'ID or PIN is incorrect.' });
         return;
       }
 
@@ -1089,16 +1098,22 @@ apiRouter.post('/auth/login', async (req, res) => {
           schoolId: school.id,
           role,
           fullName: role === 'parent' ? `Parent of ${matchStd.firstName}` : `${matchStd.firstName} ${matchStd.lastName}`,
-          phone,
+          phone: role === 'parent' ? phone : (matchStd.studentPhone || matchStd.fatherPhone || ''),
           studentId: matchStd.studentId,
           passwordHash: '',
           pin: matchStd.pinHash,
           isBlocked: false,
+          mustChangePassword: true,
           failedLoginAttempts: 0,
           linkedStudentIds: role === 'parent' ? matchedStudents.map(student => student.id) : [matchStd.id]
         });
       }
 
+      if (existingUser.mustChangePassword) {
+        const challengeToken = createSignedSessionToken({ sessionId: `bootstrap-${randomUUID()}`, userId: existingUser.id, role: existingUser.role, schoolId: school.id, createdAt: Date.now(), expiresAt: Date.now() + 5 * 60 * 1000 });
+        res.json({ requirePinChange: true, challengeToken });
+        return;
+      }
       await issueSessionCookie(res, existingUser, req, school.id);
       db.logAudit({
         action: 'USER_LOGIN_SUCCESS',
@@ -1129,6 +1144,10 @@ apiRouter.post('/auth/login', async (req, res) => {
     const targetUser = candidateUsers[0];
 
     // Check user record lockout
+    if (targetUser.isBlocked) {
+      res.status(403).json({ error: 'This account has been disabled. Contact your school administrator.' });
+      return;
+    }
     if (targetUser.lockedUntil && new Date(targetUser.lockedUntil) > new Date()) {
       const waitMins = Math.ceil((new Date(targetUser.lockedUntil).getTime() - Date.now()) / 60000);
       res.status(429).json({ error: `Account locked due to multiple failed logins. Try again in ${waitMins} minutes.` });
@@ -1168,13 +1187,14 @@ apiRouter.post('/auth/login', async (req, res) => {
     let linkedStudents: any[] = [];
     if (role === 'parent') {
       const allStudents = await db.getStudents(school.id);
-      linkedStudents = allStudents.filter(s => 
-        (targetUser.linkedStudentIds && targetUser.linkedStudentIds.includes(s.id)) ||
-        s.fatherPhone === phone || 
-        s.motherPhone === phone
-      );
+      linkedStudents = allStudents.filter(s => Array.isArray(targetUser.linkedStudentIds) && targetUser.linkedStudentIds.includes(s.id));
     }
 
+    if (targetUser.mustChangePassword) {
+      const challengeToken = createSignedSessionToken({ sessionId: `bootstrap-${randomUUID()}`, userId: targetUser.id, role: targetUser.role, schoolId: school.id, createdAt: Date.now(), expiresAt: Date.now() + 5 * 60 * 1000 });
+      res.json({ requirePinChange: true, challengeToken });
+      return;
+    }
     await issueSessionCookie(res, targetUser, req, school.id);
     db.logAudit({
       action: 'USER_LOGIN_SUCCESS',
@@ -1337,7 +1357,7 @@ apiRouter.post('/auth/login', async (req, res) => {
   }
 
   // First login: Super Admin must choose a password; School Admin must choose a PIN.
-  if (user.mustChangePassword && ['super_admin', 'school_admin'].includes(user.role)) {
+  if (user.mustChangePassword && ['super_admin', 'school_admin', 'student', 'parent'].includes(user.role)) {
     const challengeToken = createSignedSessionToken({
       sessionId: `bootstrap-${randomUUID()}`,
       userId: user.id,
@@ -1345,9 +1365,9 @@ apiRouter.post('/auth/login', async (req, res) => {
       createdAt: Date.now(),
       expiresAt: Date.now() + 5 * 60 * 1000
     });
-    res.json(user.role === 'school_admin'
-      ? { requirePinChange: true, challengeToken }
-      : { requirePasswordChange: true, challengeToken });
+    res.json(user.role === 'super_admin'
+      ? { requirePasswordChange: true, challengeToken }
+      : { requirePinChange: true, challengeToken });
     return;
   }
 
@@ -1524,13 +1544,13 @@ apiRouter.post('/auth/change-password', requireAuth, async (req, res) => {
 // School Admin first-login PIN setup. This route is available only in the short-lived bootstrap session.
 apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   const user = (req as any).user as User;
-  if (user.role !== 'school_admin' || !user.mustChangePassword) {
-    res.status(403).json({ error: 'PIN setup is only available during School Admin first login.' });
+  if (!['school_admin', 'student', 'parent'].includes(user.role) || !user.mustChangePassword) {
+    res.status(403).json({ error: 'PIN setup is only available during first login for this account.' });
     return;
   }
   const newPin = typeof req.body?.newPin === 'string' ? req.body.newPin.trim() : '';
-  if (!/^\d{4,6}$/.test(newPin)) {
-    res.status(400).json({ error: 'Choose a PIN containing 4 to 6 digits.', code: 'PIN_POLICY_FAILED' });
+  if (!(user.role === 'school_admin' ? /^\d{4,6}$/.test(newPin) : /^\d{6}$/.test(newPin)) || ['000000', '123456', '111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999'].includes(newPin)) {
+    res.status(400).json({ error: 'Choose a strong 6-digit PIN (School Admin may use 4–6 digits).', code: 'PIN_POLICY_FAILED' });
     return;
   }
   if (verifyPin(newPin, String(user.pin || '')) || verifyPassword(newPin, user.passwordHash)) {
@@ -1539,7 +1559,7 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   }
   const updated = db.updateUser(user.id, {
     pin: hashPin(newPin),
-    passwordHash: hashPassword(newPin),
+    ...(user.role === 'school_admin' ? { passwordHash: hashPassword(newPin) } : {}),
     mustChangePassword: false
   });
   if (!updated) {
@@ -1554,8 +1574,8 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     schoolId: user.schoolId,
     userId: user.id,
     userName: user.fullName,
-    userRole: 'school_admin',
-    details: 'School Admin completed first-login PIN setup.',
+    userRole: user.role,
+    details: `${user.role} completed first-login PIN setup.`,
     severity: 'info'
   });
   await db.flush();
