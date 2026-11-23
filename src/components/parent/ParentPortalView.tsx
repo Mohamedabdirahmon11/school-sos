@@ -3,7 +3,7 @@
  * Multi-child sibling switcher, attendance percentage, fee balance & official receipts, exam results, and report cards
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
@@ -21,8 +21,9 @@ import {
 } from 'lucide-react';
 
 export const ParentPortalView: React.FC = () => {
-  const { user, school, t } = useAuth();
-  const [selectedChildIndex, setSelectedChildIndex] = useState(0);
+  const { user, school, t, selectedStudentId, refreshUser } = useAuth();
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(selectedStudentId);
+  const [childSelectionError, setChildSelectionError] = useState('');
   const [reportCardDownloading, setReportCardDownloading] = useState(false);
   const [reportCardDownloadError, setReportCardDownloadError] = useState('');
   const childrenState = useApi(async () => {
@@ -31,7 +32,7 @@ export const ParentPortalView: React.FC = () => {
     return Array.isArray(all) ? all : [];
   }, [school?.id, user?.id, user?.phone, user?.parentPhone, user?.linkedStudentIds?.join(',')], Boolean(school));
   const children: any[] = childrenState.data ?? [];
-  const currentChild = children[selectedChildIndex];
+  const currentChild = children.find(child => child.id === selectedChildId);
   const childState = useApi(
     () => ApiClient.getStudentDetails(currentChild?.id, school?.id, true),
     [currentChild?.id, school?.id],
@@ -56,9 +57,41 @@ export const ParentPortalView: React.FC = () => {
     .filter((notice: any) => notice.classId === currentChild?.classId && String(notice.title || '').toLowerCase().includes('exam results published'))
     .slice(0, 3);
 
-  const handleSelectChild = (idx: number) => {
-    setSelectedChildIndex(idx);
-    setReportCardDownloadError('');
+  useEffect(() => {
+    setSelectedChildId(selectedStudentId);
+  }, [selectedStudentId]);
+
+  useEffect(() => {
+    if (children.length === 1 && !selectedStudentId && !selectedChildId) {
+      void ApiClient.selectParentChild(children[0].id)
+        .then(() => { setSelectedChildId(children[0].id); void refreshUser(); })
+        .catch(error => setChildSelectionError(error instanceof Error ? error.message : 'Could not select your child.'));
+    }
+  }, [children.length, children[0]?.id, selectedStudentId, selectedChildId, refreshUser]);
+
+  const handleSelectChild = async (idx: number) => {
+    const child = children[idx];
+    if (!child) return;
+    setChildSelectionError('');
+    try {
+      await ApiClient.selectParentChild(child.id);
+      setSelectedChildId(child.id);
+      setReportCardDownloadError('');
+      await refreshUser();
+    } catch (error) {
+      setChildSelectionError(error instanceof Error ? error.message : 'Could not select this child.');
+    }
+  };
+
+  const handleChangeChild = async () => {
+    setChildSelectionError('');
+    try {
+      await ApiClient.selectParentChild();
+      setSelectedChildId(null);
+      await refreshUser();
+    } catch (error) {
+      setChildSelectionError(error instanceof Error ? error.message : 'Could not change the selected child.');
+    }
   };
 
   const handleDownloadTermReportCard = async () => {
@@ -84,7 +117,21 @@ export const ParentPortalView: React.FC = () => {
 
   if (childrenState.loading) return <div className="p-6 space-y-3" aria-label="Loading parent portal"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-32 animate-pulse rounded-xl bg-white" /></div>;
   if (childrenState.error) return <ErrorState error={childrenState.error} onRetry={childrenState.retry} />;
-  if (!currentChild) return <div className="p-6 text-xs text-[#64748B]">No children are linked to this parent account.</div>;
+  if (children.length === 0) return <div className="mx-auto max-w-xl p-8 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><Users className="h-6 w-6" /></div><h2 className="text-base font-semibold text-[#132A29]">Weli ilmo laguma xirin</h2><p className="mt-2 text-xs text-[#64748B]">La xidhiidh maamulka dugsiga si akoonkaaga loogu xiro ilmahaaga.</p></div>;
+  if (!currentChild) return (
+    <div className="mx-auto max-w-3xl p-4 md:p-8 space-y-5">
+      <div><span className="text-[11px] font-bold uppercase tracking-wide text-[#0F766E]">Parent Portal</span><h1 className="mt-1 text-2xl font-semibold text-[#132A29]">Dooro ilmaha</h1><p className="mt-1 text-xs text-[#64748B]">Dooro ilmaha aad rabto inaad xogtiisa aragto.</p></div>
+      {childSelectionError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{childSelectionError}</p>}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {children.map((child, index) => (
+          <button key={child.id} type="button" onClick={() => void handleSelectChild(index)} className="flex items-center gap-3 rounded-xl border border-[#E2E8F0] bg-white p-4 text-left shadow-xs transition hover:border-[#0F766E] hover:bg-[#F0FDFA]">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0F766E] text-sm font-bold text-white">{String(child.firstName || '?').slice(0,1).toUpperCase()}</span>
+            <span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#132A29]">{child.firstName} {child.lastName}</span><span className="mt-1 block text-xs text-[#64748B]">{child.className || 'Fasalka lama cayimin'} · {child.studentId}</span></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
   if (childState.loading) return <div className="p-6 space-y-3" aria-label="Loading child details"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
   if (childState.error) return <ErrorState error={childState.error} onRetry={childState.retry} />;
   const attendanceRecords = childData?.attendance || [];
@@ -109,25 +156,7 @@ export const ParentPortalView: React.FC = () => {
           </p>
         </div>
 
-        {/* Multi-Child Switcher Buttons */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[#64748B] font-medium hidden sm:inline">Switch Child:</span>
-          <div className="flex items-center gap-1.5 p-1 bg-[#F1F5F9] rounded-lg">
-            {children.map((child, idx) => (
-              <button
-                key={child.id}
-                onClick={() => handleSelectChild(idx)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
-                  selectedChildIndex === idx
-                    ? 'bg-[#0F766E] text-white shadow-xs'
-                    : 'text-[#334155] hover:bg-[#E2E8F0]'
-                }`}
-              >
-                {child.firstName} ({child.studentId})
-              </button>
-            ))}
-          </div>
-        </div>
+        {children.length > 1 && <button type="button" onClick={() => void handleChangeChild()} className="rounded-lg border border-[#CBD5E1] bg-white px-3 py-2 text-xs font-semibold text-[#334155] hover:border-[#0F766E]">Beddel ilmaha</button>}
       </div>
 
       {resultNotices.length > 0 && (
