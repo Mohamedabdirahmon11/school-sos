@@ -5871,7 +5871,7 @@ apiRouter.post('/students/:id/reset-pin', requireAuth, requireSchoolContext, asy
     return;
   }
 
-  if (req.body?.customPin !== undefined && (typeof req.body.customPin !== 'string' || !/^\d{6}$/.test(req.body.customPin) || ['000000','123456','111111','222222','333333','444444','555555','666666','777777','888888','999999'].includes(req.body.customPin))) {
+  if (req.body?.customPin !== undefined && !isStrongPortalPin(req.body.customPin)) {
     res.status(400).json({ error: 'Student PIN must be a strong 6-digit number.' }); return;
   }
   const result = await db.resetStudentPin(student.id, school.id, req.body?.customPin, { id: user.id, name: user.fullName, role: user.role, ipAddress: req.ip });
