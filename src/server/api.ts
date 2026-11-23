@@ -691,6 +691,16 @@ async function getParentLinkedStudentIds(schoolId: string, parentId: string): Pr
   return [...new Set(links.items.filter((row: any) => !row.revokedAt).map((row: any) => String(row.studentId || '')).filter(Boolean))];
 }
 
+async function getParentSelectedClassId(schoolId: string, parentId: string, studentId: string): Promise<string | null> {
+  if (!studentId || !/^[A-Za-z0-9_-]{1,64}$/.test(studentId)) return null;
+  const linkedIds = await getParentLinkedStudentIds(schoolId, parentId);
+  if (!linkedIds.includes(studentId)) return null;
+  const student = (await db.queryPage('students', { school_id: schoolId, id: studentId }, 1, 1, undefined, 'id,class_id')).items[0] as any;
+  if (!student) return null;
+  const currentClassId = await getStudentCurrentClassId(schoolId, studentId, String(student.classId || ''));
+  return currentClassId || null;
+}
+
 async function canAccessStudentRecord(user: User, studentId: string): Promise<boolean> {
   const student = await db.getStudentById(studentId, user.schoolId);
   if (!student || (user.schoolId && student.schoolId !== user.schoolId)) return false;
