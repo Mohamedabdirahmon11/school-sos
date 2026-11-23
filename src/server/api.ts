@@ -2791,12 +2791,25 @@ apiRouter.post('/import/confirm', requireAuth, requireSchoolAdminOrSuperAdmin, r
     classes: classRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, name: item.name, class_code: item.classCode, academic_year: item.academicYear, grade_level: item.gradeLevel, section: item.section, shift: item.shift, room_number: item.roomNumber, capacity: item.capacity, monthly_fee: item.monthlyFee })),
     students: studentRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, student_id: item.studentId, first_name: item.firstName, middle_name: item.middleName, last_name: item.lastName, gender: item.gender, admission_date: item.admissionDate, student_phone: item.studentPhone, father_phone: item.fatherPhone, father_name: item.fatherName, address: item.address, mother_phone: null, class_id: item.classId, section: item.section, status: item.status || 'active', pin_hash: item.pinHash })),
     users: userRecords.map(item => ({ id: item.id, school_id: item.schoolId, branch_id: item.branchId, role: item.role, full_name: item.fullName, phone: item.phone, parent_phone: item.parentPhone, student_id: item.studentId, linked_student_ids: item.linkedStudentIds, pin_hash: item.pin })),
-    audit_logs: [{ id: auditId, action: 'SCHOOL_BULK_IMPORT', category: 'school', school_id: school.id, school_name: school.name, user_id: user.id, user_name: user.fullName, user_role: user.role, details: `Bulk import completed: ${studentRecords.length} students, ${classRecords.length} classes, ${parentRecords.size} parent accounts.` }]
+    audit_logs: [{ id: auditId, action: 'SCHOOL_BULK_IMPORT', category: 'school', school_id: school.id, school_name: school.name, user_id: user.id, user_name: user.fullName, user_role: user.role, ip_address: req.ip, details: `Bulk import completed: ${studentRecords.length} students, ${classRecords.length} classes, ${parentRecords.size} parent accounts.` }]
   };
   try {
     await db.bulkImportStudents(payload);
   } catch {
     res.status(500).json({ error: 'Import failed. No records were written; please retry.' }); return;
+  }
+  try {
+    for (const parentRecord of parentRecords.values()) {
+      for (const studentRecord of studentRecords) {
+        if (parentRecord.linkedStudentIds?.includes(studentRecord.id)) {
+          await db.linkParentToStudent(parentRecord.id, studentRecord.id, school.id, 'guardian', user.id, user.role, req.ip);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[auth] Bulk import parent links need reconciliation:', error instanceof Error ? error.message : 'unknown error');
+    res.status(503).json({ error: 'Import data was saved, but parent links need administrator reconciliation. Do not repeat the import.' });
+    return;
   }
   res.json({ success: true, counts: { classes: classRecords.length, students: studentRecords.length, parents: parentRecords.size, skipped: validated.totals.skipped }, pinSlips });
 });
