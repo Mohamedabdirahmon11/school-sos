@@ -5808,6 +5808,28 @@ apiRouter.post('/students', requireAuth, requireSchoolContext, requireSchoolAdmi
   res.status(201).json({ ...sanitizeStudent(student), initialPin });
 });
 
+apiRouter.post('/parents/:id/phone', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school as School;
+  const actor = (req as any).user as User;
+  const parent = await db.getUserById(String(req.params.id || ''), school.id);
+  if (!parent || parent.role !== 'parent') { res.status(404).json({ error: 'Parent account was not found in this school.' }); return; }
+  const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+  if (!validImportPhone(phone)) { res.status(400).json({ error: 'Enter a valid international phone number.' }); return; }
+  const normalized = phone.replace(/[^0-9]/g, '');
+  const duplicate = (await db.getParents(school.id)).some(row => row.id !== parent.id
+    && String(row.phone || row.parentPhone || '').replace(/[^0-9]/g, '') === normalized);
+  if (duplicate) { res.status(409).json({ error: 'This phone number is already used by another parent account in this school.' }); return; }
+  const updated = db.updateUser(parent.id, { phone, parentPhone: phone });
+  if (!updated) { res.status(404).json({ error: 'Parent account was not updated.' }); return; }
+  db.logAudit({
+    action: 'PARENT_PHONE_CHANGED', category: 'auth', schoolId: school.id,
+    userId: actor.id, userName: actor.fullName, userRole: actor.role,
+    details: `Parent phone number updated for parent account ${parent.id}.`, severity: 'warning'
+  });
+  await db.flush();
+  res.json({ success: true, parent: sanitizeUser(updated) });
+});
+
 apiRouter.post('/parents/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const result = await db.resetParentPin(String(req.params.id || ''), school.id);
