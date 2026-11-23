@@ -24,7 +24,15 @@ for(const width of widths) for(const theme of themes) {
   await expect(live.locator('.pp-brand b')).toContainText('Axmed Cabdi');
   await expect(live.locator('.pp-child-item')).toHaveCount(3);
   for(const [section,label] of sections) {
-   await reference.goto(referenceUrl+'?theme='+theme+'#'+section);
+   await reference.goto(referenceUrl+'?theme='+theme);
+   if(width>760) {
+    if(section!=='home') await reference.locator('#nav .nb').filter({hasText:label}).click();
+   } else if(['home','kids','marks'].includes(section)) {
+    if(section!=='home') await reference.locator('#bnav > .nb').filter({hasText:label}).click();
+   } else {
+    await reference.locator('#bnav [data-more]').click();
+    await reference.locator('#bnav .sheet .nb').filter({hasText:label}).click();
+   }
    await expect(reference.locator('#main h1')).toBeVisible();
    await reference.screenshot({path:path.join(folder,'reference',section+'.png'),fullPage:true});
    if(width>760) {
