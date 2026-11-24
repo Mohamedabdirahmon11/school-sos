@@ -5354,7 +5354,10 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   }
   if (cachedResponse) parentContactsResponseCache.delete(cacheKey);
 
-  const classes = await queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived');
+  const [classes, currentYearId] = await Promise.all([
+    queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
+    getCurrentAcademicYearId(school.id)
+  ]);
   let studentClassFilter: string | string[] | undefined = requestedClassId || undefined;
   if (role === 'teacher') {
     const ownClassIds = classes.filter((klass: any) => klass.classTeacherId === user.id && !klass.isArchived).map((klass: any) => klass.id);
@@ -5365,7 +5368,6 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
     studentClassFilter = requestedClassId || ownClassIds;
   }
   const classScope = studentClassFilter ? (Array.isArray(studentClassFilter) ? studentClassFilter : [studentClassFilter]) : null;
-  const currentYearId = await getCurrentAcademicYearId(school.id);
   const currentEnrollments = currentYearId
     ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', class_id: classScope || undefined }, 'student_id,class_id,section_id')
     : [];
