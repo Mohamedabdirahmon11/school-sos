@@ -88,16 +88,16 @@ test('extra modules use debounced student options instead of downloading every s
 });
 
 
-test('GET exam config, reports and yearly rankings use read-only default configuration', () => {
+test('GET exam config and yearly rankings use read-only defaults while reports use the read-only SQL RPC', () => {
   assert.match(api, /apiRouter\.get\('\/exams\/config'[\s\S]*?db\.getExamConfig\(school\.id, school\.academicYear, false\)/);
-  assert.match(api, /apiRouter\.get\('\/school\/reports\/summary'[\s\S]*?db\.getExamConfig\(school\.id, school\.academicYear, false\)/);
+  assert.ok(api.includes("db.callRpc<Record<string, unknown>>('schoolos_school_reports_summary'"));
   assert.match(api, /db\.getClassYearlyRankings\(school\.id, classId, false\)/);
 });
 
 
 test('school report summary is cached per school and role and invalidated after tenant writes', () => {
   assert.match(api, /const schoolReportSummaryCache = new SchoolReadinessCache<any>\(60_000\)/);
-  assert.match(api, /schoolReportSummaryCache\.get\(\`\$\{school\.id\}:\$\{user\.role\}\`, async \(\) =>/);
+  assert.match(api, /schoolReportSummaryCache\.get\(\`\$\{school\.id\}:\$\{user\.role\}\`, \(\) =>/);
   assert.match(api, /schoolReportSummaryCache\.invalidatePrefix\(\`\$\{schoolId\}:\`\)/);
   assert.match(api, /if \(user\.role === 'accountant' \|\| user\.role === 'super_admin'\)/);
 });
