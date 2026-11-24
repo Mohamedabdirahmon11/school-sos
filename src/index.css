@@ -2790,3 +2790,80 @@ body { font-family: var(--schoolos-font-body); }
 .schoolos-login-page .schoolos-login-title,
 .schoolos-login-page h3 { font-family: Georgia, 'Times New Roman', serif; }
 .dark .schoolos-login-page .schoolos-login-card { border-radius: 12px; }
+
+
+/* Readability guardrails: never clip navigation labels or primary page copy. */
+.school-admin-sidebar > nav section h2 {
+  height: auto !important;
+  max-width: 100%;
+  white-space: normal !important;
+  overflow: visible !important;
+  overflow-wrap: anywhere;
+}
+.school-admin-sidebar > nav section button {
+  height: auto !important;
+  min-width: 0;
+  align-items: flex-start !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  line-height: 1.35 !important;
+}
+.school-admin-sidebar > nav section button > span:nth-of-type(3) {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.35;
+}
+.school-admin-sidebar > div:first-child {
+  min-width: 0;
+}
+.school-admin-sidebar > div:first-child > div:nth-child(2) {
+  min-width: 0;
+  max-width: 100%;
+}
+.school-admin-sidebar > div:first-child > div:nth-child(2) > div {
+  max-width: 100%;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+/* Long headings and action labels wrap instead of disappearing behind fixed-width cards. */
+main :is(h1, h2, h3, h4) {
+  max-width: 100%;
+  white-space: normal !important;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+main :is(button, a, label) {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+main button {
+  height: auto;
+  min-height: 38px;
+  line-height: 1.35;
+}
+main :is(.flex, .inline-flex) > * {
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .school-admin-sidebar > nav section button {
+    padding-top: 9px !important;
+    padding-bottom: 9px !important;
+  }
+  main :is(h1, h2, h3, h4) {
+    overflow-wrap: anywhere;
+  }
+}
