@@ -7052,6 +7052,7 @@ apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, req
   const account = createLogin ? db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin), mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0 }) : null;
   const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions: createLogin ? resolvedPermissions : [], status: 'active', ...(customRole ? { roleId: customRole.id, roleTitle: customRole.name } : {}), ...(account ? { userId: account.id } : {}) });
   if (account) db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
+  await db.flush();
   res.status(201).json({ ...staff, ...(createLogin ? { initialPin } : {}) });
 });
 apiRouter.post('/school/staff/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
