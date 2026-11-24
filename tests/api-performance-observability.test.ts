@@ -186,7 +186,7 @@ test('critical list and report routes have explicit query-count ceilings', () =>
   assert.match(budgets, /'GET \/students\/options': 4/);
   assert.match(budgets, /'GET \/messages\/contacts': 12/);
   assert.match(budgets, /'GET \/classes\/:id\/details': 8/);
-  assert.match(budgets, /'GET \/school\/reports\/summary': 8/);
+  assert.match(budgets, /'GET \/school\/reports\/summary': 2/);
   assert.match(budgets, /'GET \/exams\/rankings\/yearly': 12/);
 });
 
