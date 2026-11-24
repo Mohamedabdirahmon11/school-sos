@@ -346,7 +346,7 @@ VALUES
 \ir ../../supabase/migrations/20261124100000_school_reports_summary_rpc.sql
 \ir ../../supabase/migrations/20261124100000_school_reports_summary_rpc.sql
 
-DO $
+DO $report$
 DECLARE
   report jsonb;
   school_admin_report jsonb;
@@ -377,7 +377,7 @@ BEGIN
   ASSERT NOT has_function_privilege('authenticated',
     'public.schoolos_school_reports_summary(character varying, character varying, boolean)', 'EXECUTE'),
     'authenticated must not execute the report summary RPC directly';
-END $;
+END $report$;
 
 -- Match baseline production attendance index, then apply the additive
 -- performance migration twice to prove idempotency on the actual schema.
