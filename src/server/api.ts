@@ -4439,10 +4439,10 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   return statuses;
 }
 
-async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string, orFilter?: string) {
+async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string, orFilter?: string, pageSize = 100) {
   const rows: any[] = [];
   for (let page = 1;; page += 1) {
-    const result = await db.queryPage(table, filters, page, 100, orFilter, columns, orderBy);
+    const result = await db.queryPage(table, filters, page, pageSize, orFilter, columns, orderBy, true, pageSize);
     rows.push(...result.items);
     if (rows.length >= result.total || result.items.length === 0) break;
   }
@@ -5933,7 +5933,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
       academic_year_id: currentYearId,
       status: 'active',
       class_id: enrollmentClassScope
-    }, 'id,student_id,class_id,section_id,roll_number')
+    }, 'id,student_id,class_id,section_id,roll_number', undefined, undefined, 1_000)
     : [];
   const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
   const enrollmentClassIds = [...new Set(currentEnrollments.map((row: any) => String(row.classId || '')).filter(Boolean))];
