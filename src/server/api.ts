@@ -9992,6 +9992,7 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         : [];
     }
   } else {
+    if (!allowedRoles[user.role]?.length) { res.json([]); return; }
     const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
     const search = rawSearch.replace(/[%(),*\\"]/g, '').slice(0, 80);
     const searchFilter = search
