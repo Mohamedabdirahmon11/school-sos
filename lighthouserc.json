@@ -1,0 +1,44 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run preview -- --host 127.0.0.1",
+      "startServerReadyPattern": "Local:",
+      "url": [
+        "http://127.0.0.1:4173/"
+      ],
+      "numberOfRuns": 3,
+      "settings": {
+        "chromeFlags": "--no-sandbox --disable-dev-shm-usage"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "largest-contentful-paint": [
+          "error",
+          {
+            "maxNumericValue": 2500,
+            "aggregationMethod": "median"
+          }
+        ],
+        "total-blocking-time": [
+          "error",
+          {
+            "maxNumericValue": 200,
+            "aggregationMethod": "median"
+          }
+        ],
+        "cumulative-layout-shift": [
+          "error",
+          {
+            "maxNumericValue": 0.1,
+            "aggregationMethod": "median"
+          }
+        ]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci"
+    }
+  }
+}
