@@ -1,8 +1,9 @@
-## Global page refresh control — in progress (2026-11-23)
+## Global page refresh control — merged into performance branch (2026-11-23)
 
-- ADDED: a compact, accessible refresh icon in the shared authenticated-page viewport, so School Admin, Super Admin, Accountant, Teacher, Parent, Student, and setup screens can reload the current page and its latest data without adding separate controls to each module.
-- DESIGN: icon-only 32px control with tooltip/accessible label, neutral border, and SchoolOS teal hover/focus styling; no route, API, database, or tenant data behavior is changed.
-- VERIFICATION: pending GitHub Actions typecheck, tests, and production build. Browser visual review and checking refresh behavior on each role still need local testing.
+- Preserved the shared 32px refresh control from latest `main` in the performance branch; it reloads the current authenticated page without changing routes or API behavior.
+- Kept the public-login immediate paint/session-verification fix intact.
+- Preserved the latest School Settings WhatsApp E.164 `+` prefix correction.
+- Verification: the performance branch CI will re-run these combined changes before they are considered validated.
 
 ## School sidebar navigation and appearance — in progress (2026-11-16)
 
