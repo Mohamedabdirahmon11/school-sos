@@ -1,0 +1,26 @@
+/* AL-BUSHRA reference-inspired timetable skin; behavior and API remain unchanged. */
+.schoolos-timetable-page{--tt-ink:#162033;--tt-muted:#6a7690;--tt-line:#e1e7f1;--tt-primary:#2563eb;--tt-soft:#e7efff;max-width:1100px!important;padding:20px 16px 32px!important;color:var(--tt-ink)}
+.schoolos-timetable-page>div:first-child{position:relative;isolation:isolate;overflow:hidden;margin:0 -16px 22px!important;padding:22px 20px 34px!important;border-radius:0 0 22px 22px;background:linear-gradient(125deg,#2563eb 0%,#5146c8 55%,#7c3aed 100%);color:#fff;box-shadow:0 12px 28px rgba(37,99,235,.18)}
+.schoolos-timetable-page>div:first-child h1,.schoolos-timetable-page>div:first-child p{color:#fff!important}
+.schoolos-timetable-page>div:first-child h1{font-size:24px!important;font-weight:800;letter-spacing:-.03em}
+.schoolos-timetable-page>div:first-child p{opacity:.86}
+.schoolos-timetable-page button,.schoolos-timetable-page select,.schoolos-timetable-page input{border-radius:10px;transition:background .15s,border-color .15s,box-shadow .15s}
+.schoolos-timetable-page button:focus-visible,.schoolos-timetable-page select:focus-visible,.schoolos-timetable-page input:focus-visible{outline:3px solid rgba(37,99,235,.22);outline-offset:2px}
+.schoolos-timetable-page>div:nth-child(2),.schoolos-timetable-page article{border:1px solid var(--tt-line)!important;border-radius:16px!important;background:#fff;box-shadow:0 5px 18px rgba(20,30,60,.045)}
+.schoolos-timetable-page article{padding:14px!important;overflow:hidden}
+.schoolos-timetable-page article h2,.schoolos-timetable-page article h3{color:#162033}
+.schoolos-timetable-page table{border-collapse:separate;border-spacing:5px;width:100%;min-width:720px}
+.schoolos-timetable-page thead th{padding:8px 5px;background:#f1f5ff;color:#53617b;border:0;border-radius:9px;font-size:11px;font-weight:800;text-transform:uppercase}
+.schoolos-timetable-page tbody th{padding:8px 7px;color:#6a7690;background:#f8faff;border-radius:9px;font-size:11px;white-space:nowrap}
+.schoolos-timetable-page td{border:0!important;padding:3px!important;min-width:105px}
+.schoolos-timetable-page td>div{min-height:56px;border-radius:12px!important;border:1px solid #dbe7ff!important;background:#eef4ff!important;padding:8px!important}
+.schoolos-timetable-page td strong{color:#254da8!important;font-size:12px!important}
+.schoolos-timetable-page td span{color:#66758f!important}
+.schoolos-timetable-page td button{font-size:10px}
+.schoolos-timetable-page .overflow-x-auto{border-radius:12px;scrollbar-width:thin}
+.schoolos-timetable-page .bg-white.rounded-xl,.schoolos-timetable-page .bg-white.rounded-lg{border-color:var(--tt-line)}
+.schoolos-timetable-page input,.schoolos-timetable-page select{border-color:#dce4f2;background:#fff;color:#27344b;min-height:38px}
+.schoolos-timetable-page button.bg-teal-700,.schoolos-timetable-page button[class*="bg-[#0F766E]"]{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]) .schoolos-timetable-page{color:#e8edf5}:root:not([data-theme=light]) .schoolos-timetable-page article,:root:not([data-theme=light]) .schoolos-timetable-page>div:nth-child(2){background:#161e2b!important;border-color:#2a3649!important}:root:not([data-theme=light]) .schoolos-timetable-page tbody th{background:#202b3d;color:#aab6ca}:root:not([data-theme=light]) .schoolos-timetable-page thead th{background:#202d46;color:#aab6ca}:root:not([data-theme=light]) .schoolos-timetable-page input,:root:not([data-theme=light]) .schoolos-timetable-page select{background:#161e2b;color:#e8edf5;border-color:#35445b}}
+@media(max-width:640px){.schoolos-timetable-page{padding:12px 10px 24px!important}.schoolos-timetable-page>div:first-child{margin:0 -10px 16px!important;padding:20px 14px 28px!important}.schoolos-timetable-page article{padding:9px!important}.schoolos-timetable-page table{min-width:650px}}
+@media print{.schoolos-timetable-page>div:first-child{background:#fff!important;color:#111!important;box-shadow:none!important}.schoolos-timetable-page>div:first-child h1,.schoolos-timetable-page>div:first-child p{color:#111!important}}
