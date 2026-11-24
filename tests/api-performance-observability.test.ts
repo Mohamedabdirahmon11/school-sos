@@ -101,3 +101,14 @@ test('school report summary is cached per school and role and invalidated after 
   assert.match(api, /schoolReportSummaryCache\.invalidatePrefix\(\`\$\{schoolId\}:\`\)/);
   assert.match(api, /if \(user\.role === 'accountant' \|\| user\.role === 'super_admin'\)/);
 });
+
+
+test('yearly rankings cache is five minutes, tenant and identity scoped, and invalidated on writes', () => {
+  assert.match(api, /const classYearlyRankingsCache = new SchoolReadinessCache<any>\(5 \* 60_000\)/);
+  assert.match(api, /classYearlyRankingsCache\.invalidatePrefix\(\`\$\{schoolId\}:`\)/);
+  const start = api.indexOf("apiRouter.get('/exams/rankings/yearly'");
+  const end = api.indexOf('// Year-End Promotion Confirmation', start);
+  const route = api.slice(start, end);
+  assert.ok(route.indexOf('canReadClassResults') < route.indexOf('classYearlyRankingsCache.get'));
+  assert.match(route, /\$\{school\.id\}:\$\{school\.academicYear\}:\$\{classId\}:\$\{role\}:\$\{user\.id\}/);
+});
