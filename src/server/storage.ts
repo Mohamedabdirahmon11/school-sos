@@ -119,11 +119,11 @@ interface CachedAuthContext {
   expiresAt: number;
 }
 
-const AUTH_CONTEXT_TTL_MS = 60_000;
+const AUTH_CONTEXT_TTL_MS = 30_000;
 // Reuse a successful session-row check briefly across bursty API requests.
 // Local logout/revocation invalidates this immediately; remote revocations
 // become visible within this short bounded window.
-const AUTH_SESSION_VALIDATION_TTL_MS = 2_000;
+const AUTH_SESSION_VALIDATION_TTL_MS = 30_000;
 const authSessionValidationCache = new Map<string, {
   userId: string;
   schoolId: string | null;
@@ -165,6 +165,13 @@ const authContextCache = new Map<string, CachedAuthContext>();
 const schoolContextCache = new Map<string, { school: School; expiresAt: number }>();
 const branchListCache = new Map<string, { branches: SchoolBranch[]; expiresAt: number }>();
 const noticeCountCache = new Map<string, { count: number; expiresAt: number }>();
+function invalidateAuthContextForUser(userId: string): void {
+  authContextCache.delete(userId);
+  for (const [sessionId, entry] of authSessionValidationCache) {
+    if (entry.userId === userId) authSessionValidationCache.delete(sessionId);
+  }
+}
+
 
 const COMMUNICATION_SECRET_PREFIX = 'enc:v1:';
 function communicationSecretKey(): Buffer {
@@ -210,7 +217,7 @@ export function shouldTouchSession(currentExpiresAt: string, requestedExpiresAt:
   if (!Number.isFinite(current) || !Number.isFinite(requested)) return true;
   if (requested <= current) return requested < current;
   const timeoutMs = Math.max(1_000, requested - now);
-  const refreshWindowMs = Math.min(60_000, Math.max(1_000, timeoutMs / 20));
+  const refreshWindowMs = Math.min(5 * 60_000, Math.max(1_000, timeoutMs / 20));
   return requested - current >= refreshWindowMs;
 }
 
@@ -480,7 +487,10 @@ class StorageEngine {
 
   private invalidateAuthContextsForSchool(schoolId: string): void {
     for (const [userId, context] of authContextCache) {
-      if (context.user.schoolId === schoolId) authContextCache.delete(userId);
+      if (context.user.schoolId === schoolId) invalidateAuthContextForUser(userId);
+    }
+    for (const [sessionId, entry] of authSessionValidationCache) {
+      if (entry.schoolId === schoolId) authSessionValidationCache.delete(sessionId);
     }
   }
 
@@ -1628,13 +1638,13 @@ class StorageEngine {
       payload.pin = hashPin(payload.pin);
     }
     this.data.users[idx] = { ...this.data.users[idx], ...payload };
-    authContextCache.delete(id);
+    invalidateAuthContextForUser(id);
     this.save();
     return this.data.users[idx];
   }
 
   public deleteUser(id: string): boolean {
-    authContextCache.delete(id);
+    invalidateAuthContextForUser(id);
     const len = this.data.users.length;
     this.data.users = this.data.users.filter(u => u.id !== id);
     if (this.data.users.length < len) {
