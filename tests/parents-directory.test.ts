@@ -55,11 +55,30 @@ test('Parents directory uses the unique contacts endpoint and exposes class All 
 });
 
 
-test('guardian links are paginated by existing composite-key columns, not a nonexistent id column', () => {
+test('guardian links are restricted to students visible in the active directory', () => {
   const start = api.indexOf("apiRouter.get('/parents/contacts'");
   const end = api.indexOf("apiRouter.get('/students'", start);
   const route = api.slice(start, end);
-  assert.match(route, /queryAllRows\('student_guardians',[^\n]*'guardian_id,student_id,relation,is_primary',[^\n]*'guardian_id,student_id'\)/);
+  assert.match(route, /student_id: studentIdsForFilter/);
+  assert.match(route, /student_id: students\\.map\\(\\(student: any\\) => String\\(student\\.id\\)\\)/);
+  assert.match(route, /'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id'/);
+});
+
+test('parent directory responses are briefly cached per school and access scope then invalidated on writes', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(api, /parentContactsResponseCache = new Map/);
+  assert.match(route, /const cacheKey = \\[school\\.id, role, role === 'teacher' \\? user\\.id : 'school'/);
+  assert.match(route, /expiresAt: Date\\.now\\(\\) \\+ 10_000/);
+  assert.match(api, /parentContactsResponseCache\\.keys\\(\\)[\\s\\S]*?parentContactsResponseCache\\.delete\\(key\\)/);
+});
+
+test('parent directory overlaps independent class and academic-year reads', () => {
+  const start = api.indexOf("apiRouter.get('/parents/contacts'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /const \\[classes, currentYearId\\] = await Promise\\.all\\(/);
 });
 
 test('parents without phone numbers remain visible with a safe placeholder', () => {
