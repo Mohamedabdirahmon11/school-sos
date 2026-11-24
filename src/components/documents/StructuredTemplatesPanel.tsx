@@ -24,6 +24,17 @@ const TEMPLATE_OPTIONS: Array<{ kind:TemplateKind; label:string }> = [
 
 const DAYS = ['Isniin','Talaado','Arbaco','Khamiis','Jimce','Sabti'];
 const DEFAULT_SUBJECTS: TemplateSubject[] = [{ id:'subject-1', name:'Maaddada 1', maxMark:100 }];
+const STUDENT_DOCUMENT_CARDS = [
+  {kind:'certificate' as TemplateKind,title:'Shahaadada Ardayga',category:'Certificates',icon:'🎓',color:'#dbeafe',description:'Caddeyn rasmi ah oo muujinaysa diiwaangelinta ardayga.'},
+  {kind:'individual_report_card' as TemplateKind,title:'Warqadda Natiijada',category:'Reports',icon:'📊',color:'#fce7f3',description:'Natiijooyinka, darajooyinka iyo faallooyinka xilli-dugsiyeedka.'},
+  {kind:'attendance_sheet' as TemplateKind,title:'Warbixinta Xaadirinta',category:'Reports',icon:'✅',color:'#cffafe',description:'Maalmaha yimid, maqnaa iyo xaadirinta fasalka.'},
+  {kind:'student_id_cards' as TemplateKind,title:'Kaarka Aqoonsiga',category:'Cards',icon:'🪪',color:'#ffedd5',description:'Kaarka aqoonsiga ardayda oo diyaar u ah daabacaad.'},
+  {kind:'official_letter' as TemplateKind,title:'Warqad Rasmi ah',category:'Letters',icon:'✉️',color:'#dcfce7',description:'Warqad dugsi oo loogu talagalay waalid ama hay’ad.'},
+  {kind:'exam_result_list' as TemplateKind,title:'Liiska Natiijooyinka',category:'Reports',icon:'📋',color:'#ede9fe',description:'Liiska fasalka iyo wadarta dhibcaha la ansixiyey.'},
+  {kind:'class_list' as TemplateKind,title:'Liiska Ardayda',category:'Policies',icon:'📘',color:'#e5e7eb',description:'Liiska ardayda fasalka oo la daabici karo.'},
+  {kind:'fee_receipt' as TemplateKind,title:'Rasiidka Lacag-bixinta',category:'Letters',icon:'🧾',color:'#fef3c7',description:'Rasiidka lacag-bixinta ardayga ee kaydsan.'}
+];
+const STUDENT_DOC_CATEGORIES=['All','Certificates','Letters','Reports','Cards','Policies'];
 
 function defaultConfig(kind:TemplateKind, accentColor:string):TemplateConfig {
   const logoKinds:TemplateKind[]=['exam_result_list','individual_report_card','certificate','student_id_cards','official_letter','fee_receipt'];
@@ -183,6 +194,8 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
   const [certificateDate,setCertificateDate]=useState(()=>dateInTimezone(schoolTimezone));
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
+  const [catalogSearch,setCatalogSearch]=useState('');
+  const [catalogCategory,setCatalogCategory]=useState('All');
   const [preview,setPreview]=useState('');
 
   useEffect(()=>{const today=dateInTimezone(schoolTimezone);setYear(Number(today.slice(0,4)));setMonth(Number(today.slice(5,7)));setCertificateDate(today);},[schoolTimezone]);
@@ -506,6 +519,11 @@ export function StructuredTemplatesPanel({schoolName,accentColor,logoUrl,schoolT
       <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">Xir</button>
     </div>
     {message&&<div role="status" className="mb-3 rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">{message}</div>}
+    {canManageTemplates&&<section className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label="Dukumentiyada ardayga">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-base font-extrabold text-slate-900">Dukumentiyada Ardayga</h3><p className="text-xs text-slate-500">Dooro dukumentiga aad rabto inaad diyaariso.</p></div><input aria-label="Raadi dukumentiyada" value={catalogSearch} onChange={event=>setCatalogSearch(event.target.value)} placeholder="Raadi dukumenti…" className="min-h-10 min-w-[190px] flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm sm:max-w-xs"/></div>
+      <div className="student-doc-categories mb-3 flex flex-wrap gap-2">{STUDENT_DOC_CATEGORIES.map(category=><button key={category} type="button" aria-pressed={catalogCategory===category} onClick={()=>setCatalogCategory(category)}>{category==='All'?'Dhammaan':category}</button>)}</div>
+      <div className="student-doc-catalog">{STUDENT_DOCUMENT_CARDS.filter(card=>(catalogCategory==='All'||card.category===catalogCategory)&&card.title.toLowerCase().includes(catalogSearch.toLowerCase())).map(card=><button key={card.kind} type="button" className="student-doc-card" onClick={()=>changeKind(card.kind)} aria-label={'Dooro '+card.title}><span className="student-doc-icon" style={{backgroundColor:card.color}}>{card.icon}</span><span className="student-doc-tag">{card.category}</span><strong>{card.title}</strong><p>{card.description}</p></button>)}</div>
+    </section>}
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
       <div className="space-y-3">
         <label className="block text-xs font-semibold text-slate-600">Nooca template-ka
