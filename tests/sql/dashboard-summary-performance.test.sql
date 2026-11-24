@@ -354,3 +354,18 @@ END $$;
 
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT public.school_dashboard_summary('school-load');
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT count(*)
+FROM public.attendance_records
+WHERE school_id = 'school-load'
+  AND class_id = 'load-class-01'
+  AND date >= CURRENT_DATE - 30;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT class_id, student_id, sum(percentage)
+FROM public.student_marks
+WHERE school_id = 'school-load'
+  AND exam_id = 'load-exam-1'
+GROUP BY class_id, student_id;
+
