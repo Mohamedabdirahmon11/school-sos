@@ -50,3 +50,227 @@
   .school-people-page thead th { background:#202d27; }
   .school-people-page tbody tr:hover { background:#202d27; }
 }
+
+
+/* HTML reference parity: warm ivory canvas, compact cards and six-stage pipeline. */
+.school-people-page {
+  --people-bg: #f7f6f1;
+  --people-card: #ffffff;
+  --people-ink: #18312b;
+  --people-muted: #68756f;
+  --people-line: #e5e3da;
+  --people-accent: #176b58;
+  background: var(--people-bg);
+  border-radius: 18px;
+  color: var(--people-ink);
+}
+.school-people-page > header:first-child {
+  background: #fff !important;
+  color: var(--people-ink) !important;
+  border: 1px solid var(--people-line);
+  border-radius: 16px !important;
+  box-shadow: 0 2px 8px rgb(28 43 38 / 4%) !important;
+}
+.school-people-page > header:first-child h1,
+.school-people-page > header:first-child p,
+.school-people-page > header:first-child span { color: var(--people-ink) !important; }
+.school-people-page > header:first-child p { opacity: .72; }
+.school-people-page button:not(:disabled) { cursor: pointer; }
+.school-people-page button:disabled { cursor: not-allowed; }
+
+/* Teachers: turn the directory into the reference's responsive teacher-card grid. */
+.school-people-teachers-page .people-reference-directory,
+.school-people-teachers-page .bg-white.rounded-xl.border.shadow-sm.overflow-hidden {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.school-people-teachers-page table { border-collapse: separate; border-spacing: 0; }
+.school-people-teachers-page thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+.school-people-teachers-page tbody {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
+  gap: 12px;
+  padding: 2px;
+}
+.school-people-teachers-page tbody tr {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--people-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(28 43 38 / 4%);
+}
+.school-people-teachers-page tbody td {
+  display: block;
+  border: 0;
+  padding: 9px 14px !important;
+  overflow-wrap: anywhere;
+}
+.school-people-teachers-page tbody td:first-child {
+  padding-top: 16px !important;
+  background: #fbfcfa;
+}
+.school-people-teachers-page tbody td:last-child {
+  border-top: 1px solid #eeeee8;
+  padding-bottom: 14px !important;
+}
+.school-people-teachers-page tbody td:last-child button { margin: 3px 4px 0 0; }
+
+/* Parents & Contacts: reference-like clean directory with grouped child details. */
+.school-people-parents-page > div:has(> table),
+.school-people-parents-page .bg-white.rounded-xl.border {
+  border-color: var(--people-line) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 8px rgb(28 43 38 / 4%);
+}
+.school-people-parents-page table { min-width: 720px; }
+.school-people-parents-page tbody tr { vertical-align: top; }
+.school-people-parents-page tbody td { padding-top: 14px; padding-bottom: 14px; }
+.school-people-parents-page tbody td:nth-child(2) { min-width: 190px; }
+.school-people-parents-page tbody td:nth-child(4) { min-width: 220px; }
+
+/* Admissions: six visible lanes on desktop, horizontal scroll on compact screens. */
+.school-people-admissions-page .people-admissions-board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(220px, 1fr));
+  align-items: start;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 2px 2px 12px;
+  scrollbar-width: thin;
+}
+.school-people-admissions-page .people-admissions-board > section {
+  min-height: 260px;
+  border-color: var(--people-line) !important;
+  border-radius: 14px !important;
+  background: #f0f1eb !important;
+}
+.school-people-admissions-page .people-admissions-board article {
+  border-color: var(--people-line) !important;
+  border-radius: 11px !important;
+  box-shadow: 0 1px 4px rgb(28 43 38 / 5%);
+}
+.school-people-admissions-page .people-admissions-board h2 { font-size: 12px; }
+
+/* Staff roles: cards and directory follow the reference's compact administration layout. */
+.school-people-staff-page section,
+.school-people-staff-page > div.bg-white {
+  border-color: var(--people-line) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 8px rgb(28 43 38 / 4%);
+}
+.school-people-staff-page section > div.grid > div {
+  border-color: var(--people-line) !important;
+  border-radius: 11px !important;
+  background: #fbfcfa;
+}
+.school-people-staff-page table { min-width: 760px; }
+.school-people-staff-page tbody tr:hover { background: #f5f8f4; }
+
+@media (max-width: 767px) {
+  .school-people-page { border-radius: 0; padding: 12px !important; }
+  .school-people-admissions-page .people-admissions-board { grid-template-columns: repeat(6, minmax(240px, 82vw)); }
+  .school-people-teachers-page tbody { grid-template-columns: 1fr; }
+}
+
+
+/* All four People Admin pages use a div-based title row except Teachers.
+   Apply the same reference header treatment consistently without touching other modules. */
+.school-people-page > div:first-child:not(.people-admissions-board) {
+  border-radius: 14px;
+}
+.school-people-parents-page > div:first-child,
+.school-people-admissions-page > div:first-child,
+.school-people-staff-page > div:first-child {
+  background: #fff;
+  border: 1px solid var(--people-line);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 8px rgb(28 43 38 / 4%);
+}
+.school-people-parents-page > div:first-child h1,
+.school-people-admissions-page > div:first-child h1,
+.school-people-staff-page > div:first-child h1 {
+  margin: 0;
+  color: var(--people-ink) !important;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -.025em;
+}
+.school-people-parents-page > div:first-child p,
+.school-people-admissions-page > div:first-child p {
+  margin-top: 5px;
+  color: var(--people-muted) !important;
+  font-size: 12px;
+}
+.school-people-parents-page > div:nth-child(2):not([role="status"]):not([role="alert"]),
+.school-people-admissions-page > div:nth-child(3),
+.school-people-staff-page > div:nth-child(2) {
+  border-color: var(--people-line) !important;
+  border-radius: 12px !important;
+}
+.school-people-parents-page .overflow-x-auto,
+.school-people-staff-page .overflow-x-auto { max-width: 100%; }
+.school-people-parents-page table,
+.school-people-staff-page table { background: var(--people-card); }
+.school-people-parents-page tbody td,
+.school-people-staff-page tbody td { color: var(--people-ink); }
+.school-people-staff-page .school-people-role-card,
+.school-people-staff-page [data-role-card] {
+  border: 1px solid var(--people-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(28 43 38 / 4%);
+}
+
+
+/* Preserve the reference's dark palette instead of forcing light-only white cards. */
+@media (prefers-color-scheme: dark) {
+  .school-people-page {
+    --people-bg: #121a17;
+    --people-card: #1a2420;
+    --people-ink: #e6efe9;
+    --people-muted: #9db0a7;
+    --people-line: #2d3b35;
+    --people-accent: #4cc58a;
+    background: var(--people-bg);
+    color: var(--people-ink);
+  }
+  .school-people-page > header:first-child,
+  .school-people-page > div:first-child,
+  .school-people-teachers-page tbody tr,
+  .school-people-parents-page .bg-white.rounded-xl.border,
+  .school-people-staff-page section,
+  .school-people-staff-page > div.bg-white,
+  .school-people-staff-page .school-people-role-card,
+  .school-people-staff-page [data-role-card] {
+    background: var(--people-card) !important;
+    border-color: var(--people-line) !important;
+    color: var(--people-ink);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
+  }
+  .school-people-page h1,
+  .school-people-page h2,
+  .school-people-page h3,
+  .school-people-page p,
+  .school-people-page label,
+  .school-people-page td,
+  .school-people-page th,
+  .school-people-page input,
+  .school-people-page select,
+  .school-people-page textarea {
+    background: #121a17;
+    border-color: var(--people-line);
+    color: var(--people-ink);
+  }
+  .school-people-page thead th { background: #202d27; color: var(--people-muted); }
+  .school-people-page tbody tr:hover { background: #202d27; }
+  .school-people-teachers-page tbody td:first-child { background: #202d27; }
+  .school-people-admissions-page .people-admissions-board > section { background: #1f2f28 !important; }
+  .school-people-admissions-page .people-admissions-board article { background: var(--people-card) !important; }
+  .school-people-staff-page section > div.grid > div { background: #202d27; }
+}

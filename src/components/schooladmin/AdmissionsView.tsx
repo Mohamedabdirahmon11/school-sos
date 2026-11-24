@@ -123,7 +123,7 @@ export const AdmissionsView: React.FC = () => {
       </div>
 
       {loading ? <div className="bg-white border rounded-xl p-8 text-center text-xs text-[#64748B]">Loading admissions...</div> : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
+        <div className="people-admissions-board grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
           {ADMISSION_STAGES.map((stage, stageIndex) => {
             const stageRows = visibleRows.filter(row => getStage(row) === stage.key);
             return <section key={stage.key} aria-label={stage.label} className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 min-w-0">
