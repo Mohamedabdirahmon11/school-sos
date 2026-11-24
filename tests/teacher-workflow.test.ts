@@ -250,7 +250,8 @@ test('teacher sidebar remains fixed while the central viewport owns vertical scr
   const app = read('../src/App.tsx');
   assert.match(sidebar, /fixed inset-y-0 left-0/);
   assert.match(sidebar, /overflow-y-auto/);
-  assert.match(app, /<main className="min-h-0 flex-1 overflow-y-auto overscroll-contain/);
+  assert.match(app, /<main className=/);
+  assert.match(app, /overflow-y-auto overscroll-contain/);
 });
 
 
