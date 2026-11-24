@@ -238,3 +238,119 @@ END $$;
 
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT public.teacher_dashboard_summary('school-a', 'teacher-a');
+
+
+-- Large synthetic tenant fixture for the CI performance regression budget.
+-- This is an isolated PostgreSQL service database; it never connects to live Supabase.
+INSERT INTO public.schools (id, timezone)
+VALUES ('school-load', 'Africa/Addis_Ababa')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.classes (id, school_id, name, grade_level, is_archived, class_teacher_id)
+SELECT
+  'load-class-' || lpad(g::text, 2, '0'),
+  'school-load',
+  'Grade ' || g,
+  g::text,
+  false,
+  'load-user-' || lpad(g::text, 2, '0')
+FROM generate_series(1, 40) AS g
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.teachers (id, school_id, status, user_id)
+SELECT
+  'load-teacher-' || lpad(g::text, 2, '0'),
+  'school-load',
+  'active',
+  'load-user-' || lpad(g::text, 2, '0')
+FROM generate_series(1, 80) AS g
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.students (id, school_id, student_id, first_name, middle_name, last_name, class_id, admission_date, status, created_at)
+SELECT
+  'load-student-' || lpad(g::text, 4, '0'),
+  'school-load',
+  'L' || lpad(g::text, 4, '0'),
+  'Student',
+  '',
+  g::text,
+  'load-class-' || lpad((((g - 1) % 40) + 1)::text, 2, '0'),
+  CURRENT_DATE,
+  'active',
+  now() - (g || ' seconds')::interval
+FROM generate_series(1, 1500) AS g
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.attendance_records (id, school_id, class_id, student_id, date, status)
+SELECT
+  'load-attendance-' || lpad(g::text, 6, '0'),
+  'school-load',
+  'load-class-' || lpad(((((g - 1) % 1500) % 40) + 1)::text, 2, '0'),
+  'load-student-' || lpad(((((g - 1) % 1500) + 1))::text, 4, '0'),
+  CURRENT_DATE - (g % 30),
+  CASE WHEN g % 10 = 0 THEN 'absent' WHEN g % 7 = 0 THEN 'late' ELSE 'present' END
+FROM generate_series(1, 100000) AS g
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.student_marks (
+  id varchar(64) PRIMARY KEY,
+  school_id varchar(64) NOT NULL,
+  exam_id varchar(64) NOT NULL,
+  student_id varchar(64) NOT NULL,
+  class_id varchar(64) NOT NULL,
+  percentage numeric(6,2) NOT NULL,
+  status text NOT NULL
+);
+
+INSERT INTO public.student_marks (id, school_id, exam_id, student_id, class_id, percentage, status)
+SELECT
+  'load-mark-' || lpad(g::text, 6, '0'),
+  'school-load',
+  'load-exam-' || ((g - 1) % 4 + 1),
+  'load-student-' || lpad(((((g - 1) % 1500) + 1))::text, 4, '0'),
+  'load-class-' || lpad(((((g - 1) % 1500) % 40) + 1)::text, 2, '0'),
+  (g % 101)::numeric(6,2),
+  CASE WHEN g % 5 = 0 THEN 'draft' ELSE 'approved' END
+FROM generate_series(1, 20000) AS g
+ON CONFLICT (id) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_student_marks_school_exam_student
+  ON public.student_marks (school_id, exam_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_student_marks_class_id
+  ON public.student_marks (class_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_records_school_class_date
+  ON public.attendance_records (school_id, class_id, date);
+CREATE INDEX IF NOT EXISTS idx_attendance_records_school_student_date
+  ON public.attendance_records (school_id, student_id, date);
+
+ANALYZE public.students;
+ANALYZE public.teachers;
+ANALYZE public.classes;
+ANALYZE public.attendance_records;
+ANALYZE public.student_marks;
+
+DO $$
+DECLARE
+  summary jsonb;
+BEGIN
+  ASSERT (SELECT count(*) FROM public.classes WHERE school_id = 'school-load') = 40,
+    'large fixture must contain 40 classes';
+  ASSERT (SELECT count(*) FROM public.students WHERE school_id = 'school-load') = 1500,
+    'large fixture must contain 1500 students';
+  ASSERT (SELECT count(*) FROM public.teachers WHERE school_id = 'school-load') = 80,
+    'large fixture must contain 80 teachers';
+  ASSERT (SELECT count(*) FROM public.attendance_records WHERE school_id = 'school-load') = 100000,
+    'large fixture must contain 100000 attendance rows';
+  ASSERT (SELECT count(*) FROM public.student_marks WHERE school_id = 'school-load') = 20000,
+    'large fixture must contain 20000 student marks rows';
+  summary := public.school_dashboard_summary('school-load');
+  ASSERT summary->'stats'->>'totalStudents' = '1500',
+    'large tenant dashboard must return the seeded student count';
+  ASSERT summary->'stats'->>'totalTeachers' = '80',
+    'large tenant dashboard must return the seeded teacher count';
+  ASSERT summary->>'totalClasses' = '40',
+    'large tenant dashboard must return the seeded class count';
+END $$;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT public.school_dashboard_summary('school-load');
