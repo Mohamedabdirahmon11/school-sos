@@ -75,6 +75,7 @@ const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
 const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
 const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
 const schoolReportSummaryCache = new SchoolReadinessCache<any>(60_000);
+const classYearlyRankingsCache = new SchoolReadinessCache<any>(5 * 60_000);
 const teacherDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
 
 function getCachedSchoolDashboardSummary(schoolId: string) {
@@ -107,6 +108,7 @@ apiRouter.use((req, res, next) => {
         schoolReadinessCache.invalidate(schoolId);
         schoolDashboardSummaryCache.invalidate(schoolId);
         schoolReportSummaryCache.invalidatePrefix(`${schoolId}:`);
+        classYearlyRankingsCache.invalidatePrefix(`${schoolId}:`);
         teacherDashboardSummaryCache.invalidatePrefix(`${schoolId}:`);
       }
     });
@@ -8520,21 +8522,36 @@ apiRouter.get('/exams/rankings/semester', requireAuth, requireSchoolContext, asy
 // Semester 2 Combined Yearly Results & Ranking (for Final Report Card)
 apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
   const { classId } = req.query;
   if (!classId || typeof classId !== 'string') { res.status(400).json({ error: 'classId is required.' }); return; }
   if (!await canReadClassResults(req, res, classId)) return;
-  const [rankings, klass] = await Promise.all([db.getClassYearlyRankings(school.id, classId, false), db.getClassById(classId, school.id)]);
-  const studentIds = rankings.map(row => row.student.id);
-  const commentsResult = studentIds.length
-    ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
-    : { data: [], error: null };
-  const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
-  for (const row of commentsResult.data || []) {
-    const comments = commentsByStudent.get(row.student_id) || [];
-    comments.push({ semester: row.semester, comment: row.comment || '' });
-    commentsByStudent.set(row.student_id, comments);
+  const role = normalizeRole(user.role) || user.role;
+  const cacheKey = `${school.id}:${school.academicYear}:${classId}:${role}:${user.id}`;
+  try {
+    const rankings = await classYearlyRankingsCache.get(cacheKey, async () => {
+      const [rows, klass] = await Promise.all([
+        db.getClassYearlyRankings(school.id, classId, false),
+        db.getClassById(classId, school.id)
+      ]);
+      if (!klass) return null;
+      const studentIds = rows.map(row => row.student.id);
+      const commentsResult = studentIds.length
+        ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass.academicYear || school.academicYear).in('student_id', studentIds)
+        : { data: [], error: null };
+      const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
+      for (const row of commentsResult.data || []) {
+        const comments = commentsByStudent.get(row.student_id) || [];
+        comments.push({ semester: row.semester, comment: row.comment || '' });
+        commentsByStudent.set(row.student_id, comments);
+      }
+      return rows.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] }));
+    });
+    if (!rankings) { res.status(404).json({ error: 'Class was not found.' }); return; }
+    res.json(rankings);
+  } catch {
+    res.status(503).json({ error: 'Unable to load yearly exam rankings.' });
   }
-  res.json(rankings.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] })));
 });
 
 // Year-End Promotion Confirmation
