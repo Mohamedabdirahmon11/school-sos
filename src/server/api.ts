@@ -6994,7 +6994,7 @@ apiRouter.put('/school/staff/roles/:id', requireAuth, requireSchoolAdminOrSuperA
   const { name, description, permissions } = req.body || {};
   if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) { res.status(400).json({ error: 'Role name must be 2–100 characters.' }); return; }
   if (description !== undefined && (typeof description !== 'string' || description.length > 500)) { res.status(400).json({ error: 'Role description must be 500 characters or fewer.' }); return; }
-  if ((permissions !== undefined || roleId !== undefined) && (!Array.isArray(resolvedPermissions) || resolvedPermissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more role permissions are invalid.' }); return; }
+  if (permissions !== undefined && (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more role permissions are invalid.' }); return; }
   const roles = await db.getStaffRoles(school.id);
   const prior = roles.find(role => role.id === req.params.id);
   if (!prior) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
@@ -7078,7 +7078,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
   const resolvedPermissions = selectedRole ? selectedRole.permissions : permissions;
   if (fullName !== undefined && (typeof fullName !== 'string' || !fullName.trim()) || roleTitle !== undefined && (typeof roleTitle !== 'string' || !roleTitle.trim())) { res.status(400).json({ error: 'Full name and role title must be non-empty text.' }); return; }
   if (email !== undefined && typeof email !== 'string' || phone !== undefined && typeof phone !== 'string') { res.status(400).json({ error: 'Email and phone must be text values.' }); return; }
-  if (permissions !== undefined && (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more staff permissions are invalid.' }); return; }
+  if ((permissions !== undefined || roleId !== undefined) && (!Array.isArray(resolvedPermissions) || resolvedPermissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more staff permissions are invalid.' }); return; }
   if (monthlySalary !== undefined && (!Number.isFinite(Number(monthlySalary)) || Number(monthlySalary) < 0)) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   if (status !== undefined && !['active', 'inactive'].includes(status)) { res.status(400).json({ error: 'Status must be active or inactive.' }); return; }
   const prior = (await db.getStaffMembers(school.id)).find(item => item.id === req.params.id);
@@ -7102,7 +7102,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
     const existingLogin = await db.findUserForLogin(cleanEmail);
     if (existingLogin && existingLogin.id !== prior.userId) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
   }
-  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions: roleId !== undefined ? resolvedPermissions : permissions, roleId: roleId !== undefined ? (selectedRole?.id || undefined) : undefined, roleTitle: selectedRole ? selectedRole.name : roleTitle, status }).filter(([, value]) => value !== undefined));
+  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle: selectedRole ? selectedRole.name : roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions: roleId !== undefined ? resolvedPermissions : permissions, roleId: roleId !== undefined ? (selectedRole?.id || '') : undefined, status }).filter(([, value]) => value !== undefined));
   const updated = await db.updateStaffMember(req.params.id, school.id, updates);
   if (!updated) { res.status(404).json({ error: 'Staff member not found.' }); return; }
   if (updated.userId) {
