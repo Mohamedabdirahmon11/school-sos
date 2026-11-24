@@ -6974,16 +6974,72 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
 const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
+apiRouter.get('/school/staff/roles', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  res.json(await db.getStaffRoles((req as any).school.id));
+});
+apiRouter.post('/school/staff/roles', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const { name, description, permissions } = req.body || {};
+  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) { res.status(400).json({ error: 'Role name must be 2–100 characters.' }); return; }
+  if (description !== undefined && (typeof description !== 'string' || description.length > 500)) { res.status(400).json({ error: 'Role description must be 500 characters or fewer.' }); return; }
+  if (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission))) { res.status(400).json({ error: 'One or more role permissions are invalid.' }); return; }
+  const roles = await db.getStaffRoles(school.id);
+  if (roles.some(role => String(role.name).toLowerCase() === name.trim().toLowerCase())) { res.status(409).json({ error: 'A role with that name already exists in this school.' }); return; }
+  const role = await db.createStaffRole({ schoolId: school.id, name: name.trim(), description: typeof description === 'string' ? description.trim() : '', permissions: [...new Set(permissions)] });
+  await db.flush();
+  res.status(201).json(role);
+});
+apiRouter.put('/school/staff/roles/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const { name, description, permissions } = req.body || {};
+  if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) { res.status(400).json({ error: 'Role name must be 2–100 characters.' }); return; }
+  if (description !== undefined && (typeof description !== 'string' || description.length > 500)) { res.status(400).json({ error: 'Role description must be 500 characters or fewer.' }); return; }
+  if ((permissions !== undefined || roleId !== undefined) && (!Array.isArray(resolvedPermissions) || resolvedPermissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more role permissions are invalid.' }); return; }
+  const roles = await db.getStaffRoles(school.id);
+  const prior = roles.find(role => role.id === req.params.id);
+  if (!prior) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  const nextName = typeof name === 'string' ? name.trim() : prior.name;
+  if (roles.some(role => role.id !== prior.id && String(role.name).toLowerCase() === nextName.toLowerCase())) { res.status(409).json({ error: 'A role with that name already exists in this school.' }); return; }
+  const updated = await db.updateStaffRole(prior.id, school.id, { ...(name !== undefined ? { name: nextName } : {}), ...(description !== undefined ? { description: description.trim() } : {}), ...(permissions !== undefined ? { permissions: [...new Set(permissions)] } : {}) });
+  if (!updated) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  if (permissions !== undefined || name !== undefined) {
+    const members = (await db.getStaffMembers(school.id)).filter(member => member.roleId === prior.id);
+    for (const member of members) {
+      const changed = await db.updateStaffMember(member.id, school.id, { ...(permissions !== undefined ? { permissions: updated.permissions } : {}), ...(name !== undefined ? { roleTitle: updated.name } : {}) });
+      if (changed?.userId) {
+        db.updateUser(changed.userId, { permissions: changed.permissions });
+        invalidateAuthenticatedSnapshot(changed.userId);
+      }
+    }
+  }
+  db.logAudit({ action: 'STAFF_ROLE_UPDATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated custom staff role ${updated.name}.`, severity: 'warning' });
+  await db.flush();
+  res.json(updated);
+});
+apiRouter.delete('/school/staff/roles/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const role = (await db.getStaffRoles(school.id)).find(item => item.id === req.params.id);
+  if (!role) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  if ((await db.getStaffMembers(school.id)).some(member => member.roleId === role.id)) { res.status(409).json({ error: 'This role is assigned to staff. Reassign those staff members before deleting it.' }); return; }
+  const deleted = await db.deleteStaffRole(role.id, school.id);
+  if (!deleted) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  await db.flush();
+  res.json({ success: true });
+});
+
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   res.json(await db.getStaffMembers((req as any).school.id));
 });
 apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const { fullName, roleTitle, email, phone, monthlySalary, permissions } = req.body || {};
+  const { fullName, roleTitle, email, phone, monthlySalary, permissions, roleId } = req.body || {};
   const initialPin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
   const createLogin = req.body?.createLogin !== false;
   if (typeof fullName !== 'string' || !fullName.trim() || typeof roleTitle !== 'string' || !roleTitle.trim() || (createLogin && !/^\d{4,6}$/.test(initialPin))) { res.status(400).json({ error: 'Full name and role title are required; a 4–6 digit PIN is required only when creating login access.' }); return; }
-  if (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)) || (!createLogin && permissions.length > 0)) { res.status(400).json({ error: 'No-login staff records cannot receive system permissions.' }); return; }
+  const customRole = typeof roleId === 'string' && roleId ? (await db.getStaffRoles(school.id)).find(role => role.id === roleId) : null;
+  if (roleId && !customRole) { res.status(400).json({ error: 'Selected custom role does not belong to this school.' }); return; }
+  const resolvedPermissions = customRole ? customRole.permissions : permissions;
+  if (!Array.isArray(resolvedPermissions) || resolvedPermissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)) || (!createLogin && resolvedPermissions.length > 0)) { res.status(400).json({ error: 'No-login staff records cannot receive system permissions.' }); return; }
   if (!Number.isFinite(Number(monthlySalary)) || Number(monthlySalary) < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid contact email.' }); return; }
@@ -6994,7 +7050,7 @@ apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, req
   const existingUsers = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (existingStaff.some(item => item.staffId?.toUpperCase() === staffId) || existingUsers.some((item: any) => item.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
   const account = createLogin ? db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin), mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0 }) : null;
-  const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions: createLogin ? permissions : [], status: 'active', ...(account ? { userId: account.id } : {}) });
+  const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions: createLogin ? resolvedPermissions : [], status: 'active', ...(customRole ? { roleId: customRole.id, roleTitle: customRole.name } : {}), ...(account ? { userId: account.id } : {}) });
   if (account) db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
   res.status(201).json({ ...staff, ...(createLogin ? { initialPin } : {}) });
 });
@@ -7016,7 +7072,10 @@ apiRouter.post('/school/staff/:id/reset-pin', requireAuth, requireSchoolAdminOrS
 
 apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const { fullName, roleTitle, email, phone, monthlySalary, permissions, status } = req.body || {};
+  const { fullName, roleTitle, email, phone, monthlySalary, permissions, status, roleId } = req.body || {};
+  const selectedRole = typeof roleId === 'string' && roleId ? (await db.getStaffRoles(school.id)).find(role => role.id === roleId) : null;
+  if (roleId && !selectedRole) { res.status(400).json({ error: 'Selected custom role does not belong to this school.' }); return; }
+  const resolvedPermissions = selectedRole ? selectedRole.permissions : permissions;
   if (fullName !== undefined && (typeof fullName !== 'string' || !fullName.trim()) || roleTitle !== undefined && (typeof roleTitle !== 'string' || !roleTitle.trim())) { res.status(400).json({ error: 'Full name and role title must be non-empty text.' }); return; }
   if (email !== undefined && typeof email !== 'string' || phone !== undefined && typeof phone !== 'string') { res.status(400).json({ error: 'Email and phone must be text values.' }); return; }
   if (permissions !== undefined && (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more staff permissions are invalid.' }); return; }
@@ -7043,7 +7102,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
     const existingLogin = await db.findUserForLogin(cleanEmail);
     if (existingLogin && existingLogin.id !== prior.userId) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
   }
-  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions, status }).filter(([, value]) => value !== undefined));
+  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions: roleId !== undefined ? resolvedPermissions : permissions, roleId: roleId !== undefined ? (selectedRole?.id || undefined) : undefined, roleTitle: selectedRole ? selectedRole.name : roleTitle, status }).filter(([, value]) => value !== undefined));
   const updated = await db.updateStaffMember(req.params.id, school.id, updates);
   if (!updated) { res.status(404).json({ error: 'Staff member not found.' }); return; }
   if (updated.userId) {
@@ -7071,6 +7130,33 @@ apiRouter.post('/school/admissions', requireAuth, requireSchoolContext, requireS
   await db.flush();
   res.status(201).json(application);
 });
+apiRouter.patch('/school/admissions/:id/pipeline-stage', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
+  const school = (req as any).school;
+  const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
+  if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
+  const stages = ['applied', 'review', 'interview', 'accepted', 'enrolled', 'rejected'];
+  const current = application.pipelineStage || (application.status === 'approved' ? 'enrolled' : application.status === 'rejected' ? 'rejected' : 'applied');
+  const next = req.body?.stage;
+  if (typeof next !== 'string' || !stages.includes(next)) { res.status(400).json({ error: 'Choose a valid admissions stage.' }); return; }
+  if (current === 'enrolled' || current === 'rejected') { res.status(409).json({ error: 'Completed applications cannot be moved to another stage.' }); return; }
+  if (next === 'enrolled') { res.status(400).json({ error: 'Use the enroll action from the accepted stage.' }); return; }
+  if (next === 'rejected') {
+    const rejected = await db.updateAdmissionApplication(application.id, school.id, 'rejected');
+    db.logAudit({ action: 'ADMISSION_APPLICATION_REJECTED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was rejected from ${current}.`, severity: 'warning' });
+    await db.flush();
+    res.json({ ...rejected, pipelineStage: 'rejected' });
+    return;
+  }
+  const currentIndex = stages.indexOf(current);
+  const nextIndex = stages.indexOf(next);
+  if (currentIndex < 0 || Math.abs(nextIndex - currentIndex) !== 1 || nextIndex > 3) { res.status(409).json({ error: 'Move applications one stage at a time; enrollment is completed with the enroll action.' }); return; }
+  const updated = await db.updateAdmissionPipelineStage(application.id, school.id, next);
+  if (!updated) { res.status(404).json({ error: 'Admission application not found.' }); return; }
+  db.logAudit({ action: 'ADMISSION_PIPELINE_STAGE_CHANGED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} moved from ${current} to ${next}.`, severity: 'info' });
+  await db.flush();
+  res.json(updated);
+});
+
 apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
   const school = (req as any).school;
   const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
