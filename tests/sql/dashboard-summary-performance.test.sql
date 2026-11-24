@@ -323,8 +323,8 @@ ON CONFLICT (id) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_attendance_date
   ON public.attendance_records (school_id, class_id, date);
 
-\\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
-\\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
+\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
+\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
 
 DO $$
 BEGIN
