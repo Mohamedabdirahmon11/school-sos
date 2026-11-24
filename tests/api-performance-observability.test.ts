@@ -189,3 +189,13 @@ test('critical list and report routes have explicit query-count ceilings', () =>
   assert.match(budgets, /'GET \/school\/reports\/summary': 8/);
   assert.match(budgets, /'GET \/exams\/rankings\/yearly': 12/);
 });
+
+
+test('student list reads active enrollments in bounded batches instead of 100-row loops', () => {
+  assert.match(api, /async function queryAllRows\([\s\S]*?pageSize = 100/);
+  assert.match(api, /queryPage\(table, filters, page, pageSize, orFilter, columns, orderBy, true, pageSize\)/);
+  const start = api.indexOf("apiRouter.get('/students'");
+  const end = api.indexOf("apiRouter.get('/students/export'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /'id,student_id,class_id,section_id,roll_number', undefined, undefined, 1_000/);
+});
