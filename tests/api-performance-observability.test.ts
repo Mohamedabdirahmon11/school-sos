@@ -62,3 +62,27 @@ test('public login paints while session verification runs but cannot submit befo
   assert.match(login, /if \(authCheckPending\) return;/);
   assert.match(login, /disabled=\{isLoading \|\| authCheckPending\}/);
 });
+
+
+test('student options endpoint is bounded, school scoped, role scoped, and excludes fee joins', () => {
+  const start = api.indexOf("apiRouter.get('/students/options'");
+  const end = api.indexOf("apiRouter.get('/students'", start);
+  const route = api.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(route, /requireAuth, requireSchoolContext, requireParentPortalSetupReady/);
+  assert.match(route, /school_id: school\.id/);
+  assert.match(route, /getTeacherAssignedClassIds\(school\.id, user\.id\)/);
+  assert.match(route, /getParentLinkedStudentIds\(school\.id, user\.id\)/);
+  assert.match(route, /db\.queryPage\([\s\S]*?\n    1,\n    20,/);
+  assert.match(route, /id,student_id,first_name,middle_name,last_name,status,class_id/);
+  assert.match(route, /res\.set\('Cache-Control', 'private, no-store'\)/);
+  assert.doesNotMatch(route, /fee_payments|getStudentFeeStatusMap|feeStatus/);
+});
+
+test('extra modules use debounced student options instead of downloading every student', () => {
+  const modules = readFileSync(new URL('../src/components/schooladmin/ExtraModulesView.tsx', import.meta.url), 'utf8');
+  assert.match(modules, /ApiClient\.getStudentOptions\(search\)/);
+  assert.match(modules, /\}, 250\)/);
+  assert.doesNotMatch(modules, /ApiClient\.getAllStudents\(/);
+  assert.match(modules, /Search student by name or ID/);
+});
