@@ -3,7 +3,7 @@ import './people-admin.css';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolClass } from '../../types/index.ts';
-import { Check, CheckCircle2, Inbox, Plus, X } from 'lucide-react';
+import { Check, CheckCircle2, Plus, X } from 'lucide-react';
 
 interface AdmissionApplication {
   id: string; firstName: string; middleName: string; lastName: string; gender: 'male' | 'female';
