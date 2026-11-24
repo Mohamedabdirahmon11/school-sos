@@ -359,3 +359,28 @@
 :root[data-theme="dark"] .school-people-page select,
 :root[data-theme="dark"] .school-people-page textarea {background:#121a17;color:var(--people-ink);border-color:var(--people-line)}
 :root[data-theme="dark"] .school-people-admissions-page .people-admissions-board>section {background:var(--people-soft)!important}
+
+
+/* Teachers can switch between compact cards and a traditional data table. */
+.school-people-teachers-page .teacher-directory-cards .overflow-x-auto { overflow:visible; }
+.school-people-teachers-page .teacher-directory-cards table { width:100%; min-width:0; }
+.school-people-teachers-page .teacher-directory-cards thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+.school-people-teachers-page .teacher-directory-cards tbody { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr)); gap:14px; padding:12px; }
+.school-people-teachers-page .teacher-directory-cards tbody tr { display:flex; flex-direction:column; min-width:0; overflow:hidden; border:1px solid var(--people-line); border-radius:14px; background:var(--people-card); }
+.school-people-teachers-page .teacher-directory-cards tbody td { display:block; white-space:normal; padding:10px 14px!important; border:0; overflow-wrap:anywhere; }
+.school-people-teachers-page .teacher-directory-cards tbody td:first-child { padding-top:15px!important; background:var(--people-card); }
+.school-people-teachers-page .teacher-directory-cards tbody td:last-child { border-top:1px solid var(--people-line); }
+.school-people-teachers-page .teacher-directory-rows { overflow:hidden!important; }
+.school-people-teachers-page .teacher-directory-rows .overflow-x-auto { overflow-x:auto; }
+.school-people-teachers-page .teacher-directory-rows table { display:table; width:100%; min-width:900px; border-collapse:collapse; }
+.school-people-teachers-page .teacher-directory-rows thead { position:static; width:auto; height:auto; overflow:visible; clip:auto; white-space:normal; }
+.school-people-teachers-page .teacher-directory-rows thead tr { display:table-row; }
+.school-people-teachers-page .teacher-directory-rows thead th { display:table-cell; padding:12px 14px; white-space:nowrap; }
+.school-people-teachers-page .teacher-directory-rows tbody { display:table-row-group; padding:0; }
+.school-people-teachers-page .teacher-directory-rows tbody tr { display:table-row; min-width:0; border:0; border-radius:0; box-shadow:none; background:transparent; }
+.school-people-teachers-page .teacher-directory-rows tbody td { display:table-cell; padding:12px 14px!important; white-space:normal; vertical-align:middle; border-bottom:1px solid var(--people-line); }
+.school-people-teachers-page .teacher-directory-rows tbody td:first-child { background:transparent; padding-top:12px!important; }
+.school-people-teachers-page .teacher-directory-rows tbody td:last-child { border-top:0; min-width:250px; white-space:nowrap; }
+.school-people-teachers-page .teacher-directory-rows tbody tr:hover { background:var(--people-soft); }
+@media (max-width:767px) { .school-people-teachers-page .teacher-directory-cards tbody { grid-template-columns:1fr; padding:8px; } .school-people-teachers-page .teacher-directory-rows table { min-width:900px; } }
+@media (prefers-color-scheme:dark) { .school-people-teachers-page .teacher-directory-rows tbody tr { background:transparent; } .school-people-teachers-page .teacher-directory-rows tbody tr:hover { background:#202d27; } }
