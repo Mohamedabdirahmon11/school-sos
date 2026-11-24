@@ -9957,7 +9957,19 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         : [];
     }
   } else {
-    const users = await db.getUsers(school.id);
+    const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const search = rawSearch.replace(/[%(),*\\"]/g, '').slice(0, 80);
+    const searchFilter = search
+      ? `full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,student_id.ilike.%${search}%`
+      : undefined;
+    const users = (await db.queryPage(
+      'users',
+      { school_id: school.id, role: allowedRoles[user.role] || [] },
+      1,
+      100,
+      searchFilter,
+      'id,role,full_name,email,phone,student_id'
+    )).items;
     contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
     if (user.role === 'teacher') {
       const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
