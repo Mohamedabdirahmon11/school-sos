@@ -397,7 +397,19 @@ BEGIN
     WHERE schemaname = 'public'
       AND indexname = 'idx_student_marks_school_exam_student'
   ), 'the production marks schema must not assume a nonexistent exam_id column';
-END $$;
+END $;
+
+-- Preserve the legacy API fallback where a configured zero pass mark defaults to 50.
+UPDATE public.exam_configs SET pass_mark_percentage = 0 WHERE id = 'config-a';
+DO $
+DECLARE
+  report jsonb;
+BEGIN
+  report := public.schoolos_school_reports_summary('school-a', '2026-2027', false);
+  ASSERT (report->>'passRate')::numeric = 50,
+    'zero configured pass mark must retain the legacy 50 percent fallback';
+END $;
+UPDATE public.exam_configs SET pass_mark_percentage = 50 WHERE id = 'config-a';
 
 ANALYZE public.students;
 ANALYZE public.teachers;
