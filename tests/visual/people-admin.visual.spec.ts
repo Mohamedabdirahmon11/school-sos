@@ -32,11 +32,11 @@ for (const width of viewports) {
         await reference.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);
         await reference.locator('#nav [data-tab="' + view.tab + '"]').click();
         await expect(reference.locator('#main h1')).toBeVisible();
-        await reference.screenshot({ path: path.join(folder, 'reference', view.section + '.png'), fullPage: true });
+        await reference.locator('#main').screenshot({ path: path.join(folder, 'reference', view.section + '.png') });
 
         await live.goto('http://127.0.0.1:4173/teacher-portal-visual.html?component=people-admin&section=' + view.section + '&theme=' + theme);
         await expect(live.locator('.school-people-page h1')).toBeVisible();
-        await live.screenshot({ path: path.join(folder, 'schoolos', view.section + '.png'), fullPage: true });
+        await live.locator('.school-people-page').screenshot({ path: path.join(folder, 'schoolos', view.section + '.png') });
       }
 
       expect(errors, 'People Admin browser errors').toEqual([]);
