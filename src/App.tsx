@@ -196,8 +196,8 @@ const AppContent: React.FC = () => {
         <div className="min-h-0 flex-1 flex flex-col min-w-0 overflow-hidden">
           {!setupRequired && !['student', 'parent'].includes(user.role) && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
-          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6">
-            <div className="sticky top-2 z-40 flex h-0 justify-end px-4 pointer-events-none">
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6 relative">
+            <div className="pointer-events-none absolute right-4 top-2 z-40">
               <button
                 type="button"
                 onClick={() => window.location.reload()}
