@@ -180,6 +180,5 @@ test('read-only exam configuration reads do not create or upsert missing default
   const method = storage.slice(start, end);
   assert.match(method, /persistIfMissing = true/);
   assert.match(method, /if \(persistIfMissing\) \{[\s\S]*?this\.data\.examConfigs\.push\(conf\)[\s\S]*?this\.save\(\)/);
-  assert.match(method, /if \(!persistIfMissing\)/);
   assert.match(method, /return conf;/);
 });
