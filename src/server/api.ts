@@ -69,6 +69,8 @@ export const apiRouter = Router();
 
 type ParentPortalSummaryCacheEntry = { expiresAt: number; payload: any };
 const parentPortalSummaryCache = new Map<string, ParentPortalSummaryCacheEntry>();
+type ParentContactsCacheEntry = { expiresAt: number; items: any[]; total: number };
+const parentContactsResponseCache = new Map<string, ParentContactsCacheEntry>();
 const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
 const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
 const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
@@ -86,6 +88,9 @@ function invalidateParentPortalSummaryCache(schoolId: string) {
   const prefix = schoolId + ':';
   for (const key of parentPortalSummaryCache.keys()) {
     if (key.startsWith(prefix)) parentPortalSummaryCache.delete(key);
+  }
+  for (const key of parentContactsResponseCache.keys()) {
+    if (key.startsWith(prefix)) parentContactsResponseCache.delete(key);
   }
 }
 
@@ -4358,7 +4363,8 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   if (studentIds && studentIds.length === 0) return statuses;
   const payments = await queryAllRows('fee_payments', {
     school_id: schoolId,
-    student_id: studentIds
+    student_id: studentIds,
+    academic_year: academicYear
   }, 'student_id,amount_due,amount_paid,remaining_amount,voided_at,academic_year');
   const totals = new Map<string, { due: number; paid: number; remaining: number }>();
   for (const payment of payments) {
@@ -5335,27 +5341,37 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
   const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
-  const classes = await db.getClasses(school.id);
+  const classId = requestedClassId;
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.trim().replace(/[^\\p{L}\\p{N}\\s+()._-]/gu, '').slice(0, 80)
+    : '';
+  const cacheKey = [school.id, role, role === 'teacher' ? user.id : 'school', classId || '*', page, pageSize, search.toLowerCase()].join(':');
+  const cachedResponse = parentContactsResponseCache.get(cacheKey);
+  if (cachedResponse && cachedResponse.expiresAt > Date.now()) {
+    res.set({ 'Cache-Control': 'private, no-store', 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': String(cachedResponse.total), 'X-Total-Pages': String(Math.ceil(cachedResponse.total / pageSize)) });
+    res.json(cachedResponse.items);
+    return;
+  }
+  if (cachedResponse) parentContactsResponseCache.delete(cacheKey);
+
+  const [classes, currentYearId] = await Promise.all([
+    queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
+    getCurrentAcademicYearId(school.id)
+  ]);
   let studentClassFilter: string | string[] | undefined = requestedClassId || undefined;
   if (role === 'teacher') {
-    const ownClassIds = classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived).map(klass => klass.id);
+    const ownClassIds = classes.filter((klass: any) => klass.classTeacherId === user.id && !klass.isArchived).map((klass: any) => klass.id);
     if (!ownClassIds.length) { res.status(403).json({ error: 'You are not assigned as a Form Teacher to a class.' }); return; }
     if (requestedClassId && !ownClassIds.includes(requestedClassId)) {
       res.status(403).json({ error: 'Parent contacts are limited to your own Form Teacher class.' }); return;
     }
     studentClassFilter = requestedClassId || ownClassIds;
   }
-  const classId = requestedClassId;
-  const search = typeof req.query.search === 'string'
-    ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
-    : '';
-
-  const currentYearId = await getCurrentAcademicYearId(school.id);
+  const classScope = studentClassFilter ? (Array.isArray(studentClassFilter) ? studentClassFilter : [studentClassFilter]) : null;
   const currentEnrollments = currentYearId
-    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active' }, 'student_id,class_id,section_id')
+    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', class_id: classScope || undefined }, 'student_id,class_id,section_id')
     : [];
   const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
-  const classScope = studentClassFilter ? (Array.isArray(studentClassFilter) ? studentClassFilter : [studentClassFilter]) : null;
   const studentIdsForFilter = currentYearId && classScope
     ? [...new Set(currentEnrollments.filter((row: any) => classScope.includes(String(row.classId))).map((row: any) => String(row.studentId)))]
     : null;
@@ -5368,12 +5384,21 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   let guardianLinks: any[] = [];
   let sectionRows: any[] = [];
   try {
-    [students, guardianRows, guardianLinks, sectionRows] = await Promise.all([
+    const scopedGuardianLinksPromise = currentYearId && classScope
+      ? studentIdsForFilter?.length
+        ? queryAllRows('student_guardians', { school_id: school.id, student_id: studentIdsForFilter }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id')
+        : Promise.resolve([] as any[])
+      : null;
+    let scopedGuardianLinks: any[] | null = null;
+    [students, guardianRows, sectionRows, scopedGuardianLinks] = await Promise.all([
       currentYearId && classScope && !studentIdsForFilter?.length ? Promise.resolve([]) : queryAllRows('students', studentFilters, LIST_QUERY_COLUMNS.students),
       queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
-      queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id'),
-      sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([])
+      sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([]),
+      scopedGuardianLinksPromise || Promise.resolve(null)
     ]);
+    guardianLinks = scopedGuardianLinks ?? (students.length
+      ? await queryAllRows('student_guardians', { school_id: school.id, student_id: students.map((student: any) => String(student.id)) }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id')
+      : []);
   } catch (error) {
     console.error('[parents/contacts] Failed to load parent directory data.', { schoolId: school.id, error });
     res.status(503).json({ error: 'Parent contacts are temporarily unavailable. Please retry.', code: 'PARENT_CONTACTS_UNAVAILABLE', retryable: true });
@@ -5447,6 +5472,8 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
 
   const total = filtered.length;
   const items = filtered.slice((page - 1) * pageSize, page * pageSize);
+  parentContactsResponseCache.set(cacheKey, { expiresAt: Date.now() + 10_000, items, total });
+  while (parentContactsResponseCache.size > 500) parentContactsResponseCache.delete(parentContactsResponseCache.keys().next().value!);
   res.set({
     'Cache-Control': 'private, no-store',
     'X-Page': String(page),

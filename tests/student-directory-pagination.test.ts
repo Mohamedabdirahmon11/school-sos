@@ -66,3 +66,13 @@ test('student roster overlaps class and section labels with student reads after 
   assert.match(route, /sectionRowsPromise = sectionIds\.length[\s\S]*?queryAllRows\('class_sections'/);
   assert.match(route, /setRosterLabels\(classRows, sectionRows\)/);
 });
+
+
+test('student fee-status reads are restricted to the requested academic year', () => {
+  const api = read('../src/server/api.ts');
+  const start = api.indexOf('async function getStudentFeeStatusMap');
+  const end = api.indexOf('async function queryAllRows', start);
+  const helper = api.slice(start, end);
+  assert.ok(helper.includes('student_id: studentIds'));
+  assert.ok(helper.includes('academic_year: academicYear'));
+});
