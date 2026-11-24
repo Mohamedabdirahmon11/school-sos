@@ -84,25 +84,25 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
       </div>
     </section>
 
-    <section aria-label="School statistics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="School statistics" className="school-admin-showcase-metrics grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Total students" value={totalStudents.toLocaleString()} hint="Enrolled students" icon={GraduationCap} tone="blue" onClick={() => onNavigate('sch_students')} />
       <Metric label="Teachers" value={totalTeachers.toLocaleString()} hint="Teaching staff" icon={Users} tone="green" onClick={() => onNavigate('sch_teachers')} />
       <Metric label="Attendance today" value={result.stats.attendanceRecordedToday > 0 ? String(attendanceRate) + '%' : 'Not recorded'} hint={result.stats.attendanceRecordedToday > 0 ? 'Register recorded' : 'Not recorded yet'} icon={CalendarCheck} tone="purple" onClick={() => onNavigate('sch_attendance')} />
       <Metric label="Total classes" value={totalClasses.toLocaleString()} hint="School classes" icon={School} tone="amber" onClick={() => onNavigate('sch_classes')} />
     </section>
 
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)]">
+    <section className="school-admin-showcase-insights grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)]">
       <div className="school-dashboard-panel school-admin-showcase-panel min-w-0 p-5 md:p-6">
         <div className="mb-5 flex items-center justify-between gap-3"><div><div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400"><Activity size={14} /> Attendance</div><h2 className="text-base font-semibold text-slate-900">Weekly attendance trend</h2></div>
           <button type="button" onClick={() => onNavigate('sch_attendance')} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Open register <ArrowUpRight size={14} /></button>
         </div>
-        {result.attendanceTrend.length ? <div className="flex h-52 items-end gap-2 border-b border-slate-100 px-1 sm:gap-4">
+        {result.attendanceTrend.length ? <div className="school-admin-attendance-chart flex h-52 items-end gap-2 border-b border-slate-100 px-1 sm:gap-4">
           {result.attendanceTrend.map((item: DashboardRecord, index: number) => {
             const rate = Math.max(0, Math.min(100, Number(item.rate ?? item.attendanceRate ?? item.present) || 0));
             const height = Math.max(4, rate / maxTrend * 100);
             return <div key={item.date ?? item.day ?? index} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2">
               <span className="text-[10px] font-bold tabular-nums text-slate-500">{rate}%</span>
-              <div className="flex h-full w-full max-w-[68px] items-end overflow-hidden rounded-t-md bg-slate-100"><div className="w-full rounded-t-md bg-[#0F766E] transition-all" style={{ height: String(height) + '%' }} /></div>
+              <div className="school-admin-attendance-bar flex h-full w-full max-w-[68px] items-end overflow-hidden rounded-t-md bg-slate-100"><div className="school-admin-attendance-fill w-full rounded-t-md bg-[#0F766E] transition-all" style={{ height: String(height) + '%' }} /></div>
               <span className="max-w-full truncate text-[10px] text-slate-400">{item.day ?? (typeof item.date === 'string' ? item.date.slice(0, 3) : 'Day ' + (index + 1))}</span>
             </div>;
           })}
@@ -124,21 +124,21 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
       </div>}
     </section>
 
-    <section className="grid gap-4 lg:grid-cols-3">
+    <section className="school-admin-showcase-bottom grid gap-4 lg:grid-cols-3">
       <div className="school-dashboard-panel school-admin-showcase-panel min-w-0 p-5">
         <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600"><AlertCircle size={17} /></span><div><h2 className="text-sm font-semibold text-slate-900">Needs attention</h2><p className="text-[11px] text-slate-400">Absence alerts</p></div></div>
-        {result.absentStudents.length ? result.absentStudents.slice(0, 4).map((student: DashboardRecord, index: number) => <div key={student.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{student.name ?? student.studentName ?? 'Student absent'}</p><p className="mt-1 text-xs text-slate-400">{student.className ?? student.class ?? 'Class not provided'} · {student.daysAbsent ? student.daysAbsent + ' days absent' : 'Absent today'}</p></div>) : <EmptyState title="No absence alerts today" description="There are no absence records to review for today." className="min-h-28 border-0 bg-transparent" />}
+        {result.absentStudents.length ? result.absentStudents.slice(0, 4).map((student: DashboardRecord, index: number) => <div key={student.id ?? index} className="school-admin-feed-item border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{student.name ?? student.studentName ?? 'Student absent'}</p><p className="mt-1 text-xs text-slate-400">{student.className ?? student.class ?? 'Class not provided'} · {student.daysAbsent ? student.daysAbsent + ' days absent' : 'Absent today'}</p></div>) : <EmptyState title="No absence alerts today" description="There are no absence records to review for today." className="min-h-28 border-0 bg-transparent" />}
       </div>
 
       <div className="school-dashboard-panel min-w-0 p-5">
         <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600"><BookOpen size={17} /></span><div><h2 className="text-sm font-semibold text-slate-900">Quick actions</h2><p className="text-[11px] text-slate-400">Common school tasks</p></div></div>
-        <div className="grid grid-cols-2 gap-2">{actions.map(item => <button key={item.view} type="button" onClick={() => item.view === 'sch_students' ? onOpenAddStudent() : onNavigate(item.view)} disabled={item.view === 'sch_students' && isReadOnly} className="group flex min-h-[88px] flex-col items-start justify-between rounded-xl border border-slate-200 p-3 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60 disabled:opacity-50"><item.icon size={18} className="text-blue-600" /><span><span className="block text-xs font-bold text-slate-700">{item.label}</span><span className="mt-1 block text-[10px] text-slate-400">{item.detail}</span></span></button>)}</div>
+        <div className="grid grid-cols-2 gap-2">{actions.map(item => <button key={item.view} type="button" onClick={() => item.view === 'sch_students' ? onOpenAddStudent() : onNavigate(item.view)} disabled={item.view === 'sch_students' && isReadOnly} className="school-admin-quick-action group flex min-h-[88px] flex-col items-start justify-between rounded-xl border border-slate-200 p-3 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60 disabled:opacity-50"><item.icon size={18} className="text-blue-600" /><span><span className="block text-xs font-bold text-slate-700">{item.label}</span><span className="mt-1 block text-[10px] text-slate-400">{item.detail}</span></span></button>)}</div>
       </div>
 
       <div className="school-dashboard-panel min-w-0 p-5">
         <div className="mb-3 flex items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-slate-900">Recent activity</h2><p className="text-[11px] text-slate-400">Latest school updates</p></div><button type="button" onClick={() => onNavigate('sch_notices')} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">View all</button></div>
-        {result.recentActivity.length ? result.recentActivity.slice(0, 4).map((item: DashboardRecord, index: number) => <div key={item.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{item.title ?? item.description ?? item.type ?? 'Activity'}</p><p className="mt-1 text-xs text-slate-400">{item.detail ?? item.name ?? item.date ?? ''}</p></div>)
-          : result.notices.slice(0, 4).map((notice: DashboardRecord, index: number) => <div key={notice.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{notice.title ?? 'School notice'}</p><p className="mt-1 line-clamp-2 text-xs text-slate-400">{notice.content ?? ''}</p></div>)}
+        {result.recentActivity.length ? result.recentActivity.slice(0, 4).map((item: DashboardRecord, index: number) => <div key={item.id ?? index} className="school-admin-feed-item border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{item.title ?? item.description ?? item.type ?? 'Activity'}</p><p className="mt-1 text-xs text-slate-400">{item.detail ?? item.name ?? item.date ?? ''}</p></div>)
+          : result.notices.slice(0, 4).map((notice: DashboardRecord, index: number) => <div key={notice.id ?? index} className="school-admin-feed-item border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{notice.title ?? 'School notice'}</p><p className="mt-1 line-clamp-2 text-xs text-slate-400">{notice.content ?? ''}</p></div>)}
         {!result.recentActivity.length && !result.notices.length && <p className="py-8 text-center text-sm text-slate-400">No recent activity available.</p>}
       </div>
     </section>
