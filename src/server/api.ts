@@ -7102,7 +7102,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
     const existingLogin = await db.findUserForLogin(cleanEmail);
     if (existingLogin && existingLogin.id !== prior.userId) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
   }
-  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle: selectedRole ? selectedRole.name : roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions: roleId !== undefined ? resolvedPermissions : permissions, roleId: roleId !== undefined ? (selectedRole?.id || '') : undefined, status }).filter(([, value]) => value !== undefined));
+  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle: selectedRole ? selectedRole.name : roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions: roleId !== undefined ? resolvedPermissions : permissions, roleId: roleId !== undefined ? (selectedRole?.id || null) : undefined, status }).filter(([, value]) => value !== undefined));
   const updated = await db.updateStaffMember(req.params.id, school.id, updates);
   if (!updated) { res.status(404).json({ error: 'Staff member not found.' }); return; }
   if (updated.userId) {
