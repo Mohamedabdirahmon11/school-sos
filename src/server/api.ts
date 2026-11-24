@@ -8528,30 +8528,26 @@ apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async
   if (!await canReadClassResults(req, res, classId)) return;
   const role = normalizeRole(user.role) || user.role;
   const cacheKey = `${school.id}:${school.academicYear}:${classId}:${role}:${user.id}`;
-  try {
-    const rankings = await classYearlyRankingsCache.get(cacheKey, async () => {
-      const [rows, klass] = await Promise.all([
-        db.getClassYearlyRankings(school.id, classId, false),
-        db.getClassById(classId, school.id)
-      ]);
-      if (!klass) return null;
-      const studentIds = rows.map(row => row.student.id);
-      const commentsResult = studentIds.length
-        ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass.academicYear || school.academicYear).in('student_id', studentIds)
-        : { data: [], error: null };
-      const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
-      for (const row of commentsResult.data || []) {
-        const comments = commentsByStudent.get(row.student_id) || [];
-        comments.push({ semester: row.semester, comment: row.comment || '' });
-        commentsByStudent.set(row.student_id, comments);
-      }
-      return rows.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] }));
-    });
-    if (!rankings) { res.status(404).json({ error: 'Class was not found.' }); return; }
-    res.json(rankings);
-  } catch {
-    res.status(503).json({ error: 'Unable to load yearly exam rankings.' });
-  }
+  const rankings = await classYearlyRankingsCache.get(cacheKey, async () => {
+    const [rows, klass] = await Promise.all([
+      db.getClassYearlyRankings(school.id, classId, false),
+      db.getClassById(classId, school.id)
+    ]);
+    if (!klass) return null;
+    const studentIds = rows.map(row => row.student.id);
+    const commentsResult = studentIds.length
+      ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass.academicYear || school.academicYear).in('student_id', studentIds)
+      : { data: [], error: null };
+    const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
+    for (const row of commentsResult.data || []) {
+      const comments = commentsByStudent.get(row.student_id) || [];
+      comments.push({ semester: row.semester, comment: row.comment || '' });
+      commentsByStudent.set(row.student_id, comments);
+    }
+    return rows.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] }));
+  });
+  if (!rankings) { res.status(404).json({ error: 'Class was not found.' }); return; }
+  res.json(rankings);
 });
 
 // Year-End Promotion Confirmation
