@@ -112,3 +112,15 @@ test('yearly rankings cache is five minutes, tenant and identity scoped, and inv
   assert.ok(route.indexOf('canReadClassResults') < route.indexOf('classYearlyRankingsCache.get'));
   assert.match(route, /\$\{school\.id\}:\$\{school\.academicYear\}:\$\{classId\}:\$\{role\}:\$\{user\.id\}/);
 });
+
+
+test('class details cache is short-lived, school/role/user/page scoped and invalidated on writes', () => {
+  assert.match(api, /const classDetailsCache = new SchoolReadinessCache<any>\(60_000\)/);
+  assert.match(api, /classDetailsCache\.invalidatePrefix\(\`\$\{schoolId\}:`\)/);
+  const start = api.indexOf("apiRouter.get('/classes/:id/details'");
+  const end = api.indexOf("apiRouter.get('/school/dashboard'", start);
+  const route = api.slice(start, end);
+  assert.ok(route.indexOf('getTeacherAssignedClassIds') < route.indexOf('classDetailsCache.get'));
+  assert.match(route, /\$\{school\.id\}:\$\{req\.params\.id\}:\$\{role\}:\$\{user\.id\}:\$\{page\}:\$\{pageSize\}:\$\{search\}/);
+  assert.match(route, /res\.json\(details\)/);
+});
