@@ -680,7 +680,7 @@ export interface StaffMember {
   schoolId: string;
   staffId: string;
   userId?: string;
-  roleId?: string;
+  roleId?: string | null;
   fullName: string;
   roleTitle: string;
   email: string;
