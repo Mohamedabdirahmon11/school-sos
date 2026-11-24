@@ -73,6 +73,42 @@ test('class attendance reads avoid exact-count pagination and select only regist
   assert.doesNotMatch(method, /count:\s*'exact'/);
 });
 
+test('bulk attendance returns only the register columns from one conflict-safe upsert', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async recordDailyAttendance(');
+  const end = storage.indexOf('// EXAMS & RESULTS', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /\.upsert\(payload, \{ onConflict: 'school_id,class_id,student_id,date' \}\)/);
+  assert.match(method, /\.select\('id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at'\)/);
+  assert.doesNotMatch(method, /\.select\('\*'\)/);
+});
+
+test('production mark-as-read uses one school and conversation scoped idempotent update', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async markMessagesRead(');
+  const end = storage.indexOf('public async getBroadcasts(', start);
+  const method = storage.slice(start, end);
+  const production = method.slice(method.indexOf('const client = supabase'));
+  assert.match(production, /from\('direct_messages'\)[\s\S]*?update\(\{ is_read: true \}\)/);
+  assert.match(production, /\.eq\('school_id', schoolId\)/);
+  assert.match(production, /\.eq\('sender_id', contactId\)/);
+  assert.match(production, /\.eq\('recipient_id', userId\)/);
+  assert.match(production, /\.eq\('is_read', false\)/);
+  assert.doesNotMatch(production, /getMessages\(/);
+});
+
+test('message inbox combines sent and received rows in one school-scoped OR query', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async getMessages(');
+  const end = storage.indexOf('public async sendMessage(', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /queryRows<DirectMessage>\([\s\S]*?'direct_messages',[\s\S]*?\{ school_id: schoolId \},[\s\S]*?sender_id\.eq\.\$\{userId\},recipient_id\.eq\.\$\{userId\}/);
+  assert.doesNotMatch(method, /Promise\.all|const \[sent, received\]/);
+  assert.match(method, /id,school_id,sender_id,sender_name,sender_role,recipient_id,recipient_name,recipient_role,content,timestamp,is_read/);
+  assert.match(storage, /private async queryRows<[\s\S]*?orFilter\?: string[\s\S]*?queryPage<T>\(table, filters, page, 100, orFilter, columns\)/);
+});
+
+
 
 test('concurrent request contexts coalesce cold settings and plans reads', () => {
   const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
@@ -83,7 +119,6 @@ test('concurrent request contexts coalesce cold settings and plans reads', () =>
   assert.match(storage, /finally\(\(\) => \{ this\.settingsLoadPromise = null; \}\)/);
   assert.match(storage, /finally\(\(\) => \{ this\.plansLoadPromise = null; \}\)/);
 });
-
 
 test('plan configuration is loaded only for Super Admin plan and invoice routes', () => {
   const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
