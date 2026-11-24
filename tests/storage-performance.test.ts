@@ -135,5 +135,6 @@ test('unrelated request flushes never upsert built-in plans without a database b
   const end = storage.indexOf('public setTestClient(', start);
   const persist = storage.slice(start, end);
   assert.match(persist, /table === 'plans' && !knownIds\.has\('plans'\) && !knownRows\.has\('plans'\)/);
-  assert.match(persist, /continue;[\\s\\S]*?await this\.persistTable/);
+  assert.ok(persist.includes('continue;'));
+  assert.ok(persist.includes('await this.persistTable(client, table, rows, toRows(table), knownIds, knownRows)'));
 });
