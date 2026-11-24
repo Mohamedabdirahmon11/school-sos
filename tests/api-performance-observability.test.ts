@@ -167,3 +167,14 @@ test('student list ETag hits return 304 before enrollment or student database qu
   assert.match(route, /res\.status\(304\)\.end\(\)/);
   assert.match(route, /createHash\('sha256'\)/);
 });
+
+
+test('teacher assignment readiness is cached per school and invalidated after setup mutations', () => {
+  assert.match(api, /const teacherAssignmentReadinessCache = new SchoolReadinessCache<any>\(30_000\)/);
+  assert.match(api, /teacherAssignmentReadinessCache\.invalidate\(schoolId\)/);
+  const start = api.indexOf('async function getTeacherAssignmentReadinessForSchool');
+  const end = api.indexOf('async function ensureTeacherAssignmentReadyForTeacher', start);
+  const helper = api.slice(start, end);
+  assert.match(helper, /teacherAssignmentReadinessCache\.get\(school\.id, async \(\) =>/);
+  assert.match(helper, /Promise\.all\(\[/);
+});
