@@ -8580,10 +8580,9 @@ apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async
       db.getClassYearlyRankings(school.id, classId, false),
       db.getClassById(classId, school.id)
     ]);
-    if (!klass) return null;
     const studentIds = rows.map(row => row.student.id);
     const commentsResult = studentIds.length
-      ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass.academicYear || school.academicYear).in('student_id', studentIds)
+      ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
       : { data: [], error: null };
     const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
     for (const row of commentsResult.data || []) {
@@ -8593,7 +8592,6 @@ apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async
     }
     return rows.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] }));
   });
-  if (!rankings) { res.status(404).json({ error: 'Class was not found.' }); return; }
   res.json(rankings);
 });
 
