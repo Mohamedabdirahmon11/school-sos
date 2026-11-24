@@ -15,7 +15,8 @@ import {
   Edit, 
   UserPlus, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  X
 } from 'lucide-react';
 
 const AVAILABLE_PERMISSIONS = STAFF_PERMISSION_REGISTRY;
