@@ -1729,11 +1729,11 @@ export class ApiClient {
     return this.request<any[]>(`/messages?${query.toString()}`);
   }
 
-  public static async getMessageContacts(params?: { studentId?: string }) {
-    const endpoint = params?.studentId
-      ? '/messages/contacts?studentId=' + encodeURIComponent(params.studentId)
-      : '/messages/contacts';
-    return this.request<any[]>(endpoint);
+  public static async getMessageContacts(params?: { studentId?: string; search?: string }) {
+    const query = new URLSearchParams();
+    if (params?.studentId) query.set('studentId', params.studentId);
+    if (params?.search?.trim()) query.set('q', params.search.trim());
+    return this.request<any[]>(`/messages/contacts?${query.toString()}`);
   }
 
   public static async markMessagesRead(contactId: string, studentId?: string) {
