@@ -226,3 +226,54 @@
   background: #fff;
   box-shadow: 0 1px 4px rgb(28 43 38 / 4%);
 }
+
+
+/* Preserve the reference's dark palette instead of forcing light-only white cards. */
+@media (prefers-color-scheme: dark) {
+  .school-people-page {
+    --people-bg: #121a17;
+    --people-card: #1a2420;
+    --people-ink: #e6efe9;
+    --people-muted: #9db0a7;
+    --people-line: #2d3b35;
+    --people-accent: #4cc58a;
+    background: var(--people-bg);
+    color: var(--people-ink);
+  }
+  .school-people-page > header:first-child,
+  .school-people-page > div:first-child,
+  .school-people-teachers-page tbody tr,
+  .school-people-parents-page .bg-white.rounded-xl.border,
+  .school-people-staff-page section,
+  .school-people-staff-page > div.bg-white,
+  .school-people-staff-page .school-people-role-card,
+  .school-people-staff-page [data-role-card] {
+    background: var(--people-card) !important;
+    border-color: var(--people-line) !important;
+    color: var(--people-ink);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
+  }
+  .school-people-page h1,
+  .school-people-page h2,
+  .school-people-page h3,
+  .school-people-page p,
+  .school-people-page label,
+  .school-people-page td,
+  .school-people-page th,
+  .school-people-page span {
+    color: var(--people-ink);
+  }
+  .school-people-page input,
+  .school-people-page select,
+  .school-people-page textarea {
+    background: #121a17;
+    border-color: var(--people-line);
+    color: var(--people-ink);
+  }
+  .school-people-page thead th { background: #202d27; color: var(--people-muted); }
+  .school-people-page tbody tr:hover { background: #202d27; }
+  .school-people-teachers-page tbody td:first-child { background: #202d27; }
+  .school-people-admissions-page .people-admissions-board > section { background: #1f2f28 !important; }
+  .school-people-admissions-page .people-admissions-board article { background: var(--people-card) !important; }
+  .school-people-staff-page section > div.grid > div { background: #202d27; }
+}
