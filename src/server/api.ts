@@ -77,6 +77,9 @@ const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
 const schoolReportSummaryCache = new SchoolReadinessCache<any>(60_000);
 const classYearlyRankingsCache = new SchoolReadinessCache<any>(5 * 60_000);
 const classDetailsCache = new SchoolReadinessCache<any>(60_000);
+type StudentListCacheEntry = { expiresAt: number; body: any[]; headers: Record<string, string> };
+const studentListResponseCache = new Map<string, StudentListCacheEntry>();
+const STUDENT_LIST_CACHE_TTL_MS = 20_000;
 const teacherDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
 
 function getCachedSchoolDashboardSummary(schoolId: string) {
@@ -111,6 +114,7 @@ apiRouter.use((req, res, next) => {
         schoolReportSummaryCache.invalidatePrefix(`${schoolId}:`);
         classYearlyRankingsCache.invalidatePrefix(`${schoolId}:`);
         classDetailsCache.invalidatePrefix(`${schoolId}:`);
+        for (const key of studentListResponseCache.keys()) if (key.startsWith(`${schoolId}:`)) studentListResponseCache.delete(key);
         teacherDashboardSummaryCache.invalidatePrefix(`${schoolId}:`);
       }
     });
@@ -5876,6 +5880,39 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
     ? ['student_id', 'first_name', 'middle_name', 'last_name', 'student_phone', 'father_phone', 'mother_phone']
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
+
+  // Cache only successful paginated responses after role/teacher/parent scope checks.
+  // Cache keys include the authenticated identity and every response-shaping filter.
+  const studentCacheKey = `${school.id}:${JSON.stringify({
+    userId: user.id, role: user.role, filters, roleFilter, page, pageSize, search, feeStatus,
+    allClass: req.query.allClass === 'true'
+  })}`;
+  const cachedStudentPage = req.query.allClass === 'true' ? undefined : studentListResponseCache.get(studentCacheKey);
+  if (cachedStudentPage && cachedStudentPage.expiresAt > Date.now()) {
+    res.set(cachedStudentPage.headers);
+    res.json(cachedStudentPage.body);
+    return;
+  }
+  if (cachedStudentPage) studentListResponseCache.delete(studentCacheKey);
+  if (req.query.allClass !== 'true') {
+    const originalJson = res.json.bind(res);
+    res.json = ((body: any) => {
+      if (res.statusCode === 200 && Array.isArray(body)) {
+        const headers: Record<string, string> = {};
+        for (const name of ['X-Page', 'X-Page-Size', 'X-Total-Count', 'X-Total-Pages']) {
+          const value = res.getHeader(name);
+          if (value !== undefined) headers[name] = String(value);
+        }
+        studentListResponseCache.set(studentCacheKey, { expiresAt: Date.now() + STUDENT_LIST_CACHE_TTL_MS, body, headers });
+        while (studentListResponseCache.size > 200) {
+          const oldest = studentListResponseCache.keys().next().value;
+          if (oldest === undefined) break;
+          studentListResponseCache.delete(oldest);
+        }
+      }
+      return originalJson(body);
+    }) as Response['json'];
+  }
 
   // Resolve the displayed/filtered class from active enrollments for the current year.
   // When a class or teacher scope is known, constrain enrollment reads at the database
