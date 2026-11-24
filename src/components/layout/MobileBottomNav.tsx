@@ -1,7 +1,7 @@
 /**
- * Mobile quick navigation generated from the shared role-aware route registry.
- * Keep every role-aware destination reachable on narrow screens without squeezing labels.
- * Teacher quick tabs are registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
+ * Five role-aware mobile shortcuts plus a dedicated full-menu entry.
+ * School Admin uses a fixed five-column bar so every destination stays visible on phones.
+ * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
 import { Menu } from 'lucide-react';
@@ -18,6 +18,7 @@ interface MobileBottomNavProps {
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, onNavigate, onOpenMenu }) => {
   const { user, t } = useAuth();
   const role = (user?.role || 'school_admin') as SchoolOSRole;
+  const isSchoolAdmin = role === 'school_admin';
   const tabs = getMobileNavigation(role).filter(route =>
     !route.permission || role !== 'accountant' || hasStaffNavigationPermission(user?.permissions, route.permission)
   );
@@ -25,10 +26,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   return (
     <nav
       aria-label="Quick navigation"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#dce7e4] bg-white/95 shadow-[0_-8px_28px_rgba(15,45,40,0.10)] backdrop-blur-md"
+      data-mobile-role={role}
+      className="schoolos-mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#dce7e4] bg-white/95 shadow-[0_-8px_28px_rgba(15,45,40,0.10)] backdrop-blur-xl"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 6px)' }}
     >
-      <div className="flex min-h-[64px] items-stretch gap-1 overflow-x-auto overscroll-x-contain px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className={`flex min-h-[68px] items-stretch px-2 ${isSchoolAdmin ? 'school-admin-mobile-quick-grid' : 'gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
         {tabs.map(route => {
           const Icon = route.icon;
           const isActive = currentView === route.id;
@@ -41,11 +43,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
               aria-label={label}
               aria-current={isActive ? 'page' : undefined}
               title={label}
-              className={`relative flex min-h-[58px] min-w-[68px] flex-1 shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isActive ? 'bg-[#e8f4f1] text-[#0F766E]' : 'text-[#64748B] hover:bg-[#f4f8f7] hover:text-[#132A29]'}`}
+              className={`schoolos-mobile-quick-action relative flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'min-w-0 flex-1 px-0.5' : 'min-w-[68px] flex-1 shrink-0 snap-start px-2'} ${isActive ? 'bg-[#e8f4f1] text-[#0F766E]' : 'text-[#64748B] hover:bg-[#f4f8f7] hover:text-[#132A29]'}`}
             >
               {isActive && <span aria-hidden="true" className="absolute top-0 h-[3px] w-7 rounded-b-full bg-[#0F766E]" />}
               <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
-              <span className="max-w-[76px] truncate text-[10px] font-semibold leading-tight">{label}</span>
+              <span className={`truncate font-semibold leading-tight ${isSchoolAdmin ? 'max-w-full text-[9px] min-[380px]:text-[10px]' : 'max-w-[76px] text-[10px]'}`}>{label}</span>
             </button>
           );
         })}
@@ -53,8 +55,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
           type="button"
           onClick={onOpenMenu}
           aria-label="Open full navigation menu"
+          aria-haspopup="dialog"
           title="Menu"
-          className="flex min-h-[58px] min-w-[68px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98]"
+          className={`schoolos-mobile-menu-action flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'w-[52px] shrink-0 px-1' : 'min-w-[68px] shrink-0 px-2'}`}
         >
           <Menu aria-hidden="true" className="h-5 w-5 shrink-0" />
           <span className="text-[10px] font-semibold leading-tight">Menu</span>

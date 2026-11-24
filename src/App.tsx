@@ -196,7 +196,7 @@ const AppContent: React.FC = () => {
         <div className="min-h-0 flex-1 flex flex-col min-w-0 overflow-hidden">
           {!setupRequired && !['student', 'parent'].includes(user.role) && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
-          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6 relative">
+          <main className={`min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6 relative ${user.role === 'school_admin' ? 'school-admin-mobile-content' : ''}`}>
             <div className="pointer-events-none absolute right-4 top-2 z-40">
               <button
                 type="button"
