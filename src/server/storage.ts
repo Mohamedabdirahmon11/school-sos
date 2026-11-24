@@ -3449,10 +3449,24 @@ class StorageEngine {
 
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
   public async getClassYearlyRankings(schoolId: string, classId: string) {
-    const students = await this.getStudents(schoolId, classId);
-    const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
-    const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
-    const [config, school] = await Promise.all([this.getExamConfig(schoolId), this.getSchoolById(schoolId)]);
+    // Resolve the class/year once, then batch independent school-scoped reads.
+    // The two semester result sets come from one class/year marks query instead
+    // of repeating both the class lookup and student_marks round-trip.
+    const klass = await this.getClassById(classId, schoolId);
+    const [students, school, assignments, allSubjects, allMarks] = await Promise.all([
+      this.getStudents(schoolId, classId),
+      this.getSchoolById(schoolId),
+      this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId }),
+      this.getSubjects(schoolId),
+      this.queryRows<StudentMark>('student_marks', {
+        school_id: schoolId,
+        class_id: classId,
+        academic_year: klass?.academicYear
+      })
+    ]);
+    const config = await this.getExamConfig(schoolId, klass?.academicYear || school?.academicYear);
+    const sem1Marks = allMarks.filter(mark => mark.status === 'approved' && mark.semester === 'Semester 1');
+    const sem2Marks = allMarks.filter(mark => mark.status === 'approved' && mark.semester === 'Semester 2');
     const attendanceWindowStart = school?.terms
       ? [school.terms.semester1Start, school.terms.semester2Start].filter(Boolean).sort()[0]
       : undefined;
@@ -3471,12 +3485,11 @@ class StorageEngine {
     }
 
     // Keep inactive class subjects as blank report-card rows, but exclude them from every total and rank.
-    const assignments = await this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId });
     const activeAssignments = assignments.filter(assignment => assignment.isActive);
     const expectedSubjectIds = [...new Set(activeAssignments.map(assignment => assignment.subjectId).filter(Boolean))];
     const allAssignedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
     const activeSubjectIds = new Set(expectedSubjectIds);
-    const subjects = (await this.getSubjects(schoolId)).filter(subject => allAssignedSubjectIds.includes(subject.id));
+    const subjects = allSubjects.filter(subject => allAssignedSubjectIds.includes(subject.id));
 
     const getTermRankMap = (termMarks: StudentMark[]) => {
       const rows = students.map(student => {
