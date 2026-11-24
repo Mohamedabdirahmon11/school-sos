@@ -6985,7 +6985,7 @@ apiRouter.post('/school/staff/roles', requireAuth, requireSchoolAdminOrSuperAdmi
   if (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission))) { res.status(400).json({ error: 'One or more role permissions are invalid.' }); return; }
   const roles = await db.getStaffRoles(school.id);
   if (roles.some(role => String(role.name).toLowerCase() === name.trim().toLowerCase())) { res.status(409).json({ error: 'A role with that name already exists in this school.' }); return; }
-  const role = await db.createStaffRole({ schoolId: school.id, name: name.trim(), description: typeof description === 'string' ? description.trim() : '', permissions: [...new Set(permissions)] });
+  const role = await db.createStaffRole({ schoolId: school.id, name: name.trim(), description: typeof description === 'string' ? description.trim() : '', permissions: [...new Set(permissions as string[])] });
   await db.flush();
   res.status(201).json(role);
 });
