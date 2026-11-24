@@ -295,33 +295,49 @@ ON CONFLICT (id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS public.student_marks (
   id varchar(64) PRIMARY KEY,
   school_id varchar(64) NOT NULL,
-  exam_id varchar(64) NOT NULL,
-  student_id varchar(64) NOT NULL,
   class_id varchar(64) NOT NULL,
-  percentage numeric(6,2) NOT NULL,
+  subject_id varchar(64) NOT NULL,
+  student_id varchar(64) NOT NULL,
+  academic_year varchar(50) NOT NULL,
+  semester varchar(50) NOT NULL CHECK (semester IN ('Semester 1', 'Semester 2')),
+  percentage numeric(5,2) NOT NULL DEFAULT 0,
   status text NOT NULL
 );
 
-INSERT INTO public.student_marks (id, school_id, exam_id, student_id, class_id, percentage, status)
+INSERT INTO public.student_marks (id, school_id, class_id, subject_id, student_id, academic_year, semester, percentage, status)
 SELECT
   'load-mark-' || lpad(g::text, 6, '0'),
   'school-load',
-  'load-exam-' || ((g - 1) % 4 + 1),
-  'load-student-' || lpad(((((g - 1) % 1500) + 1))::text, 4, '0'),
   'load-class-' || lpad(((((g - 1) % 1500) % 40) + 1)::text, 2, '0'),
-  (g % 101)::numeric(6,2),
+  'load-subject-' || ((g - 1) % 12 + 1),
+  'load-student-' || lpad(((((g - 1) % 1500) + 1))::text, 4, '0'),
+  '2026-2027',
+  CASE WHEN g % 2 = 0 THEN 'Semester 1' ELSE 'Semester 2' END,
+  (g % 101)::numeric(5,2),
   CASE WHEN g % 5 = 0 THEN 'draft' ELSE 'approved' END
 FROM generate_series(1, 20000) AS g
 ON CONFLICT (id) DO NOTHING;
 
-CREATE INDEX IF NOT EXISTS idx_student_marks_school_exam_student
-  ON public.student_marks (school_id, exam_id, student_id);
-CREATE INDEX IF NOT EXISTS idx_student_marks_class_id
-  ON public.student_marks (class_id);
-CREATE INDEX IF NOT EXISTS idx_attendance_records_school_class_date
+-- Match baseline production attendance index, then apply the additive
+-- performance migration twice to prove idempotency on the actual schema.
+CREATE INDEX IF NOT EXISTS idx_attendance_date
   ON public.attendance_records (school_id, class_id, date);
-CREATE INDEX IF NOT EXISTS idx_attendance_records_school_student_date
-  ON public.attendance_records (school_id, student_id, date);
+
+\\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
+\\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
+
+DO $$
+BEGIN
+  ASSERT to_regclass('public.idx_student_marks_school_class_year_student_term') IS NOT NULL,
+    'class/year/semester marks lookup index must be installed';
+  ASSERT to_regclass('public.idx_attendance_school_student_date') IS NOT NULL,
+    'school/student/date attendance lookup index must be installed';
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_student_marks_school_exam_student'
+  ), 'the production marks schema must not assume a nonexistent exam_id column';
+END $$;
 
 ANALYZE public.students;
 ANALYZE public.teachers;
@@ -366,6 +382,8 @@ EXPLAIN (ANALYZE, BUFFERS)
 SELECT class_id, student_id, sum(percentage)
 FROM public.student_marks
 WHERE school_id = 'school-load'
-  AND exam_id = 'load-exam-1'
+  AND class_id = 'load-class-01'
+  AND academic_year = '2026-2027'
+  AND status = 'approved'
 GROUP BY class_id, student_id;
 
