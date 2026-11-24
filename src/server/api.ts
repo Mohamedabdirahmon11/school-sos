@@ -73,6 +73,7 @@ type ParentContactsCacheEntry = { expiresAt: number; items: any[]; total: number
 const parentContactsResponseCache = new Map<string, ParentContactsCacheEntry>();
 const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
 const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
+const teacherAssignmentReadinessCache = new SchoolReadinessCache<any>(30_000);
 const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
 const schoolReportSummaryCache = new SchoolReadinessCache<any>(60_000);
 const classYearlyRankingsCache = new SchoolReadinessCache<any>(5 * 60_000);
@@ -110,6 +111,7 @@ apiRouter.use((req, res, next) => {
       if (schoolId && res.statusCode >= 200 && res.statusCode < 400) {
         invalidateParentPortalSummaryCache(schoolId);
         schoolReadinessCache.invalidate(schoolId);
+        teacherAssignmentReadinessCache.invalidate(schoolId);
         schoolDashboardSummaryCache.invalidate(schoolId);
         schoolReportSummaryCache.invalidatePrefix(`${schoolId}:`);
         classYearlyRankingsCache.invalidatePrefix(`${schoolId}:`);
@@ -10873,19 +10875,21 @@ function requireParentPortalSetupReady(req: any, res: any, next: (error?: unknow
 
 
 async function getTeacherAssignmentReadinessForSchool(school: School) {
-  const [classes, teachers, curriculum, subjects] = await Promise.all([
-    queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
-    queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,school_id,user_id,full_name,status'),
-    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
-    queryAllRows('subjects', { school_id: school.id }, 'id,school_id,name')
-  ]);
-  return evaluateTeacherAssignmentReadiness(
-    school.id,
-    classes.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name, section: row.section, classTeacherId: row.classTeacherId, isArchived: row.isArchived })),
-    teachers.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, userId: row.userId, fullName: row.fullName, status: row.status })),
-    curriculum.map((row: any) => ({ schoolId: row.schoolId, classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
-    subjects.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name }))
-  );
+  return teacherAssignmentReadinessCache.get(school.id, async () => {
+    const [classes, teachers, curriculum, subjects] = await Promise.all([
+      queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
+      queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,school_id,user_id,full_name,status'),
+      queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
+      queryAllRows('subjects', { school_id: school.id }, 'id,school_id,name')
+    ]);
+    return evaluateTeacherAssignmentReadiness(
+      school.id,
+      classes.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name, section: row.section, classTeacherId: row.classTeacherId, isArchived: row.isArchived })),
+      teachers.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, userId: row.userId, fullName: row.fullName, status: row.status })),
+      curriculum.map((row: any) => ({ schoolId: row.schoolId, classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
+      subjects.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name }))
+    );
+  });
 }
 
 async function ensureTeacherAssignmentReadyForTeacher(school: School, res: any): Promise<boolean> {
