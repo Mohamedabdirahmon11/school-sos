@@ -99,7 +99,7 @@ test('school report summary is cached per school and role and invalidated after 
   assert.match(api, /const schoolReportSummaryCache = new SchoolReadinessCache<any>\(60_000\)/);
   assert.match(api, /schoolReportSummaryCache\.get\(\`\$\{school\.id\}:\$\{user\.role\}\`, \(\) =>/);
   assert.match(api, /schoolReportSummaryCache\.invalidatePrefix\(\`\$\{schoolId\}:\`\)/);
-  assert.match(api, /if \(user\.role === 'accountant' \|\| user\.role === 'super_admin'\)/);
+  assert.ok(api.includes("const includeFinance = user.role === 'accountant' || user.role === 'super_admin'"));
 });
 
 
