@@ -336,6 +336,48 @@ SELECT
 FROM generate_series(1, 20000) AS g
 ON CONFLICT (id) DO NOTHING;
 
+INSERT INTO public.student_marks
+  (id, school_id, class_id, subject_id, student_id, academic_year, semester, percentage, status)
+VALUES
+  ('report-mark-a1', 'school-a', 'class-a', 'subject-a1', 'a1', '2026-2027', 'Semester 1', 75, 'approved'),
+  ('report-mark-a2', 'school-a', 'class-a', 'subject-a2', 'a2', '2026-2027', 'Semester 1', 40, 'approved');
+
+\ir ../../supabase/migrations/20261124100000_school_reports_summary_rpc.sql
+\ir ../../supabase/migrations/20261124100000_school_reports_summary_rpc.sql
+
+DO $
+DECLARE
+  report jsonb;
+  school_admin_report jsonb;
+BEGIN
+  report := public.schoolos_school_reports_summary('school-a', '2026-2027', true);
+  ASSERT report->>'studentCount' = '3', 'report student count must include active students only';
+  ASSERT report->>'teacherCount' = '1', 'report teacher count must be school scoped';
+  ASSERT report->>'studentTeacherRatio' = '3.0', 'student-teacher ratio must preserve one-decimal precision';
+  ASSERT jsonb_array_length(report->'classEnrollment') = 1, 'archived and cross-school classes must be excluded';
+  ASSERT report->'classEnrollment'->0->>'classId' = 'class-a', 'class enrollment must remain school scoped';
+  ASSERT (report->>'attendanceRate')::numeric = 50, 'attendance rate must preserve dashboard summary semantics';
+  ASSERT (report->>'passRate')::numeric = 50, 'pass rate must use approved marks and school pass mark';
+  ASSERT (report->>'totalDue')::numeric = 100, 'finance total due must exclude voided and other-school payments';
+  ASSERT (report->>'totalCollected')::numeric = 70, 'finance collected total must exclude voided and other-school payments';
+  ASSERT (report->>'totalArrears')::numeric = 30, 'finance arrears must exclude voided and other-school payments';
+  ASSERT (report->>'paymentCount')::integer = 2, 'finance payment count must exclude voided payments';
+  ASSERT jsonb_array_length(report->'recentPayments') = 2, 'recent payments must be bounded and school scoped';
+
+  school_admin_report := public.schoolos_school_reports_summary('school-a', '2026-2027', false);
+  ASSERT NOT (school_admin_report ? 'totalDue'), 'school-admin report must not contain finance totals';
+  ASSERT NOT (school_admin_report ? 'recentPayments'), 'school-admin report must not contain payment rows';
+  ASSERT has_function_privilege('service_role',
+    'public.schoolos_school_reports_summary(character varying, character varying, boolean)', 'EXECUTE'),
+    'service_role must execute the report summary RPC';
+  ASSERT NOT has_function_privilege('anon',
+    'public.schoolos_school_reports_summary(character varying, character varying, boolean)', 'EXECUTE'),
+    'anon must not execute the report summary RPC';
+  ASSERT NOT has_function_privilege('authenticated',
+    'public.schoolos_school_reports_summary(character varying, character varying, boolean)', 'EXECUTE'),
+    'authenticated must not execute the report summary RPC directly';
+END $;
+
 -- Match baseline production attendance index, then apply the additive
 -- performance migration twice to prove idempotency on the actual schema.
 CREATE INDEX IF NOT EXISTS idx_attendance_date
