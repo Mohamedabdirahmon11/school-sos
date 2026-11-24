@@ -86,3 +86,10 @@ test('extra modules use debounced student options instead of downloading every s
   assert.doesNotMatch(modules, /ApiClient\.getAllStudents\(/);
   assert.match(modules, /Search student by name or ID/);
 });
+
+
+test('GET exam config, reports and yearly rankings use read-only default configuration', () => {
+  assert.match(api, /apiRouter\.get\('\/exams\/config'[\s\S]*?db\.getExamConfig\(school\.id, school\.academicYear, false\)/);
+  assert.match(api, /apiRouter\.get\('\/school\/reports\/summary'[\s\S]*?db\.getExamConfig\(school\.id, school\.academicYear, false\)/);
+  assert.match(api, /db\.getClassYearlyRankings\(school\.id, classId, false\)/);
+});
