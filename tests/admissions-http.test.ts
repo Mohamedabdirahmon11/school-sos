@@ -648,3 +648,78 @@ test('school backup restore previews tenant-scoped rows and requires explicit ma
   }
   assert.equal(memory.rows('audit_logs').some(row => row.action === 'SCHOOL_BACKUP_RESTORED'), true);
 });
+
+
+test('admissions pipeline advances through the six reference stages and only enrolls after acceptance', async () => {
+  const createdResponse = await fetch(`${baseUrl}/school/admissions`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ firstName: 'Pipeline', lastName: 'Applicant', gender: 'female', gradeApplying: 'Grade 1', classId: klass.id, fatherPhone: '+15550007111', motherPhone: '' })
+  });
+  assert.equal(createdResponse.status, 201, await createdResponse.clone().text());
+  let application = await createdResponse.json();
+  assert.equal(application.pipelineStage, 'applied');
+
+  for (const stage of ['review', 'interview', 'accepted']) {
+    const response = await fetch(`${baseUrl}/school/admissions/${application.id}/pipeline-stage`, {
+      method: 'PATCH', headers, body: JSON.stringify({ stage })
+    });
+    assert.equal(response.status, 200, await response.clone().text());
+    application = await response.json();
+    assert.equal(application.pipelineStage, stage);
+  }
+
+  const enrolled = await fetch(`${baseUrl}/school/admissions/${application.id}/approve`, { method: 'POST', headers });
+  assert.equal(enrolled.status, 200, await enrolled.clone().text());
+  const result = await enrolled.json();
+  assert.equal(result.application.status, 'approved');
+  assert.equal(memory.rows('students').filter(row => (row.school_id ?? row.schoolId) === school.id && (row.first_name ?? row.firstName) === 'Pipeline').length, 1);
+  const completedMove = await fetch(`${baseUrl}/school/admissions/${application.id}/pipeline-stage`, {
+    method: 'PATCH', headers, body: JSON.stringify({ stage: 'review' })
+  });
+  assert.equal(completedMove.status, 409);
+});
+
+test('custom staff roles are school-scoped, validate grants and synchronize assigned staff', async () => {
+  const created = await fetch(`${baseUrl}/school/staff/roles`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ name: 'Admissions Officer', description: 'Admissions and library access', permissions: ['admissions_manage', 'library_manage'] })
+  });
+  assert.equal(created.status, 201, await created.clone().text());
+  const role = await created.json();
+  assert.equal(role.schoolId, school.id);
+  assert.deepEqual([...role.permissions].sort(), ['admissions_manage', 'library_manage']);
+
+  const invalid = await fetch(`${baseUrl}/school/staff/roles`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ name: 'Invalid Role', permissions: ['super_admin'] })
+  });
+  assert.equal(invalid.status, 400);
+
+  const updated = await fetch(`${baseUrl}/school/staff/roles/${role.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ permissions: ['admissions_manage', 'reports_export'] })
+  });
+  assert.equal(updated.status, 200, await updated.clone().text());
+  assert.deepEqual([...(await updated.json()).permissions].sort(), ['admissions_manage', 'reports_export']);
+
+  const staff = await fetch(`${baseUrl}/school/staff`, {
+    method: 'POST', headers,
+    body: JSON.stringify({ fullName: 'Pipeline Role Staff', roleTitle: 'Temporary title', email: 'pipeline-role-staff@example.test', phone: '+15550007112', monthlySalary: 0, permissions: [], roleId: role.id, pin: '123456', createLogin: true })
+  });
+  assert.equal(staff.status, 201, await staff.clone().text());
+  const staffRow = await staff.json();
+  assert.equal(staffRow.roleId, role.id);
+  assert.equal(staffRow.roleTitle, 'Admissions Officer');
+  assert.deepEqual([...staffRow.permissions].sort(), ['admissions_manage', 'reports_export']);
+
+  const roleUpdateAfterAssignment = await fetch(`${baseUrl}/school/staff/roles/${role.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ permissions: ['admissions_manage'] })
+  });
+  assert.equal(roleUpdateAfterAssignment.status, 200, await roleUpdateAfterAssignment.clone().text());
+  const reloadedStaff = (await fetch(`${baseUrl}/school/staff`, { headers }).then(response => response.json())).find((item: any) => item.id === staffRow.id);
+  assert.deepEqual(reloadedStaff.permissions, ['admissions_manage']);
+
+  const blockedDelete = await fetch(`${baseUrl}/school/staff/roles/${role.id}`, { method: 'DELETE', headers });
+  assert.equal(blockedDelete.status, 409);
+});
