@@ -325,7 +325,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
       <nav aria-label="Main navigation" className={`min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain ${isCompact ? "px-2" : "px-3"} py-4 [scrollbar-color:rgba(153,246,228,.28)_transparent] [scrollbar-width:thin]`}>
         <button type="button" onClick={() => setIsCollapsed(value => !value)} aria-label={menuText(isCompact ? "Expand sidebar" : "Collapse sidebar")} aria-expanded={!isCompact} title={menuText(isCompact ? "Expand sidebar" : "Collapse sidebar")} style={{ color: "var(--sidebar-text)" }} className="mb-2 hidden w-full items-center justify-end rounded-lg px-2 py-1 hover:bg-black/10 md:flex">
-          {isCompact ? <ChevronRight size={18}/> : <ChevronLeft size={18}/ >}
+          {isCompact ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
         </button>
         {!isCompact && <label style={{ color: "var(--sidebar-text)" }} className="mb-3 flex min-h-10 items-center gap-2 rounded-xl border border-current/10 bg-black/10 px-3">
           <Search size={15} aria-hidden="true" />
