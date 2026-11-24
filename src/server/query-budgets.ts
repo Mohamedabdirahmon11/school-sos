@@ -13,7 +13,7 @@ export const API_QUERY_BUDGETS: Readonly<Record<string, number>> = Object.freeze
   'GET /students/options': 4,
   'GET /messages/contacts': 12,
   'GET /classes/:id/details': 8,
-  'GET /school/reports/summary': 8,
+  'GET /school/reports/summary': 2,
   'GET /exams/rankings/yearly': 12,
   'GET /teachers': 16,
   'GET /classes': 16,
