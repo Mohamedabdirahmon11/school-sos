@@ -187,7 +187,7 @@ export const AttendanceView: React.FC = () => {
 
   if (isSchoolAdmin) {
     return (
-      <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+      <div className="school-admin-attendance-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">School-wide daily report</p>
@@ -230,7 +230,7 @@ export const AttendanceView: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+    <div className="school-admin-attendance-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
