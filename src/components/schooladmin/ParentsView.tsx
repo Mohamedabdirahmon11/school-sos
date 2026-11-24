@@ -150,7 +150,7 @@ export const ParentsView: React.FC = () => {
   return (
     <div className="school-people-page school-people-parents-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Parents & Guardian Directory</h1>
+        <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Waalidka & Xiriirada</h1>
         <p className="text-xs text-[#64748B]">One contact per unique guardian phone number, with linked enrolled children</p>
       </div>
 
