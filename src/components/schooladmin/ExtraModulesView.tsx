@@ -240,7 +240,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     ApiClient.getHealthVisits()
       .then(visits => {
         if (cancelled) return;
-        setHealthLogs(visits);
+        const byId = new Map(healthStudents.map((student: any) => [student.id, student]));
+        setHealthLogs(visits.map((visit: any) => {
+          const student: any = byId.get(visit.studentId);
+          return { ...visit, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : visit.studentId };
+        }));
       })
       .catch((err: any) => { if (!cancelled) setModuleError(err.message || 'Unable to load clinic visits.'); })
       .finally(() => { if (!cancelled) setHealthLoading(false); });
@@ -324,7 +328,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     ApiClient.getDisciplineIncidents()
       .then(rows => {
         if (cancelled) return;
-        setDisciplineLogs(rows);
+        const byId = new Map(students.map((student: any) => [student.id, student]));
+        setDisciplineLogs(rows.map((row: any) => {
+          const student: any = byId.get(row.studentId);
+          return { ...row, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : row.studentId };
+        }));
       })
       .catch((err: any) => { if (!cancelled) setDisciplineError(err.message || 'Unable to load discipline records.'); })
       .finally(() => { if (!cancelled) setDisciplineLoading(false); });
