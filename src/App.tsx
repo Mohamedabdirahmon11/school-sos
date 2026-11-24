@@ -372,7 +372,7 @@ const AppContent: React.FC = () => {
             )}
 
             {/* PARENT ROUTING */}
-            {activeView.startsWith('p_') && <ParentPortalView />}
+            {activeView.startsWith('p_') && <ParentPortalView initialView={activeView} />}
 
             {/* STUDENT ROUTING */}
             {activeView.startsWith('st_') && (
