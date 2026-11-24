@@ -3647,3 +3647,242 @@ main :is(.flex, .inline-flex) > * {
   .school-students-page .student-mobile-class { font-weight:650; color:#334b44; }
   .school-students-page .student-mobile-card > div:nth-child(2) { gap:7px; }
 }
+
+
+/* SchoolOS mobile-wide pass: keep every workspace readable and operable on phones. */
+@media (max-width: 767px) {
+  .school-people-admissions-page,
+  .school-people-staff-page,
+  .schoolos-assignment-page,
+  .schoolos-timetable-page,
+  .documents-view {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Admissions pipeline: readable stage lanes, compact application cards. */
+  .school-people-admissions-page .people-admissions-board {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+    min-width: 0;
+  }
+  .school-people-admissions-page .people-admissions-board > * {
+    min-width: 0;
+    width: 100%;
+    border-radius: 16px;
+  }
+  .school-people-admissions-page input,
+  .school-people-admissions-page select,
+  .school-people-admissions-page textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .school-people-admissions-page button,
+  .school-people-staff-page button,
+  .schoolos-assignment-page button,
+  .schoolos-timetable-page button,
+  .documents-view button {
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+  .school-people-admissions-page .fixed.inset-0 > div,
+  .school-people-staff-page .fixed.inset-0 > div {
+    width: calc(100vw - 24px) !important;
+    max-width: 560px !important;
+    max-height: calc(100dvh - 28px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px !important;
+  }
+
+  /* Staff roles and permissions: prevent clipped role names and tiny checkboxes. */
+  .school-people-staff-page > div:first-child {
+    align-items: stretch;
+  }
+  .school-people-staff-page > div:first-child > div,
+  .school-people-staff-page > div:first-child > div > * {
+    min-width: 0;
+  }
+  .school-people-staff-page .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .school-people-staff-page input,
+  .school-people-staff-page select,
+  .school-people-staff-page textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .school-people-staff-page [type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+  .school-people-staff-page .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .school-people-staff-page table {
+    min-width: 680px;
+  }
+
+  /* Teacher assignment workspace: filters stack; matrix scrolls inside its own frame. */
+  .schoolos-assignment-page .schoolos-assignment-toolbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .schoolos-assignment-page .schoolos-assignment-toolbar > * {
+    width: 100%;
+    min-width: 0 !important;
+  }
+  .schoolos-assignment-page input,
+  .schoolos-assignment-page select {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .schoolos-assignment-page .scroll,
+  .schoolos-assignment-page .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .schoolos-assignment-page table {
+    min-width: 720px;
+  }
+  .schoolos-assignment-page .grid {
+    min-width: 0;
+  }
+
+  /* Timetable matrix: preserve the day × period grid, with horizontal-only inner scrolling. */
+  .schoolos-timetable-page .overflow-x-auto,
+  .schoolos-timetable-page .scroll {
+    max-width: 100%;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .schoolos-timetable-page table {
+    min-width: 680px;
+  }
+  .schoolos-timetable-page input,
+  .schoolos-timetable-page select,
+  .schoolos-timetable-page textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .schoolos-timetable-page .grid-cols-2,
+  .schoolos-timetable-page .md\\:grid-cols-5,
+  .schoolos-timetable-page .xl\\:grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /* School documents: editor first, library becomes a horizontal, touch-scrollable shelf. */
+  .documents-view {
+    gap: 12px !important;
+  }
+  .documents-view > .grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+  .documents-view > .grid > * {
+    min-width: 0;
+    width: 100%;
+  }
+  .documents-view .max-h-\\[68vh\\] {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding-bottom: 6px;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .documents-view .max-h-\\[68vh\\] > * {
+    flex: 0 0 180px;
+    min-width: 180px;
+  }
+  .documents-view .min-h-\\[420px\\] {
+    min-height: 260px !important;
+  }
+  .documents-view input,
+  .documents-view select,
+  .documents-view textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .documents-view .documents-admin-details {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Contacts, people directories and staff panels: keep labels readable at small widths. */
+  .school-people-page h1,
+  .schoolos-assignment-page h1,
+  .schoolos-timetable-page h1,
+  .documents-view h1 {
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
+  .school-people-page p,
+  .school-people-page label,
+  .school-people-page th,
+  .school-people-page td,
+  .schoolos-assignment-page label,
+  .schoolos-timetable-page label,
+  .documents-view label {
+    overflow-wrap: anywhere;
+  }
+  .school-people-page .text-slate-400,
+  .school-people-page .text-slate-500,
+  .school-people-page .text-\\[\\#64748B\\],
+  .documents-view .text-slate-400,
+  .documents-view .text-slate-500 {
+    color: #52636b !important;
+  }
+  .school-people-page .text-teal-100,
+  .school-people-page .text-teal-50 {
+    color: #e7fffa !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .school-people-admissions-page,
+  .school-people-staff-page,
+  .schoolos-assignment-page,
+  .schoolos-timetable-page,
+  .documents-view {
+    padding-left: 9px !important;
+    padding-right: 9px !important;
+  }
+  .school-people-staff-page .overflow-x-auto table,
+  .schoolos-assignment-page table,
+  .schoolos-timetable-page table {
+    font-size: 11px;
+  }
+  .documents-view .max-h-\\[68vh\\] > * {
+    flex-basis: 158px;
+    min-width: 158px;
+  }
+}
