@@ -73,5 +73,6 @@ test('student fee-status reads are restricted to the requested academic year', (
   const start = api.indexOf('async function getStudentFeeStatusMap');
   const end = api.indexOf('async function queryAllRows', start);
   const helper = api.slice(start, end);
-  assert.match(helper, /student_id: studentIds,[\\s\\S]*?academic_year: academicYear/);
+  assert.ok(helper.includes('student_id: studentIds'));
+  assert.ok(helper.includes('academic_year: academicYear'));
 });
