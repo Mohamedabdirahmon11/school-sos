@@ -142,3 +142,17 @@ test('messages UI debounces contact search and sends it to the server', () => {
   assert.match(view, /\}, 250\)/);
   assert.doesNotMatch(view, /Promise\.all\(\[[\s\S]*?getMessageContacts/);
 });
+
+
+test('student pages use a short-lived per-school, role, user and filter cache invalidated by writes', () => {
+  assert.match(api, /const STUDENT_LIST_CACHE_TTL_MS = 20_000/);
+  assert.match(api, /studentListResponseCache\.get\(studentCacheKey\)/);
+  assert.match(api, /studentListResponseCache\.set\(studentCacheKey/);
+  assert.match(api, /studentListResponseCache\.keys\(\).*schoolId/);
+  const start = api.indexOf("apiRouter.get('/students',");
+  const end = api.indexOf("apiRouter.get('/teachers'", start);
+  const route = api.slice(start, end);
+  assert.ok(route.indexOf('getTeacherAssignedClassIds') < route.indexOf('studentListResponseCache.get'));
+  assert.match(route, /userId: user\.id, role: user\.role, filters, roleFilter, page, pageSize, search, feeStatus/);
+  assert.match(route, /req\.query\.allClass !== 'true'/);
+});
