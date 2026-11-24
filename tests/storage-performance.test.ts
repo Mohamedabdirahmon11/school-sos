@@ -157,3 +157,17 @@ test('API request observability reports non-DB time and warns on slow or duplica
   assert.match(api, /Number\(count\) > 1/);
   assert.match(api, /poolWaitMs: null/);
 });
+
+
+test('yearly rankings load one class-year marks set and parallelize independent school reads', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async getClassYearlyRankings(');
+  const end = storage.indexOf('// YEAR-END PROMOTION', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /const klass = await this\.getClassById\(classId, schoolId\)/);
+  assert.match(method, /const \[students, school, assignments, allSubjects, allMarks\] = await Promise\.all\(/);
+  assert.match(method, /this\.queryRows<StudentMark>\('student_marks', \{[\s\S]*?school_id: schoolId,[\s\S]*?class_id: classId,[\s\S]*?academic_year: klass\?\.academicYear/);
+  assert.match(method, /allMarks\.filter\(mark => mark\.status === 'approved' && mark\.semester === 'Semester 1'\)/);
+  assert.match(method, /allMarks\.filter\(mark => mark\.status === 'approved' && mark\.semester === 'Semester 2'\)/);
+  assert.doesNotMatch(method, /this\.getMarks\(/);
+});
