@@ -310,8 +310,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           {school?.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-lg font-black">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
         </div>}
         {school?.sidebarTheme?.showSchoolName !== false && <div className={`min-w-0 max-w-full text-left ${isCollapsed ? 'md:hidden' : ''}`}>
-          <div className="truncate text-[14px] font-bold tracking-tight">{school?.name || menuText(role === 'super_admin' && !inspectedSchool ? 'Platform Management' : 'School Workspace')}</div>
-          {school && <div style={{ color: "var(--sidebar-text)", opacity: 0.62 }} className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[.14em]">{school.code}</div>}
+          <div className="max-w-full whitespace-normal break-words text-[14px] font-bold leading-tight tracking-tight [overflow-wrap:anywhere]">{school?.name || menuText(role === 'super_admin' && !inspectedSchool ? 'Platform Management' : 'School Workspace')}</div>
+          {school && <div style={{ color: "var(--sidebar-text)", opacity: 0.62 }} className="mt-0.5 max-w-full whitespace-normal break-words text-[9px] font-semibold uppercase leading-tight tracking-[.12em] [overflow-wrap:anywhere]">{school.code}</div>}
         </div>}
         <button onClick={onCloseMobile} aria-label={menuText('Close menu')} style={{ color: "var(--sidebar-text)" }} className="absolute right-2 top-2 rounded-lg p-2 hover:bg-black/10 md:hidden"><ChevronRight size={18}/></button>
       </div>
@@ -325,19 +325,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
           <input value={menuSearch} onChange={event => setMenuSearch(event.target.value)} placeholder={menuText('Search menu')} aria-label={menuText('Search navigation menu')} style={{ color: "var(--sidebar-text)" }} className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:opacity-50" />
         </label>}
         {visibleGroups.map(group => <section key={group.title}>
-          {school?.sidebarTheme?.showGroupLabels !== false && <h2 style={{ color: 'var(--sidebar-text)', opacity: 0.62 }} className={`mb-2 px-3 text-[9px] font-bold uppercase tracking-[.16em] ${isCollapsed ? "md:hidden" : ""}`}>{menuText(group.title)}</h2>}
+          {school?.sidebarTheme?.showGroupLabels !== false && <h2 style={{ color: 'var(--sidebar-text)', opacity: 0.62 }} className={`mb-2 whitespace-normal break-words px-3 text-[9px] font-bold uppercase leading-tight tracking-[.16em] ${isCollapsed ? "md:hidden" : ""}`}>{menuText(group.title)}</h2>}
           <div className="space-y-0.5">
             {group.items.filter(entry => role !== 'accountant' || !entry.permission || hasStaffNavigationPermission(user?.permissions, entry.permission)).map(entry => {
               const Icon = entry.icon;
               const active = currentView === entry.id;
               return <button key={entry.id} type="button" aria-current={active ? 'page' : undefined} onClick={() => handleNavigate(entry.id)}
                 title={isCollapsed ? entry.label : undefined}
-                className={`group relative flex w-full items-center gap-3 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-11' : 'min-h-10'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
+                className={`group relative flex h-auto min-w-0 w-full items-start gap-3 py-2.5 ${school?.sidebarTheme?.density === 'compact' ? 'min-h-9' : school?.sidebarTheme?.density === 'spacious' ? 'min-h-11' : 'min-h-10'} ${isCollapsed ? "justify-center px-2" : "px-3"} text-left font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${active ? "text-white shadow-lg shadow-teal-950/25 ring-1 ring-white/10" : "text-slate-300 hover:bg-white/[.075] hover:text-white"}`}
                 style={{ borderRadius: active && school?.sidebarTheme?.activeStyle === 'pill' ? '999px' : 'var(--sidebar-radius, 14px)', fontSize: 'var(--sidebar-font-size, 13px)', color: active && school?.sidebarTheme?.activeStyle !== 'bar' ? 'var(--sidebar-accent-foreground)' : 'var(--sidebar-text)', ...(active && school?.sidebarTheme?.activeStyle !== 'bar' && school?.sidebarTheme?.activeStyle !== 'outline' ? { backgroundColor: 'var(--sidebar-accent)' } : {}), ...(active && school?.sidebarTheme?.activeStyle === 'outline' ? { backgroundColor: 'transparent', border: '1px solid var(--sidebar-accent)' } : {}) }}>
                 <span aria-hidden="true" className={`absolute top-2 bottom-2 w-[3px] rounded-r ${active && school?.sidebarTheme?.activeStyle === 'bar' ? "" : "hidden"}`} style={active ? { left: -12, backgroundColor: "var(--sidebar-accent)" } : undefined}/>
-                <span className="grid shrink-0 place-items-center" style={{ color: active ? "var(--sidebar-accent-foreground)" : "var(--sidebar-text)", opacity: active ? 1 : 0.72 }}><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-blue-100/65 group-hover:text-blue-100"}`} fill={school?.sidebarTheme?.iconStyle === 'filled' ? 'currentColor' : 'none'}/></span>
-                <span className={`min-w-0 flex-1 truncate ${isCollapsed ? "md:hidden" : ""}`}>{entry.label}</span>
-                {active && <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCollapsed ? "hidden" : ""}`} style={{ backgroundColor: "var(--sidebar-accent-foreground)" }}/>}
+                <span className="mt-0.5 grid shrink-0 place-items-center" style={{ color: active ? "var(--sidebar-accent-foreground)" : "var(--sidebar-text)", opacity: active ? 1 : 0.72 }}><Icon className={`h-[18px] w-[18px] shrink-0 ${active ? "" : "text-blue-100/65 group-hover:text-blue-100"}`} fill={school?.sidebarTheme?.iconStyle === 'filled' ? 'currentColor' : 'none'}/></span>
+                <span className={`min-w-0 flex-1 whitespace-normal break-words leading-snug [overflow-wrap:anywhere] ${isCollapsed ? "md:hidden" : ""}`}>{entry.label}</span>
+                {active && <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${isCollapsed ? "hidden" : ""}`} style={{ backgroundColor: "var(--sidebar-accent-foreground)" }}/>}
               </button>;
             })}
           </div>
