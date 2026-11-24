@@ -62,12 +62,25 @@ import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variab
 import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
 import { validateTemplateConfig, type TemplateConfig } from '../lib/documents/template-engine.ts';
 import { allocateMixedRoomSeating, buildManhajGroups } from '../lib/term-exam-scheduling.ts';
+import { SchoolReadinessCache } from './readiness-cache.ts';
+import { getApiQueryBudget } from './query-budgets.ts';
 
 export const apiRouter = Router();
 
 type ParentPortalSummaryCacheEntry = { expiresAt: number; payload: any };
 const parentPortalSummaryCache = new Map<string, ParentPortalSummaryCacheEntry>();
 const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
+const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
+const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
+const teacherDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
+
+function getCachedSchoolDashboardSummary(schoolId: string) {
+  return schoolDashboardSummaryCache.get(schoolId, () => db.getSchoolDashboardSummary(schoolId));
+}
+
+function getCachedTeacherDashboardSummary(schoolId: string, teacherId: string) {
+  return teacherDashboardSummaryCache.get(`${schoolId}:${teacherId}`, () => db.getTeacherDashboardSummary(schoolId, teacherId));
+}
 
 function invalidateParentPortalSummaryCache(schoolId: string) {
   const prefix = schoolId + ':';
@@ -83,7 +96,12 @@ apiRouter.use((req, res, next) => {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
     res.on('finish', () => {
       const schoolId = String((req as any).school?.id || '');
-      if (schoolId && res.statusCode >= 200 && res.statusCode < 400) invalidateParentPortalSummaryCache(schoolId);
+      if (schoolId && res.statusCode >= 200 && res.statusCode < 400) {
+        invalidateParentPortalSummaryCache(schoolId);
+        schoolReadinessCache.invalidate(schoolId);
+        schoolDashboardSummaryCache.invalidate(schoolId);
+        teacherDashboardSummaryCache.invalidatePrefix(`${schoolId}:`);
+      }
     });
   }
   next();
@@ -182,32 +200,62 @@ function sendPdf(res: Response, filename: string, pages: PdfPageInput[]) {
   res.status(200).set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${safeName}.pdf"` }).send(createPdf(pages));
 }
 
-// Production requests get an empty request context; domain methods fetch only
-// the required Supabase rows. Test routers install their explicit adapter.
+// Production requests get an isolated AsyncLocalStorage context. Metrics are
+// attached inside that context so the finish callback reads this request's
+// counters rather than the process-global fallback context.
 apiRouter.use((req, res, next) => {
   const storage = db as any;
+  const suppliedRequestId = String(req.get('x-request-id') || '');
+  const requestId = /^[a-zA-Z0-9._-]{1,80}$/.test(suppliedRequestId) ? suppliedRequestId : randomUUID();
+  const requestStarted = performance.now();
+  res.setHeader('X-Request-Id', requestId);
+
   res.once('finish', () => {
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && res.statusCode < 400) {
-      if (/^\/branches(?:\/|$)/.test(req.path)) invalidateListCache('school_branches');
-      if (/^\/classes(?:\/|$)/.test(req.path)) invalidateListCache('classes');
-      if (/^\/subjects(?:\/|$)/.test(req.path)) invalidateListCache('subjects');
-      if (/^\/teachers(?:\/|$)/.test(req.path)) invalidateListCache('teachers');
-    }
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) || res.statusCode >= 400) return;
+    if (req.path === '/branches' || req.path.startsWith('/branches/')) invalidateListCache('school_branches');
+    if (req.path === '/classes' || req.path.startsWith('/classes/')) invalidateListCache('classes');
+    if (req.path === '/subjects' || req.path.startsWith('/subjects/')) invalidateListCache('subjects');
+    if (req.path === '/teachers' || req.path.startsWith('/teachers/')) invalidateListCache('teachers');
   });
+
   if (typeof storage.prepareRequestContext !== 'function') { next(); return; }
-  const requestStarted = process.env.NODE_ENV === 'development' ? performance.now() : 0;
-  res.once('finish', () => {
-    if (process.env.NODE_ENV !== 'development') return;
-    const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
-    console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
-  });
   // Plans are only consumed by Super Admin plan management and invoice generation.
   // Avoid adding a cold global plans query to every school/teacher/parent request.
   const includePlans = req.path === '/superadmin/plans'
     || req.path.startsWith('/superadmin/plans/')
     || (req.method === 'POST' && req.path === '/superadmin/invoices/generate');
   void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`, includePlans).then((context: any) => {
-    storage.runWithRequestContext(context, next);
+    storage.runWithRequestContext(context, () => {
+      res.once('finish', () => {
+        const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
+        const route = req.route?.path ? `${req.baseUrl}${req.route.path}` : req.path;
+        const schoolId = String((req as any).school?.id || (req as any).user?.schoolId || req.headers['x-school-id'] || req.query.schoolId || '') || null;
+        console.info(JSON.stringify({
+          event: 'api.request',
+          requestId,
+          method: req.method,
+          route,
+          status: res.statusCode,
+          durationMs: Math.round((performance.now() - requestStarted) * 100) / 100,
+          dbQueries: metrics.count,
+          dbDurationMs: metrics.durationMs,
+          schoolId
+        }));
+        const queryBudget = getApiQueryBudget(req.method, route);
+        if (queryBudget !== null && metrics.count > queryBudget) {
+          console.warn(JSON.stringify({
+            event: 'api.query_budget_exceeded',
+            requestId,
+            method: req.method,
+            route,
+            dbQueries: metrics.count,
+            maxQueries: queryBudget,
+            schoolId
+          }));
+        }
+      });
+      next();
+    });
   }).catch(() => {
     if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });
   });
@@ -835,6 +883,13 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
   }
 
   (req as any).school = school;
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    // Invalidate before the route handler so a write followed by a readiness
+    // check in the same request cannot reuse the pre-mutation checklist.
+    schoolReadinessCache.invalidate(school.id);
+    schoolDashboardSummaryCache.invalidate(school.id);
+    teacherDashboardSummaryCache.invalidatePrefix(`${school.id}:`);
+  }
   next();
 }
 
@@ -3087,11 +3142,11 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
     if (role === 'teacher') {
       const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
       if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required for the dashboard.' }); return; }
-      const summary = await db.getTeacherDashboardSummary(school.id, String(teacher.items[0].id));
+      const summary = await getCachedTeacherDashboardSummary(school.id, String(teacher.items[0].id));
       res.json(summary);
       return;
     }
-    const summary = await db.getSchoolDashboardSummary(school.id);
+    const summary = await getCachedSchoolDashboardSummary(school.id);
     if (role === 'accountant' || role === 'super_admin') {
       res.json(summary);
       return;
@@ -3119,7 +3174,7 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'This role cannot view school reports.' }); return; }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'reports_export')) { res.status(403).json({ error: 'Your staff account does not have permission to view reports.' }); return; }
   try {
-    const summary = await db.getSchoolDashboardSummary(school.id);
+    const summary = await getCachedSchoolDashboardSummary(school.id);
     const stats = summary?.stats || {};
     const approvedMarks = (await queryAllRows('student_marks', {
       school_id: school.id,
@@ -10563,9 +10618,11 @@ async function getSchoolSetupState(school: School) {
 
 /** Single school-scoped readiness entry point shared by setup UI and API gates. */
 async function evaluateReadiness(schoolId: string) {
-  const school = await db.getSchoolById(schoolId);
-  if (!school) throw new Error('School was not found.');
-  return getSchoolSetupState(school);
+  return schoolReadinessCache.get(schoolId, async () => {
+    const school = await db.getSchoolById(schoolId);
+    if (!school) throw new Error('School was not found.');
+    return getSchoolSetupState(school);
+  });
 }
 
 async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknown) => void) {

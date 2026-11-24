@@ -302,7 +302,7 @@ test('daily attendance uses one atomic batch upsert before returning success', (
   const end = storage.indexOf('// EXAMS & RESULTS', start);
   const method = storage.slice(start, end);
   assert.ok(method.includes(".upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })"));
-  assert.ok(method.includes(".select('*')"));
+  assert.ok(method.includes(".select('id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at')"));
   assert.ok(!method.includes('this.save()'));
   assert.ok(!method.includes('this.flush()'));
   assert.ok(!method.includes('queryRows'));

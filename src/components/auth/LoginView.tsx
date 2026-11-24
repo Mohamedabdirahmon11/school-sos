@@ -28,7 +28,7 @@ import {
   Calculator
 } from 'lucide-react';
 
-export const LoginView: React.FC = () => {
+export const LoginView: React.FC<{ authCheckPending?: boolean }> = ({ authCheckPending = false }) => {
   const { login, refreshUser, t } = useAuth();
   const [activeTab, setActiveTab] = useState<UserRole>('school_admin');
   const [parentStudentMode, setParentStudentMode] = useState(false);
@@ -51,6 +51,7 @@ export const LoginView: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authCheckPending) return;
     setError(null);
     setIsLoading(true);
 
@@ -285,7 +286,7 @@ export const LoginView: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || authCheckPending}
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#0F766E] hover:bg-[#0D655E] text-white text-xs font-semibold rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0F766E] disabled:opacity-50"
             >
               {isLoading ? 'Verifying...' : 'Sign in to Platform'}

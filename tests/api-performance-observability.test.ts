@@ -1,0 +1,64 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+const login = readFileSync(new URL('../src/components/auth/LoginView.tsx', import.meta.url), 'utf8');
+const bundleBudget = readFileSync(new URL('../scripts/check-bundle-budget.mjs', import.meta.url), 'utf8');
+const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+
+test('API request metrics include request ID, route, status, elapsed time, query count and school ID', () => {
+  assert.match(api, /res\.setHeader\('X-Request-Id', requestId\)/);
+  for (const field of ['method', 'status', 'durationMs', 'dbQueries', 'dbDurationMs']) {
+    assert.match(api, new RegExp('\\b' + field + ':'));
+  }
+  assert.match(api, /requestId,/);
+  assert.match(api, /route,/);
+  assert.match(api, /schoolId\s*\n\s*}\)\);/);
+  assert.match(api, /console\.info\(JSON\.stringify\(/);
+});
+
+test('request metrics read query counters inside the matching AsyncLocalStorage context', () => {
+  const contextIndex = api.indexOf('storage.runWithRequestContext(context, () => {');
+  const finishIndex = api.indexOf("res.once('finish'", contextIndex);
+  const metricsIndex = api.indexOf('storage.getRequestQueryMetrics?.()', finishIndex);
+  assert.ok(contextIndex >= 0 && finishIndex > contextIndex && metricsIndex > finishIndex);
+});
+
+test('readiness and dashboard caches are tenant scoped and invalidated after successful writes', () => {
+  assert.match(api, /new SchoolReadinessCache<any>\(30_000\)/);
+  assert.match(api, /new SchoolReadinessCache<any>\(15_000\)/);
+  assert.match(api, /schoolId\s*\n\s*}\)\);/);
+  assert.match(api, /schoolId\s*\n\s*}\)\);/);
+  assert.ok(api.includes('teacherDashboardSummaryCache.invalidatePrefix'));
+  assert.match(api, /schoolId\s*\n\s*}\)\);/);
+});
+
+test('main application routes keep lazy-loaded views behind a Suspense boundary', () => {
+  assert.match(app, /React\.lazy\(\(\) => import\('\.\/components\/schooladmin\/StudentsView\.tsx'\)/);
+  assert.match(app, /React\.lazy\(\(\) => import\('\.\/components\/teacher\/TeacherPortalView\.tsx'\)/);
+  assert.match(app, /React\.lazy\(\(\) => import\('\.\/components\/student\/StudentPortalView\.tsx'\)/);
+  assert.match(app, /React\.lazy\(\(\) => import\('\.\/components\/parent\/ParentPortalView\.tsx'\)/);
+  assert.match(app, /<React\.Suspense fallback=/);
+});
+
+test('bundle budget reports actual gzip bytes and enforces explicit entry budgets', () => {
+  assert.match(bundleBudget, /gzipSync/);
+  assert.match(bundleBudget, /BUNDLE_ENTRY_JS_MAX_GZIP_KB/);
+  assert.match(bundleBudget, /BUNDLE_ENTRY_CSS_MAX_GZIP_KB/);
+  assert.match(bundleBudget, /process\.exitCode = 1/);
+});
+
+test('Lighthouse CI uses a current trace-compatible release and retains report artifacts', () => {
+  assert.match(workflow, /@lhci\/cli@0\.16\.1/);
+  assert.match(workflow, /include-hidden-files: true/);
+  assert.match(workflow, /lcpDetails:/);
+});
+
+test('public login paints while session verification runs but cannot submit before authorization resolves', () => {
+  assert.match(app, /if \(isLoading && user\) return <LoadingState/);
+  assert.match(app, /if \(!user\) \{\s*return <LoginView authCheckPending=\{isLoading\} \/>/);
+  assert.match(login, /if \(authCheckPending\) return;/);
+  assert.match(login, /disabled=\{isLoading \|\| authCheckPending\}/);
+});

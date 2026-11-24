@@ -18,11 +18,11 @@ test('teacher dashboard aggregation is school-scoped and uses only the authentic
   assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.teacher_dashboard_summary[\s\S]*TO service_role/);
   assert.match(storage, /rpc\('teacher_dashboard_summary', \{[\s\S]*p_school_id: schoolId,[\s\S]*p_teacher_id: teacherId/);
   const start = api.indexOf("if (role === 'teacher') {", api.indexOf("apiRouter.get('/school/dashboard'"));
-  const end = api.indexOf("const summary = await db.getSchoolDashboardSummary", start);
+  const end = api.indexOf("const summary = await getCachedSchoolDashboardSummary", start);
   assert.ok(start >= 0 && end > start);
   const teacherRoute = api.slice(start, end);
   assert.match(teacherRoute, /school_id: school\.id, user_id: user\.id/);
-  assert.match(teacherRoute, /db\.getTeacherDashboardSummary\(school\.id, String\(teacher\.items\[0\]\.id\)\)/);
+  assert.match(teacherRoute, /getCachedTeacherDashboardSummary\(school\.id, String\(teacher\.items\[0\]\.id\)\)/);
   assert.doesNotMatch(teacherRoute, /db\.getStudents\(school\.id\)|db\.getSchoolAttendance\(school\.id\)/);
 });
 
