@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="so">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>People – SchoolOS Admin</title>
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--ink:#1c2b26;--mut:#5f6f68;--line:#d9d6cb;--side:#1f4d3f;--sideink:#e8f1ec;--ok:#1b7f4b;--warn:#a65b00;--bad:#b3261e;--acc:#1f4d3f;--accink:#fff;--soft:#eaf2ed;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a17;--card:#1a2420;--ink:#e6efe9;--mut:#9db0a7;--line:#2d3b35;--side:#0d2a21;--sideink:#d5e6dd;--ok:#4cc58a;--warn:#e8a042;--bad:#f2867f;--acc:#4cc58a;--accink:#08241a;--soft:#1f2f28;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121a17;--card:#1a2420;--ink:#e6efe9;--mut:#9db0a7;--line:#2d3b35;--side:#0d2a21;--sideink:#d5e6dd;--ok:#4cc58a;--warn:#e8a042;--bad:#f2867f;--acc:#4cc58a;--accink:#08241a;--soft:#1f2f28;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+h1,h2,h3{font-family:Georgia,serif;margin:0}
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+aside.sb{background:var(--side);color:var(--sideink);padding:18px 12px;position:sticky;top:0;height:100vh}
+.sb h2{font-size:18px;padding:0 8px 2px}.sb small{display:block;padding:0 8px 14px;opacity:.7}
+.tb{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;color:inherit;font:inherit;padding:10px;border-radius:8px;cursor:pointer;text-align:left}
+.tb:hover{background:rgba(255,255,255,.08)}.tb.on{background:rgba(255,255,255,.16);font-weight:700}.tb .n{margin-left:auto;font-size:12px;opacity:.8}
+main{padding:22px clamp(14px,3vw,36px) 50px;min-width:0}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.hd h1{font-size:26px}.hd p{margin:2px 0 0;color:var(--mut)}
+.btn{background:var(--acc);color:var(--accink);border:0;border-radius:8px;padding:9px 16px;font:inherit;font-weight:700;cursor:pointer}
+.btn.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}.btn.sm{padding:4px 9px;font-size:13px}.btn.dng{background:var(--bad);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.bar input{flex:1;min-width:180px}.bar select{width:auto;min-width:130px}
+:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px}
+.wrap{overflow-x:auto;padding:0}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+tr:last-child td{border:0}
+.pill{font-size:12px;padding:2px 9px;border-radius:10px;background:var(--soft);white-space:nowrap;display:inline-block;margin:1px 2px 1px 0}.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
+.av{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--acc);color:var(--accink);font-size:12px;font-weight:700;margin-right:8px;vertical-align:middle}
+.empty{padding:34px;text-align:center;color:var(--mut)}
+.pg{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;color:var(--mut);font-size:13px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:flex;justify-content:flex-end}
+.dr{background:var(--card);width:min(480px,100%);height:100%;overflow:auto;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+.dr h2{font-size:22px;margin-bottom:4px}.dr .sub{color:var(--mut);margin:0 0 16px}
+.f{margin-bottom:14px}.f label{display:block;font-weight:600;font-size:14px;margin-bottom:4px}.f .req{color:var(--bad)}
+.f .er{color:var(--bad);font-size:13px;margin-top:3px}.f.bad input,.f.bad select{border-color:var(--bad)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sec{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:18px 0 8px;border-top:1px solid var(--line);padding-top:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chips label{display:flex;gap:6px;align-items:center;font-weight:400;border:1px solid var(--line);border-radius:20px;padding:4px 10px;margin:0}.chips input{width:auto}
+.fo{display:flex;gap:8px;position:sticky;bottom:0;background:var(--card);padding-top:10px}
+.ok-box{background:var(--soft);border:1px solid var(--ok);border-radius:10px;padding:14px;margin-bottom:14px}
+.pin{font:700 28px Georgia,serif;letter-spacing:.2em}
+.kan{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);gap:12px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--soft);border-radius:12px;padding:10px;min-height:200px}.col h3{font-size:14px;display:flex;justify-content:space-between;margin-bottom:8px}
+.k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}.k b{display:block}.k .lbl{color:var(--mut);font-size:13px}
+.k .a{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.rl{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.rl .btn{display:flex;gap:6px;align-items:center}
+.mx td,.mx th{text-align:center}.mx td:first-child,.mx th:first-child{text-align:left}.mx input{width:auto;accent-color:var(--acc)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:10px;z-index:30}
+.lbl{color:var(--mut);font-size:13px}
+.sts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}.sts div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--mut);font-size:13px}.sts b{display:block;font:700 22px Georgia,serif;color:var(--ink)}
+.bar2{height:6px;background:var(--soft);border-radius:3px;overflow:hidden;margin-top:4px}.bar2 i{display:block;height:100%;background:var(--ok)}.bar2.warn i{background:var(--warn)}.bar2.bad i{background:var(--bad)}
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}.tc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px}.tc.off{opacity:.65}.th{display:flex;gap:10px;align-items:center}.av.lg{width:46px;height:46px;font-size:16px;margin:0}.tr{display:flex;justify-content:space-between;gap:8px;align-items:center}.tf{display:flex;justify-content:flex-end;gap:6px;margin-top:4px;border-top:1px solid var(--line);padding-top:10px}.er2{color:var(--bad);font-size:13px}
+.mb{display:flex;gap:10px;align-items:flex-end;height:160px;margin-top:12px}.mb div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;font-size:12px;color:var(--mut)}.mb i{display:block;width:100%;max-width:56px;background:var(--acc);border-radius:6px 6px 0 0}.mb span{margin-top:4px;color:var(--ink);font-weight:700}
+@media(max-width:820px){.app{display:block}aside.sb{position:static;height:auto;padding:10px}.sb h2,.sb small{display:none}#nav{display:flex;overflow-x:auto;gap:4px}.tb{white-space:nowrap;width:auto}.tb .n{display:none}.g2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sb"><h2>People</h2><small>Dadka dugsiga</small><nav id="nav" aria-label="People"></nav></aside>
+<main id="main"></main>
+</div>
+<div id="layer"></div>
+<script>
+const LK='people-admin-v1',PER=8;
+const TABS=[['students','🎒','Ardayda'],['teachers','👩‍🏫','Macallimiinta'],['parents','👨‍👩‍👧','Waalidka & Xiriirada'],['adm','📝','Admissions Pipeline'],['fees','💰','Lacagta Dugsiga'],['roles','🔐','Staff Roles & Permissions']];
+const MODS=[['students','Ardayda'],['teachers','Macallimiinta'],['parents','Waalidka'],['adm','Admissions'],['att','Imaanshaha'],['marks','Natiijooyinka'],['fees','Lacagaha'],['rep','Warbixinno'],['set','Settings']];
+const ACT=[['v','Eeg'],['c','Abuur'],['e','Beddel'],['d','Tirtir'],['x','Dhoofi']];
+const STAGES=[['applied','Codsi cusub'],['review','Hubin'],['interview','Wareysi / Imtixaan'],['accepted','La aqbalay'],['enrolled','La diiwaangeliyey'],['rejected','La diiday']];
+const SUBJ=['Xisaab','Soomaali','Ingiriisi','Sayniis','Diin','Carabi','Juqraafi','Taariikh'];
+const pm=s=>Object.fromEntries(MODS.map(([k])=>[k,s[k]||'']));
+const seed=()=>({
+ classes:[{id:'c1',n:'8A'},{id:'c2',n:'5B'},{id:'c3',n:'2A'},{id:'c4',n:'7C'}],
+ parents:[{id:'p1',n:'Axmed Cabdi',ph:'0610000000',rel:'Aabo'},{id:'p2',n:'Xaawo Maxamed',ph:'0615111111',rel:'Hooyo'},{id:'p3',n:'Cali Warsame',ph:'0617222222',rel:'Aabo'}],
+ students:[{id:'ST-0421',n:'Faadumo Axmed',g:'Gabadh',dob:'2013-04-02',cls:'c1',pid:'p1',st:'active'},{id:'ST-0388',n:'Cabdi Axmed',g:'Wiil',dob:'2016-09-12',cls:'c2',pid:'p1',st:'active'},{id:'ST-0510',n:'Hodan Axmed',g:'Gabadh',dob:'2019-01-20',cls:'c3',pid:'p1',st:'active'},{id:'ST-0433',n:'Maxamed Cali',g:'Wiil',dob:'2013-06-30',cls:'c1',pid:'p3',st:'active'},{id:'ST-0402',n:'Sagal Xaawo',g:'Gabadh',dob:'2014-11-05',cls:'c4',pid:'p2',st:'inactive'}],
+ teachers:[{id:'t1',n:'Axmed Cali',ph:'0612345601',em:'axmed@school.so',sub:['Xisaab','Sayniis'],form:'c1',load:24,st:'active'},{id:'t2',n:'Hodan Nuur',ph:'0612345602',em:'',sub:['Soomaali'],form:'c2',load:18,st:'active'},{id:'t3',n:'Cumar Maxamed',ph:'0612345603',em:'',sub:['Ingiriisi'],form:'c3',load:22,st:'active'},{id:'t4',n:'Sacdiyo Yuusuf',ph:'0612345604',em:'',sub:['Sayniis','Juqraafi'],form:'',load:31,st:'active'}],
+ apps:[{id:'a1',n:'Ayaan Jaamac',cls:'c1',gn:'Jaamac Nuur',ph:'0618000001',stage:'applied',note:''},{id:'a2',n:'Ismaaciil Cali',cls:'c2',gn:'Cali Ismaaciil',ph:'0618000002',stage:'review',note:''},{id:'a3',n:'Nasra Axmed',cls:'c3',gn:'Axmed Nasra',ph:'0618000003',stage:'interview',note:'Imtixaan Isniinta'},{id:'a4',n:'Bashiir Cumar',cls:'c4',gn:'Cumar Bashiir',ph:'0618000004',stage:'accepted',note:''}],
+ roles:[{id:'r1',n:'Admin',lock:1,perm:pm(Object.fromEntries(MODS.map(([k])=>[k,'vcedx'])))},{id:'r2',n:'Registrar',perm:pm({students:'vced',teachers:'v',parents:'vced',adm:'vcedx',att:'v'})},{id:'r3',n:'Accountant',perm:pm({fees:'vcedx',students:'v',rep:'vx'})},{id:'r4',n:'Teacher',perm:pm({students:'v',att:'vce',marks:'vce'})},{id:'r5',n:'Librarian',perm:pm({students:'v'})}],
+ staff:[{id:'u1',n:'Maryan Cabdi',ph:'0619000001',em:'maryan@school.so',role:'r1',st:'active'},{id:'u2',n:'Faarax Daahir',ph:'0619000002',em:'',role:'r2',st:'active'},{id:'u3',n:'Khadra Siciid',ph:'0619000003',em:'',role:'r3',st:'active'}]
+});
+let DB;try{DB=Object.assign(seed(),JSON.parse(localStorage.getItem(LK)||'{}'))}catch(e){DB=seed()}
+const save=()=>{try{localStorage.setItem(LK,JSON.stringify(DB))}catch(e){}};
+DB.students.forEach((s,i)=>{if(s.fee===undefined){s.fee=300;s.paid=[300,150,0,300,100][i%5];s.bus=i%2?'Haa':'Maya';s.adm='2024-09-01'}});
+DB.teachers.forEach((t,i)=>{if(!t.hire){t.hire=['2019-09-01','2021-01-15','2022-09-01','2023-02-10'][i%4];t.q=t.q||['BSc Xisaab','Diploma Af-Soomaali','BA Ingiriisi','BSc Sayniis'][i%4]}});
+let S={tab:'students',q:'',f:{},pg:1,dr:null,role:'r2',toast:'',tv:'cards'};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=id=>document.getElementById(id),uid=p=>p+Math.random().toString(36).slice(2,7);
+const cn=id=>(DB.classes.find(c=>c.id===id)||{}).n||'—',pn=id=>(DB.parents.find(p=>p.id===id)||{}).n||'—',rn=id=>(DB.roles.find(r=>r.id===id)||{}).n||'—';
+const ini=n=>n.split(' ').map(x=>x[0]).slice(0,2).join('');
+const phone=v=>v.replace(/\D/g,'');
+const tempPin=()=>{let p;do{p=String(100000+Math.floor(Math.random()*900000))}while(/^(\d)\1+$/.test(p)||'1234567890123456'.includes(p)||'6543210987654321'.includes(p));return p};
+const nextSid=()=>'ST-'+String(Math.max(0,...DB.students.map(s=>+s.id.slice(3)))+1).padStart(4,'0');
+const pill=(t,k='')=>`<span class="pill ${k}">${esc(t)}</span>`;
+const stp=s=>s==='active'?pill('Active','ok'):pill('Inactive','bad');
+// ---------- FORM CONFIG ----------
+const clsOpts=()=>DB.classes.map(c=>[c.id,c.n]);
+const FORMS={
+ students:{t:'Arday cusub',te:'Beddel ardayga',sub:'ID iyo PIN ku-meel-gaar ah ayaa si toos ah u abuurmaya. Lacagta waxaa maamula Cashier-ka, bus-kana qaybta Transport.',f:[['n','Magaca buuxa','text',1],['g','Jinsiga','select',1,[['Wiil','Wiil'],['Gabadh','Gabadh']]],['dob','Taariikhda dhalashada','date',1],['cls','Fasalka','select',1,clsOpts],['_s','Waalidka / Mas’uulka'],['gn','Magaca waalidka','text',1],['gph','Telefoonka waalidka','tel',1],['rel','Xiriirka','select',0,[['Aabo','Aabo'],['Hooyo','Hooyo'],['Mas’uul','Mas’uul']]],['addr','Cinwaanka','text',0]]},
+ teachers:{t:'Macallin cusub',te:'Beddel macallinka',sub:'Maaddooyinka iyo fasalka waxaa qoondeeya Teacher Assignment.',f:[['n','Magaca buuxa','text',1],['ph','Telefoonka','tel',1],['em','Email','email',0],['sub','Maaddooyinka uu dhigi karo','multi',0,()=>SUBJ.map(x=>[x,x])],['q','Waxbarasho / shahaado','text',0],['hire','Taariikhda shaqada bilowday','date',0]]},
+ parents:{t:'Waalid / xiriir cusub',te:'Beddel waalidka',sub:'Lambarka telefoonku waa gaar (hal waalid, hal lambar).',f:[['n','Magaca buuxa','text',1],['ph','Telefoonka','tel',1],['rel','Xiriirka','select',1,[['Aabo','Aabo'],['Hooyo','Hooyo'],['Mas’uul','Mas’uul'],['Xiriir degdeg','Xiriir degdeg ah']]],['kids','Caruurta lagu xirayo','multi',0,()=>DB.students.map(s=>[s.id,s.n+' ('+cn(s.cls)+')'])]]},
+ adm:{t:'Codsi cusub',te:'Beddel codsiga',sub:'Codsigu wuxuu ka bilaabmayaa "Codsi cusub".',f:[['n','Magaca codsadaha','text',1],['cls','Fasalka la codsanayo','select',1,clsOpts],['gn','Magaca waalidka','text',1],['ph','Telefoonka waalidka','tel',1],['note','Qoraal','textarea',0]]},
+ staff:{t:'Shaqaale cusub',te:'Beddel shaqaalaha',sub:'Door doorka; fasaxyada ayaa ka imanaya doorkaas.',f:[['n','Magaca buuxa','text',1],['ph','Telefoonka','tel',1],['em','Email','email',0],['role','Doorka (Role)','select',1,()=>DB.roles.map(r=>[r.id,r.n])]]},
+ pay:{t:'Diiwaangeli lacag',te:'Diiwaangeli lacag',sub:'Lacagta ardaygu bixiyey. Waxaa lagu daraa wadarta la bixiyey.',f:[['amt','Lacagta (USD)','number',1],['note','Qoraal (ikhtiyaari)','text',0]]},
+ role:{t:'Role cusub',te:'Role',sub:'Fasaxyada ka dib ku dooro shabakadda.',f:[['n','Magaca role-ka','text',1],['from','Ka koobi fasaxyada','select',0,()=>[['','Madhan'],...DB.roles.map(r=>[r.id,r.n])]]]}
+};
+const KEYS={students:'students',teachers:'teachers',parents:'parents',adm:'apps',staff:'staff'};
+function fld(f,v,er){const [k,l,t,req,o]=f;if(t===undefined)return `<div class="sec">${esc(l)}</div>`;
+ const opts=typeof o==='function'?o():o;let inp='';
+ if(t==='select')inp=`<select name="${k}">${opts.map(([a,b])=>`<option value="${esc(a)}" ${String(v??'')===String(a)?'selected':''}>${esc(b)}</option>`).join('')}</select>`;
+ else if(t==='multi')inp=`<div class="chips">${opts.map(([a,b])=>`<label><input type="checkbox" name="${k}" value="${esc(a)}" ${(v||[]).includes(a)?'checked':''}>${esc(b)}</label>`).join('')||'<span class="lbl">Ma jiraan doorashooyin.</span>'}</div>`;
+ else if(t==='textarea')inp=`<textarea name="${k}" rows="3">${esc(v)}</textarea>`;
+ else inp=`<input name="${k}" type="${t}" value="${esc(v)}" ${t==='tel'?'inputmode="tel"':''}>`;
+ return `<div class="f ${er?'bad':''}"><label>${esc(l)}${req?' <span class="req">*</span>':''}</label>${inp}${er?`<div class="er">${er}</div>`:''}</div>`}
+function openForm(kind,id,errs={},vals){const F=FORMS[kind],arr=DB[KEYS[kind]]||[],rec=id?arr.find(r=>r.id===id):null;
+ const v=vals||(rec?(kind==='students'?{...rec,gn:pn(rec.pid),gph:(DB.parents.find(p=>p.id===rec.pid)||{}).ph,rel:(DB.parents.find(p=>p.id===rec.pid)||{}).rel}:kind==='parents'?{...rec,kids:DB.students.filter(s=>s.pid===rec.id).map(s=>s.id)}:rec):{});
+ S.dr={kind,id,errs,vals:v,done:null};drawer()}
+function drawer(){const d=S.dr;if(!d){$('layer').innerHTML='';return}
+ const F=FORMS[d.kind];
+ if(d.done){$('layer').innerHTML=`<div class="ov" data-close="1"><aside class="dr" role="dialog" aria-modal="true"><h2>✓ Waa la kaydiyey</h2><div class="ok-box">${d.done}</div><button class="btn" data-close="1">Xidh</button></aside></div>`;return}
+ $('layer').innerHTML=`<div class="ov" data-ovl="1"><aside class="dr" role="dialog" aria-modal="true" aria-label="${esc(F.t)}"><h2>${esc(d.id?F.te:F.t)}</h2><p class="sub">${esc(F.sub)}</p><form id="frm" novalidate>${F.f.map(f=>fld(f,d.vals[f[0]],d.errs[f[0]])).join('')}<div class="fo"><button class="btn" type="submit">Kaydi</button><button class="btn sec" type="button" data-close="1">Jooji</button></div></form></aside></div>`;
+ const f=$('frm');if(f&&f.elements[0])f.elements[0].focus()}
+function readForm(kind){const F=FORMS[kind],fm=$('frm'),v={};F.f.forEach(([k,,t])=>{if(!t)return;if(t==='multi')v[k]=[...fm.querySelectorAll(`[name="${k}"]:checked`)].map(x=>x.value);else v[k]=(fm.elements[k].value||'').trim()});return v}
+function submitForm(){const d=S.dr,kind=d.kind,v=readForm(kind),er={};
+ FORMS[kind].f.forEach(([k,l,t,req])=>{if(req&&t&&t!=='multi'&&!v[k])er[k]='Qasab.'});
+ ['ph','gph'].forEach(k=>{if(v[k]&&phone(v[k]).length<9)er[k]='Lambar sax ah geli (9+ tiro).'});
+ if(v.em&&!/^\S+@\S+\.\S+$/.test(v.em))er.em='Email khaldan.';
+ const dupe=(arr,key)=>arr.find(x=>phone(x.ph)===phone(v[key])&&x.id!==d.id);
+ if(kind==='parents'&&!er.ph&&dupe(DB.parents,'ph'))er.ph='Lambarkan waalid kale ayaa leh.';
+ if(kind==='teachers'&&!er.ph&&dupe(DB.teachers,'ph'))er.ph='Lambarkan macallin kale ayaa leh.';
+ if(kind==='staff'&&!er.ph&&dupe(DB.staff,'ph'))er.ph='Lambarkan shaqaale kale ayaa leh.';
+ if(kind==='students'&&v.dob&&v.dob>new Date().toISOString().slice(0,10))er.dob='Taariikhdu ma noqon karto mustaqbal.';
+ 
+ if(kind==='pay'){const st=DB.students.find(x=>x.id===d.id),left=st.fee-st.paid;if(!(+v.amt>0))er.amt='Geli lacag sax ah.';else if(+v.amt>left)er.amt='Waxa harsan waa $'+left+' oo keliya.'}
+ if(Object.keys(er).length){S.dr.errs=er;S.dr.vals=v;drawer();const b=document.querySelector('.f.bad input,.f.bad select');if(b)b.focus();return}
+ let msg='';
+ if(kind==='students'){let p=DB.parents.find(x=>phone(x.ph)===phone(v.gph));if(!p){p={id:uid('p'),n:v.gn,ph:v.gph,rel:v.rel};DB.parents.push(p)}else p.rel=p.rel||v.rel;
+  if(d.id){Object.assign(DB.students.find(s=>s.id===d.id),{n:v.n,g:v.g,dob:v.dob,cls:v.cls,pid:p.id,addr:v.addr})}
+  else{const id=nextSid(),pin=tempPin();DB.students.push({id,n:v.n,g:v.g,dob:v.dob,cls:v.cls,pid:p.id,st:'active',addr:v.addr});
+   msg=`<b>${esc(v.n)}</b> · Fasalka ${esc(cn(v.cls))}<p class="lbl" style="margin:8px 0 2px">Student ID</p><div class="pin" style="font-size:22px">${id}</div><p class="lbl" style="margin:8px 0 2px">PIN ku-meel-gaar ah (mar keliya ayaa la tusayaa)</p><div class="pin">${pin}</div><p class="lbl">Ardaygu wuxuu beddelayaa PIN-ka galitaankiisa ugu horreeya. Waalidka: ${esc(p.n)} (${esc(p.ph)}) ${DB.students.filter(s=>s.pid===p.id).length>1?'· waa waalid jira, hal akoon ayuu leeyahay.':'· akoon cusub.'}</p>`}}
+ if(kind==='teachers'){const o={n:v.n,ph:v.ph,em:v.em,sub:v.sub,q:v.q,hire:v.hire};if(d.id)Object.assign(DB.teachers.find(t=>t.id===d.id),o);else{DB.teachers.push({id:uid('t'),...o,form:'',load:0,st:'active'});msg=`<b>${esc(v.n)}</b> waa la daray. Hadda u gudub <b>Teacher Assignment</b> si loogu qoondeeyo fasal iyo maaddo.`}}
+ if(kind==='parents'){let p=d.id?DB.parents.find(x=>x.id===d.id):null;if(p)Object.assign(p,{n:v.n,ph:v.ph,rel:v.rel});else{p={id:uid('p'),n:v.n,ph:v.ph,rel:v.rel};DB.parents.push(p);msg=`<b>${esc(v.n)}</b> waa la daray${v.kids.length?` oo lagu xiray ${v.kids.length} ilmood`:''}.`}
+  DB.students.forEach(s=>{if(v.kids.includes(s.id))s.pid=p.id})}
+ if(kind==='adm'){const o={n:v.n,cls:v.cls,gn:v.gn,ph:v.ph,note:v.note};if(d.id)Object.assign(DB.apps.find(a=>a.id===d.id),o);else{DB.apps.push({id:uid('a'),...o,stage:'applied'});msg=`Codsiga <b>${esc(v.n)}</b> wuxuu galay "Codsi cusub".`}}
+ if(kind==='staff'){const o={n:v.n,ph:v.ph,em:v.em,role:v.role};if(d.id)Object.assign(DB.staff.find(s=>s.id===d.id),o);else{DB.staff.push({id:uid('u'),...o,st:'active'});msg=`<b>${esc(v.n)}</b> · ${esc(rn(v.role))}. PIN ku-meel-gaar ah: <div class="pin">${tempPin()}</div>`}}
+ if(kind==='pay'){const st=DB.students.find(x=>x.id===d.id);st.paid+=+v.amt;(st.pay=st.pay||[]).push({a:+v.amt,d:new Date().toISOString().slice(0,10),n:v.note});msg=`Lacag <b>${usd(+v.amt)}</b> ayaa loo diiwaangeliyey <b>${esc(st.n)}</b>.<p class="lbl">La bixiyey: ${usd(st.paid)} / ${usd(st.fee)} · Harsan: ${usd(st.fee-st.paid)}</p>`}
+ if(kind==='role'){const base=DB.roles.find(r=>r.id===v.from),r={id:uid('r'),n:v.n,perm:pm(base?JSON.parse(JSON.stringify(base.perm)):{})};DB.roles.push(r);S.role=r.id;msg=`Role-ka <b>${esc(v.n)}</b> waa la abuuray. Ku dooro fasaxyada shabakadda.`}
+ save();if(msg){S.dr.done=msg;drawer()}else{S.dr=null;drawer();toast('Waa la beddelay')}render()}
+function toast(t){S.toast=t;let e=document.querySelector('.toast');if(e)e.remove();e=document.createElement('div');e.className='toast';e.textContent=t;e.setAttribute('role','status');document.body.appendChild(e);setTimeout(()=>e.remove(),2200)}
+// ---------- VIEWS ----------
+function head(t,p,btn){return `<div class="hd"><div><h1>${t}</h1><p>${p}</p></div>${btn||''}</div>`}
+function table(cols,rows,actions,empty){if(!rows.length)return `<div class="card"><div class="empty">${empty||'Ma jiro xog la helay.'}</div></div>`;
+ const pages=Math.ceil(rows.length/PER);S.pg=Math.min(S.pg,pages);const sl=rows.slice((S.pg-1)*PER,S.pg*PER);
+ return `<div class="card wrap"><table><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}<th></th></tr>${sl.map(r=>`<tr>${cols.map(c=>`<td>${c[1](r)}</td>`).join('')}<td>${actions(r)}</td></tr>`).join('')}</table><div class="pg"><span>${rows.length} natiijo</span><span><button class="btn sec sm" data-pg="-1" ${S.pg<=1?'disabled':''}>←</button> ${S.pg} / ${pages} <button class="btn sec sm" data-pg="1" ${S.pg>=pages?'disabled':''}>→</button></span></div></div>`}
+const bar=(ph,fs)=>`<div class="bar"><input id="q" type="search" placeholder="${ph}" value="${esc(S.q)}" aria-label="Raadi">${fs.map(([k,l,o])=>`<select data-f="${k}" aria-label="${l}"><option value="">${l}: dhammaan</option>${o.map(([a,b])=>`<option value="${esc(a)}" ${S.f[k]===a?'selected':''}>${esc(b)}</option>`).join('')}</select>`).join('')}</div>`;
+const flt=(rows,txt)=>rows.filter(r=>(!S.q||txt(r).toLowerCase().includes(S.q.toLowerCase())));
+const act=(k,id,extra='')=>`${extra}<button class="btn sec sm" data-edit="${k}|${id}" aria-label="Beddel">✏️</button> <button class="btn sec sm" data-del="${k}|${id}" aria-label="Tirtir">🗑</button>`;
+const usd=n=>'$'+(n||0).toLocaleString('en-US');
+const stats=()=>{const A=DB.students;return `<div class="sts"><div><b>${A.length}</b>Arday</div><div><b style="color:var(--ok)">${A.filter(s=>s.st==='active').length}</b>Active</div><div><b>${A.filter(s=>s.st!=='active').length}</b>Inactive</div><div><b>${A.filter(s=>s.g==='Wiil').length}</b>Wiilal</div><div><b>${A.filter(s=>s.g==='Gabadh').length}</b>Gabdho</div><div><b>${DB.parents.length}</b>Waalid</div></div>`};
+const tvTog=()=>`<div class="tabs" style="margin-bottom:10px"><button class="btn ${S.tv==='table'?'sec':''} sm" data-tv="cards">▦ Kaararka</button><button class="btn ${S.tv==='table'?'':'sec'} sm" data-tv="table">☰ Liis</button></div>`;
+// Xogta Cashier-ka (demo, akhri-keliya): Grade 1–4, lacagta bishii + qado
+const FG=[{g:1,fee:20,lunch:10,n:34,c:.82},{g:2,fee:20,lunch:10,n:31,c:.74},{g:3,fee:25,lunch:10,n:29,c:.69},{g:4,fee:25,lunch:10,n:27,c:.78}];
+const FP=[['Maryan Cali',1,30,'Cash',0,'Cashier 1'],['Cabdi Nuur',3,35,'EVC Plus',0,'Cashier 1'],['Sagal Axmed',2,30,'Cash',1,'Cashier 2'],['Ayaan Jaamac',4,35,'eDahab',1,'Cashier 1'],['Hodan Warsame',1,30,'EVC Plus',2,'Cashier 2'],['Bashiir Cumar',3,35,'Cash',3,'Cashier 1'],['Nasra Maxamed',2,30,'Cash',3,'Cashier 2'],['Ismaaciil Faarax',4,35,'EVC Plus',5,'Cashier 1']];
+const V={
+students(){let r=flt(DB.students,s=>s.n+s.id+pn(s.pid));if(S.f.cls)r=r.filter(s=>s.cls===S.f.cls);if(S.f.st)r=r.filter(s=>s.st===S.f.st);
+ return head('Ardayda',`${DB.students.length} arday · ${DB.students.filter(s=>s.st==='active').length} active`,`<button class="btn" data-add="students">+ Arday cusub</button>`)+stats()+bar('Raadi magac, ID ama waalid…',[['cls','Fasal',clsOpts()],['st','Xaalad',[['active','Active'],['inactive','Inactive']]]])+
+ table([['Arday',s=>`<span class="av">${ini(s.n)}</span><b>${esc(s.n)}</b>`],['ID',s=>s.id],['Fasal',s=>cn(s.cls)],['Waalid',s=>esc(pn(s.pid))],['Xaalad',s=>stp(s.st)]],r,s=>act('students',s.id,`<button class="btn sec sm" data-pin="${s.id}" title="Reset PIN">🔑</button> <button class="btn sec sm" data-tog="students|${s.id}" title="Active/Inactive">⏯</button> `),'Arday lama helin. Ku dar ardayga ugu horreeya.')},
+teachers(){if(S.tv==='table')return V.teachersOld();let r=flt(DB.teachers,t=>t.n+t.ph+t.sub.join());if(S.f.st)r=r.filter(t=>t.st===S.f.st);if(S.f.fm)r=r.filter(t=>S.f.fm==='yes'?t.form:!t.form);
+ const T=DB.teachers,over=T.filter(t=>t.load>30).length,noF=DB.classes.filter(c=>!T.some(t=>t.form===c.id)).length;
+ return head('Macallimiinta',`${T.length} macallin`,`<button class="btn" data-add="teachers">+ Macallin cusub</button>`)
+ +`<div class="sts"><div><b>${T.length}</b>Macallimiin</div><div><b>${T.filter(t=>t.st==='active').length}</b>Active</div><div><b>${T.filter(t=>t.form).length}</b>Form Teachers</div><div><b style="color:${over?'var(--bad)':'inherit'}">${over}</b>Culays >30</div><div><b style="color:${noF?'var(--warn)':'inherit'}">${noF}</b>Fasal Form Teacher la’aan</div></div>`
+ +tvTog()+bar('Raadi magac, telefoon ama maaddo…',[['st','Xaalad',[['active','Active'],['inactive','Inactive']]],['fm','Form Teacher',[['yes','Haa'],['no','Maya']]]])
+ +(r.length?`<div class="tg">${r.map(t=>{const w=Math.min(100,Math.round(t.load*100/30)),k=t.load>30?'bad':t.load>26?'warn':'';return `<div class="tc ${t.st==='inactive'?'off':''}"><div class="th"><span class="av lg">${ini(t.n)}</span><div style="flex:1;min-width:0"><b>${esc(t.n)}</b><div class="lbl">${esc(t.q||'')}</div></div>${stp(t.st)}</div>
+ <div class="lbl">📞 ${esc(t.ph)}${t.em?' · ✉️ '+esc(t.em):''}</div>
+ <div class="tr"><span class="lbl">Maaddooyin</span><div style="text-align:right">${t.sub.map(x=>pill(x)).join('')||'—'}</div></div>
+ <div class="tr"><span class="lbl">Form Teacher</span>${t.form?pill('Fasalka '+cn(t.form),'ok'):'<span class="lbl">Maya</span>'}</div>
+ <div class="tr"><span class="lbl">Culayska</span><b>${t.load} / 30 periods</b></div><div class="bar2 ${k}"><i style="width:${w}%"></i></div>
+ ${t.load>30?'<div class="er2">Xadka 30 periods waa la dhaafay</div>':''}
+ ${t.hire?`<div class="lbl">Bilaabay: ${esc(t.hire)}</div>`:''}
+ <div class="tf">${act('teachers',t.id,`<button class="btn sec sm" data-tog="teachers|${t.id}" title="Active/Inactive">⏯</button> `)}</div></div>`}).join('')}</div>`:`<div class="card"><div class="empty">Macallin lama helin.</div></div>`)},
+teachersOld(){let r=flt(DB.teachers,t=>t.n+t.ph+t.sub.join());if(S.f.st)r=r.filter(t=>t.st===S.f.st);
+ return head('Macallimiinta',`${DB.teachers.length} macallin`,`<button class="btn" data-add="teachers">+ Macallin cusub</button>`)+bar('Raadi magac, telefoon ama maaddo…',[['st','Xaalad',[['active','Active'],['inactive','Inactive']]]])+
+ tvTog()+table([['Macallin',t=>`<span class="av">${ini(t.n)}</span><b>${esc(t.n)}</b>`],['Telefoon',t=>esc(t.ph)],['Maaddooyin',t=>t.sub.map(x=>pill(x)).join('')||'—'],['Form Teacher',t=>t.form?pill(cn(t.form),'ok'):'—'],['Culays',t=>pill(t.load+' / 30 periods',t.load>30?'bad':t.load>26?'warn':'ok')],['Xaalad',t=>stp(t.st)]],r,t=>act('teachers',t.id,`<button class="btn sec sm" data-tog="teachers|${t.id}">⏯</button> `),'Macallin lama helin.')},
+parents(){let r=flt(DB.parents,p=>p.n+p.ph);
+ return head('Waalidka & Xiriirada',`${DB.parents.length} waalid / xiriir`,`<button class="btn" data-add="parents">+ Waalid cusub</button>`)+bar('Raadi magac ama telefoon…',[])+
+ table([['Waalid',p=>`<span class="av">${ini(p.n)}</span><b>${esc(p.n)}</b>`],['Telefoon',p=>esc(p.ph)],['Xiriir',p=>esc(p.rel)],['Caruurta',p=>DB.students.filter(s=>s.pid===p.id).map(s=>pill(s.n.split(' ')[0]+' · '+cn(s.cls))).join('')||`<span class="lbl">Ilmo lama xirin</span>`]],r,p=>act('parents',p.id),'Waalid lama helin.')},
+adm(){const A=DB.apps.filter(a=>!S.q||(a.n+a.gn).toLowerCase().includes(S.q.toLowerCase()));
+ return head('Admissions Pipeline',`${DB.apps.length} codsi · hal-hal u guur marxaladaha`,`<button class="btn" data-add="adm">+ Codsi cusub</button>`)+bar('Raadi codsade ama waalid…',[])+
+ `<div class="kan">${STAGES.map(([k,l],i)=>{const L=A.filter(a=>a.stage===k);return `<div class="col"><h3>${l}<span class="pill">${L.length}</span></h3>${L.map(a=>`<div class="k"><b>${esc(a.n)}</b><span class="lbl">Fasalka ${esc(cn(a.cls))} · ${esc(a.gn)}</span><span class="lbl" style="display:block">${esc(a.ph)}</span>${a.note?`<span class="lbl" style="display:block">📝 ${esc(a.note)}</span>`:''}<div class="a">${i>0&&k!=='enrolled'?`<button class="btn sec sm" data-mv="${a.id}|-1" aria-label="Dib">←</button>`:''}${k==='accepted'?`<button class="btn sm" data-enr="${a.id}">Diiwaangeli</button>`:i<4?`<button class="btn sec sm" data-mv="${a.id}|1" aria-label="Hore">→</button>`:''}${k!=='enrolled'&&k!=='rejected'?`<button class="btn sec sm" data-rej="${a.id}">Diid</button>`:''}<button class="btn sec sm" data-edit="adm|${a.id}">✏️</button></div></div>`).join('')||'<div class="lbl" style="padding:12px;text-align:center">Madhan</div>'}</div>`}).join('')}</div>`},
+fees(){const G=FG.filter(x=>!S.f.gr||String(x.g)===S.f.gr);
+ const tot=G.reduce((a,x)=>({n:a.n+x.n,exp:a.exp+x.n*(x.fee+x.lunch),got:a.got+Math.round(x.n*(x.fee+x.lunch)*x.c),paid:a.paid+Math.round(x.n*x.c)}),{n:0,exp:0,got:0,paid:0});
+ const mon=new Date(),ML=[5,4,3,2,1,0].map(i=>new Date(mon.getFullYear(),mon.getMonth()-i,1).toLocaleDateString('so',{month:'short'})),HV=[2100,2350,2280,2500,2420,tot.got],mx=Math.max(...HV,1);
+ const P=FP.filter(p=>(!S.f.gr||String(p[1])===S.f.gr)&&(!S.f.me||p[3]===S.f.me)&&(!S.q||p[0].toLowerCase().includes(S.q.toLowerCase())));
+ return head('Lacagta Dugsiga',`Xogta Cashier-ka · ${mon.toLocaleDateString('so',{month:'long',year:'numeric'})}`)
+ +`<div class="card" style="border-left:4px solid var(--acc)"><b>Akhri-keliya.</b> Lacagaha waxaa maamula Cashier-ka. Halkan waxaa lagu soo bandhigayaa waxa dugsiga soo galay; lacagta ardayda looma geliyo foomka Add Student. <span class="lbl">(Tirooyinka waa tusaale.)</span></div>`
+ +`<div class="sts"><div><b>${usd(tot.exp)}</b>La filayo bishan</div><div><b style="color:var(--ok)">${usd(tot.got)}</b>Dugsiga soo galay</div><div><b style="color:var(--bad)">${usd(tot.exp-tot.got)}</b>Harsan</div><div><b>${tot.paid} / ${tot.n}</b>Arday bixiyey</div><div><b>${usd(FP.filter(p=>p[4]===0).reduce((a,p)=>a+p[2],0))}</b>Maanta la helay</div></div>`
+ +bar('Raadi ardayga…',[['gr','Grade',FG.map(x=>[String(x.g),'Grade '+x.g])],['me','Habka',[['Cash','Cash'],['EVC Plus','EVC Plus'],['eDahab','eDahab']]]])
+ +`<div class="card wrap"><table><tr><th>Grade</th><th>Lacagta bisha</th><th>Qado</th><th>Wadarta bisha</th><th>Arday bixiyey</th><th>La filayo</th><th>La helay</th><th>Harsan</th></tr>${G.map(x=>{const e=x.n*(x.fee+x.lunch),g=Math.round(e*x.c);return `<tr><td><b>Grade ${x.g}</b></td><td>${usd(x.fee)}</td><td>${usd(x.lunch)}</td><td>${usd(x.fee+x.lunch)}</td><td>${Math.round(x.n*x.c)} / ${x.n}</td><td>${usd(e)}</td><td style="color:var(--ok)">${usd(g)}</td><td style="color:var(--bad)">${usd(e-g)}</td></tr>`}).join('')}</table></div>`
+ +`<div class="card"><b>Lacagta la helay · 6-dii bilood ee ugu dambeeyay</b><div class="mb">${HV.map((v,i)=>`<div><i style="height:${Math.round(v*100/mx*.7)}%"></i><span>${usd(v)}</span><small>${ML[i]}</small></div>`).join('')}</div></div>`
+ +`<h3 style="margin:16px 0 10px">Lacag-bixinnadii ugu dambeeyay</h3>`+(P.length?`<div class="card wrap"><table><tr><th>Arday</th><th>Grade</th><th>Lacag</th><th>Habka</th><th>Cashier</th><th>Goorma</th></tr>${P.map(p=>`<tr><td><b>${esc(p[0])}</b></td><td>Grade ${p[1]}</td><td style="color:var(--ok)">${usd(p[2])}</td><td>${pill(p[3])}</td><td>${esc(p[5])}</td><td>${p[4]===0?'Maanta':p[4]===1?'Shalay':'Hor '+p[4]+' maalmood'}</td></tr>`).join('')}</table></div>`:`<div class="card"><div class="empty">Lacag-bixin lama helin.</div></div>`)},
+roles(){const R=DB.roles.find(r=>r.id===S.role)||DB.roles[0];
+ const sf=DB.staff.filter(s=>!S.q||(s.n+s.ph).toLowerCase().includes(S.q.toLowerCase()));
+ return head('Staff Roles & Permissions','Dooro role, kadibna dooro waxa uu sameyn karo',`<button class="btn" data-add="staff">+ Shaqaale cusub</button>`)+
+ `<div class="card"><div class="rl">${DB.roles.map(r=>`<button class="btn ${r.id===R.id?'':'sec'}" data-role="${r.id}">${esc(r.n)}${r.lock?' 🔒':''} <span class="pill">${DB.staff.filter(s=>s.role===r.id).length}</span></button>`).join('')}<button class="btn sec" data-add="role">+ Role cusub</button></div>
+ <div class="wrap"><table class="mx"><tr><th>Qaybta</th>${ACT.map(a=>`<th>${a[1]}</th>`).join('')}</tr>${MODS.map(([m,l])=>`<tr><td><b>${l}</b></td>${ACT.map(([c])=>`<td><input type="checkbox" data-pm="${R.id}|${m}|${c}" ${R.perm[m].includes(c)?'checked':''} ${R.lock?'disabled':''} aria-label="${l} ${c}"></td>`).join('')}</tr>`).join('')}</table></div>
+ ${R.lock?'<p class="lbl">Admin wuxuu leeyahay fasax buuxa, lama beddeli karo.</p>':`<p><button class="btn sec sm" data-delrole="${R.id}" ${DB.staff.some(s=>s.role===R.id)?'disabled title="Role-kan shaqaale ayaa isticmaala"':''}>Tirtir role-kan</button></p>`}</div>
+ <h3 style="margin:18px 0 10px">Shaqaalaha</h3>`+bar('Raadi shaqaale…',[])+
+ table([['Shaqaale',s=>`<span class="av">${ini(s.n)}</span><b>${esc(s.n)}</b>`],['Telefoon',s=>esc(s.ph)],['Role',s=>`<select data-sr="${s.id}" ${DB.roles.find(r=>r.id===s.role)&&DB.roles.find(r=>r.id===s.role).lock&&DB.staff.filter(x=>x.role===s.role).length<2?'disabled':''}>${DB.roles.map(r=>`<option value="${r.id}" ${r.id===s.role?'selected':''}>${esc(r.n)}</option>`).join('')}</select>`],['Xaalad',s=>stp(s.st)]],sf,s=>act('staff',s.id,`<button class="btn sec sm" data-tog="staff|${s.id}">⏯</button> `),'Shaqaale lama helin.')}
+};
+const CNT=()=>({students:DB.students.length,teachers:DB.teachers.length,parents:DB.parents.length,adm:DB.apps.length,roles:DB.staff.length,fees:''});
+function render(){const c=CNT();$('nav').innerHTML=TABS.map(([k,i,t])=>`<button class="tb ${S.tab===k?'on':''}" data-tab="${k}" ${S.tab===k?'aria-current="page"':''}><span>${i}</span>${t}<span class="n">${c[k]}</span></button>`).join('');
+ const q=document.activeElement&&document.activeElement.id==='q',pos=q?document.activeElement.selectionStart:0;
+ $('main').innerHTML=V[S.tab]();if(q){const e=$('q');if(e){e.focus();e.setSelectionRange(pos,pos)}}}
+// ---------- EVENTS ----------
+document.addEventListener('click',e=>{const t=e.target,b=t.closest('button'),d=b&&b.dataset;
+ if(t.dataset&&t.dataset.ovl&&t===t){}
+ if(t.classList&&t.classList.contains('ov')){S.dr=null;drawer();return}
+ if(!b)return;
+ if(d.close){S.dr=null;drawer();return}
+ if(d.tab){S.tab=d.tab;S.q='';S.f={};S.pg=1;render();scrollTo(0,0);return}
+ if(d.add){if(d.add==='role'){openForm('role')}else openForm(d.add);return}
+ if(d.edit){const[k,id]=d.edit.split('|');openForm(k,id);return}
+ if(d.pg){S.pg+=Number(d.pg);render();return}
+ if(d.tog){const[k,id]=d.tog.split('|'),r=DB[KEYS[k]].find(x=>x.id===id);r.st=r.st==='active'?'inactive':'active';save();render();toast(r.st==='active'?'La hawlgeliyey':'La joojiyey');return}
+ if(d.del){const[k,id]=d.del.split('|');if(!confirm('Ma hubtaa inaad tirtirto? Tallaabadan dib looma celin karo.'))return;
+  if(k==='parents'&&DB.students.some(s=>s.pid===id))return alert('Waalidkan caruur ayaa ku xidhan. Marka hore beddel xiriirka ama ka dhig inactive.');
+  if(k==='teachers'){const tt=DB.teachers.find(x=>x.id===id);if(tt.load>0&&!confirm('Macallinkan wuxuu leeyahay qoondeyn ('+tt.load+' periods). Waa la tirtiraa?'))return}
+  if(k==='staff'&&DB.staff.find(x=>x.id===id).role==='r1'&&DB.staff.filter(x=>x.role==='r1').length<2)return alert('Admin ugu dambeeya lama tirtiri karo.');
+  DB[KEYS[k]]=DB[KEYS[k]].filter(x=>x.id!==id);save();render();toast('Waa la tirtiray');return}
+ if(d.pay){const s=DB.students.find(x=>x.id===d.pay),left=(s.fee||0)-(s.paid||0);if(left<=0){toast('Lacagta oo dhan waa la bixiyey');return}S.dr={kind:'pay',id:d.pay,errs:{},vals:{amt:left},done:null};drawer();return}
+ if(d.pin){const s=DB.students.find(x=>x.id===d.pin);if(!confirm('PIN cusub u samee '+s.n+'?'))return;S.dr={kind:'students',done:`<b>${esc(s.n)}</b> · ${s.id}<p class="lbl" style="margin:8px 0 2px">PIN cusub (mar keliya ayaa la tusayaa)</p><div class="pin">${tempPin()}</div><p class="lbl">Ardaygu wuxuu qasab u beddelayaa galitaanka xiga.</p>`};drawer();return}
+ if(d.mv){const[id,dx]=d.mv.split('|'),a=DB.apps.find(x=>x.id===id),o=STAGES.map(s=>s[0]).filter(k=>k!=='rejected'),i=o.indexOf(a.stage)+Number(dx);if(a.stage==='rejected')a.stage='review';else if(o[i]&&o[i]!=='enrolled')a.stage=o[i];save();render();return}
+ if(d.rej){DB.apps.find(x=>x.id===d.rej).stage='rejected';save();render();return}
+ if(d.enr){const a=DB.apps.find(x=>x.id===d.enr);let p=DB.parents.find(x=>phone(x.ph)===phone(a.ph));if(!p){p={id:uid('p'),n:a.gn,ph:a.ph,rel:'Mas’uul'};DB.parents.push(p)}
+  const id=nextSid(),pin=tempPin();DB.students.push({id,n:a.n,g:'',dob:'',cls:a.cls,pid:p.id,st:'active'});a.stage='enrolled';save();render();
+  S.dr={kind:'students',done:`<b>${esc(a.n)}</b> waa la diiwaangeliyey, Fasalka ${esc(cn(a.cls))}<p class="lbl" style="margin:8px 0 2px">Student ID</p><div class="pin" style="font-size:22px">${id}</div><p class="lbl" style="margin:8px 0 2px">PIN ku-meel-gaar ah</p><div class="pin">${pin}</div><p class="lbl">Waxaa lagu daray liiska Ardayda. Buuxi jinsiga iyo taariikhda dhalashada.</p>`};drawer();return}
+ if(d.tv){S.tv=d.tv;render();return}
+ if(d.role){S.role=d.role;render();return}
+ if(d.delrole){if(!confirm('Tirtir role-kan?'))return;DB.roles=DB.roles.filter(r=>r.id!==d.delrole);S.role=DB.roles[0].id;save();render();return}});
+document.addEventListener('submit',e=>{if(e.target.id==='frm'){e.preventDefault();submitForm()}});
+document.addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;S.pg=1;render()}});
+document.addEventListener('change',e=>{const t=e.target;
+ if(t.dataset.f!==undefined){S.f[t.dataset.f]=t.value;S.pg=1;render()}
+ else if(t.dataset.pm){const[r,m,c]=t.dataset.pm.split('|'),R=DB.roles.find(x=>x.id===r);let p=R.perm[m];p=t.checked?(p.includes(c)?p:p+c):p.replace(c,'');if(c==='v'&&!t.checked)p='';if(c!=='v'&&t.checked&&!p.includes('v'))p+='v';R.perm[m]=p;save();render()}
+ else if(t.dataset.sr){const s=DB.staff.find(x=>x.id===t.dataset.sr);if(s.role==='r1'&&DB.staff.filter(x=>x.role==='r1').length<2){alert('Admin ugu dambeeya ma beddeli karo.');render();return}s.role=t.value;save();render();toast('Role waa la beddelay')}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.dr){S.dr=null;drawer()}});
+render();
+</script>
+</body>
+</html>
