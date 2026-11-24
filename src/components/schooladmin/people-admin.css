@@ -1,0 +1,52 @@
+/* People administration visual language — scoped to the four People modules. */
+.school-people-page {
+  --people-bg: #f6f4ee;
+  --people-card: #fff;
+  --people-ink: #1c2b26;
+  --people-muted: #5f6f68;
+  --people-line: #d9d6cb;
+  --people-accent: #1f4d3f;
+  --people-soft: #eaf2ed;
+  color: var(--people-ink);
+}
+.school-people-page h1,
+.school-people-page h2,
+.school-people-page h3 { color: var(--people-ink); letter-spacing: -.02em; }
+.school-people-page input,
+.school-people-page select,
+.school-people-page textarea {
+  border-color: var(--people-line);
+  border-radius: 8px;
+}
+.school-people-page button { transition: background-color .15s ease, border-color .15s ease, transform .15s ease; }
+.school-people-page button:focus-visible,
+.school-people-page a:focus-visible,
+.school-people-page input:focus-visible,
+.school-people-page select:focus-visible,
+.school-people-page textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--people-accent) 35%, transparent);
+  outline-offset: 2px;
+}
+.school-people-page table { border-collapse: separate; border-spacing: 0; }
+.school-people-page thead th { background: #f6f7f3; color: var(--people-muted); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; }
+.school-people-page tbody tr:hover { background: #f7faf7; }
+.school-people-page [role="status"],
+.school-people-page [role="alert"] { border-radius: 10px; }
+.school-people-page .people-panel {
+  background: var(--people-card);
+  border: 1px solid var(--people-line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgb(28 43 38 / 4%);
+}
+.school-people-page .people-muted { color: var(--people-muted); }
+.school-people-page .people-accent { color: var(--people-accent); }
+@media (prefers-reduced-motion: reduce) {
+  .school-people-page *, .school-people-page *::before, .school-people-page *::after {
+    scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .school-people-page { --people-bg:#121a17; --people-card:#1a2420; --people-ink:#e6efe9; --people-muted:#9db0a7; --people-line:#2d3b35; --people-accent:#4cc58a; --people-soft:#1f2f28; }
+  .school-people-page thead th { background:#202d27; }
+  .school-people-page tbody tr:hover { background:#202d27; }
+}

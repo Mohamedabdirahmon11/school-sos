@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './people-admin.css';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { StaffMember } from '../../types/index.ts';
 import { STAFF_PERMISSION_REGISTRY } from '../../lib/staff-permissions.ts';
@@ -156,11 +157,11 @@ export const StaffAccessView: React.FC = () => {
   );
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="school-people-page school-people-staff-page mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
-            Staff & Access
+            Staff Roles & Permissions
           </h1>
         </div>
         <button
