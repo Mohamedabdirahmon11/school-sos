@@ -398,7 +398,7 @@ BEGIN
     WHERE schemaname = 'public'
       AND indexname = 'idx_student_marks_school_exam_student'
   ), 'the production marks schema must not assume a nonexistent exam_id column';
-END $;
+END $$;
 
 -- Preserve the legacy API fallback where a configured zero pass mark defaults to 50.
 UPDATE public.exam_configs SET pass_mark_percentage = 0 WHERE id = 'config-a';
