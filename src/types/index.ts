@@ -680,6 +680,7 @@ export interface StaffMember {
   schoolId: string;
   staffId: string;
   userId?: string;
+  roleId?: string;
   fullName: string;
   roleTitle: string;
   email: string;
@@ -703,6 +704,7 @@ export interface AdmissionApplication {
   motherPhone: string;
   appliedDate: string;
   status: 'pending' | 'approved' | 'rejected';
+  pipelineStage?: 'applied' | 'review' | 'interview' | 'accepted' | 'enrolled' | 'rejected';
   studentId?: string;
 }
 
