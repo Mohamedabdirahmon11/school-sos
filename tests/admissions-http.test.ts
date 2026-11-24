@@ -712,6 +712,14 @@ test('custom staff roles are school-scoped, validate grants and synchronize assi
   assert.equal(staffRow.roleTitle, 'Admissions Officer');
   assert.deepEqual([...staffRow.permissions].sort(), ['admissions_manage', 'reports_export']);
 
+  const roleUpdateAfterAssignment = await fetch(`${baseUrl}/school/staff/roles/${role.id}`, {
+    method: 'PUT', headers,
+    body: JSON.stringify({ permissions: ['admissions_manage'] })
+  });
+  assert.equal(roleUpdateAfterAssignment.status, 200, await roleUpdateAfterAssignment.clone().text());
+  const reloadedStaff = (await fetch(`${baseUrl}/school/staff`, { headers }).then(response => response.json())).find((item: any) => item.id === staffRow.id);
+  assert.deepEqual(reloadedStaff.permissions, ['admissions_manage']);
+
   const blockedDelete = await fetch(`${baseUrl}/school/staff/roles/${role.id}`, { method: 'DELETE', headers });
   assert.equal(blockedDelete.status, 409);
 });
