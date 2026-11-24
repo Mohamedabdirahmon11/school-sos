@@ -913,11 +913,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <h3 className="text-lg font-bold text-slate-900">Student bus register</h3>
                   <p className="mt-0.5 text-xs text-slate-500">Assign new students and manage current passengers from this single list.</p>
                 </div>
-                <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{activeTransportStudents.length} active students</span>
+                <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{activeTransportStudents.length} matching students</span>
               </div>
               <div className="mt-4 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_190px_minmax(0,1fr)]">
                 <div className="relative">
-                  <input type="search" value={busStudentSearch} onChange={event => setBusStudentSearch(event.target.value)} placeholder="Search name, student ID or class..." className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-100" />
+                  <input type="search" value={busStudentSearch} onChange={event => setBusStudentSearch(event.target.value)} placeholder="Search student name or ID..." className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-100" />
                 </div>
                 <select value={assignmentClassId} onChange={event => setAssignmentClassId(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500">
                   <option value="all">All classes</option>
