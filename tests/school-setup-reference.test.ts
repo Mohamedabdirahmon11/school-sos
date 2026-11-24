@@ -178,6 +178,7 @@ test('eligible new schools repair stale completion markers before resuming setup
   const api = read('src/server/api.ts');
   const wizard = read('src/components/schooladmin/SchoolSetupWizard.tsx');
   assert.ok(api.includes('canFinish: isSchoolSetupWizardEligible(school.createdAt)'));
-  assert.ok(api.includes('const progressBase = isSchoolSetupWizardEligible(school.createdAt)'));\n  assert.ok(api.includes('completedAt: null, completedSteps: state.progress.completedSteps.filter((id: number) => id !== 10)'));
+  assert.ok(api.includes('const progressBase = isSchoolSetupWizardEligible(school.createdAt)'));
+  assert.ok(api.includes('completedAt: null, completedSteps: state.progress.completedSteps.filter((id: number) => id !== 10)'));
   assert.ok(wizard.includes('current.progress.completedAt && (!isSchoolSetupWizardEligible(school?.createdAt) || (current.canFinish && isSchoolSetupProgressCompleteWithTeacherAssignment(current.progress)))'));
 });
