@@ -127,3 +127,13 @@ test('plan configuration is loaded only for Super Admin plan and invoice routes'
   assert.match(api, /req\.method === 'POST' && req\.path === '\/superadmin\/invoices\/generate'/);
   assert.match(api, /prepareRequestContext\(req\.path === '\/auth\/login', `\$\{req\.method\} \$\{req\.path\}`, includePlans\)/);
 });
+
+
+test('unrelated request flushes never upsert built-in plans without a database baseline', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('private async persistSnapshot(');
+  const end = storage.indexOf('public setTestClient(', start);
+  const persist = storage.slice(start, end);
+  assert.match(persist, /table === 'plans' && !knownIds\.has\('plans'\) && !knownRows\.has\('plans'\)/);
+  assert.match(persist, /continue;[\\s\\S]*?await this\.persistTable/);
+});
