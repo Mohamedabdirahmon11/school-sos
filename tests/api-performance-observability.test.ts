@@ -211,7 +211,7 @@ test('student lists participate in the shared client ETag cache', () => {
 
 test('school reports summary uses one tenant-scoped SQL RPC and keeps finance role-gated', () => {
   const start = api.indexOf("apiRouter.get('/school/reports/summary'");
-  const end = api.indexOf("\\napiRouter.", start + 1);
+  const end = api.indexOf("\napiRouter.", start + 1);
   const route = api.slice(start, end);
   const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   const migration = readFileSync(new URL('../supabase/migrations/20261124100000_school_reports_summary_rpc.sql', import.meta.url), 'utf8');
