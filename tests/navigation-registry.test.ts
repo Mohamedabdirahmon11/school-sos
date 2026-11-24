@@ -44,3 +44,9 @@ test('Parents & Contacts navigation is available to Form Teachers as well as sch
   assert.ok(route);
   assert.deepEqual(route.roles, ['school_admin', 'super_admin', 'teacher']);
 });
+
+test('School Admin mobile navigation presents exactly five always-visible quick actions', () => {
+  assert.deepEqual(getMobileNavigation('school_admin').map(route => route.id), [
+    'sch_dashboard', 'sch_students', 'sch_parents', 'sch_classes', 'sch_attendance'
+  ]);
+});
