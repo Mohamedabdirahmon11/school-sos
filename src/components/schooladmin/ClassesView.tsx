@@ -181,7 +181,7 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   };
 
   return (
-    <div className="academic-setup">
+    <div className="academic-setup school-admin-classes-page">
       <div className="wrap">
         <AcademicSetupHeader active="sch_classes" onNavigate={onNavigate} />
         <h2>Classes &amp; Sections</h2>

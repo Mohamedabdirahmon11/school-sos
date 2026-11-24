@@ -3446,3 +3446,204 @@ main :is(.flex, .inline-flex) > * {
   .schoolos-mobile-bottom-nav *,
   .school-admin-sidebar[data-mobile-open="true"] * { transition:none !important;animation:none !important; }
 }
+
+
+/* School Admin module-by-module phone layouts. These rules are scoped to the relevant view. */
+@media (max-width: 767px) {
+  /* Parents: turn the six-column directory into readable contact cards. */
+  .school-people-parents-page { padding:12px !important; }
+  .school-people-parents-page > div:first-child { padding:16px !important; gap:8px; }
+  .school-people-parents-page > div:first-child h1 { font-size:22px !important; line-height:1.2; }
+  .school-people-parents-page > div:nth-child(2) { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+  .school-people-parents-page > div:nth-child(2) input,
+  .school-people-parents-page > div:nth-child(2) select { width:100%; min-height:46px; font-size:16px; }
+  .school-people-parents-page .overflow-x-auto { overflow:visible !important; }
+  .school-people-parents-page table { display:block; width:100%; min-width:0 !important; }
+  .school-people-parents-page thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+  .school-people-parents-page tbody { display:grid; gap:10px; }
+  .school-people-parents-page tbody tr {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0;
+    overflow:hidden; border:1px solid var(--people-line); border-radius:15px;
+    background:var(--people-card); box-shadow:0 3px 12px rgb(24 49 43 / 5%);
+  }
+  .school-people-parents-page tbody td {
+    display:flex; flex-direction:column; align-items:flex-start; gap:5px;
+    min-width:0; padding:11px 12px !important; border:0 !important;
+    border-bottom:1px solid var(--people-line) !important;
+    font-size:12px; line-height:1.45; overflow-wrap:anywhere;
+  }
+  .school-people-parents-page tbody td::before {
+    color:var(--people-muted); font-size:9px; font-weight:800;
+    letter-spacing:.07em; text-transform:uppercase;
+  }
+  .school-people-parents-page tbody td:nth-child(1)::before { content:"No."; }
+  .school-people-parents-page tbody td:nth-child(2) { grid-column:1/-1; background:var(--people-soft); }
+  .school-people-parents-page tbody td:nth-child(2)::before { content:"Parent contact"; }
+  .school-people-parents-page tbody td:nth-child(3)::before { content:"Relationship"; }
+  .school-people-parents-page tbody td:nth-child(4) { grid-column:1/-1; }
+  .school-people-parents-page tbody td:nth-child(4)::before { content:"Linked children"; }
+  .school-people-parents-page tbody td:nth-child(5)::before { content:"Children"; }
+  .school-people-parents-page tbody td:nth-child(6)::before { content:"Account"; }
+  .school-people-parents-page tbody td:nth-child(6) button {
+    width:100%; min-height:40px; justify-content:center; margin:2px 0 0 !important;
+  }
+  .school-people-parents-page tbody td[colspan] { display:block; grid-column:1/-1; text-align:center; }
+
+  /* Classes: compact grade cards, clear labels and comfortable inline editing. */
+  .school-admin-classes-page { padding:12px 10px calc(28px + env(safe-area-inset-bottom)) !important; }
+  .school-admin-classes-page .wrap { width:100%; padding:0; }
+  .school-admin-classes-page h2 { font-size:22px; line-height:1.2; }
+  .school-admin-classes-page .lead { font-size:13px; line-height:1.55; }
+  .school-admin-classes-page .card { min-width:0; padding:13px; border-radius:16px; }
+  .school-admin-classes-page .bar { display:grid; grid-template-columns:minmax(0,1fr); gap:9px; }
+  .school-admin-classes-page .bar input,
+  .school-admin-classes-page .bar select,
+  .school-admin-classes-page .bar button { width:100%; min-width:0; min-height:44px; font-size:14px; }
+  .school-admin-classes-page .scroll { overflow:visible !important; }
+  .school-admin-classes-page .scroll table { display:block; width:100%; min-width:0 !important; }
+  .school-admin-classes-page .scroll thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+  .school-admin-classes-page .scroll tbody { display:grid; gap:10px; }
+  .school-admin-classes-page .scroll tbody tr {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0;
+    padding:4px 10px; border:1px solid var(--ds-border); border-radius:14px;
+    background:var(--ds-card); box-shadow:0 2px 8px rgb(16 24 40 / 5%);
+  }
+  .school-admin-classes-page .scroll tbody td {
+    display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+    min-width:0; padding:9px 5px; border:0; border-bottom:1px solid var(--ds-border);
+    font-size:12px; overflow-wrap:anywhere;
+  }
+  .school-admin-classes-page .scroll tbody td::before {
+    color:var(--ds-muted); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+  }
+  .school-admin-classes-page .scroll tbody td:nth-child(1)::before { content:"Class"; }
+  .school-admin-classes-page .scroll tbody td:nth-child(2)::before { content:"Level"; }
+  .school-admin-classes-page .scroll tbody td:nth-child(3)::before { content:"Shift"; }
+  .school-admin-classes-page .scroll tbody td:nth-child(4)::before { content:"Capacity"; }
+  .school-admin-classes-page .scroll tbody td:nth-child(5) { grid-column:1/-1; }
+  .school-admin-classes-page .scroll tbody td:nth-child(5)::before { content:"Form teacher"; }
+  .school-admin-classes-page .scroll tbody td:nth-child(6)::before { content:"Subjects"; }
+  .school-admin-classes-page .scroll tbody td:nth-child(7) { grid-column:1/-1; border-bottom:0; }
+  .school-admin-classes-page .scroll tbody td:nth-child(7) button { width:100%; min-height:40px; }
+  .school-admin-classes-page .scroll tbody td select,
+  .school-admin-classes-page .scroll tbody td input { width:100%; min-width:0; min-height:42px; font-size:14px; }
+
+  /* Attendance: make school-wide absence records actionable without a 700px table. */
+  .school-admin-attendance-page { padding:13px 11px calc(28px + env(safe-area-inset-bottom)) !important; gap:16px; }
+  .school-admin-attendance-page h1 { font-size:23px !important; line-height:1.2; }
+  .school-admin-attendance-page > div:first-child { align-items:stretch; }
+  .school-admin-attendance-page button { min-height:40px; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] { overflow:visible !important; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] table { display:block; width:100%; min-width:0 !important; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody { display:grid; gap:9px; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody tr {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0;
+    padding:5px 10px; border:1px solid #dce7e4; border-radius:14px; background:#fff;
+  }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td {
+    display:flex; flex-direction:column; gap:4px; min-width:0;
+    padding:9px 5px !important; border:0; border-bottom:1px solid #edf2f0;
+    font-size:11px; overflow-wrap:anywhere;
+  }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td::before {
+    color:#71817d; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+  }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(1)::before { content:"Student ID"; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(2)::before { content:"Student"; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(3)::before { content:"Class"; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(4)::before { content:"Parent phone"; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(5) { grid-column:1/-1; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(5)::before { content:"Note"; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(6) { grid-column:1/-1; border:0; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(6)::before { content:"Action"; }
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(6) button { width:100%; min-height:44px; justify-content:center; }
+
+  /* Fees: ledger entries become stacked receipt cards with aligned money values. */
+  .school-admin-fees-page { padding:13px 11px calc(28px + env(safe-area-inset-bottom)) !important; gap:16px; }
+  .school-admin-fees-page h1 { font-size:23px !important; line-height:1.2; }
+  .school-admin-fees-page > div:first-child { align-items:stretch; }
+  .school-admin-fees-page > div:first-child button { min-height:44px; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] { overflow:visible !important; border:0 !important; background:transparent !important; box-shadow:none !important; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] table { display:block; width:100%; min-width:0 !important; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody { display:grid; gap:10px; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody tr {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0;
+    padding:5px 11px; border:1px solid #dce7e4; border-radius:15px; background:#fff;
+    box-shadow:0 3px 12px rgb(16 37 34 / 5%);
+  }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td {
+    display:flex; flex-direction:column; align-items:flex-start; gap:4px;
+    min-width:0; padding:9px 5px !important; border:0; border-bottom:1px solid #edf2f0;
+    text-align:left !important; font-size:11px; overflow-wrap:anywhere;
+  }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td::before {
+    color:#71817d; font-size:9px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(1)::before { content:"Receipt"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(2) { grid-column:1/-1; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(2)::before { content:"Student"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(3)::before { content:"Fee type"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(4)::before { content:"Month"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(5)::before { content:"Due"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(6)::before { content:"Paid"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(7)::before { content:"Remaining"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(8)::before { content:"Status"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(9) { grid-column:1/-1; border:0; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(9)::before { content:"Actions"; }
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(9) button { min-height:40px; margin:3px 5px 3px 0; }
+
+  /* School settings: configuration choices become thumb-friendly, single-column panels. */
+  .school-admin-settings-page { padding:12px 11px calc(28px + env(safe-area-inset-bottom)) !important; }
+  .school-admin-settings-page h1 { font-size:22px !important; }
+  .school-admin-settings-page section > .grid { grid-template-columns:minmax(0,1fr) !important; }
+  .school-admin-settings-page section button { min-height:46px; padding:11px 12px !important; font-size:12px !important; line-height:1.4; }
+  .school-admin-settings-page input,
+  .school-admin-settings-page select,
+  .school-admin-settings-page textarea { width:100%; min-width:0; min-height:44px; font-size:16px; }
+  .school-admin-settings-page .grid { min-width:0; }
+  .school-admin-settings-page .grid > * { min-width:0; }
+  .school-admin-settings-page [role="tablist"] { display:flex; max-width:100%; overflow-x:auto; gap:6px; padding-bottom:5px; }
+  .school-admin-settings-page [role="tab"] { flex:0 0 auto; min-height:42px; white-space:nowrap; }
+  .school-admin-settings-page button { touch-action:manipulation; }
+
+  /* Timetable: keep the timetable itself scrollable, but never the whole page sideways. */
+  .school-admin-timetable-page { padding:12px 10px calc(30px + env(safe-area-inset-bottom)) !important; gap:14px; }
+  .school-admin-timetable-page h1 { font-size:22px !important; line-height:1.2; }
+  .school-admin-timetable-page > div:first-child { align-items:stretch; }
+  .school-admin-timetable-page > div:first-child button { min-height:44px; }
+  .school-admin-timetable-page .grid { min-width:0; }
+  .school-admin-timetable-page .grid > * { min-width:0; }
+  .school-admin-timetable-page details { border-radius:14px; padding:13px; }
+  .school-admin-timetable-page details .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  .school-admin-timetable-page input,
+  .school-admin-timetable-page select { min-width:0; min-height:44px; width:100%; font-size:16px; }
+  .school-admin-timetable-page .overflow-x-auto { max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
+  .school-admin-timetable-page table { min-width:620px; }
+}
+@media (max-width: 380px) {
+  .school-people-parents-page tbody tr,
+  .school-admin-classes-page .scroll tbody tr,
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody tr,
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody tr { grid-template-columns:minmax(0,1fr); }
+  .school-people-parents-page tbody td:nth-child(2),
+  .school-people-parents-page tbody td:nth-child(4),
+  .school-people-parents-page tbody td:nth-child(6),
+  .school-admin-classes-page .scroll tbody td:nth-child(5),
+  .school-admin-classes-page .scroll tbody td:nth-child(7),
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(5),
+  .school-admin-attendance-page [aria-label^="Attendance records table"] tbody td:nth-child(6),
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(2),
+  .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(9) { grid-column:1; }
+}
+
+@media (max-width: 767px) {
+  .school-students-page .student-mobile-roll {
+    display:inline-flex; align-items:center; min-height:26px; padding:4px 9px;
+    border:1px solid #c9e6dc; border-radius:999px; background:#eaf7f1;
+    color:#126b58; font-size:11px; font-weight:800; white-space:nowrap;
+  }
+  .school-students-page .student-mobile-class { font-weight:650; color:#334b44; }
+  .school-students-page .student-mobile-card > div:nth-child(2) { gap:7px; }
+}
