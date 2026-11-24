@@ -37,7 +37,7 @@ const Metric = ({ label, value, hint, onClick, icon: Icon, tone }: {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   tone: 'blue' | 'green' | 'purple' | 'amber';
 }) => (
-  <button type="button" onClick={onClick} data-tone={tone} className="school-admin-metric min-w-0 text-left">
+  <button type="button" onClick={onClick} data-tone={tone} className="school-admin-metric school-admin-showcase-metric min-w-0 text-left">
     <div className="flex items-start justify-between gap-3"><div className="min-w-0">
       <div className="metric-label">{label}</div><div className="metric-value mt-2">{value}</div>
       {hint && <div className="metric-hint mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold">{hint}</div>}
@@ -66,8 +66,8 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     { label: 'New admission', detail: 'Register a student', icon: UserPlus, view: 'sch_students' }
   ].filter(item => (item.view !== 'sch_fees' || canViewFinance) && (item.view !== 'sch_students' || canManageStudents));
 
-  return <div className="school-dashboard-page mx-auto w-full max-w-[1600px] space-y-5 p-4 md:p-6">
-    <section className="school-dashboard-hero relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 text-slate-800 md:p-6">
+  return <div className="school-dashboard-page school-admin-showcase mx-auto w-full max-w-[1600px] space-y-5 p-4 md:p-6">
+    <section className="school-dashboard-hero school-admin-showcase-hero relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 text-slate-800 md:p-6">
       <div className="relative z-10 flex flex-col justify-between gap-5 md:flex-row md:items-center">
         <div className="flex min-w-0 items-center gap-4">
           {school?.logoUrl ? <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white p-2"><img src={school.logoUrl} alt="" className="h-full w-full object-contain" /></div>
@@ -92,7 +92,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     </section>
 
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)]">
-      <div className="school-dashboard-panel min-w-0 p-5 md:p-6">
+      <div className="school-dashboard-panel school-admin-showcase-panel min-w-0 p-5 md:p-6">
         <div className="mb-5 flex items-center justify-between gap-3"><div><div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400"><Activity size={14} /> Attendance</div><h2 className="text-base font-semibold text-slate-900">Weekly attendance trend</h2></div>
           <button type="button" onClick={() => onNavigate('sch_attendance')} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Open register <ArrowUpRight size={14} /></button>
         </div>
@@ -109,7 +109,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
         </div> : <EmptyState title="Weekly trend is not available yet" description="Attendance history will appear here when the dashboard API supplies it." className="min-h-52 border-0 bg-slate-50" />}
       </div>
 
-      {canViewFinance && <div className="school-dashboard-panel p-5 md:p-6">
+      {canViewFinance && <div className="school-dashboard-panel school-admin-showcase-panel p-5 md:p-6">
         <div className="mb-5 flex items-center gap-2"><Wallet size={17} className="text-blue-600" /><div><h2 className="text-base font-semibold text-slate-900">Fee collection</h2><p className="mt-0.5 text-xs text-slate-500">Collected vs outstanding</p></div></div>
         {totalFees > 0 ? <div className="flex flex-col items-center gap-5 sm:flex-row xl:flex-col 2xl:flex-row">
           <div className="relative grid h-36 w-36 shrink-0 place-items-center rounded-full" style={{ background: 'conic-gradient(var(--brand-color) ' + collectedPercent + '%, #f5c24d 0)' }}>
@@ -125,7 +125,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
     </section>
 
     <section className="grid gap-4 lg:grid-cols-3">
-      <div className="school-dashboard-panel min-w-0 p-5">
+      <div className="school-dashboard-panel school-admin-showcase-panel min-w-0 p-5">
         <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600"><AlertCircle size={17} /></span><div><h2 className="text-sm font-semibold text-slate-900">Needs attention</h2><p className="text-[11px] text-slate-400">Absence alerts</p></div></div>
         {result.absentStudents.length ? result.absentStudents.slice(0, 4).map((student: DashboardRecord, index: number) => <div key={student.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{student.name ?? student.studentName ?? 'Student absent'}</p><p className="mt-1 text-xs text-slate-400">{student.className ?? student.class ?? 'Class not provided'} · {student.daysAbsent ? student.daysAbsent + ' days absent' : 'Absent today'}</p></div>) : <EmptyState title="No absence alerts today" description="There are no absence records to review for today." className="min-h-28 border-0 bg-transparent" />}
       </div>
