@@ -7000,7 +7000,7 @@ apiRouter.put('/school/staff/roles/:id', requireAuth, requireSchoolAdminOrSuperA
   if (!prior) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
   const nextName = typeof name === 'string' ? name.trim() : prior.name;
   if (roles.some(role => role.id !== prior.id && String(role.name).toLowerCase() === nextName.toLowerCase())) { res.status(409).json({ error: 'A role with that name already exists in this school.' }); return; }
-  const updated = await db.updateStaffRole(prior.id, school.id, { ...(name !== undefined ? { name: nextName } : {}), ...(description !== undefined ? { description: description.trim() } : {}), ...(permissions !== undefined ? { permissions: [...new Set(permissions)] } : {}) });
+  const updated = await db.updateStaffRole(prior.id, school.id, { ...(name !== undefined ? { name: nextName } : {}), ...(description !== undefined ? { description: description.trim() } : {}), ...(permissions !== undefined ? { permissions: [...new Set(permissions as string[])] } : {}) });
   if (!updated) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
   if (permissions !== undefined || name !== undefined) {
     const members = (await db.getStaffMembers(school.id)).filter(member => member.roleId === prior.id);
