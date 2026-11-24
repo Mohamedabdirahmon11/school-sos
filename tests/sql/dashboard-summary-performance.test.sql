@@ -20,6 +20,13 @@ CREATE TABLE public.schools (
   id varchar(64) PRIMARY KEY,
   timezone text
 );
+
+CREATE TABLE public.exam_configs (
+  id varchar(64) PRIMARY KEY,
+  school_id varchar(64) NOT NULL,
+  academic_year varchar(50) NOT NULL,
+  pass_mark_percentage numeric(5,2) NOT NULL DEFAULT 50
+);
 CREATE TABLE public.students (
   id varchar(64) PRIMARY KEY,
   school_id varchar(64) NOT NULL,
@@ -57,17 +64,25 @@ CREATE TABLE public.fee_payments (
   school_id varchar(64) NOT NULL,
   student_id varchar(64),
   receipt_number text,
+  reference_number text,
   academic_year text,
   month text,
   fee_type text,
+  fee_structure_id varchar(64),
+  idempotency_key text,
   amount_due numeric(12,2),
   amount_paid numeric(12,2),
   remaining_amount numeric(12,2),
   payment_method text,
   status text,
   date date NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  voided_at timestamptz
+  recorded_by varchar(64),
+  notes text,
+  voided_at timestamptz,
+  voided_by varchar(64),
+  void_reason text,
+  idempotency_keys jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE public.school_notices (
   id varchar(64) PRIMARY KEY,
@@ -84,6 +99,9 @@ CREATE TABLE public.school_notices (
 
 INSERT INTO public.schools (id, timezone)
 VALUES ('school-a', 'Africa/Addis_Ababa'), ('school-b', 'Africa/Addis_Ababa');
+
+INSERT INTO public.exam_configs (id, school_id, academic_year, pass_mark_percentage)
+VALUES ('config-a', 'school-a', '2026-2027', 50);
 
 INSERT INTO public.classes (id, school_id, name, grade_level, is_archived)
 VALUES
