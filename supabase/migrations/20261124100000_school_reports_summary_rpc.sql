@@ -39,7 +39,7 @@ AS $function$
   ),
   exam_pass_mark AS (
     SELECT COALESCE((
-      SELECT config.pass_mark_percentage
+      SELECT NULLIF(config.pass_mark_percentage, 0)
       FROM public.exam_configs AS config
       WHERE config.school_id = p_school_id
         AND config.academic_year = p_academic_year
