@@ -7,7 +7,10 @@ const translate = (key: string) => ({
 const visualParams = new URLSearchParams(window.location.search);
 const studentMode = visualParams.get('component') === 'student';
 const parentMode = visualParams.get('component') === 'parent';
-const user = parentMode
+const peopleAdminMode = visualParams.get('component') === 'people-admin';
+const user = peopleAdminMode
+  ? { id: 'admin-user-visual-001', role: 'admin', fullName: 'School Administrator', phone: '+251911000000' }
+  : parentMode
   ? { id: 'parent-user-visual-001', role: 'parent', fullName: 'Axmed Cabdi', phone: '+251911000001', linkedStudentIds: ['student-001','student-002','student-003'] }
   : studentMode
   ? { id: 'student-user-visual-001', role: 'student', fullName: 'Faadumo Axmed Cabdi', studentId: 'ST-0421' }
