@@ -176,3 +176,53 @@
   .school-people-admissions-page .people-admissions-board { grid-template-columns: repeat(6, minmax(240px, 82vw)); }
   .school-people-teachers-page tbody { grid-template-columns: 1fr; }
 }
+
+
+/* All four People Admin pages use a div-based title row except Teachers.
+   Apply the same reference header treatment consistently without touching other modules. */
+.school-people-page > div:first-child:not(.people-admissions-board) {
+  border-radius: 14px;
+}
+.school-people-parents-page > div:first-child,
+.school-people-admissions-page > div:first-child,
+.school-people-staff-page > div:first-child {
+  background: #fff;
+  border: 1px solid var(--people-line);
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 8px rgb(28 43 38 / 4%);
+}
+.school-people-parents-page > div:first-child h1,
+.school-people-admissions-page > div:first-child h1,
+.school-people-staff-page > div:first-child h1 {
+  margin: 0;
+  color: var(--people-ink) !important;
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -.025em;
+}
+.school-people-parents-page > div:first-child p,
+.school-people-admissions-page > div:first-child p {
+  margin-top: 5px;
+  color: var(--people-muted) !important;
+  font-size: 12px;
+}
+.school-people-parents-page > div:nth-child(2):not([role="status"]):not([role="alert"]),
+.school-people-admissions-page > div:nth-child(3),
+.school-people-staff-page > div:nth-child(2) {
+  border-color: var(--people-line) !important;
+  border-radius: 12px !important;
+}
+.school-people-parents-page .overflow-x-auto,
+.school-people-staff-page .overflow-x-auto { max-width: 100%; }
+.school-people-parents-page table,
+.school-people-staff-page table { background: var(--people-card); }
+.school-people-parents-page tbody td,
+.school-people-staff-page tbody td { color: var(--people-ink); }
+.school-people-staff-page .school-people-role-card,
+.school-people-staff-page [data-role-card] {
+  border: 1px solid var(--people-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(28 43 38 / 4%);
+}
