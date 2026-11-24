@@ -154,7 +154,7 @@ export class ApiClient {
     try {
       response = await fetch(`/api${endpoint}`, {
         ...requestOptions,
-        ...(listEndpoint ? { cache: 'no-cache' as RequestCache } : {}),
+        ...(method === 'GET' ? { cache: (listEndpoint ? 'no-cache' : 'no-store') as RequestCache } : {}),
         credentials: 'include', // Enforce httpOnly signed cookie inclusion on every request
         headers: {
           ...this.getHeaders(),
