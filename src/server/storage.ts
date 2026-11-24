@@ -756,11 +756,12 @@ class StorageEngine {
     this.testClient = client;
   }
 
-  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*', orderBy?: string, ascending = true): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
+  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*', orderBy?: string, ascending = true, maxPageSize = 100): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Supabase client is not configured.');
     const safePage = Math.max(1, Math.floor(page) || 1);
-    const safeSize = Math.min(100, Math.max(1, Math.floor(pageSize) || 20));
+    const safeMaxPageSize = Math.min(1_000, Math.max(1, Math.floor(maxPageSize) || 100));
+    const safeSize = Math.min(safeMaxPageSize, Math.max(1, Math.floor(pageSize) || 20));
     let query = client.from(table).select(columns, { count: 'exact' });
     for (const [field, value] of Object.entries(filters)) {
       if (value === undefined || value === '') continue;
