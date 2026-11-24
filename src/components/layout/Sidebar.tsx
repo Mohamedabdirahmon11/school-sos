@@ -27,13 +27,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   const { user, school, inspectedSchool, language } = useAuth();
   const role = user?.role || 'school_admin';
   const [menuSearch, setMenuSearch] = useState('');
-  // A phone drawer is always expanded, even if the desktop sidebar was saved as collapsed.
-  const isCompact = isCollapsed && !isOpenMobile;
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
     const saved = window.localStorage.getItem(`schoolos:sidebar-collapsed:${user?.id || 'guest'}`);
     return saved === null ? Boolean(school?.sidebarTheme?.defaultCollapsed) : saved === 'true';
   });
+  // A phone drawer is always expanded, even if the desktop sidebar was saved as collapsed.
+  const isCompact = isCollapsed && !isOpenMobile;
   useEffect(() => {
     const theme = school?.sidebarTheme;
     const presets: Record<string, { background: string; text: string; accent: string }> = {
