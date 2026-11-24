@@ -203,8 +203,13 @@ test('transport data is loaded only when the Transport module is active', () => 
 });
 
 
-test('Library lending loads the current school student list for book assignment', () => {
-  const libraryEffect = ui.slice(ui.indexOf("if (!school || activeModule !== 'library')"), ui.indexOf('const handleAddDisciplineIncident'));
-  assert.match(libraryEffect, /ApiClient\.getAllStudents\(undefined, undefined\)/);
-  assert.match(libraryEffect, /setStudents\(studentRows\)/);
+test('Library lending uses bounded searchable student options instead of downloading the full school roster', () => {
+  const optionsStart = ui.indexOf('Fetch only the first 20 matching students');
+  const optionsEnd = ui.indexOf("if (!school || activeModule !== 'health')", optionsStart);
+  const optionsEffect = ui.slice(optionsStart, optionsEnd);
+  const libraryEffect = ui.slice(ui.indexOf("if (!school || activeModule !== 'library')"), ui.indexOf("if (!school || activeModule !== 'transport')"));
+  assert.match(optionsEffect, /ApiClient\.getStudentOptions\(search\)/);
+  assert.match(optionsEffect, /setStudents\(rows\)/);
+  assert.match(optionsEffect, /\}, 250\)/);
+  assert.doesNotMatch(libraryEffect, /getAllStudents|getStudents\(/);
 });
