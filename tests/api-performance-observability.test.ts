@@ -124,3 +124,21 @@ test('class details cache is short-lived, school/role/user/page scoped and inval
   assert.match(route, /\$\{school\.id\}:\$\{req\.params\.id\}:\$\{role\}:\$\{user\.id\}:\$\{page\}:\$\{pageSize\}:\$\{search\}/);
   assert.match(route, /res\.json\(details\)/);
 });
+
+
+test('message contacts query only allowed roles with a bounded projection and server-side search', () => {
+  const start = api.indexOf("apiRouter.get('/messages/contacts'");
+  const end = api.indexOf("apiRouter.get('/messages'", start);
+  const route = api.slice(start, end);
+  assert.match(route, /req\.query\.q/);
+  assert.match(route, /db\.queryPage\([\s\S]*?'users',[\s\S]*?\n      1,\n      100,/);
+  assert.match(route, /id,role,full_name,email,phone,student_id/);
+  assert.doesNotMatch(route, /db\.getUsers\(school\.id\)/);
+});
+
+test('messages UI debounces contact search and sends it to the server', () => {
+  const view = readFileSync(new URL('../src/components/schooladmin/MessagesView.tsx', import.meta.url), 'utf8');
+  assert.match(view, /ApiClient\.getMessageContacts\(\{ search: searchContact \}\)/);
+  assert.match(view, /\}, 250\)/);
+  assert.doesNotMatch(view, /Promise\.all\(\[[\s\S]*?getMessageContacts/);
+});
