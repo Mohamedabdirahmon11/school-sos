@@ -7110,7 +7110,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
     if (!updatedUser) { res.status(500).json({ error: 'Staff member was updated, but the linked sign-in account could not be updated.' }); return; }
     invalidateAuthenticatedSnapshot(updated.userId);
   }
-  if (permissions !== undefined || status !== undefined) {
+  if (permissions !== undefined || roleId !== undefined || status !== undefined) {
     db.logAudit({ action: 'STAFF_ACCESS_UPDATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated staff account access for ${updated.userId || updated.id}.`, severity: 'warning' });
   }
   res.json(updated);
