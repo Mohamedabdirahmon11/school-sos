@@ -49,6 +49,7 @@ CREATE TABLE public.classes (
   school_id varchar(64) NOT NULL,
   name text,
   grade_level text,
+  section text NOT NULL DEFAULT '',
   is_archived boolean NOT NULL DEFAULT false
 );
 CREATE TABLE public.attendance_records (
