@@ -3,16 +3,17 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { calculateSubscriptionGraceEnd, lockoutAttemptCountFromRow, shouldTouchSession, shouldReuseCachedAuthSession } from '../src/server/storage.ts';
 
-test('session refresh persistence is throttled to at most once per minute', () => {
+test('long-lived session last-seen persistence is throttled to at most once per five minutes', () => {
   const now = Date.UTC(2026, 10, 3, 12, 0, 0);
-  const currentExpiry = new Date(now + 60 * 60 * 1000).toISOString();
+  const timeoutMs = 30 * 24 * 60 * 60 * 1000;
+  const currentExpiry = new Date(now + timeoutMs).toISOString();
 
   assert.equal(
-    shouldTouchSession(currentExpiry, new Date(now + 60 * 60 * 1000 + 59_999).toISOString(), now),
+    shouldTouchSession(currentExpiry, new Date(now + timeoutMs + 5 * 60_000 - 1).toISOString(), now),
     false
   );
   assert.equal(
-    shouldTouchSession(currentExpiry, new Date(now + 60 * 60 * 1000 + 60_000).toISOString(), now),
+    shouldTouchSession(currentExpiry, new Date(now + timeoutMs + 5 * 60_000).toISOString(), now),
     true
   );
 });
@@ -56,9 +57,9 @@ test('cached session validation is reused only inside its short TTL and while th
   const now = Date.UTC(2026, 10, 22, 12, 0, 0);
   const sessionExpiry = new Date(now + 60_000).toISOString();
 
-  assert.equal(shouldReuseCachedAuthSession(now + 1_999, sessionExpiry, now), true);
+  assert.equal(shouldReuseCachedAuthSession(now + 29_999, sessionExpiry, now), true);
   assert.equal(shouldReuseCachedAuthSession(now, sessionExpiry, now), false);
-  assert.equal(shouldReuseCachedAuthSession(now + 2_000, sessionExpiry, now + 2_000), false);
+  assert.equal(shouldReuseCachedAuthSession(now + 30_000, sessionExpiry, now + 30_000), false);
   assert.equal(shouldReuseCachedAuthSession(now + 1_000, new Date(now - 1).toISOString(), now), false);
 });
 
@@ -188,4 +189,25 @@ test('internal query page batching is capped at 1000 rows while public defaults 
   const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
   assert.match(storage, /ascending = true, maxPageSize = 100/);
   assert.match(storage, /Math\.min\(1_000, Math\.max\(1, Math\.floor\(maxPageSize\) \|\| 100\)\)/);
+});
+
+
+test('auth session and user context caches are 30 seconds and user updates invalidate local session entries', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(storage, /const AUTH_CONTEXT_TTL_MS = 30_000/);
+  assert.match(storage, /const AUTH_SESSION_VALIDATION_TTL_MS = 30_000/);
+  assert.match(storage, /function invalidateAuthContextForUser\(userId: string\): void/);
+  assert.match(storage, /for \(const \[sessionId, entry\] of authSessionValidationCache\)[\s\S]*?entry\.userId === userId/);
+  const updateStart = storage.indexOf('public updateUser(');
+  const updateEnd = storage.indexOf('public deleteUser(', updateStart);
+  assert.match(storage.slice(updateStart, updateEnd), /invalidateAuthContextForUser\(id\)/);
+});
+
+test('school auth context invalidation clears cached sessions for that school', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('private invalidateAuthContextsForSchool(');
+  const end = storage.indexOf('private invalidateNoticeCounts(', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /invalidateAuthContextForUser\(userId\)/);
+  assert.match(method, /entry\.schoolId === schoolId/);
 });
