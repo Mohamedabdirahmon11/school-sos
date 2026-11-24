@@ -3638,3 +3638,13 @@ main :is(.flex, .inline-flex) > * {
   .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(2),
   .school-admin-fees-page [aria-label^="Fee ledger table"] tbody td:nth-child(9) { grid-column:1; }
 }
+
+@media (max-width: 767px) {
+  .school-students-page .student-mobile-roll {
+    display:inline-flex; align-items:center; min-height:26px; padding:4px 9px;
+    border:1px solid #c9e6dc; border-radius:999px; background:#eaf7f1;
+    color:#126b58; font-size:11px; font-weight:800; white-space:nowrap;
+  }
+  .school-students-page .student-mobile-class { font-weight:650; color:#334b44; }
+  .school-students-page .student-mobile-card > div:nth-child(2) { gap:7px; }
+}
