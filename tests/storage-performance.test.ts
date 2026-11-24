@@ -182,3 +182,10 @@ test('read-only exam configuration reads do not create or upsert missing default
   assert.match(method, /if \(persistIfMissing\) \{[\s\S]*?this\.data\.examConfigs\.push\(conf\)[\s\S]*?this\.save\(\)/);
   assert.match(method, /return conf;/);
 });
+
+
+test('internal query page batching is capped at 1000 rows while public defaults remain 100', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(storage, /ascending = true, maxPageSize = 100/);
+  assert.match(storage, /Math\.min\(1_000, Math\.max\(1, Math\.floor\(maxPageSize\) \|\| 100\)\)/);
+});
