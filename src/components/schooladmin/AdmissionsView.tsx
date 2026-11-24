@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import './people-admin.css';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolClass } from '../../types/index.ts';
@@ -76,7 +77,7 @@ export const AdmissionsView: React.FC = () => {
   const visibleRows = applications.filter(row => statusFilter === 'all' || row.status === statusFilter);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="school-people-page school-people-admissions-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">Admissions & Student Enrollment</h1>
