@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { Header } from './components/layout/Header.tsx';
 import { Sidebar } from './components/layout/Sidebar.tsx';
@@ -89,11 +90,15 @@ const AppContent: React.FC = () => {
     return () => { active = false; };
   }, [currentView, user?.id]);
 
-  if (isLoading) return <LoadingState label="Initializing SchoolOS Platform…" className="min-h-screen border-0 bg-[#F3F6F6]" />;
+  // Public login is rendered immediately while the HttpOnly session cookie is
+  // checked in the background. The form cannot submit until that check ends.
+  // Authenticated users still wait for their server-verified identity before
+  // any protected dashboard or portal is mounted.
+  if (isLoading && user) return <LoadingState label="Initializing SchoolOS Platform…" className="min-h-screen border-0 bg-[#F3F6F6]" />;
 
-  // Not logged in -> Show Multi-Role Login Screen
+  // Not logged in (or session check pending) -> show the public login screen.
   if (!user) {
-    return <LoginView />;
+    return <LoginView authCheckPending={isLoading} />;
   }
 
   // First-login accounts must finish password setup before any dashboard
@@ -191,7 +196,18 @@ const AppContent: React.FC = () => {
         <div className="min-h-0 flex-1 flex flex-col min-w-0 overflow-hidden">
           {!setupRequired && !['student', 'parent'].includes(user.role) && <Header currentView={activeView} onNavigate={handleNavigate} />}
 
-          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6">
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-16 md:pb-6 relative">
+            <div className="pointer-events-none absolute right-4 top-2 z-40">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                title="Refresh this page"
+                aria-label="Refresh this page"
+                className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E2E8F0] bg-white/95 text-[#64748B] shadow-sm transition-colors hover:border-[#99F6E4] hover:text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F766E] focus-visible:ring-offset-2"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
             {setupRequired && activeView !== 'sch_setup' && (
               <div className="mx-auto w-full max-w-6xl px-4 pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950">

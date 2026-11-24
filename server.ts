@@ -12,7 +12,7 @@ import { createServer as createViteServer } from 'vite';
 import { apiRouter } from './src/server/api.ts';
 import { apiErrorHandler } from './src/server/async-errors.ts';
 import { apiNotFound, createLoginRateLimiter, getTrustProxyHops, securityHeaders } from './src/server/security-middleware.ts';
-import { assertProductionAssets } from './src/server/production-assets.ts';
+import { assertProductionAssets, productionAssetCacheControl } from './src/server/production-assets.ts';
 import { db, initializeStorage } from './src/server/storage.ts';
 import path from 'node:path';
 
@@ -83,7 +83,11 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+      setHeaders(res, filePath) {
+        res.setHeader('Cache-Control', productionAssetCacheControl(path.relative(distPath, filePath)));
+      }
+    }));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolSetupData, SchoolSetupState } from '../../types/index.ts';
 import { getEthiopianCalendarInfo } from '../../lib/ethiopian-calendar.ts';
+import { isSchoolSetupProgressCompleteWithTeacherAssignment, isSchoolSetupWizardEligible } from '../../lib/school-setup-navigation.ts';
 import { SchoolSetupInlineEditor } from './SchoolSetupInlineEditor.tsx';
 
 interface Props { onNavigate: (view: string) => void; onComplete: () => Promise<void>; }
@@ -68,7 +69,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     setChecklistLoading(true);
     try {
       const current = await ApiClient.getSchoolSetupProgress();
-      if (current.progress.completedAt) {
+      if (current.progress.completedAt && (!isSchoolSetupWizardEligible(school?.createdAt) || (current.canFinish && isSchoolSetupProgressCompleteWithTeacherAssignment(current.progress)))) {
         setSetupState(current);
         setReferenceStep(9);
         return;

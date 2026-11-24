@@ -1,3 +1,4 @@
+import { isSchoolSetupProgressCompleteWithTeacherAssignment } from '../src/lib/school-setup-navigation.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -166,4 +167,9 @@ test('six setup modules render inside the wizard and use existing database-backe
   assert.match(editor, /request<any>\('\/teacher-assignments'/);
   assert.match(editor, /request\(.*timetable/);
   assert.doesNotMatch(editor, /localStorage/);
+});
+test('legacy completion markers cannot unlock a new-school dashboard without Teacher Assignment', () => {
+  const base = { completedAt: '2026-11-23T12:00:00.000Z', completedSteps: [1, 2, 3, 4, 5, 6, 8, 10], skippedSteps: [7, 9] };
+  assert.equal(isSchoolSetupProgressCompleteWithTeacherAssignment(base), false);
+  assert.equal(isSchoolSetupProgressCompleteWithTeacherAssignment({ ...base, completedSteps: [0, ...base.completedSteps] }), true);
 });

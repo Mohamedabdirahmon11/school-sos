@@ -109,6 +109,7 @@ interface StorageContext {
   persistedRows: Map<string, Map<string, string>>;
   queryCount: number;
   queryDurationMs: number;
+  queryTables: Map<string, number>;
   routeLabel: string;
 }
 
@@ -118,11 +119,11 @@ interface CachedAuthContext {
   expiresAt: number;
 }
 
-const AUTH_CONTEXT_TTL_MS = 60_000;
+const AUTH_CONTEXT_TTL_MS = 30_000;
 // Reuse a successful session-row check briefly across bursty API requests.
 // Local logout/revocation invalidates this immediately; remote revocations
 // become visible within this short bounded window.
-const AUTH_SESSION_VALIDATION_TTL_MS = 2_000;
+const AUTH_SESSION_VALIDATION_TTL_MS = 30_000;
 const authSessionValidationCache = new Map<string, {
   userId: string;
   schoolId: string | null;
@@ -164,6 +165,13 @@ const authContextCache = new Map<string, CachedAuthContext>();
 const schoolContextCache = new Map<string, { school: School; expiresAt: number }>();
 const branchListCache = new Map<string, { branches: SchoolBranch[]; expiresAt: number }>();
 const noticeCountCache = new Map<string, { count: number; expiresAt: number }>();
+function invalidateAuthContextForUser(userId: string): void {
+  authContextCache.delete(userId);
+  for (const [sessionId, entry] of authSessionValidationCache) {
+    if (entry.userId === userId) authSessionValidationCache.delete(sessionId);
+  }
+}
+
 
 const COMMUNICATION_SECRET_PREFIX = 'enc:v1:';
 function communicationSecretKey(): Buffer {
@@ -209,7 +217,7 @@ export function shouldTouchSession(currentExpiresAt: string, requestedExpiresAt:
   if (!Number.isFinite(current) || !Number.isFinite(requested)) return true;
   if (requested <= current) return requested < current;
   const timeoutMs = Math.max(1_000, requested - now);
-  const refreshWindowMs = Math.min(60_000, Math.max(1_000, timeoutMs / 20));
+  const refreshWindowMs = Math.min(5 * 60_000, Math.max(1_000, timeoutMs / 20));
   return requested - current >= refreshWindowMs;
 }
 
@@ -378,7 +386,7 @@ class StorageEngine {
   private feePaymentQueues = new Map<string, Promise<void>>();
   private globalContext: StorageContext = {
     data: this.createEmptySchema(), initialized: false, writeQueue: Promise.resolve(),
-    writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, routeLabel: ''
+    writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, queryTables: new Map(), routeLabel: ''
   };
   private get state(): StorageContext { return this.contexts.getStore() || this.globalContext; }
   private get data(): DatabaseSchema { return this.state.data; }
@@ -394,6 +402,9 @@ class StorageEngine {
   private testClient: any = null;
   private settingsCache: { expiresAt: number; value: SuperAdminSettings } | null = null;
   private plansCache: { expiresAt: number; value: PlanConfig[] } | null = null;
+  // Coalesce cold-cache reads across concurrent HTTP request contexts.
+  private settingsLoadPromise: Promise<SuperAdminSettings> | null = null;
+  private plansLoadPromise: Promise<PlanConfig[]> | null = null;
 
   constructor() {
     this.data = this.createEmptySchema();
@@ -468,6 +479,7 @@ class StorageEngine {
     const durationMs = performance.now() - startedAt;
     this.state.queryCount += 1;
     this.state.queryDurationMs += durationMs;
+    this.state.queryTables.set(table, (this.state.queryTables.get(table) || 0) + 1);
     if (process.env.NODE_ENV === 'development') {
       console.info(`[api-query] ${this.state.routeLabel || 'non-request'} ${table}.${operation} ${Math.round(durationMs)}ms`);
     }
@@ -475,7 +487,10 @@ class StorageEngine {
 
   private invalidateAuthContextsForSchool(schoolId: string): void {
     for (const [userId, context] of authContextCache) {
-      if (context.user.schoolId === schoolId) authContextCache.delete(userId);
+      if (context.user.schoolId === schoolId) invalidateAuthContextForUser(userId);
+    }
+    for (const [sessionId, entry] of authSessionValidationCache) {
+      if (entry.schoolId === schoolId) authSessionValidationCache.delete(sessionId);
     }
   }
 
@@ -495,6 +510,20 @@ class StorageEngine {
       if (failure && typeof failure === 'object') Object.assign(wrapped, { code: (failure as any).code, table: (failure as any).table, payloadKeys: (failure as any).payloadKeys });
       throw wrapped;
     }
+  }
+
+  public async callRpc<T = unknown>(functionName: string, args: Record<string, unknown>): Promise<T> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error(`Database RPC "${functionName}" is unavailable.`);
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc(functionName, args);
+    this.recordQuery(`rpc:${functionName}`, 'call', startedAt);
+    if (error) {
+      const wrapped = new Error(error.message || `Database RPC "${functionName}" failed.`);
+      Object.assign(wrapped, { code: error.code, details: error.details, hint: error.hint });
+      throw wrapped;
+    }
+    return data as T;
   }
 
   public async approveAdmissionAtomically(payload: Record<string, unknown>): Promise<void> {
@@ -592,7 +621,7 @@ class StorageEngine {
   public async createRequestContext(routeLabel = ''): Promise<StorageContext> {
     return {
       data: this.createEmptySchema(), initialized: true, writeQueue: Promise.resolve(),
-      writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, routeLabel
+      writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, queryTables: new Map(), routeLabel
     };
   }
 
@@ -611,8 +640,12 @@ class StorageEngine {
     return this.contexts.run(context, callback);
   }
 
-  public getRequestQueryMetrics(): { count: number; durationMs: number } {
-    return { count: this.state.queryCount, durationMs: Math.round(this.state.queryDurationMs * 100) / 100 };
+  public getRequestQueryMetrics(): { count: number; durationMs: number; tableCounts: Record<string, number> } {
+    return {
+      count: this.state.queryCount,
+      durationMs: Math.round(this.state.queryDurationMs * 100) / 100,
+      tableCounts: Object.fromEntries(this.state.queryTables)
+    };
   }
 
   public async checkSupabaseHealth(): Promise<{ ok: boolean; roundTripMs: number }> {
@@ -663,23 +696,39 @@ class StorageEngine {
     await this.contexts.run(context, async () => {
       const settingsTask = async () => {
         if (this.settingsCache && this.settingsCache.expiresAt > Date.now()) {
-          this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.settingsCache.value }]);
+          this.data.settings = { ...DEFAULT_SETTINGS, ...this.settingsCache.value };
+          this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.data.settings }]);
           return;
         }
-        const rows = await this.queryRows<SuperAdminSettings>('super_admin_settings', { id: 'default' });
-        if (rows[0]) this.data.settings = { ...DEFAULT_SETTINGS, ...rows[0] };
-        this.settingsCache = { value: { ...this.data.settings }, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+        if (!this.settingsLoadPromise) {
+          this.settingsLoadPromise = (async () => {
+            const rows = await this.queryRows<SuperAdminSettings>('super_admin_settings', { id: 'default' });
+            const value = rows[0] ? { ...DEFAULT_SETTINGS, ...rows[0] } : { ...this.data.settings };
+            this.settingsCache = { value, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+            return value;
+          })().finally(() => { this.settingsLoadPromise = null; });
+        }
+        const value = await this.settingsLoadPromise;
+        this.data.settings = { ...DEFAULT_SETTINGS, ...value };
+        this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.data.settings }]);
       };
       const plansTask = async () => {
         if (this.plansCache && this.plansCache.expiresAt > Date.now()) {
           this.cacheQueryRows('plans', this.plansCache.value.map(plan => ({ ...plan })));
           return;
         }
-        // queryRows already merges persisted plan fields over built-in defaults
-        // and records the matching persistence baseline. Do not replace that
-        // merged state with raw rows, or unrelated writes will upsert it again.
-        await this.queryRows<PlanConfig>('plans', {});
-        this.plansCache = { value: this.data.plans.map(plan => ({ ...plan })), expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+        if (!this.plansLoadPromise) {
+          this.plansLoadPromise = (async () => {
+            // queryRows merges persisted plan fields over built-in defaults.
+            // Preserve the merged snapshot and its persistence baseline.
+            await this.queryRows<PlanConfig>('plans', {});
+            const value = this.data.plans.map(plan => ({ ...plan }));
+            this.plansCache = { value, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
+            return value;
+          })().finally(() => { this.plansLoadPromise = null; });
+        }
+        const value = await this.plansLoadPromise;
+        this.cacheQueryRows('plans', value.map(plan => ({ ...plan })));
       };
       await Promise.all(includePlans ? [settingsTask(), plansTask()] : [settingsTask()]);
       if (includeLockouts) {
@@ -717,7 +766,13 @@ class StorageEngine {
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
     await this.persistTable(client, 'super_admin_settings', settingsRows, toRows('super_admin_settings'), knownIds, knownRows);
-    for (const [table, rows] of tables) await this.persistTable(client, table, rows, toRows(table), knownIds, knownRows);
+    for (const [table, rows] of tables) {
+      // Request contexts that intentionally skip global plan loading still carry
+      // built-in defaults in memory. Never persist those defaults as database
+      // writes when a session refresh or unrelated mutation flushes the context.
+      if (table === 'plans' && !knownIds.has('plans') && !knownRows.has('plans')) continue;
+      await this.persistTable(client, table, rows, toRows(table), knownIds, knownRows);
+    }
   }
 
   public setTestClient(client: any): void {
@@ -725,11 +780,12 @@ class StorageEngine {
     this.testClient = client;
   }
 
-  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*', orderBy?: string, ascending = true): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
+  public async queryPage<T = any>(table: string, filters: Record<string, string | string[] | undefined>, page = 1, pageSize = 20, orFilter?: string, columns = '*', orderBy?: string, ascending = true, maxPageSize = 100): Promise<{ items: T[]; page: number; pageSize: number; total: number }> {
     const client = this.testClient || supabase;
     if (!client) throw new Error('Supabase client is not configured.');
     const safePage = Math.max(1, Math.floor(page) || 1);
-    const safeSize = Math.min(100, Math.max(1, Math.floor(pageSize) || 20));
+    const safeMaxPageSize = Math.min(1_000, Math.max(1, Math.floor(maxPageSize) || 100));
+    const safeSize = Math.min(safeMaxPageSize, Math.max(1, Math.floor(pageSize) || 20));
     let query = client.from(table).select(columns, { count: 'exact' });
     for (const [field, value] of Object.entries(filters)) {
       if (value === undefined || value === '') continue;
@@ -746,10 +802,10 @@ class StorageEngine {
     return { items: (data || []).map((row: any) => fromSupabaseRow(row, table)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
   }
 
-  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>): Promise<T[]> {
+  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>, orFilter?: string, columns = '*'): Promise<T[]> {
     const rows: T[] = [];
     for (let page = 1;; page += 1) {
-      const result = await this.queryPage<T>(table, filters, page, 100);
+      const result = await this.queryPage<T>(table, filters, page, 100, orFilter, columns);
       rows.push(...result.items);
       if (rows.length >= result.total || result.items.length === 0) break;
     }
@@ -1484,12 +1540,66 @@ class StorageEngine {
     return this.data.staffMembers[index];
   }
 
+  public async getStaffRoles(schoolId: string): Promise<any[]> {
+    const rows: any[] = [];
+    for (let page = 1;; page += 1) {
+      const result = await this.queryPage<any>('staff_roles', { school_id: schoolId }, page, 100, undefined, '*', 'name', true);
+      rows.push(...result.items);
+      if (rows.length >= result.total || result.items.length === 0) break;
+    }
+    return rows;
+  }
+
+  public async createStaffRole(input: { schoolId: string; name: string; description?: string; permissions: string[] }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Staff role storage is unavailable.');
+    const row = { id: `role-${randomUUID()}`, ...input, description: input.description || '', isSystem: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const startedAt = performance.now();
+    const { data, error } = await client.from('staff_roles').insert(toSupabaseRow(row, 'staff_roles')).select('*').single();
+    this.recordQuery('staff_roles', 'insert', startedAt);
+    const saved = Array.isArray(data) ? data[0] : data;
+    if (error || !saved) throw new Error(`Unable to create staff role: ${error?.message || 'no row returned'}`);
+    return fromSupabaseRow(saved, 'staff_roles');
+  }
+
+  public async updateStaffRole(id: string, schoolId: string, updates: { name?: string; description?: string; permissions?: string[] }): Promise<any | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Staff role storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('staff_roles').update(toSupabaseRow({ ...updates, updatedAt: new Date().toISOString() }, 'staff_roles')).eq('id', id).eq('school_id', schoolId).select('*').maybeSingle();
+    this.recordQuery('staff_roles', 'update', startedAt);
+    if (error) throw new Error(`Unable to update staff role: ${error.message}`);
+    const saved = Array.isArray(data) ? data[0] : data;
+    return saved ? fromSupabaseRow(saved, 'staff_roles') : null;
+  }
+
+  public async deleteStaffRole(id: string, schoolId: string): Promise<boolean> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Staff role storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('staff_roles').delete().eq('id', id).eq('school_id', schoolId).select('id');
+    this.recordQuery('staff_roles', 'delete', startedAt);
+    if (error) throw new Error(`Unable to delete staff role: ${error.message}`);
+    return Array.isArray(data) && data.length > 0;
+  }
+
+  public async updateAdmissionPipelineStage(id: string, schoolId: string, pipelineStage: string): Promise<AdmissionApplication | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Admissions storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('admission_applications').update({ pipeline_stage: pipelineStage }).eq('id', id).eq('school_id', schoolId).select('*').maybeSingle();
+    this.recordQuery('admission_applications', 'update-stage', startedAt);
+    if (error) throw new Error(`Unable to update admissions stage: ${error.message}`);
+    const saved = Array.isArray(data) ? data[0] : data;
+    return saved ? fromSupabaseRow(saved, 'admission_applications') as AdmissionApplication : null;
+  }
+
   public async getAdmissionApplications(schoolId: string): Promise<AdmissionApplication[]> {
     return this.queryRows<AdmissionApplication>('admission_applications', { school_id: schoolId });
   }
 
   public createAdmissionApplication(application: Omit<AdmissionApplication, 'id' | 'appliedDate' | 'status'>): AdmissionApplication {
-    const record: AdmissionApplication = { ...application, id: `adm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, appliedDate: new Date().toISOString().slice(0, 10), status: 'pending' };
+    const record: AdmissionApplication = { ...application, id: `adm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, appliedDate: new Date().toISOString().slice(0, 10), status: 'pending', pipelineStage: 'applied' };
     this.data.admissionApplications.push(record);
     this.save();
     return record;
@@ -1596,13 +1706,13 @@ class StorageEngine {
       payload.pin = hashPin(payload.pin);
     }
     this.data.users[idx] = { ...this.data.users[idx], ...payload };
-    authContextCache.delete(id);
+    invalidateAuthContextForUser(id);
     this.save();
     return this.data.users[idx];
   }
 
   public deleteUser(id: string): boolean {
-    authContextCache.delete(id);
+    invalidateAuthContextForUser(id);
     const len = this.data.users.length;
     this.data.users = this.data.users.filter(u => u.id !== id);
     if (this.data.users.length < len) {
@@ -2630,7 +2740,7 @@ class StorageEngine {
     const startedAt = performance.now();
     const { data, error } = await client.from('attendance_records')
       .upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })
-      .select('*');
+      .select('id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at');
     this.recordQuery('attendance_records', 'upsert-batch', startedAt);
     if (error) throw new Error(error.message || 'Unable to save daily attendance.');
     return ((data || payload) as any[]).map(row => fromSupabaseRow(row, 'attendance_records')) as AttendanceRecord[];
@@ -2639,7 +2749,7 @@ class StorageEngine {
   // -------------------------------------------------------------
   // EXAMS & RESULTS: Small Exam + Big Exam -> Percentage Only
   // -------------------------------------------------------------
-  public async getExamConfig(schoolId: string, academicYear?: string): Promise<ExamConfig> {
+  public async getExamConfig(schoolId: string, academicYear?: string, persistIfMissing = true): Promise<ExamConfig> {
     // Flush pending writes before reading so a config created earlier in this
     // request is visible to the new database-backed read.
     await this.flush();
@@ -2667,15 +2777,17 @@ class StorageEngine {
         passMarkPercentage: 50,
         updatedAt: new Date().toISOString()
       };
-      this.data.examConfigs.push(conf);
-      this.save();
-      try {
-        await this.flush();
-      } catch (error) {
-        // Another request may have inserted the unique school/year row first.
-        const persisted = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
-        if (persisted.length) return persisted[0];
-        throw error;
+      if (persistIfMissing) {
+        this.data.examConfigs.push(conf);
+        this.save();
+        try {
+          await this.flush();
+        } catch (error) {
+          // Another request may have inserted the unique school/year row first.
+          const persisted = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
+          if (persisted.length) return persisted[0];
+          throw error;
+        }
       }
     }
     if (!Array.isArray(conf.assessmentComponents) || !conf.assessmentComponents.length) {
@@ -3417,11 +3529,25 @@ class StorageEngine {
   }
 
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
-  public async getClassYearlyRankings(schoolId: string, classId: string) {
-    const students = await this.getStudents(schoolId, classId);
-    const sem1Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 1')).filter(mark => mark.status === 'approved');
-    const sem2Marks = (await this.getMarks(schoolId, classId, undefined, 'Semester 2')).filter(mark => mark.status === 'approved');
-    const [config, school] = await Promise.all([this.getExamConfig(schoolId), this.getSchoolById(schoolId)]);
+  public async getClassYearlyRankings(schoolId: string, classId: string, persistMissingConfig = true) {
+    // Resolve the class/year once, then batch independent school-scoped reads.
+    // The two semester result sets come from one class/year marks query instead
+    // of repeating both the class lookup and student_marks round-trip.
+    const klass = await this.getClassById(classId, schoolId);
+    const [students, school, assignments, allSubjects, allMarks] = await Promise.all([
+      this.getStudents(schoolId, classId),
+      this.getSchoolById(schoolId),
+      this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId }),
+      this.getSubjects(schoolId),
+      this.queryRows<StudentMark>('student_marks', {
+        school_id: schoolId,
+        class_id: classId,
+        academic_year: klass?.academicYear
+      })
+    ]);
+    const config = await this.getExamConfig(schoolId, klass?.academicYear || school?.academicYear, persistMissingConfig);
+    const sem1Marks = allMarks.filter(mark => mark.status === 'approved' && mark.semester === 'Semester 1');
+    const sem2Marks = allMarks.filter(mark => mark.status === 'approved' && mark.semester === 'Semester 2');
     const attendanceWindowStart = school?.terms
       ? [school.terms.semester1Start, school.terms.semester2Start].filter(Boolean).sort()[0]
       : undefined;
@@ -3440,12 +3566,11 @@ class StorageEngine {
     }
 
     // Keep inactive class subjects as blank report-card rows, but exclude them from every total and rank.
-    const assignments = await this.queryRows<any>('class_subjects', { school_id: schoolId, class_id: classId });
     const activeAssignments = assignments.filter(assignment => assignment.isActive);
     const expectedSubjectIds = [...new Set(activeAssignments.map(assignment => assignment.subjectId).filter(Boolean))];
     const allAssignedSubjectIds = [...new Set(assignments.map(assignment => assignment.subjectId).filter(Boolean))];
     const activeSubjectIds = new Set(expectedSubjectIds);
-    const subjects = (await this.getSubjects(schoolId)).filter(subject => allAssignedSubjectIds.includes(subject.id));
+    const subjects = allSubjects.filter(subject => allAssignedSubjectIds.includes(subject.id));
 
     const getTermRankMap = (termMarks: StudentMark[]) => {
       const rows = students.map(student => {
@@ -4352,11 +4477,14 @@ class StorageEngine {
   }
 
   public async getMessages(schoolId: string, userId: string): Promise<DirectMessage[]> {
-    const [sent, received] = await Promise.all([
-      this.queryRows<DirectMessage>('direct_messages', { school_id: schoolId, sender_id: userId }),
-      this.queryRows<DirectMessage>('direct_messages', { school_id: schoolId, recipient_id: userId })
-    ]);
-    return [...new Map([...sent, ...received].map(message => [message.id, message])).values()];
+    // One tenant-scoped PostgREST query replaces separate sent/received scans
+    // and the in-memory de-duplication pass.
+    return this.queryRows<DirectMessage>(
+      'direct_messages',
+      { school_id: schoolId },
+      `sender_id.eq.${userId},recipient_id.eq.${userId}`,
+      'id,school_id,sender_id,sender_name,sender_role,recipient_id,recipient_name,recipient_role,content,timestamp,is_read'
+    );
   }
 
   public async sendMessage(msgData: Omit<DirectMessage, 'id' | 'timestamp' | 'isRead'>): Promise<DirectMessage> {
@@ -4373,16 +4501,44 @@ class StorageEngine {
   }
 
   public async markMessagesRead(schoolId: string, userId: string, contactId: string): Promise<void> {
-    await this.getMessages(schoolId, userId);
-    let changed = false;
-    this.data.messages = this.data.messages.map(message => {
-      if (message.schoolId === schoolId && message.senderId === contactId && message.recipientId === userId && !message.isRead) { changed = true; return { ...message, isRead: true }; }
-      return message;
-    });
-    if (changed) {
-      this.save();
-      await this.flush();
+    if (this.testClient) {
+      // Keep the deterministic in-memory adapter path used by storage tests.
+      await this.getMessages(schoolId, userId);
+      let changed = false;
+      this.data.messages = this.data.messages.map(message => {
+        if (message.schoolId === schoolId && message.senderId === contactId && message.recipientId === userId && !message.isRead) {
+          changed = true;
+          return { ...message, isRead: true };
+        }
+        return message;
+      });
+      if (changed) {
+        this.save();
+        await this.flush();
+      }
+      return;
     }
+
+    const client = supabase;
+    if (!client) throw new Error('Messages storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('direct_messages')
+      .update({ is_read: true })
+      .eq('school_id', schoolId)
+      .eq('sender_id', contactId)
+      .eq('recipient_id', userId)
+      .eq('is_read', false);
+    this.recordQuery('direct_messages', 'mark-conversation-read', startedAt);
+    if (error) throw new Error(error.message || 'Unable to mark conversation as read.');
+
+    // Keep any already-loaded process cache coherent without re-reading the
+    // complete sent + received message history or flushing a full snapshot.
+    this.data.messages = this.data.messages.map(message =>
+      message.schoolId === schoolId && message.senderId === contactId
+        && message.recipientId === userId && !message.isRead
+        ? { ...message, isRead: true }
+        : message
+    );
   }
 
   public async getBroadcasts(): Promise<PlatformBroadcast[]> {

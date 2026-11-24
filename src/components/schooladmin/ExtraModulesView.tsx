@@ -115,6 +115,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   const [notice, setNotice] = useState<string | null>(null);
   const [moduleError, setModuleError] = useState<string | null>(null);
   const [moduleSearch, setModuleSearch] = useState('');
+  const [studentOptionSearch, setStudentOptionSearch] = useState('');
   const [modulePage, setModulePage] = useState(1);
   const [moduleSortField, setModuleSortField] = useState('default');
   const [moduleSortDirection, setModuleSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -191,21 +192,59 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
   );
 
 
+  // Fetch only the first 20 matching students for module selectors. Search is
+  // debounced and never downloads the complete school roster on module entry.
+  useEffect(() => {
+    if (!school || !['health', 'library', 'transport', 'discipline'].includes(activeModule)) return;
+    let cancelled = false;
+    const search = activeModule === 'transport' ? busStudentSearch : studentOptionSearch;
+    const timeout = window.setTimeout(() => {
+      void ApiClient.getStudentOptions(search).then(rows => {
+        if (cancelled) return;
+        if (activeModule === 'health') {
+          setHealthStudents(rows);
+          setHealthStudentId(current => rows.some(student => student.id === current) ? current : rows[0]?.id || '');
+        } else {
+          setStudents(rows);
+          if (activeModule === 'library') setLoanStudentId(current => rows.some(student => student.id === current && student.status === 'active') ? current : rows.find(student => student.status === 'active')?.id || '');
+          if (activeModule === 'discipline') setIncidentStudentId(current => rows.some(student => student.id === current) ? current : rows[0]?.id || '');
+        }
+      }).catch((error: any) => {
+        if (!cancelled) setModuleError(error.message || 'Unable to search students.');
+      });
+    }, 250);
+    return () => { cancelled = true; window.clearTimeout(timeout); };
+  }, [school?.id, activeModule, studentOptionSearch, busStudentSearch]);
+
+  useEffect(() => {
+    const byId = new Map(healthStudents.map((student: any) => [student.id, student]));
+    setHealthLogs(current => current.map((visit: any) => {
+      const student: any = byId.get(visit.studentId);
+      return { ...visit, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : visit.studentId };
+    }));
+  }, [healthStudents]);
+
+  useEffect(() => {
+    const byId = new Map(students.map((student: any) => [student.id, student]));
+    setDisciplineLogs(current => current.map((row: any) => {
+      const student: any = byId.get(row.studentId);
+      return { ...row, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : row.studentId };
+    }));
+  }, [students]);
+
   useEffect(() => {
     if (!school || activeModule !== 'health') return;
     let cancelled = false;
     setHealthLoading(true);
     setModuleError(null);
-    Promise.all([ApiClient.getHealthVisits(), ApiClient.getAllStudents()])
-      .then(([visits, studentRows]) => {
+    ApiClient.getHealthVisits()
+      .then(visits => {
         if (cancelled) return;
-        setHealthStudents(studentRows);
-        const byId = new Map(studentRows.map((student: any) => [student.id, student]));
+        const byId = new Map(healthStudents.map((student: any) => [student.id, student]));
         setHealthLogs(visits.map((visit: any) => {
           const student: any = byId.get(visit.studentId);
           return { ...visit, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : visit.studentId };
         }));
-        setHealthStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
       })
       .catch((err: any) => { if (!cancelled) setModuleError(err.message || 'Unable to load clinic visits.'); })
       .finally(() => { if (!cancelled) setHealthLoading(false); });
@@ -243,14 +282,12 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     setLibraryError(null);
     Promise.all([
       ApiClient.getLibraryBooks(school.id),
-      ApiClient.getLibraryLoans(),
-      ApiClient.getAllStudents(undefined, undefined)
+      ApiClient.getLibraryLoans()
     ])
-      .then(([bookRows, loanRows, studentRows]) => {
+      .then(([bookRows, loanRows]) => {
         if (cancelled) return;
         setBooks(bookRows);
         setLibraryLoans(loanRows);
-        setStudents(studentRows);
         const firstAvailable = bookRows.find(book => loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0));
         setLoanBookId(current => bookRows.some(book => book.id === current &&
           loanRows.filter(loan => loan.bookId === book.id && loan.status === 'issued').length < Number(book.quantity || 0))
@@ -267,18 +304,15 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     setModuleError(null);
     Promise.all([
       ApiClient.getTransportRoutes(school.id),
-      ApiClient.getAllStudents(undefined, undefined),
       ApiClient.getBusAssignments(),
       ApiClient.getTransportDrivers(),
       ApiClient.getClasses()
-    ]).then(([routeRows, studentRows, assignmentRows, driverRows, classRows]) => {
+    ]).then(([routeRows, assignmentRows, driverRows, classRows]) => {
       if (cancelled) return;
       setRoutes(routeRows);
       setDriverStaffs(driverRows);
-      setStudents(studentRows);
       setTransportClasses(classRows.filter((item: any) => !item.isArchived));
       setBusAssignments(assignmentRows);
-      setSelectedBusStudentIds(current => current.filter(id => studentRows.some((student: any) => student.id === id && student.status === 'active')));
       setAssignmentRouteId(current => routeRows.some((route: any) => route.id === current) ? current : routeRows[0]?.id || '');
     }).catch((err: any) => {
       if (!cancelled) setModuleError(err.message || 'Unable to load transport records.');
@@ -291,19 +325,14 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
     let cancelled = false;
     setDisciplineLoading(true);
     setDisciplineError(null);
-    Promise.all([ApiClient.getDisciplineIncidents(), ApiClient.getAllStudents(undefined, undefined)])
-      .then(([rows, studentRows]) => {
+    ApiClient.getDisciplineIncidents()
+      .then(rows => {
         if (cancelled) return;
-        setStudents(studentRows);
-        const byId = new Map(studentRows.map((student: any) => [student.id, student]));
+        const byId = new Map(students.map((student: any) => [student.id, student]));
         setDisciplineLogs(rows.map((row: any) => {
           const student: any = byId.get(row.studentId);
-          return {
-            ...row,
-            studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : row.studentId
-          };
+          return { ...row, studentName: student ? [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') : row.studentId };
         }));
-        setIncidentStudentId(current => studentRows.some((student: any) => student.id === current) ? current : studentRows[0]?.id || '');
       })
       .catch((err: any) => { if (!cancelled) setDisciplineError(err.message || 'Unable to load discipline records.'); })
       .finally(() => { if (!cancelled) setDisciplineLoading(false); });
@@ -719,6 +748,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                       return available > 0 ? <option key={book.id} value={book.id}>{book.title} · {available} available</option> : null;
                     })}
                   </select>
+                  <input type="search" value={studentOptionSearch} onChange={e => { setStudentOptionSearch(e.target.value); setLoanStudentId(''); }} placeholder="Search student by name or ID" aria-label="Search students" className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg sm:col-span-1" />
                   <select required value={loanStudentId} onChange={e => setLoanStudentId(e.target.value)} className="px-3 py-2 text-xs border border-[#CBD5E1] rounded-lg sm:col-span-1">
                     <option value="">Select student</option>
                     {students.filter(student => student.status === 'active').map(student => <option key={student.id} value={student.id}>{student.firstName} {student.lastName} · {student.studentId}</option>)}
@@ -883,11 +913,11 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
                   <h3 className="text-lg font-bold text-slate-900">Student bus register</h3>
                   <p className="mt-0.5 text-xs text-slate-500">Assign new students and manage current passengers from this single list.</p>
                 </div>
-                <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{activeTransportStudents.length} active students</span>
+                <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">{activeTransportStudents.length} matching students</span>
               </div>
               <div className="mt-4 grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_190px_minmax(0,1fr)]">
                 <div className="relative">
-                  <input type="search" value={busStudentSearch} onChange={event => setBusStudentSearch(event.target.value)} placeholder="Search name, student ID or class..." className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-100" />
+                  <input type="search" value={busStudentSearch} onChange={event => setBusStudentSearch(event.target.value)} placeholder="Search student name or ID..." className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-100" />
                 </div>
                 <select value={assignmentClassId} onChange={event => setAssignmentClassId(event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-500">
                   <option value="all">All classes</option>
@@ -1014,6 +1044,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           <form onSubmit={handleAddDisciplineIncident} className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
             <label className="space-y-1 text-xs font-medium text-slate-700">
               Student
+              <input type="search" value={studentOptionSearch} onChange={event => { setStudentOptionSearch(event.target.value); setIncidentStudentId(''); }} placeholder="Search student by name or ID" aria-label="Search students" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
               <select required value={incidentStudentId} onChange={event => setIncidentStudentId(event.target.value)} disabled={isReadOnly || disciplineLoading || !students.length} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
                 <option value="">Select student</option>
                 {students.map((student: any) => <option key={student.id} value={student.id}>{[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')} · {student.studentId}</option>)}
@@ -1099,6 +1130,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           <form onSubmit={handleSaveHealthVisit} className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
             <label className="space-y-1 text-xs font-medium text-slate-700">
               Student
+              <input type="search" value={studentOptionSearch} onChange={event => { setStudentOptionSearch(event.target.value); setHealthStudentId(''); }} placeholder="Search student by name or ID" aria-label="Search students" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
               <select required value={healthStudentId} onChange={event => setHealthStudentId(event.target.value)} disabled={isReadOnly || healthLoading || !healthStudents.length} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
                 <option value="">Select student</option>
                 {healthStudents.map((student: any) => <option key={student.id} value={student.id}>{[student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')} · {student.studentId}</option>)}

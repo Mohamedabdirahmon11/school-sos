@@ -54,6 +54,129 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Enforce initial JavaScript and CSS bundle budgets
+        run: npm run perf:bundle
+
+      - name: Upload bundle size report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schoolos-bundle-report-${{ github.sha }}
+          path: dist/performance-bundle-report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload production frontend for Lighthouse
+        uses: actions/upload-artifact@v4
+        with:
+          name: schoolos-dist-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 2
+
+
+  lighthouse-login:
+    name: Lighthouse login Web Vitals budget
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Download production frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: schoolos-dist-${{ github.sha }}
+          path: dist/
+
+      - name: Run Lighthouse mobile login audit
+        run: npx --yes @lhci/cli@0.16.1 autorun --config=./lighthouserc.json
+
+      - name: Print Lighthouse LCP element and Web Vitals
+        if: always()
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const directory = '.lighthouseci';
+          if (!fs.existsSync(directory)) process.exit(0);
+          for (const name of fs.readdirSync(directory).filter(file => file.endsWith('.json') && file !== 'manifest.json')) {
+            try {
+              const report = JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8'));
+              const audits = report.audits || {};
+              const element = audits['largest-contentful-paint-element']?.details?.items?.[0]?.node;
+              console.log(JSON.stringify({
+                report: name,
+                lcpMs: audits['largest-contentful-paint']?.numericValue,
+                tbtMs: audits['total-blocking-time']?.numericValue,
+                cls: audits['cumulative-layout-shift']?.numericValue,
+                lcpElement: element?.snippet || null,
+                lcpSelector: element?.selector || null,
+                lcpPath: element?.path || null,
+                lcpDetails: JSON.stringify(
+                  audits['largest-contentful-paint-element']?.details?.items?.[0]
+                  ?? audits['largest-contentful-paint']?.details?.items?.[0]
+                  ?? null
+                ).slice(0, 1200)
+              }));
+            } catch (error) {
+              console.warn(`Unable to parse Lighthouse report ${name}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+          NODE
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schoolos-lighthouse-${{ github.sha }}
+          path: .lighthouseci/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  dashboard-summary-sql:
+    name: Dashboard summary SQL performance and tenant-isolation tests
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolos_dashboard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d schoolos_dashboard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Run dashboard summary migration twice and verify isolation
+        env:
+          PGPASSWORD: postgres
+        run: psql "postgresql://postgres:postgres@localhost:5432/schoolos_dashboard_test" -v ON_ERROR_STOP=1 -f tests/sql/dashboard-summary-performance.test.sql
 
   school-setup-sql:
     name: School Setup PostgreSQL migration integration
@@ -85,6 +208,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
           psql "postgresql://postgres:postgres@localhost:5432/schoolos_test" -v ON_ERROR_STOP=1 -f tests/sql/school-setup-migrations.test.sql
+
+  people-admin-sql:
+    name: People Admin pipeline and custom roles SQL integration
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolos_people_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d schoolos_people_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run People Admin migration integration checks
+        env:
+          PGPASSWORD: postgres
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql "postgresql://postgres:postgres@localhost:5432/schoolos_people_test" -v ON_ERROR_STOP=1 -f tests/sql/people-admin-migrations.test.sql
 
   teacher-portal-visual:
     name: Teacher Portal responsive screenshots

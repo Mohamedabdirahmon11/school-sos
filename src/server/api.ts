@@ -62,17 +62,42 @@ import { summarizeDocumentAcademicMarks } from '../lib/documents/academic-variab
 import { documentVerificationRateLimiter } from '../lib/documents/verification-rate-limit.ts';
 import { validateTemplateConfig, type TemplateConfig } from '../lib/documents/template-engine.ts';
 import { allocateMixedRoomSeating, buildManhajGroups } from '../lib/term-exam-scheduling.ts';
+import { SchoolReadinessCache } from './readiness-cache.ts';
+import { getApiQueryBudget } from './query-budgets.ts';
 
 export const apiRouter = Router();
 
 type ParentPortalSummaryCacheEntry = { expiresAt: number; payload: any };
 const parentPortalSummaryCache = new Map<string, ParentPortalSummaryCacheEntry>();
+type ParentContactsCacheEntry = { expiresAt: number; items: any[]; total: number };
+const parentContactsResponseCache = new Map<string, ParentContactsCacheEntry>();
 const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
+const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
+const teacherAssignmentReadinessCache = new SchoolReadinessCache<any>(30_000);
+const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
+const schoolReportSummaryCache = new SchoolReadinessCache<any>(60_000);
+const classYearlyRankingsCache = new SchoolReadinessCache<any>(5 * 60_000);
+const classDetailsCache = new SchoolReadinessCache<any>(60_000);
+type StudentListCacheEntry = { expiresAt: number; body: any[]; headers: Record<string, string> };
+const studentListResponseCache = new Map<string, StudentListCacheEntry>();
+const STUDENT_LIST_CACHE_TTL_MS = 20_000;
+const teacherDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
+
+function getCachedSchoolDashboardSummary(schoolId: string) {
+  return schoolDashboardSummaryCache.get(schoolId, () => db.getSchoolDashboardSummary(schoolId));
+}
+
+function getCachedTeacherDashboardSummary(schoolId: string, teacherId: string) {
+  return teacherDashboardSummaryCache.get(`${schoolId}:${teacherId}`, () => db.getTeacherDashboardSummary(schoolId, teacherId));
+}
 
 function invalidateParentPortalSummaryCache(schoolId: string) {
   const prefix = schoolId + ':';
   for (const key of parentPortalSummaryCache.keys()) {
     if (key.startsWith(prefix)) parentPortalSummaryCache.delete(key);
+  }
+  for (const key of parentContactsResponseCache.keys()) {
+    if (key.startsWith(prefix)) parentContactsResponseCache.delete(key);
   }
 }
 
@@ -83,7 +108,17 @@ apiRouter.use((req, res, next) => {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
     res.on('finish', () => {
       const schoolId = String((req as any).school?.id || '');
-      if (schoolId && res.statusCode >= 200 && res.statusCode < 400) invalidateParentPortalSummaryCache(schoolId);
+      if (schoolId && res.statusCode >= 200 && res.statusCode < 400) {
+        invalidateParentPortalSummaryCache(schoolId);
+        schoolReadinessCache.invalidate(schoolId);
+        teacherAssignmentReadinessCache.invalidate(schoolId);
+        schoolDashboardSummaryCache.invalidate(schoolId);
+        schoolReportSummaryCache.invalidatePrefix(`${schoolId}:`);
+        classYearlyRankingsCache.invalidatePrefix(`${schoolId}:`);
+        classDetailsCache.invalidatePrefix(`${schoolId}:`);
+        for (const key of studentListResponseCache.keys()) if (key.startsWith(`${schoolId}:`)) studentListResponseCache.delete(key);
+        teacherDashboardSummaryCache.invalidatePrefix(`${schoolId}:`);
+      }
     });
   }
   next();
@@ -182,27 +217,97 @@ function sendPdf(res: Response, filename: string, pages: PdfPageInput[]) {
   res.status(200).set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${safeName}.pdf"` }).send(createPdf(pages));
 }
 
-// Production requests get an empty request context; domain methods fetch only
-// the required Supabase rows. Test routers install their explicit adapter.
+// Production requests get an isolated AsyncLocalStorage context. Metrics are
+// attached inside that context so the finish callback reads this request's
+// counters rather than the process-global fallback context.
 apiRouter.use((req, res, next) => {
   const storage = db as any;
+  const suppliedRequestId = String(req.get('x-request-id') || '');
+  const requestId = /^[a-zA-Z0-9._-]{1,80}$/.test(suppliedRequestId) ? suppliedRequestId : randomUUID();
+  const requestStarted = performance.now();
+  res.setHeader('X-Request-Id', requestId);
+
   res.once('finish', () => {
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && res.statusCode < 400) {
-      if (/^\/branches(?:\/|$)/.test(req.path)) invalidateListCache('school_branches');
-      if (/^\/classes(?:\/|$)/.test(req.path)) invalidateListCache('classes');
-      if (/^\/subjects(?:\/|$)/.test(req.path)) invalidateListCache('subjects');
-      if (/^\/teachers(?:\/|$)/.test(req.path)) invalidateListCache('teachers');
-    }
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) || res.statusCode >= 400) return;
+    if (req.path === '/branches' || req.path.startsWith('/branches/')) invalidateListCache('school_branches');
+    if (req.path === '/classes' || req.path.startsWith('/classes/')) invalidateListCache('classes');
+    if (req.path === '/subjects' || req.path.startsWith('/subjects/')) invalidateListCache('subjects');
+    if (req.path === '/teachers' || req.path.startsWith('/teachers/')) invalidateListCache('teachers');
   });
+
   if (typeof storage.prepareRequestContext !== 'function') { next(); return; }
-  const requestStarted = process.env.NODE_ENV === 'development' ? performance.now() : 0;
-  res.once('finish', () => {
-    if (process.env.NODE_ENV !== 'development') return;
-    const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
-    console.info(`[api-perf] ${req.method} ${req.path} ${res.statusCode} ${Math.round(performance.now() - requestStarted)}ms queries=${metrics.count} supabase=${metrics.durationMs}ms`);
-  });
-  void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`).then((context: any) => {
-    storage.runWithRequestContext(context, next);
+  // Plans are only consumed by Super Admin plan management and invoice generation.
+  // Avoid adding a cold global plans query to every school/teacher/parent request.
+  const includePlans = req.path === '/superadmin/plans'
+    || req.path.startsWith('/superadmin/plans/')
+    || (req.method === 'POST' && req.path === '/superadmin/invoices/generate');
+  void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`, includePlans).then((context: any) => {
+    storage.runWithRequestContext(context, () => {
+      res.once('finish', () => {
+        const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0, tableCounts: {} };
+        const route = req.route?.path ? `${req.baseUrl}${req.route.path}` : req.path;
+        const durationMs = Math.round((performance.now() - requestStarted) * 100) / 100;
+        const dbDurationMs = Number(metrics.durationMs) || 0;
+        const nonDbDurationMs = Math.max(0, Math.round((durationMs - dbDurationMs) * 100) / 100);
+        const tableCounts = metrics.tableCounts || {};
+        const duplicateTables = Object.entries(tableCounts)
+          .filter(([, count]) => Number(count) > 1)
+          .map(([table, count]) => ({ table, queries: count }));
+        const schoolId = String((req as any).school?.id || (req as any).user?.schoolId || req.headers['x-school-id'] || req.query.schoolId || '') || null;
+        console.info(JSON.stringify({
+          event: 'api.request',
+          requestId,
+          method: req.method,
+          route,
+          status: res.statusCode,
+          durationMs: durationMs,
+          dbQueries: metrics.count,
+          dbDurationMs: dbDurationMs,
+          nonDbDurationMs,
+          poolWaitMs: null,
+          queryTables: tableCounts,
+          schoolId
+        }));
+        if (durationMs > 500 || metrics.count > 3) {
+          console.warn(JSON.stringify({
+            event: 'slow-request',
+            requestId,
+            method: req.method,
+            route,
+            status: res.statusCode,
+            durationMs,
+            dbDurationMs,
+            nonDbDurationMs,
+            dbQueries: metrics.count,
+            queryTables: tableCounts,
+            schoolId
+          }));
+        }
+        if (duplicateTables.length) {
+          console.warn(JSON.stringify({
+            event: 'duplicate-table-queries',
+            requestId,
+            method: req.method,
+            route,
+            duplicates: duplicateTables,
+            schoolId
+          }));
+        }
+        const queryBudget = getApiQueryBudget(req.method, route);
+        if (queryBudget !== null && metrics.count > queryBudget) {
+          console.warn(JSON.stringify({
+            event: 'api.query_budget_exceeded',
+            requestId,
+            method: req.method,
+            route,
+            dbQueries: metrics.count,
+            maxQueries: queryBudget,
+            schoolId
+          }));
+        }
+      });
+      next();
+    });
   }).catch(() => {
     if (!res.headersSent) res.status(503).json({ error: 'Unable to load SchoolOS data from Supabase. Check the database schema and service role access.' });
   });
@@ -830,6 +935,13 @@ async function requireSchoolContext(req: Request, res: Response, next: () => voi
   }
 
   (req as any).school = school;
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    // Invalidate before the route handler so a write followed by a readiness
+    // check in the same request cannot reuse the pre-mutation checklist.
+    schoolReadinessCache.invalidate(school.id);
+    schoolDashboardSummaryCache.invalidate(school.id);
+    teacherDashboardSummaryCache.invalidatePrefix(`${school.id}:`);
+  }
   next();
 }
 
@@ -3029,38 +3141,46 @@ apiRouter.get('/classes', requireAuth, requireSchoolContext, async (req, res) =>
 
 apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const role = normalizeRole((req as any).user.role);
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
   if (!['school_admin', 'super_admin', 'teacher'].includes(role || '')) { res.status(403).json({ error: 'This role cannot view class details.' }); return; }
   let teacherId: string | null = null;
   if (role === 'teacher') {
-    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: (req as any).user.id }, 1, 1, undefined, 'id');
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
     teacherId = teacher.items[0]?.id || null;
-    if (!teacherId || !(await getTeacherAssignedClassIds(school.id, (req as any).user.id)).includes(String(req.params.id))) {
+    if (!teacherId || !(await getTeacherAssignedClassIds(school.id, user.id)).includes(String(req.params.id))) {
       res.status(403).json({ error: 'Teacher class scope does not include this class.' }); return;
     }
   }
-  const klass = await db.getClassById(req.params.id, school.id);
-  if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
   const search = String(req.query.search || '').trim().replace(/[,.()]/g, ' ').slice(0, 60);
-  const orFilter = search ? `first_name.ilike.%${search}%,middle_name.ilike.%${search}%,last_name.ilike.%${search}%` : undefined;
-  const [students, assignments, timetable, attendance] = await Promise.all([
-    db.queryPage('students', { school_id: school.id, class_id: klass.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id'),
-    db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
-    db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
-    db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
-  ]);
-  const visibleAssignments = teacherId ? assignments.items.filter((item: any) => item.teacherId === teacherId) : assignments.items;
-  const visibleTimetable = teacherId ? timetable.items.filter((item: any) => item.teacherId === teacherId) : timetable.items;
-  const subjectIds = [...new Set(visibleAssignments.map((item: any) => item.subjectId))];
-  const teacherIds = [...new Set(visibleAssignments.map((item: any) => item.teacherId).filter(Boolean))];
-  const [subjectRows, teacherRows] = await Promise.all([
-    subjectIds.length ? db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects) : Promise.resolve({ items: [] as any[] }),
-    teacherIds.length ? db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.teachers) : Promise.resolve({ items: [] as any[] })
-  ]);
-  const subjectById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
-  const teacherById = new Map(teacherRows.items.map((item: any) => [item.id, item]));
-  const classSubjects = visibleAssignments.map((assignment: any) => ({ ...assignment, subject: subjectById.get(assignment.subjectId) || null, teacher: teacherById.has(assignment.teacherId) ? { id: (teacherById.get(assignment.teacherId) as any).id, fullName: (teacherById.get(assignment.teacherId) as any).fullName } : null }));
-  res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: visibleTimetable, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } });
+  const cacheKey = `${school.id}:${req.params.id}:${role}:${user.id}:${page}:${pageSize}:${search}`;
+  const details = await classDetailsCache.get(cacheKey, async () => {
+    const klass = await db.getClassById(req.params.id, school.id);
+    if (!klass || klass.isArchived) return null;
+    const orFilter = search ? `first_name.ilike.%${search}%,middle_name.ilike.%${search}%,last_name.ilike.%${search}%` : undefined;
+    const [students, assignments, timetable, attendance] = await Promise.all([
+      db.queryPage('students', { school_id: school.id, class_id: klass.id }, page, pageSize, orFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id'),
+      db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
+      db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
+      db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
+    ]);
+    const visibleAssignments = teacherId ? assignments.items.filter((item: any) => item.teacherId === teacherId) : assignments.items;
+    const visibleTimetable = teacherId ? timetable.items.filter((item: any) => item.teacherId === teacherId) : timetable.items;
+    const subjectIds = [...new Set(visibleAssignments.map((item: any) => item.subjectId))];
+    const teacherIds = [...new Set(visibleAssignments.map((item: any) => item.teacherId).filter(Boolean))];
+    const [subjectRows, teacherRows] = await Promise.all([
+      subjectIds.length ? db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects) : Promise.resolve({ items: [] as any[] }),
+      teacherIds.length ? db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.teachers) : Promise.resolve({ items: [] as any[] })
+    ]);
+    const subjectById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
+    const teacherById = new Map(teacherRows.items.map((item: any) => [item.id, item]));
+    const classSubjects = visibleAssignments.map((assignment: any) => ({ ...assignment, subject: subjectById.get(assignment.subjectId) || null, teacher: teacherById.has(assignment.teacherId) ? { id: (teacherById.get(assignment.teacherId) as any).id, fullName: (teacherById.get(assignment.teacherId) as any).fullName } : null }));
+    return { class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: visibleTimetable, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } };
+  });
+  if (!details) { res.status(404).json({ error: 'Class was not found.' }); return; }
+  res.json(details);
 });
 
 apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, requireSchoolAdminDashboardSetupComplete, async (req, res) => {
@@ -3082,11 +3202,11 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
     if (role === 'teacher') {
       const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
       if (!teacher.items.length) { res.status(403).json({ error: 'Teacher profile is required for the dashboard.' }); return; }
-      const summary = await db.getTeacherDashboardSummary(school.id, String(teacher.items[0].id));
+      const summary = await getCachedTeacherDashboardSummary(school.id, String(teacher.items[0].id));
       res.json(summary);
       return;
     }
-    const summary = await db.getSchoolDashboardSummary(school.id);
+    const summary = await getCachedSchoolDashboardSummary(school.id);
     if (role === 'accountant' || role === 'super_admin') {
       res.json(summary);
       return;
@@ -3114,48 +3234,14 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'This role cannot view school reports.' }); return; }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'reports_export')) { res.status(403).json({ error: 'Your staff account does not have permission to view reports.' }); return; }
   try {
-    const summary = await db.getSchoolDashboardSummary(school.id);
-    const stats = summary?.stats || {};
-    const approvedMarks = (await queryAllRows('student_marks', {
-      school_id: school.id,
-      academic_year: school.academicYear
-    }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
-    const examConfig = await db.getExamConfig(school.id, school.academicYear);
-    const passMark = Number(examConfig.passMarkPercentage) || 50;
-    const [schoolStudents, schoolClasses, schoolTeachers] = await Promise.all([
-      queryAllRows('students', { school_id: school.id }, 'id,class_id,status'),
-      queryAllRows('classes', { school_id: school.id }, 'id,name,grade_level,section,is_archived'),
-      queryAllRows('teachers', { school_id: school.id }, 'id,status')
-    ]);
-    const activeStudents = schoolStudents.filter((student: any) => student.status === 'active');
-    const activeTeachers = schoolTeachers.filter((teacher: any) => teacher.status === 'active');
-    const activeClassRows = schoolClasses.filter((klass: any) => !klass.isArchived);
-    const result: Record<string, unknown> = {
-      studentCount: Number(stats.totalStudents) || activeStudents.length,
-      teacherCount: activeTeachers.length,
-      studentTeacherRatio: activeTeachers.length ? Number((activeStudents.length / activeTeachers.length).toFixed(1)) : null,
-      classEnrollment: activeClassRows.map((klass: any) => ({
-        classId: klass.id,
-        className: klass.name,
-        gradeLevel: klass.gradeLevel,
-        section: klass.section,
-        studentCount: activeStudents.filter((student: any) => student.classId === klass.id).length
-      })).sort((a: any, b: any) => Number(a.gradeLevel) - Number(b.gradeLevel) || String(a.className).localeCompare(String(b.className))),
-      attendanceRate: Number(stats.attendanceRate) || 0,
-      passRate: approvedMarks.length
-        ? Math.round(approvedMarks.filter((mark: any) => Number(mark.percentage) >= passMark).length * 100 / approvedMarks.length)
-        : null
-    };
-    if (user.role === 'accountant' || user.role === 'super_admin') {
-      const allPayments = await db.getFeePayments(school.id);
-      const payments = allPayments.filter(payment => !payment.voidedAt);
-      // Voided receipts are excluded from every live finance total.
-      result.totalDue = payments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
-      result.totalCollected = payments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
-      result.totalArrears = payments.reduce((total, payment) => total + Number(payment.remainingAmount || 0), 0);
-      result.paymentCount = payments.length;
-      result.recentPayments = payments.slice(-20).reverse();
-    }
+    const includeFinance = user.role === 'accountant' || user.role === 'super_admin';
+    const result = await schoolReportSummaryCache.get(`${school.id}:${user.role}`, () =>
+      db.callRpc<Record<string, unknown>>('schoolos_school_reports_summary', {
+        p_school_id: school.id,
+        p_academic_year: String(school.academicYear || ''),
+        p_include_finance: includeFinance
+      })
+    );
     res.json(result);
   } catch {
     res.status(503).json({ error: 'Unable to load school reports.' });
@@ -4298,7 +4384,8 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   if (studentIds && studentIds.length === 0) return statuses;
   const payments = await queryAllRows('fee_payments', {
     school_id: schoolId,
-    student_id: studentIds
+    student_id: studentIds,
+    academic_year: academicYear
   }, 'student_id,amount_due,amount_paid,remaining_amount,voided_at,academic_year');
   const totals = new Map<string, { due: number; paid: number; remaining: number }>();
   for (const payment of payments) {
@@ -4315,10 +4402,10 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   return statuses;
 }
 
-async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string, orFilter?: string) {
+async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string, orFilter?: string, pageSize = 100) {
   const rows: any[] = [];
   for (let page = 1;; page += 1) {
-    const result = await db.queryPage(table, filters, page, 100, orFilter, columns, orderBy);
+    const result = await db.queryPage(table, filters, page, pageSize, orFilter, columns, orderBy, true, pageSize);
     rows.push(...result.items);
     if (rows.length >= result.total || result.items.length === 0) break;
   }
@@ -5275,27 +5362,37 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
   const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
-  const classes = await db.getClasses(school.id);
+  const classId = requestedClassId;
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.trim().replace(/[^\\p{L}\\p{N}\\s+()._-]/gu, '').slice(0, 80)
+    : '';
+  const cacheKey = [school.id, role, role === 'teacher' ? user.id : 'school', classId || '*', page, pageSize, search.toLowerCase()].join(':');
+  const cachedResponse = parentContactsResponseCache.get(cacheKey);
+  if (cachedResponse && cachedResponse.expiresAt > Date.now()) {
+    res.set({ 'Cache-Control': 'private, no-store', 'X-Page': String(page), 'X-Page-Size': String(pageSize), 'X-Total-Count': String(cachedResponse.total), 'X-Total-Pages': String(Math.ceil(cachedResponse.total / pageSize)) });
+    res.json(cachedResponse.items);
+    return;
+  }
+  if (cachedResponse) parentContactsResponseCache.delete(cacheKey);
+
+  const [classes, currentYearId] = await Promise.all([
+    queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
+    getCurrentAcademicYearId(school.id)
+  ]);
   let studentClassFilter: string | string[] | undefined = requestedClassId || undefined;
   if (role === 'teacher') {
-    const ownClassIds = classes.filter(klass => klass.classTeacherId === user.id && !klass.isArchived).map(klass => klass.id);
+    const ownClassIds = classes.filter((klass: any) => klass.classTeacherId === user.id && !klass.isArchived).map((klass: any) => klass.id);
     if (!ownClassIds.length) { res.status(403).json({ error: 'You are not assigned as a Form Teacher to a class.' }); return; }
     if (requestedClassId && !ownClassIds.includes(requestedClassId)) {
       res.status(403).json({ error: 'Parent contacts are limited to your own Form Teacher class.' }); return;
     }
     studentClassFilter = requestedClassId || ownClassIds;
   }
-  const classId = requestedClassId;
-  const search = typeof req.query.search === 'string'
-    ? req.query.search.trim().replace(/[^\p{L}\p{N}\s+()._-]/gu, '').slice(0, 80)
-    : '';
-
-  const currentYearId = await getCurrentAcademicYearId(school.id);
+  const classScope = studentClassFilter ? (Array.isArray(studentClassFilter) ? studentClassFilter : [studentClassFilter]) : null;
   const currentEnrollments = currentYearId
-    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active' }, 'student_id,class_id,section_id')
+    ? await queryAllRows('enrollments', { school_id: school.id, academic_year_id: currentYearId, status: 'active', class_id: classScope || undefined }, 'student_id,class_id,section_id')
     : [];
   const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
-  const classScope = studentClassFilter ? (Array.isArray(studentClassFilter) ? studentClassFilter : [studentClassFilter]) : null;
   const studentIdsForFilter = currentYearId && classScope
     ? [...new Set(currentEnrollments.filter((row: any) => classScope.includes(String(row.classId))).map((row: any) => String(row.studentId)))]
     : null;
@@ -5308,12 +5405,21 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   let guardianLinks: any[] = [];
   let sectionRows: any[] = [];
   try {
-    [students, guardianRows, guardianLinks, sectionRows] = await Promise.all([
+    const scopedGuardianLinksPromise = currentYearId && classScope
+      ? studentIdsForFilter?.length
+        ? queryAllRows('student_guardians', { school_id: school.id, student_id: studentIdsForFilter }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id')
+        : Promise.resolve([] as any[])
+      : null;
+    let scopedGuardianLinks: any[] | null = null;
+    [students, guardianRows, sectionRows, scopedGuardianLinks] = await Promise.all([
       currentYearId && classScope && !studentIdsForFilter?.length ? Promise.resolve([]) : queryAllRows('students', studentFilters, LIST_QUERY_COLUMNS.students),
       queryAllRows('guardians', { school_id: school.id }, 'id,full_name,phone'),
-      queryAllRows('student_guardians', { school_id: school.id }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id'),
-      sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([])
+      sectionIds.length ? queryAllRows('class_sections', { school_id: school.id, id: sectionIds }, 'id,name') : Promise.resolve([]),
+      scopedGuardianLinksPromise || Promise.resolve(null)
     ]);
+    guardianLinks = scopedGuardianLinks ?? (students.length
+      ? await queryAllRows('student_guardians', { school_id: school.id, student_id: students.map((student: any) => String(student.id)) }, 'guardian_id,student_id,relation,is_primary', 'guardian_id,student_id')
+      : []);
   } catch (error) {
     console.error('[parents/contacts] Failed to load parent directory data.', { schoolId: school.id, error });
     res.status(503).json({ error: 'Parent contacts are temporarily unavailable. Please retry.', code: 'PARENT_CONTACTS_UNAVAILABLE', retryable: true });
@@ -5387,6 +5493,8 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
 
   const total = filtered.length;
   const items = filtered.slice((page - 1) * pageSize, page * pageSize);
+  parentContactsResponseCache.set(cacheKey, { expiresAt: Date.now() + 10_000, items, total });
+  while (parentContactsResponseCache.size > 500) parentContactsResponseCache.delete(parentContactsResponseCache.keys().next().value!);
   res.set({
     'Cache-Control': 'private, no-store',
     'X-Page': String(page),
@@ -5633,6 +5741,67 @@ apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res)
   });
 });
 
+apiRouter.get('/students/options', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  const search = String(req.query.q || req.query.search || '').trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80);
+  const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
+  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: requestedClassId };
+  if (user.role === 'teacher') {
+    const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
+    if (requestedClassId && !assignedClassIds.includes(requestedClassId)) {
+      res.status(403).json({ error: 'Student access is limited to your assigned classes.' });
+      return;
+    }
+    if (!assignedClassIds.length) { res.json([]); return; }
+    filters.class_id = requestedClassId || assignedClassIds;
+  } else if (user.role === 'student') {
+    const studentId = String(user.studentId || '').trim();
+    if (!studentId) { res.json([]); return; }
+    filters.student_id = studentId;
+    filters.class_id = undefined;
+  } else if (user.role === 'parent') {
+    const linkedStudentIds = await getParentLinkedStudentIds(school.id, user.id);
+    if (!linkedStudentIds.length) { res.json([]); return; }
+    filters.id = linkedStudentIds;
+    filters.class_id = undefined;
+  } else if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'This role cannot view student options.' });
+    return;
+  }
+  const searchFilter = search
+    ? ['student_id', 'first_name', 'middle_name', 'last_name'].map(column => `${column}.ilike.*${search}*`).join(',')
+    : undefined;
+  const students = await db.queryPage(
+    'students',
+    filters,
+    1,
+    20,
+    searchFilter,
+    'id,student_id,first_name,middle_name,last_name,status,class_id',
+    'first_name,middle_name,last_name'
+  );
+  const classIds = [...new Set(students.items.map((student: any) => String(student.classId || '')).filter(Boolean))];
+  const classes = classIds.length
+    ? await db.queryPage('classes', { school_id: school.id, id: classIds }, 1, 100, undefined, 'id,name,section')
+    : { items: [] as any[] };
+  const classById = new Map(classes.items.map((klass: any) => [String(klass.id), klass]));
+  res.set('Cache-Control', 'private, no-store');
+  res.json(students.items.map((student: any) => {
+    const klass: any = classById.get(String(student.classId || ''));
+    return {
+      id: student.id,
+      studentId: student.studentId,
+      firstName: student.firstName,
+      middleName: student.middleName,
+      lastName: student.lastName,
+      status: student.status,
+      classId: student.classId || '',
+      className: klass ? [klass.name, klass.section].filter(Boolean).join(' · ') : ''
+    };
+  }));
+});
+
 apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -5677,6 +5846,45 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
 
+  // Cache only successful paginated responses after role/teacher/parent scope checks.
+  // Cache keys include the authenticated identity and every response-shaping filter.
+  const studentCacheKey = `${school.id}:${JSON.stringify({
+    userId: user.id, role: user.role, filters, roleFilter, page, pageSize, search, feeStatus,
+    allClass: req.query.allClass === 'true'
+  })}`;
+  const cachedStudentPage = req.query.allClass === 'true' ? undefined : studentListResponseCache.get(studentCacheKey);
+  if (cachedStudentPage && cachedStudentPage.expiresAt > Date.now()) {
+    res.set({ ...cachedStudentPage.headers, 'Cache-Control': 'private, no-cache' });
+    const etag = cachedStudentPage.headers.ETag;
+    const requestedEtags = String(req.headers['if-none-match'] || '').split(',').map(value => value.trim());
+    if (etag && requestedEtags.includes(etag)) { res.status(304).end(); return; }
+    res.json(cachedStudentPage.body);
+    return;
+  }
+  if (cachedStudentPage) studentListResponseCache.delete(studentCacheKey);
+  if (req.query.allClass !== 'true') {
+    const originalJson = res.json.bind(res);
+    res.json = ((body: any) => {
+      if (res.statusCode === 200 && Array.isArray(body)) {
+        const headers: Record<string, string> = {};
+        for (const name of ['X-Page', 'X-Page-Size', 'X-Total-Count', 'X-Total-Pages']) {
+          const value = res.getHeader(name);
+          if (value !== undefined) headers[name] = String(value);
+        }
+        const etag = `"${createHash('sha256').update(JSON.stringify(body)).digest('hex')}"`;
+        headers.ETag = etag;
+        res.set({ ETag: etag, 'Cache-Control': 'private, no-cache' });
+        studentListResponseCache.set(studentCacheKey, { expiresAt: Date.now() + STUDENT_LIST_CACHE_TTL_MS, body, headers });
+        while (studentListResponseCache.size > 200) {
+          const oldest = studentListResponseCache.keys().next().value;
+          if (oldest === undefined) break;
+          studentListResponseCache.delete(oldest);
+        }
+      }
+      return originalJson(body);
+    }) as Response['json'];
+  }
+
   // Resolve the displayed/filtered class from active enrollments for the current year.
   // When a class or teacher scope is known, constrain enrollment reads at the database
   // instead of loading every active enrollment in the school for a single-class roster.
@@ -5688,7 +5896,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
       academic_year_id: currentYearId,
       status: 'active',
       class_id: enrollmentClassScope
-    }, 'id,student_id,class_id,section_id,roll_number')
+    }, 'id,student_id,class_id,section_id,roll_number', undefined, undefined, 1_000)
     : [];
   const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
   const enrollmentClassIds = [...new Set(currentEnrollments.map((row: any) => String(row.classId || '')).filter(Boolean))];
@@ -6766,16 +6974,72 @@ apiRouter.post('/teachers', requireAuth, requireSchoolContext, requireSchoolAdmi
 const staffPermissions = new Set(['fees_manage', 'admissions_manage', 'attendance_manage', 'grades_manage', 'library_manage', 'transport_manage', 'inventory_manage', 'reports_export', 'payroll_manage']);
 const normalizeStaffId = (value: unknown) => typeof value === 'string' ? value.trim().toUpperCase() : '';
 const validStaffId = (value: string) => /^[A-Z0-9][A-Z0-9._-]{2,39}$/.test(value);
+apiRouter.get('/school/staff/roles', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  res.json(await db.getStaffRoles((req as any).school.id));
+});
+apiRouter.post('/school/staff/roles', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const { name, description, permissions } = req.body || {};
+  if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100) { res.status(400).json({ error: 'Role name must be 2–100 characters.' }); return; }
+  if (description !== undefined && (typeof description !== 'string' || description.length > 500)) { res.status(400).json({ error: 'Role description must be 500 characters or fewer.' }); return; }
+  if (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission))) { res.status(400).json({ error: 'One or more role permissions are invalid.' }); return; }
+  const roles = await db.getStaffRoles(school.id);
+  if (roles.some(role => String(role.name).toLowerCase() === name.trim().toLowerCase())) { res.status(409).json({ error: 'A role with that name already exists in this school.' }); return; }
+  const role = await db.createStaffRole({ schoolId: school.id, name: name.trim(), description: typeof description === 'string' ? description.trim() : '', permissions: [...new Set(permissions as string[])] });
+  await db.flush();
+  res.status(201).json(role);
+});
+apiRouter.put('/school/staff/roles/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const { name, description, permissions } = req.body || {};
+  if (name !== undefined && (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 100)) { res.status(400).json({ error: 'Role name must be 2–100 characters.' }); return; }
+  if (description !== undefined && (typeof description !== 'string' || description.length > 500)) { res.status(400).json({ error: 'Role description must be 500 characters or fewer.' }); return; }
+  if (permissions !== undefined && (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more role permissions are invalid.' }); return; }
+  const roles = await db.getStaffRoles(school.id);
+  const prior = roles.find(role => role.id === req.params.id);
+  if (!prior) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  const nextName = typeof name === 'string' ? name.trim() : prior.name;
+  if (roles.some(role => role.id !== prior.id && String(role.name).toLowerCase() === nextName.toLowerCase())) { res.status(409).json({ error: 'A role with that name already exists in this school.' }); return; }
+  const updated = await db.updateStaffRole(prior.id, school.id, { ...(name !== undefined ? { name: nextName } : {}), ...(description !== undefined ? { description: description.trim() } : {}), ...(permissions !== undefined ? { permissions: [...new Set(permissions as string[])] } : {}) });
+  if (!updated) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  if (permissions !== undefined || name !== undefined) {
+    const members = (await db.getStaffMembers(school.id)).filter(member => member.roleId === prior.id);
+    for (const member of members) {
+      const changed = await db.updateStaffMember(member.id, school.id, { ...(permissions !== undefined ? { permissions: updated.permissions } : {}), ...(name !== undefined ? { roleTitle: updated.name } : {}) });
+      if (changed?.userId) {
+        db.updateUser(changed.userId, { permissions: changed.permissions });
+        invalidateAuthenticatedSnapshot(changed.userId);
+      }
+    }
+  }
+  db.logAudit({ action: 'STAFF_ROLE_UPDATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated custom staff role ${updated.name}.`, severity: 'warning' });
+  await db.flush();
+  res.json(updated);
+});
+apiRouter.delete('/school/staff/roles/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
+  const school = (req as any).school;
+  const role = (await db.getStaffRoles(school.id)).find(item => item.id === req.params.id);
+  if (!role) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  if ((await db.getStaffMembers(school.id)).some(member => member.roleId === role.id)) { res.status(409).json({ error: 'This role is assigned to staff. Reassign those staff members before deleting it.' }); return; }
+  const deleted = await db.deleteStaffRole(role.id, school.id);
+  if (!deleted) { res.status(404).json({ error: 'Custom staff role not found.' }); return; }
+  await db.flush();
+  res.json({ success: true });
+});
+
 apiRouter.get('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   res.json(await db.getStaffMembers((req as any).school.id));
 });
 apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const { fullName, roleTitle, email, phone, monthlySalary, permissions } = req.body || {};
+  const { fullName, roleTitle, email, phone, monthlySalary, permissions, roleId } = req.body || {};
   const initialPin = typeof req.body?.pin === 'string' ? req.body.pin.trim() : '';
   const createLogin = req.body?.createLogin !== false;
   if (typeof fullName !== 'string' || !fullName.trim() || typeof roleTitle !== 'string' || !roleTitle.trim() || (createLogin && !/^\d{4,6}$/.test(initialPin))) { res.status(400).json({ error: 'Full name and role title are required; a 4–6 digit PIN is required only when creating login access.' }); return; }
-  if (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)) || (!createLogin && permissions.length > 0)) { res.status(400).json({ error: 'No-login staff records cannot receive system permissions.' }); return; }
+  const customRole = typeof roleId === 'string' && roleId ? (await db.getStaffRoles(school.id)).find(role => role.id === roleId) : null;
+  if (roleId && !customRole) { res.status(400).json({ error: 'Selected custom role does not belong to this school.' }); return; }
+  const resolvedPermissions = customRole ? customRole.permissions : permissions;
+  if (!Array.isArray(resolvedPermissions) || resolvedPermissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)) || (!createLogin && resolvedPermissions.length > 0)) { res.status(400).json({ error: 'No-login staff records cannot receive system permissions.' }); return; }
   if (!Number.isFinite(Number(monthlySalary)) || Number(monthlySalary) < 0) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json({ error: 'Enter a valid contact email.' }); return; }
@@ -6786,8 +7050,9 @@ apiRouter.post('/school/staff', requireAuth, requireSchoolAdminOrSuperAdmin, req
   const existingUsers = await queryAllRows('users', { school_id: school.id }, 'id,staff_id');
   if (existingStaff.some(item => item.staffId?.toUpperCase() === staffId) || existingUsers.some((item: any) => item.staffId?.toUpperCase() === staffId)) { res.status(409).json({ error: 'That staff ID is already used in this school.' }); return; }
   const account = createLogin ? db.createUser({ schoolId: school.id, role: 'accountant', staffId, fullName: fullName.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', passwordHash: hashPassword(randomBytes(32).toString('base64url')), pin: hashPin(initialPin), mustChangePassword: false, isBlocked: false, failedLoginAttempts: 0 }) : null;
-  const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions: createLogin ? permissions : [], status: 'active', ...(account ? { userId: account.id } : {}) });
+  const staff = db.createStaffMember({ schoolId: school.id, staffId, fullName: fullName.trim(), roleTitle: roleTitle.trim(), email: cleanEmail, phone: typeof phone === 'string' ? phone.trim() : '', monthlySalary: Number(monthlySalary), permissions: createLogin ? resolvedPermissions : [], status: 'active', ...(customRole ? { roleId: customRole.id, roleTitle: customRole.name } : {}), ...(account ? { userId: account.id } : {}) });
   if (account) db.logAudit({ action: 'STAFF_SIGN_IN_CREATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Created staff sign-in account ${account.id} for ${cleanEmail}.`, severity: 'warning' });
+  await db.flush();
   res.status(201).json({ ...staff, ...(createLogin ? { initialPin } : {}) });
 });
 apiRouter.post('/school/staff/:id/reset-pin', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -6808,10 +7073,13 @@ apiRouter.post('/school/staff/:id/reset-pin', requireAuth, requireSchoolAdminOrS
 
 apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const { fullName, roleTitle, email, phone, monthlySalary, permissions, status } = req.body || {};
+  const { fullName, roleTitle, email, phone, monthlySalary, permissions, status, roleId } = req.body || {};
+  const selectedRole = typeof roleId === 'string' && roleId ? (await db.getStaffRoles(school.id)).find(role => role.id === roleId) : null;
+  if (roleId && !selectedRole) { res.status(400).json({ error: 'Selected custom role does not belong to this school.' }); return; }
+  const resolvedPermissions = selectedRole ? selectedRole.permissions : permissions;
   if (fullName !== undefined && (typeof fullName !== 'string' || !fullName.trim()) || roleTitle !== undefined && (typeof roleTitle !== 'string' || !roleTitle.trim())) { res.status(400).json({ error: 'Full name and role title must be non-empty text.' }); return; }
   if (email !== undefined && typeof email !== 'string' || phone !== undefined && typeof phone !== 'string') { res.status(400).json({ error: 'Email and phone must be text values.' }); return; }
-  if (permissions !== undefined && (!Array.isArray(permissions) || permissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more staff permissions are invalid.' }); return; }
+  if ((permissions !== undefined || roleId !== undefined) && (!Array.isArray(resolvedPermissions) || resolvedPermissions.some((permission: unknown) => typeof permission !== 'string' || !staffPermissions.has(permission)))) { res.status(400).json({ error: 'One or more staff permissions are invalid.' }); return; }
   if (monthlySalary !== undefined && (!Number.isFinite(Number(monthlySalary)) || Number(monthlySalary) < 0)) { res.status(400).json({ error: 'Monthly salary must be a non-negative number.' }); return; }
   if (status !== undefined && !['active', 'inactive'].includes(status)) { res.status(400).json({ error: 'Status must be active or inactive.' }); return; }
   const prior = (await db.getStaffMembers(school.id)).find(item => item.id === req.params.id);
@@ -6835,7 +7103,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
     const existingLogin = await db.findUserForLogin(cleanEmail);
     if (existingLogin && existingLogin.id !== prior.userId) { res.status(409).json({ error: 'A sign-in account already uses this email.' }); return; }
   }
-  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions, status }).filter(([, value]) => value !== undefined));
+  const updates = Object.fromEntries(Object.entries({ staffId, fullName, roleTitle: selectedRole ? selectedRole.name : roleTitle, email, phone, monthlySalary: monthlySalary === undefined ? undefined : Number(monthlySalary), permissions: roleId !== undefined ? resolvedPermissions : permissions, roleId: roleId !== undefined ? (selectedRole?.id || null) : undefined, status }).filter(([, value]) => value !== undefined));
   const updated = await db.updateStaffMember(req.params.id, school.id, updates);
   if (!updated) { res.status(404).json({ error: 'Staff member not found.' }); return; }
   if (updated.userId) {
@@ -6843,7 +7111,7 @@ apiRouter.put('/school/staff/:id', requireAuth, requireSchoolAdminOrSuperAdmin, 
     if (!updatedUser) { res.status(500).json({ error: 'Staff member was updated, but the linked sign-in account could not be updated.' }); return; }
     invalidateAuthenticatedSnapshot(updated.userId);
   }
-  if (permissions !== undefined || status !== undefined) {
+  if (permissions !== undefined || roleId !== undefined || status !== undefined) {
     db.logAudit({ action: 'STAFF_ACCESS_UPDATED', category: 'security', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Updated staff account access for ${updated.userId || updated.id}.`, severity: 'warning' });
   }
   res.json(updated);
@@ -6863,6 +7131,33 @@ apiRouter.post('/school/admissions', requireAuth, requireSchoolContext, requireS
   await db.flush();
   res.status(201).json(application);
 });
+apiRouter.patch('/school/admissions/:id/pipeline-stage', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
+  const school = (req as any).school;
+  const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
+  if (!application) { res.status(404).json({ error: 'Admission application not found.' }); return; }
+  const stages = ['applied', 'review', 'interview', 'accepted', 'enrolled', 'rejected'];
+  const current = application.pipelineStage || (application.status === 'approved' ? 'enrolled' : application.status === 'rejected' ? 'rejected' : 'applied');
+  const next = req.body?.stage;
+  if (typeof next !== 'string' || !stages.includes(next)) { res.status(400).json({ error: 'Choose a valid admissions stage.' }); return; }
+  if (current === 'enrolled' || current === 'rejected') { res.status(409).json({ error: 'Completed applications cannot be moved to another stage.' }); return; }
+  if (next === 'enrolled') { res.status(400).json({ error: 'Use the enroll action from the accepted stage.' }); return; }
+  if (next === 'rejected') {
+    const rejected = await db.updateAdmissionApplication(application.id, school.id, 'rejected');
+    db.logAudit({ action: 'ADMISSION_APPLICATION_REJECTED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} was rejected from ${current}.`, severity: 'warning' });
+    await db.flush();
+    res.json({ ...rejected, pipelineStage: 'rejected' });
+    return;
+  }
+  const currentIndex = stages.indexOf(current);
+  const nextIndex = stages.indexOf(next);
+  if (currentIndex < 0 || Math.abs(nextIndex - currentIndex) !== 1 || nextIndex > 3) { res.status(409).json({ error: 'Move applications one stage at a time; enrollment is completed with the enroll action.' }); return; }
+  const updated = await db.updateAdmissionPipelineStage(application.id, school.id, next);
+  if (!updated) { res.status(404).json({ error: 'Admission application not found.' }); return; }
+  db.logAudit({ action: 'ADMISSION_PIPELINE_STAGE_CHANGED', category: 'school', schoolId: school.id, schoolName: school.name, userId: (req as any).user.id, userName: (req as any).user.fullName, userRole: (req as any).user.role, details: `Admission application ${application.id} moved from ${current} to ${next}.`, severity: 'info' });
+  await db.flush();
+  res.json(updated);
+});
+
 apiRouter.patch('/school/admissions/:id/status', requireAuth, requireSchoolContext, requireSchoolAdminOrStaffPermission('admissions_manage'), async (req, res) => {
   const school = (req as any).school;
   const application = (await db.getAdmissionApplications(school.id)).find(row => row.id === req.params.id);
@@ -7100,7 +7395,7 @@ apiRouter.put('/attendance', requireAuth, requireSchoolContext, requireSchoolSet
 
 apiRouter.get('/exams/config', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(await db.getExamConfig(school.id, school.academicYear));
+  res.json(await db.getExamConfig(school.id, school.academicYear, false));
 });
 
 apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -8332,21 +8627,30 @@ apiRouter.get('/exams/rankings/semester', requireAuth, requireSchoolContext, asy
 // Semester 2 Combined Yearly Results & Ranking (for Final Report Card)
 apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
   const { classId } = req.query;
   if (!classId || typeof classId !== 'string') { res.status(400).json({ error: 'classId is required.' }); return; }
   if (!await canReadClassResults(req, res, classId)) return;
-  const [rankings, klass] = await Promise.all([db.getClassYearlyRankings(school.id, classId), db.getClassById(classId, school.id)]);
-  const studentIds = rankings.map(row => row.student.id);
-  const commentsResult = studentIds.length
-    ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
-    : { data: [], error: null };
-  const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
-  for (const row of commentsResult.data || []) {
-    const comments = commentsByStudent.get(row.student_id) || [];
-    comments.push({ semester: row.semester, comment: row.comment || '' });
-    commentsByStudent.set(row.student_id, comments);
-  }
-  res.json(rankings.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] })));
+  const role = normalizeRole(user.role) || user.role;
+  const cacheKey = `${school.id}:${school.academicYear}:${classId}:${role}:${user.id}`;
+  const rankings = await classYearlyRankingsCache.get(cacheKey, async () => {
+    const [rows, klass] = await Promise.all([
+      db.getClassYearlyRankings(school.id, classId, false),
+      db.getClassById(classId, school.id)
+    ]);
+    const studentIds = rows.map(row => row.student.id);
+    const commentsResult = studentIds.length
+      ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
+      : { data: [], error: null };
+    const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
+    for (const row of commentsResult.data || []) {
+      const comments = commentsByStudent.get(row.student_id) || [];
+      comments.push({ semester: row.semester, comment: row.comment || '' });
+      commentsByStudent.set(row.student_id, comments);
+    }
+    return rows.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] }));
+  });
+  res.json(rankings);
 });
 
 // Year-End Promotion Confirmation
@@ -9746,7 +10050,20 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         : [];
     }
   } else {
-    const users = await db.getUsers(school.id);
+    if (!allowedRoles[user.role]?.length) { res.json([]); return; }
+    const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const search = rawSearch.replace(/[%(),*\\"]/g, '').slice(0, 80);
+    const searchFilter = search
+      ? `full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,student_id.ilike.%${search}%`
+      : undefined;
+    const users = (await db.queryPage(
+      'users',
+      { school_id: school.id, role: allowedRoles[user.role] || [] },
+      1,
+      100,
+      searchFilter,
+      'id,role,full_name,email,phone,student_id'
+    )).items;
     contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
     if (user.role === 'teacher') {
       const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
@@ -10551,16 +10868,20 @@ async function getSchoolSetupState(school: School) {
   return {
     progress,
     checklist,
-    canFinish: Boolean(progress.completedAt) || canFinishSchoolSetup(progress, checklist)
+    canFinish: isSchoolSetupWizardEligible(school.createdAt)
+      ? canFinishSchoolSetup(progress, checklist)
+      : Boolean(progress.completedAt) || canFinishSchoolSetup(progress, checklist)
   };
 }
 
 
 /** Single school-scoped readiness entry point shared by setup UI and API gates. */
 async function evaluateReadiness(schoolId: string) {
-  const school = await db.getSchoolById(schoolId);
-  if (!school) throw new Error('School was not found.');
-  return getSchoolSetupState(school);
+  return schoolReadinessCache.get(schoolId, async () => {
+    const school = await db.getSchoolById(schoolId);
+    if (!school) throw new Error('School was not found.');
+    return getSchoolSetupState(school);
+  });
 }
 
 async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknown) => void) {
@@ -10598,27 +10919,19 @@ async function requireSchoolSetupReady(req: any, res: any, next: (error?: unknow
   }
 }
 
-
 /**
- * The shared setup middleware intentionally allows access to Attendance/Exams
- * so a new School Admin can configure step 8. The dashboard itself has a stricter
- * gate: eligible School Admins must have a server-validated Final Review marker.
+ * Attendance/Exams APIs remain available while onboarding is in progress.
+ * The School Admin dashboard has a stricter server-side gate: a new school must
+ * have a currently valid Final Review marker, including Teacher Assignment.
  */
 async function requireSchoolAdminDashboardSetupComplete(req: any, res: any, next: (error?: unknown) => void) {
   const school = req.school as School | undefined;
   if (!school) { res.status(403).json({ error: 'School context is required.' }); return; }
-  if (normalizeRole(req.user?.role) !== 'school_admin' || !isSchoolSetupWizardEligible(school.createdAt)) {
-    next();
-    return;
-  }
+  if (normalizeRole(req.user?.role) !== 'school_admin' || !isSchoolSetupWizardEligible(school.createdAt)) { next(); return; }
   try {
     const state = await evaluateReadiness(school.id);
-    if (!isSchoolSetupProgressCompleteWithTeacherAssignment(state.progress)) {
-      res.status(423).json({
-        error: 'Dhammaystir dhammaan tallaabooyinka School Setup ka hor intaadan furin Dashboard-ka.',
-        code: 'SCHOOL_SETUP_REQUIRED',
-        missing: ['Final Review lama xaqiijin.']
-      });
+    if (!state.canFinish || !isSchoolSetupProgressCompleteWithTeacherAssignment(state.progress)) {
+      res.status(423).json({ error: 'Dhammaystir dhammaan tallaabooyinka School Setup ka hor intaadan furin Dashboard-ka.', code: 'SCHOOL_SETUP_REQUIRED', missing: ['Final Review lama xaqiijin.'] });
       return;
     }
     next();
@@ -10635,19 +10948,21 @@ function requireParentPortalSetupReady(req: any, res: any, next: (error?: unknow
 
 
 async function getTeacherAssignmentReadinessForSchool(school: School) {
-  const [classes, teachers, curriculum, subjects] = await Promise.all([
-    queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
-    queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,school_id,user_id,full_name,status'),
-    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
-    queryAllRows('subjects', { school_id: school.id }, 'id,school_id,name')
-  ]);
-  return evaluateTeacherAssignmentReadiness(
-    school.id,
-    classes.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name, section: row.section, classTeacherId: row.classTeacherId, isArchived: row.isArchived })),
-    teachers.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, userId: row.userId, fullName: row.fullName, status: row.status })),
-    curriculum.map((row: any) => ({ schoolId: row.schoolId, classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
-    subjects.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name }))
-  );
+  return teacherAssignmentReadinessCache.get(school.id, async () => {
+    const [classes, teachers, curriculum, subjects] = await Promise.all([
+      queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
+      queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,school_id,user_id,full_name,status'),
+      queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
+      queryAllRows('subjects', { school_id: school.id }, 'id,school_id,name')
+    ]);
+    return evaluateTeacherAssignmentReadiness(
+      school.id,
+      classes.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name, section: row.section, classTeacherId: row.classTeacherId, isArchived: row.isArchived })),
+      teachers.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, userId: row.userId, fullName: row.fullName, status: row.status })),
+      curriculum.map((row: any) => ({ schoolId: row.schoolId, classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
+      subjects.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name }))
+    );
+  });
 }
 
 async function ensureTeacherAssignmentReadyForTeacher(school: School, res: any): Promise<boolean> {
@@ -10879,7 +11194,13 @@ apiRouter.put('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
 
   let progress;
   try {
-    progress = applySchoolSetupProgressUpdate(state.progress, input, state.checklist, new Date().toISOString());
+    // Repair stale completion markers for eligible new schools if assignment or readiness is incomplete.
+    const progressBase = isSchoolSetupWizardEligible(school.createdAt)
+      && state.progress.completedAt
+      && (!state.canFinish || !isSchoolSetupProgressCompleteWithTeacherAssignment(state.progress))
+      ? { ...state.progress, completedAt: null, completedSteps: state.progress.completedSteps.filter(id => id !== 10) }
+      : state.progress;
+    progress = applySchoolSetupProgressUpdate(progressBase, input, state.checklist, new Date().toISOString());
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : 'Setup progress could not be updated.' });
     return;

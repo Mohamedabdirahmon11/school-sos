@@ -1,3 +1,10 @@
+## Global page refresh control — merged into performance branch (2026-11-23)
+
+- Preserved the shared 32px refresh control from latest `main` in the performance branch; it reloads the current authenticated page without changing routes or API behavior.
+- Kept the public-login immediate paint/session-verification fix intact.
+- Preserved the latest School Settings WhatsApp E.164 `+` prefix correction.
+- Verification: the performance branch CI will re-run these combined changes before they are considered validated.
+
 ## School sidebar navigation and appearance — in progress (2026-11-16)
 
 - IMPLEMENTED ON `feature/sidebar-theme`: The sidebar has its own English-default language preference (independent of school-wide app language) and can switch menu labels to Somali or Amharic; the preference is remembered per user. Existing menu permission filtering and route IDs are preserved.
