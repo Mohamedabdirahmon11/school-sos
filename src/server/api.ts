@@ -232,8 +232,15 @@ apiRouter.use((req, res, next) => {
   void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`, includePlans).then((context: any) => {
     storage.runWithRequestContext(context, () => {
       res.once('finish', () => {
-        const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
+        const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0, tableCounts: {} };
         const route = req.route?.path ? `${req.baseUrl}${req.route.path}` : req.path;
+        const durationMs = Math.round((performance.now() - requestStarted) * 100) / 100;
+        const dbDurationMs = Number(metrics.durationMs) || 0;
+        const nonDbDurationMs = Math.max(0, Math.round((durationMs - dbDurationMs) * 100) / 100);
+        const tableCounts = metrics.tableCounts || {};
+        const duplicateTables = Object.entries(tableCounts)
+          .filter(([, count]) => Number(count) > 1)
+          .map(([table, count]) => ({ table, queries: count }));
         const schoolId = String((req as any).school?.id || (req as any).user?.schoolId || req.headers['x-school-id'] || req.query.schoolId || '') || null;
         console.info(JSON.stringify({
           event: 'api.request',
@@ -241,11 +248,39 @@ apiRouter.use((req, res, next) => {
           method: req.method,
           route,
           status: res.statusCode,
-          durationMs: Math.round((performance.now() - requestStarted) * 100) / 100,
+          durationMs,
           dbQueries: metrics.count,
-          dbDurationMs: metrics.durationMs,
+          dbDurationMs,
+          nonDbDurationMs,
+          poolWaitMs: null,
+          queryTables: tableCounts,
           schoolId
         }));
+        if (durationMs > 500 || metrics.count > 3) {
+          console.warn(JSON.stringify({
+            event: 'slow-request',
+            requestId,
+            method: req.method,
+            route,
+            status: res.statusCode,
+            durationMs,
+            dbDurationMs,
+            nonDbDurationMs,
+            dbQueries: metrics.count,
+            queryTables: tableCounts,
+            schoolId
+          }));
+        }
+        if (duplicateTables.length) {
+          console.warn(JSON.stringify({
+            event: 'duplicate-table-queries',
+            requestId,
+            method: req.method,
+            route,
+            duplicates: duplicateTables,
+            schoolId
+          }));
+        }
         const queryBudget = getApiQueryBudget(req.method, route);
         if (queryBudget !== null && metrics.count > queryBudget) {
           console.warn(JSON.stringify({
