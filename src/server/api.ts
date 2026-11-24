@@ -3220,7 +3220,7 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
       school_id: school.id,
       academic_year: school.academicYear
     }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
-    const examConfig = await db.getExamConfig(school.id, school.academicYear);
+    const examConfig = await db.getExamConfig(school.id, school.academicYear, false);
     const passMark = Number(examConfig.passMarkPercentage) || 50;
     const [schoolStudents, schoolClasses, schoolTeachers] = await Promise.all([
       queryAllRows('students', { school_id: school.id }, 'id,class_id,status'),
@@ -7283,7 +7283,7 @@ apiRouter.put('/attendance', requireAuth, requireSchoolContext, requireSchoolSet
 
 apiRouter.get('/exams/config', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(await db.getExamConfig(school.id, school.academicYear));
+  res.json(await db.getExamConfig(school.id, school.academicYear, false));
 });
 
 apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -8518,7 +8518,7 @@ apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async
   const { classId } = req.query;
   if (!classId || typeof classId !== 'string') { res.status(400).json({ error: 'classId is required.' }); return; }
   if (!await canReadClassResults(req, res, classId)) return;
-  const [rankings, klass] = await Promise.all([db.getClassYearlyRankings(school.id, classId), db.getClassById(classId, school.id)]);
+  const [rankings, klass] = await Promise.all([db.getClassYearlyRankings(school.id, classId, false), db.getClassById(classId, school.id)]);
   const studentIds = rankings.map(row => row.student.id);
   const commentsResult = studentIds.length
     ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
