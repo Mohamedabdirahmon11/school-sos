@@ -138,3 +138,22 @@ test('unrelated request flushes never upsert built-in plans without a database b
   assert.ok(persist.includes('continue;'));
   assert.ok(persist.includes('await this.persistTable(client, table, rows, toRows(table), knownIds, knownRows)'));
 });
+
+
+test('request query metrics expose per-table counts for duplicate-read detection', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  assert.match(storage, /queryTables: Map<string, number>/);
+  assert.match(storage, /this\.state\.queryTables\.set\(table, \(this\.state\.queryTables\.get\(table\) \|\| 0\) \+ 1\)/);
+  assert.match(storage, /tableCounts: Object\.fromEntries\(this\.state\.queryTables\)/);
+  assert.match(storage, /queryTables: new Map\(\)/);
+});
+
+test('API request observability reports non-DB time and warns on slow or duplicate-table requests', () => {
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  assert.match(api, /const nonDbDurationMs = Math\.max\(0, Math\.round\(\(durationMs - dbDurationMs\) \* 100\) \/ 100\)/);
+  assert.match(api, /event: 'slow-request'/);
+  assert.match(api, /durationMs > 500 \|\| metrics\.count > 3/);
+  assert.match(api, /event: 'duplicate-table-queries'/);
+  assert.match(api, /Number\(count\) > 1/);
+  assert.match(api, /poolWaitMs: null/);
+});
