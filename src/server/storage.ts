@@ -1557,8 +1557,9 @@ class StorageEngine {
     const startedAt = performance.now();
     const { data, error } = await client.from('staff_roles').insert(toSupabaseRow(row, 'staff_roles')).select('*').single();
     this.recordQuery('staff_roles', 'insert', startedAt);
-    if (error || !data) throw new Error(`Unable to create staff role: ${error?.message || 'no row returned'}`);
-    return fromSupabaseRow(data, 'staff_roles');
+    const saved = Array.isArray(data) ? data[0] : data;
+    if (error || !saved) throw new Error(`Unable to create staff role: ${error?.message || 'no row returned'}`);
+    return fromSupabaseRow(saved, 'staff_roles');
   }
 
   public async updateStaffRole(id: string, schoolId: string, updates: { name?: string; description?: string; permissions?: string[] }): Promise<any | null> {
@@ -1568,7 +1569,8 @@ class StorageEngine {
     const { data, error } = await client.from('staff_roles').update(toSupabaseRow({ ...updates, updatedAt: new Date().toISOString() }, 'staff_roles')).eq('id', id).eq('school_id', schoolId).select('*').maybeSingle();
     this.recordQuery('staff_roles', 'update', startedAt);
     if (error) throw new Error(`Unable to update staff role: ${error.message}`);
-    return data ? fromSupabaseRow(data, 'staff_roles') : null;
+    const saved = Array.isArray(data) ? data[0] : data;
+    return saved ? fromSupabaseRow(saved, 'staff_roles') : null;
   }
 
   public async deleteStaffRole(id: string, schoolId: string): Promise<boolean> {
@@ -1588,7 +1590,8 @@ class StorageEngine {
     const { data, error } = await client.from('admission_applications').update({ pipeline_stage: pipelineStage }).eq('id', id).eq('school_id', schoolId).select('*').maybeSingle();
     this.recordQuery('admission_applications', 'update-stage', startedAt);
     if (error) throw new Error(`Unable to update admissions stage: ${error.message}`);
-    return data ? fromSupabaseRow(data, 'admission_applications') as AdmissionApplication : null;
+    const saved = Array.isArray(data) ? data[0] : data;
+    return saved ? fromSupabaseRow(saved, 'admission_applications') as AdmissionApplication : null;
   }
 
   public async getAdmissionApplications(schoolId: string): Promise<AdmissionApplication[]> {
