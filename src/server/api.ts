@@ -5755,6 +5755,67 @@ apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res)
   });
 });
 
+apiRouter.get('/students/options', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  const search = String(req.query.q || req.query.search || '').trim().replace(/[^\\p{L}\\p{N}\\s._-]/gu, '').slice(0, 80);
+  const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
+  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: requestedClassId };
+  if (user.role === 'teacher') {
+    const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
+    if (requestedClassId && !assignedClassIds.includes(requestedClassId)) {
+      res.status(403).json({ error: 'Student access is limited to your assigned classes.' });
+      return;
+    }
+    if (!assignedClassIds.length) { res.json([]); return; }
+    filters.class_id = requestedClassId || assignedClassIds;
+  } else if (user.role === 'student') {
+    const studentId = String(user.studentId || '').trim();
+    if (!studentId) { res.json([]); return; }
+    filters.student_id = studentId;
+    filters.class_id = undefined;
+  } else if (user.role === 'parent') {
+    const linkedStudentIds = await getParentLinkedStudentIds(school.id, user.id);
+    if (!linkedStudentIds.length) { res.json([]); return; }
+    filters.id = linkedStudentIds;
+    filters.class_id = undefined;
+  } else if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'This role cannot view student options.' });
+    return;
+  }
+  const searchFilter = search
+    ? ['student_id', 'first_name', 'middle_name', 'last_name'].map(column => `${column}.ilike.*${search}*`).join(',')
+    : undefined;
+  const students = await db.queryPage(
+    'students',
+    filters,
+    1,
+    20,
+    searchFilter,
+    'id,student_id,first_name,middle_name,last_name,status,class_id',
+    'first_name,middle_name,last_name'
+  );
+  const classIds = [...new Set(students.items.map((student: any) => String(student.classId || '')).filter(Boolean))];
+  const classes = classIds.length
+    ? await db.queryPage('classes', { school_id: school.id, id: classIds }, 1, 100, undefined, 'id,name,section')
+    : { items: [] as any[] };
+  const classById = new Map(classes.items.map((klass: any) => [String(klass.id), klass]));
+  res.set('Cache-Control', 'private, no-store');
+  res.json(students.items.map((student: any) => {
+    const klass: any = classById.get(String(student.classId || ''));
+    return {
+      id: student.id,
+      studentId: student.studentId,
+      firstName: student.firstName,
+      middleName: student.middleName,
+      lastName: student.lastName,
+      status: student.status,
+      classId: student.classId || '',
+      className: klass ? [klass.name, klass.section].filter(Boolean).join(' · ') : ''
+    };
+  }));
+});
+
 apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
