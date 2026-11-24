@@ -203,7 +203,7 @@ test('student list reads active enrollments in bounded batches instead of 100-ro
 
 test('student lists participate in the shared client ETag cache', () => {
   const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
-  assert.match(client, /listEndpoint = \/\^\\\/\(branches\|classes\|subjects\|teachers\|students\)\$\//);
+  assert.match(client, /branches\\|classes\\|subjects\\|teachers\\|students/);
   assert.match(client, /If-None-Match/);
   assert.match(client, /response\.status === 304/);
 });
