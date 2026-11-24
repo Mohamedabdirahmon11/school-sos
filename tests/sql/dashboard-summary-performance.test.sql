@@ -402,14 +402,14 @@ END $;
 
 -- Preserve the legacy API fallback where a configured zero pass mark defaults to 50.
 UPDATE public.exam_configs SET pass_mark_percentage = 0 WHERE id = 'config-a';
-DO $
+DO $zero$
 DECLARE
   report jsonb;
 BEGIN
   report := public.schoolos_school_reports_summary('school-a', '2026-2027', false);
   ASSERT (report->>'passRate')::numeric = 50,
     'zero configured pass mark must retain the legacy 50 percent fallback';
-END $;
+END $zero$;
 UPDATE public.exam_configs SET pass_mark_percentage = 50 WHERE id = 'config-a';
 
 ANALYZE public.students;
