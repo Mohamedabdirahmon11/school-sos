@@ -2670,7 +2670,7 @@ class StorageEngine {
   // -------------------------------------------------------------
   // EXAMS & RESULTS: Small Exam + Big Exam -> Percentage Only
   // -------------------------------------------------------------
-  public async getExamConfig(schoolId: string, academicYear?: string): Promise<ExamConfig> {
+  public async getExamConfig(schoolId: string, academicYear?: string, persistIfMissing = true): Promise<ExamConfig> {
     // Flush pending writes before reading so a config created earlier in this
     // request is visible to the new database-backed read.
     await this.flush();
@@ -2698,15 +2698,17 @@ class StorageEngine {
         passMarkPercentage: 50,
         updatedAt: new Date().toISOString()
       };
-      this.data.examConfigs.push(conf);
-      this.save();
-      try {
-        await this.flush();
-      } catch (error) {
-        // Another request may have inserted the unique school/year row first.
-        const persisted = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
-        if (persisted.length) return persisted[0];
-        throw error;
+      if (persistIfMissing) {
+        this.data.examConfigs.push(conf);
+        this.save();
+        try {
+          await this.flush();
+        } catch (error) {
+          // Another request may have inserted the unique school/year row first.
+          const persisted = await this.queryRows<ExamConfig>('exam_configs', { school_id: schoolId, academic_year: yr });
+          if (persisted.length) return persisted[0];
+          throw error;
+        }
       }
     }
     if (!Array.isArray(conf.assessmentComponents) || !conf.assessmentComponents.length) {
@@ -3448,7 +3450,7 @@ class StorageEngine {
   }
 
   // Calculate Yearly Results (combines Semester 1 and Semester 2 for final report card)
-  public async getClassYearlyRankings(schoolId: string, classId: string) {
+  public async getClassYearlyRankings(schoolId: string, classId: string, persistMissingConfig = true) {
     // Resolve the class/year once, then batch independent school-scoped reads.
     // The two semester result sets come from one class/year marks query instead
     // of repeating both the class lookup and student_marks round-trip.
@@ -3464,7 +3466,7 @@ class StorageEngine {
         academic_year: klass?.academicYear
       })
     ]);
-    const config = await this.getExamConfig(schoolId, klass?.academicYear || school?.academicYear);
+    const config = await this.getExamConfig(schoolId, klass?.academicYear || school?.academicYear, persistMissingConfig);
     const sem1Marks = allMarks.filter(mark => mark.status === 'approved' && mark.semester === 'Semester 1');
     const sem2Marks = allMarks.filter(mark => mark.status === 'approved' && mark.semester === 'Semester 2');
     const attendanceWindowStart = school?.terms
