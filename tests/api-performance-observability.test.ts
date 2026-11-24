@@ -207,3 +207,23 @@ test('student lists participate in the shared client ETag cache', () => {
   assert.match(client, /If-None-Match/);
   assert.match(client, /response\.status === 304/);
 });
+
+
+test('school reports summary uses one tenant-scoped SQL RPC and keeps finance role-gated', () => {
+  const start = api.indexOf("apiRouter.get('/school/reports/summary'");
+  const end = api.indexOf("\\napiRouter.", start + 1);
+  const route = api.slice(start, end);
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const migration = readFileSync(new URL('../supabase/migrations/20261124100000_school_reports_summary_rpc.sql', import.meta.url), 'utf8');
+  assert.ok(start >= 0 && end > start);
+  assert.match(route, /db\\.callRpc<Record<string, unknown>>\\('schoolos_school_reports_summary'/);
+  assert.match(route, /p_school_id: school\\.id/);
+  assert.match(route, /p_include_finance: includeFinance/);
+  assert.match(route, /const includeFinance = user\\.role === 'accountant' \\|\\| user\\.role === 'super_admin'/);
+  assert.doesNotMatch(route, /queryAllRows|db\\.getFeePayments|getCachedSchoolDashboardSummary/);
+  assert.match(storage, /public async callRpc<T = unknown>/);
+  assert.match(storage, /this\\.recordQuery\\(\x60rpc:\\$\\{functionName\\}\x60, 'call', startedAt\\)/);
+  assert.match(migration, /SECURITY DEFINER/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\\.schoolos_school_reports_summary/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\\.schoolos_school_reports_summary[\\s\\S]*TO service_role/);
+});
