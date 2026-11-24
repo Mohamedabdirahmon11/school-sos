@@ -3221,3 +3221,100 @@ main :is(.flex, .inline-flex) > * {
   .school-admin-role .school-admin-showcase .school-admin-showcase-metric { min-height: 130px !important; padding: 15px !important; border-radius: 13px !important; }
   .school-admin-role .school-admin-showcase .school-admin-showcase-panel { padding: 16px !important; border-radius: 14px !important; }
 }
+
+
+/* School Admin dashboard finishing pass: clearer rhythm, depth and interaction. */
+.school-admin-role .school-admin-showcase {
+  background: radial-gradient(ellipse at 92% 2%, rgba(8, 127, 114, .055), transparent 31%), #f4f8f6 !important;
+}
+.school-admin-role .school-admin-showcase .school-admin-showcase-hero {
+  min-height: 204px;
+  box-shadow: 0 18px 42px rgba(17, 75, 64, .17) !important;
+}
+.school-admin-role .school-admin-showcase .school-admin-showcase-hero h1 { line-height: 1.08 !important; }
+.school-admin-role .school-admin-showcase .school-admin-showcase-hero button {
+  transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+.school-admin-role .school-admin-showcase .school-admin-showcase-hero button:hover { transform: translateY(-2px); }
+.school-admin-role .school-admin-showcase .school-admin-showcase-metrics { gap: 15px !important; }
+.school-admin-role .school-admin-showcase .school-admin-showcase-metric {
+  min-height: 166px !important;
+  overflow: hidden;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.school-admin-role .school-admin-showcase .school-admin-showcase-metric:hover {
+  transform: translateY(-4px);
+  border-color: #b8d3c6 !important;
+  box-shadow: 0 13px 28px rgba(25, 65, 52, .11) !important;
+}
+.school-admin-role .school-admin-showcase .school-admin-showcase-metric:focus-visible,
+.school-admin-role .school-admin-showcase .school-admin-quick-action:focus-visible {
+  outline: 3px solid rgba(8, 127, 114, .38);
+  outline-offset: 3px;
+}
+.school-admin-role .school-admin-showcase .school-admin-showcase-insights,
+.school-admin-role .school-admin-showcase .school-admin-showcase-bottom { align-items: stretch; }
+.school-admin-role .school-admin-showcase .school-admin-showcase-panel {
+  min-width: 0;
+  transition: box-shadow .2s ease, border-color .2s ease;
+}
+.school-admin-role .school-admin-showcase .school-admin-showcase-panel:hover {
+  border-color: #c8ddd2 !important;
+  box-shadow: 0 10px 26px rgba(25, 65, 52, .075) !important;
+}
+.school-admin-role .school-admin-showcase .school-admin-attendance-chart {
+  position: relative;
+  isolation: isolate;
+  padding-top: 8px;
+  border-color: #e4ede8 !important;
+  background-image: linear-gradient(to top, rgba(8, 127, 114, .035) 1px, transparent 1px);
+  background-size: 100% 25%;
+}
+.school-admin-role .school-admin-showcase .school-admin-attendance-bar {
+  border: 1px solid #e3ede7;
+  border-bottom: 0;
+  background: #edf4f0 !important;
+}
+.school-admin-role .school-admin-showcase .school-admin-attendance-fill {
+  border-radius: 8px 8px 0 0 !important;
+  background: linear-gradient(180deg, #31a28d 0%, #087f72 100%) !important;
+  box-shadow: 0 -3px 12px rgba(8, 127, 114, .12);
+}
+.school-admin-role .school-admin-showcase .school-admin-quick-action {
+  min-height: 104px;
+  border-color: #e1ebe5 !important;
+  background: linear-gradient(145deg, #fff 0%, #f8fbf9 100%);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.school-admin-role .school-admin-showcase .school-admin-quick-action:hover {
+  transform: translateY(-3px);
+  border-color: #b8d8ca !important;
+  background: #f0f7f3 !important;
+  box-shadow: 0 8px 18px rgba(25, 65, 52, .07);
+}
+.school-admin-role .school-admin-showcase .school-admin-feed-item {
+  border-color: #edf2ef !important;
+  transition: padding .16s ease, background-color .16s ease;
+}
+.school-admin-role .school-admin-showcase .school-admin-feed-item:hover {
+  padding-left: 9px;
+  padding-right: 9px;
+  border-radius: 9px;
+  background: #f7faf8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-admin-role .school-admin-showcase *,
+  .school-admin-role .school-admin-showcase *::before,
+  .school-admin-role .school-admin-showcase *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+@media (max-width: 767px) {
+  .school-admin-role .school-admin-showcase .school-admin-showcase-hero { min-height: 0; }
+  .school-admin-role .school-admin-showcase .school-admin-showcase-metrics { gap: 10px !important; }
+  .school-admin-role .school-admin-showcase .school-admin-showcase-metric { min-height: 138px !important; }
+  .school-admin-role .school-admin-showcase .school-admin-quick-action { min-height: 94px; }
+}
