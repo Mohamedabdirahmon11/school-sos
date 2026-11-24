@@ -2867,3 +2867,118 @@ main :is(.flex, .inline-flex) > * {
     overflow-wrap: anywhere;
   }
 }
+
+
+/* School dashboard: restrained, editorial school-operations palette. */
+.school-admin-role .school-dashboard-page {
+  color: #243633;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-hero {
+  border: 1px solid #d9e3df !important;
+  border-bottom: 3px solid #236b61 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: 0 2px 8px rgba(28, 54, 47, .045) !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel {
+  border: 1px solid #dce5e1 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: 0 2px 8px rgba(28, 54, 47, .035) !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric {
+  position: relative;
+  min-height: 118px !important;
+  overflow: hidden;
+  border: 1px solid #dce5e1 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  padding: 17px 18px !important;
+  color: #243633 !important;
+  box-shadow: 0 2px 7px rgba(28, 54, 47, .035) !important;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: #236b61;
+  content: "";
+}
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="green"]::before { background: #66866c; }
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="purple"]::before { background: #77818c; }
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="amber"]::before { background: #b68a52; }
+.school-admin-role .school-dashboard-page .school-admin-metric:hover {
+  transform: translateY(-1px) !important;
+  border-color: #b8cbc4 !important;
+  box-shadow: 0 5px 14px rgba(28, 54, 47, .07) !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-label {
+  color: #65756f !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  letter-spacing: .01em;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-value {
+  color: #203b35 !important;
+  font-size: clamp(25px, 2.2vw, 31px) !important;
+  font-weight: 750 !important;
+  letter-spacing: -.035em !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-hint {
+  color: #65756f !important;
+  background: #f1f5f2 !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-icon {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border: 1px solid #dce8e2;
+  border-radius: 10px;
+  background: #f0f5f2;
+  color: #286b60;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-hero h1,
+.school-admin-role .school-dashboard-page .school-dashboard-panel h2 {
+  letter-spacing: -.025em;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel button:not(.school-admin-metric) {
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel button.text-blue-700 {
+  color: #236b61 !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel button.hover\\:bg-blue-50:hover,
+.school-admin-role .school-dashboard-page .school-dashboard-panel button.hover\\:bg-blue-50\\/60:hover {
+  background: #f0f5f2 !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel .bg-blue-50 {
+  background: #eef4f1 !important;
+  color: #286b60 !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel .text-blue-600 {
+  color: #286b60 !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel .bg-\\[\\#0F766E\\] {
+  background: #236b61 !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel .bg-amber-50 {
+  background: #f7f2e9 !important;
+  color: #9b713c !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel .text-amber-600 {
+  color: #9b713c !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel .bg-\\[\\#0F766E\\] {
+  background-color: #236b61 !important;
+}
+@media (max-width: 767px) {
+  .school-admin-role .school-dashboard-page .school-admin-metric {
+    min-height: 106px !important;
+    padding: 14px !important;
+  }
+  .school-admin-role .school-dashboard-page .school-dashboard-hero {
+    padding: 17px !important;
+  }
+}
