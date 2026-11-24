@@ -394,9 +394,7 @@ class StorageEngine {
   private testClient: any = null;
   private settingsCache: { expiresAt: number; value: SuperAdminSettings } | null = null;
   private plansCache: { expiresAt: number; value: PlanConfig[] } | null = null;
-  // Coalesce cold-cache reads across concurrent HTTP request contexts. Each
-  // request still receives its own isolated StorageContext and persistence
-  // baseline; only the immutable settings/plan snapshots are shared.
+  // Coalesce cold-cache reads across concurrent HTTP request contexts.
   private settingsLoadPromise: Promise<SuperAdminSettings> | null = null;
   private plansLoadPromise: Promise<PlanConfig[]> | null = null;
 
@@ -682,8 +680,6 @@ class StorageEngine {
         }
         const value = await this.settingsLoadPromise;
         this.data.settings = { ...DEFAULT_SETTINGS, ...value };
-        // queryRows populated the initiating request context. Populate this
-        // request's own context too, including its write-diff baseline.
         this.cacheQueryRows('super_admin_settings', [{ id: 'default', ...this.data.settings }]);
       };
       const plansTask = async () => {
@@ -694,7 +690,7 @@ class StorageEngine {
         if (!this.plansLoadPromise) {
           this.plansLoadPromise = (async () => {
             // queryRows merges persisted plan fields over built-in defaults.
-            // Keep that merged snapshot so unrelated writes never upsert defaults.
+            // Preserve the merged snapshot and its persistence baseline.
             await this.queryRows<PlanConfig>('plans', {});
             const value = this.data.plans.map(plan => ({ ...plan }));
             this.plansCache = { value, expiresAt: Date.now() + AUTH_CONTEXT_TTL_MS };
@@ -769,10 +765,10 @@ class StorageEngine {
     return { items: (data || []).map((row: any) => fromSupabaseRow(row, table)) as T[], page: safePage, pageSize: safeSize, total: Number(count || 0) };
   }
 
-  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>): Promise<T[]> {
+  private async queryRows<T = any>(table: string, filters: Record<string, string | string[] | undefined>, orFilter?: string, columns = '*'): Promise<T[]> {
     const rows: T[] = [];
     for (let page = 1;; page += 1) {
-      const result = await this.queryPage<T>(table, filters, page, 100);
+      const result = await this.queryPage<T>(table, filters, page, 100, orFilter, columns);
       rows.push(...result.items);
       if (rows.length >= result.total || result.items.length === 0) break;
     }
@@ -2653,7 +2649,7 @@ class StorageEngine {
     const startedAt = performance.now();
     const { data, error } = await client.from('attendance_records')
       .upsert(payload, { onConflict: 'school_id,class_id,student_id,date' })
-      .select('*');
+      .select('id,school_id,class_id,student_id,date,status,note,recorded_by,recorded_at');
     this.recordQuery('attendance_records', 'upsert-batch', startedAt);
     if (error) throw new Error(error.message || 'Unable to save daily attendance.');
     return ((data || payload) as any[]).map(row => fromSupabaseRow(row, 'attendance_records')) as AttendanceRecord[];
@@ -4375,11 +4371,14 @@ class StorageEngine {
   }
 
   public async getMessages(schoolId: string, userId: string): Promise<DirectMessage[]> {
-    const [sent, received] = await Promise.all([
-      this.queryRows<DirectMessage>('direct_messages', { school_id: schoolId, sender_id: userId }),
-      this.queryRows<DirectMessage>('direct_messages', { school_id: schoolId, recipient_id: userId })
-    ]);
-    return [...new Map([...sent, ...received].map(message => [message.id, message])).values()];
+    // One tenant-scoped PostgREST query replaces separate sent/received scans
+    // and the in-memory de-duplication pass.
+    return this.queryRows<DirectMessage>(
+      'direct_messages',
+      { school_id: schoolId },
+      `sender_id.eq.${userId},recipient_id.eq.${userId}`,
+      'id,school_id,sender_id,sender_name,sender_role,recipient_id,recipient_name,recipient_role,content,timestamp,is_read'
+    );
   }
 
   public async sendMessage(msgData: Omit<DirectMessage, 'id' | 'timestamp' | 'isRead'>): Promise<DirectMessage> {
@@ -4396,16 +4395,44 @@ class StorageEngine {
   }
 
   public async markMessagesRead(schoolId: string, userId: string, contactId: string): Promise<void> {
-    await this.getMessages(schoolId, userId);
-    let changed = false;
-    this.data.messages = this.data.messages.map(message => {
-      if (message.schoolId === schoolId && message.senderId === contactId && message.recipientId === userId && !message.isRead) { changed = true; return { ...message, isRead: true }; }
-      return message;
-    });
-    if (changed) {
-      this.save();
-      await this.flush();
+    if (this.testClient) {
+      // Keep the deterministic in-memory adapter path used by storage tests.
+      await this.getMessages(schoolId, userId);
+      let changed = false;
+      this.data.messages = this.data.messages.map(message => {
+        if (message.schoolId === schoolId && message.senderId === contactId && message.recipientId === userId && !message.isRead) {
+          changed = true;
+          return { ...message, isRead: true };
+        }
+        return message;
+      });
+      if (changed) {
+        this.save();
+        await this.flush();
+      }
+      return;
     }
+
+    const client = supabase;
+    if (!client) throw new Error('Messages storage is unavailable.');
+    const startedAt = performance.now();
+    const { error } = await client.from('direct_messages')
+      .update({ is_read: true })
+      .eq('school_id', schoolId)
+      .eq('sender_id', contactId)
+      .eq('recipient_id', userId)
+      .eq('is_read', false);
+    this.recordQuery('direct_messages', 'mark-conversation-read', startedAt);
+    if (error) throw new Error(error.message || 'Unable to mark conversation as read.');
+
+    // Keep any already-loaded process cache coherent without re-reading the
+    // complete sent + received message history or flushing a full snapshot.
+    this.data.messages = this.data.messages.map(message =>
+      message.schoolId === schoolId && message.senderId === contactId
+        && message.recipientId === userId && !message.isRead
+        ? { ...message, isRead: true }
+        : message
+    );
   }
 
   public async getBroadcasts(): Promise<PlatformBroadcast[]> {
