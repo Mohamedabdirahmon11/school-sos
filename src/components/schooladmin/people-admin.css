@@ -384,3 +384,115 @@
 .school-people-teachers-page .teacher-directory-rows tbody tr:hover { background:var(--people-soft); }
 @media (max-width:767px) { .school-people-teachers-page .teacher-directory-cards tbody { grid-template-columns:1fr; padding:8px; } .school-people-teachers-page .teacher-directory-rows table { min-width:900px; } }
 @media (prefers-color-scheme:dark) { .school-people-teachers-page .teacher-directory-rows tbody tr { background:transparent; } .school-people-teachers-page .teacher-directory-rows tbody tr:hover { background:#202d27; } }
+
+/* Mobile-first School Admin directories: readable cards, no sideways scrolling. */
+@media (max-width: 767px) {
+  .school-students-page { padding: 12px !important; }
+  .school-students-page > div:first-child { align-items: stretch; gap: 12px; }
+  .school-students-page > div:first-child > div:last-child {
+    display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; width: 100%;
+  }
+  .school-students-page > div:first-child > div:last-child button {
+    min-width: 0; min-height: 42px; justify-content: center; padding: 9px 8px;
+    border-radius: 12px; font-size: 11px; line-height: 1.25; white-space: normal;
+  }
+  .school-students-page > div:first-child > div:last-child button:last-child {
+    grid-column: 1 / -1; min-height: 48px; font-size: 13px;
+    box-shadow: 0 6px 16px rgb(14 128 120 / 18%);
+  }
+  .school-students-page .grid.grid-cols-1.gap-3 > div {
+    border-radius: 16px; padding: 13px; box-shadow: 0 2px 8px rgb(16 37 34 / 4%);
+  }
+  .school-students-page input[type="text"],
+  .school-students-page input[type="search"],
+  .school-students-page select { min-height: 44px; width: 100%; font-size: 14px; }
+  .school-students-page .student-mobile-list { padding: 10px; }
+  .school-students-page .student-mobile-card {
+    border-color: #dce7e4; border-radius: 16px; padding: 14px;
+    box-shadow: 0 3px 12px rgb(16 37 34 / 5%); transition: border-color .15s, box-shadow .15s;
+  }
+  .school-students-page .student-mobile-card:active {
+    border-color: #0e8078; box-shadow: 0 0 0 2px rgb(14 128 120 / 10%);
+  }
+  .school-students-page .student-mobile-card > div:first-child button {
+    font-size: 14px; line-height: 1.35; overflow-wrap: anywhere;
+  }
+  .school-students-page .student-mobile-card > div:nth-child(2) {
+    flex-wrap: wrap; align-items: flex-start; line-height: 1.45;
+  }
+  .school-students-page .student-mobile-card > div:nth-child(2) > span:last-child {
+    overflow-wrap: anywhere; text-align: right;
+  }
+  .school-students-page .student-mobile-card > div:last-child {
+    border-top: 1px solid #edf2f0; margin-top: 11px; padding-top: 10px;
+    line-height: 1.6; overflow-wrap: anywhere;
+  }
+  .school-people-teachers-page { padding: 12px !important; }
+  .school-people-teachers-page > header:first-child {
+    border-radius: 18px !important; padding: 18px !important;
+    background: linear-gradient(145deg,#102f2d 0%,#164b46 58%,#0f766e 100%) !important;
+  }
+  .school-people-teachers-page > header:first-child h1 { font-size: 25px !important; line-height: 1.15; }
+  .school-people-teachers-page > header:first-child .flex.flex-wrap { width: 100%; }
+  .school-people-teachers-page > header:first-child .flex.flex-wrap button { flex: 1; justify-content: center; min-height: 44px; }
+  .school-people-teachers-page section[aria-label="Teacher directory summary"] { gap: 8px; }
+  .school-people-teachers-page section[aria-label="Teacher directory summary"] article {
+    padding: 12px; border-radius: 14px; box-shadow: 0 2px 8px rgb(24 49 43 / 5%);
+  }
+  .school-people-teachers-page section[aria-label="Teacher directory summary"] article p:nth-child(2) { font-size: 25px; }
+  .school-people-teachers-page > div:has(> button[data-testid="add-teacher-button"]) {
+    padding: 14px !important; border-radius: 16px !important;
+  }
+  .school-people-teachers-page button[data-testid="add-teacher-button"] {
+    width: 100%; min-height: 48px; justify-content: center;
+  }
+  .school-people-teachers-page > div:has(> label input[type="search"]) {
+    display: grid; grid-template-columns: minmax(0,1fr); gap: 9px;
+  }
+  .school-people-teachers-page > div:has(> label input[type="search"]) input,
+  .school-people-teachers-page > div:has(> label input[type="search"]) select {
+    width: 100%; min-height: 44px; font-size: 14px;
+  }
+  .school-people-teachers-page .teacher-directory { background: transparent !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
+  .school-people-teachers-page .teacher-directory > .overflow-x-auto { overflow: visible !important; }
+  .school-people-teachers-page .teacher-directory tbody {
+    grid-template-columns: minmax(0,1fr); gap: 12px; padding: 0;
+  }
+  .school-people-teachers-page .teacher-directory tbody tr {
+    border: 1px solid var(--people-line); border-radius: 16px; background: var(--people-card);
+    box-shadow: 0 3px 12px rgb(24 49 43 / 6%); padding: 5px 0;
+  }
+  .school-people-teachers-page .teacher-directory tbody td {
+    display: grid; grid-template-columns: minmax(94px, .36fr) minmax(0,1fr);
+    align-items: start; gap: 10px; padding: 9px 14px !important;
+    font-size: 12px; line-height: 1.5; overflow-wrap: anywhere;
+  }
+  .school-people-teachers-page .teacher-directory tbody td::before {
+    color: var(--people-muted); font-size: 10px; font-weight: 800;
+    letter-spacing: .045em; text-transform: uppercase;
+  }
+  .school-people-teachers-page .teacher-directory tbody td:first-child {
+    display: block; padding: 13px 14px 12px !important;
+    border-bottom: 1px solid var(--people-line); background: transparent !important;
+  }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(2)::before { content: "Maaddooyin"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(3)::before { content: "Fasallada"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(4)::before { content: "Fasal macallin"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(5)::before { content: "Telefoon"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(6)::before { content: "Xaalad"; }
+  .school-people-teachers-page .teacher-directory tbody td:last-child {
+    display: flex; flex-wrap: wrap; gap: 7px; border-top: 1px solid var(--people-line);
+    margin-top: 5px; padding: 12px 14px !important;
+  }
+  .school-people-teachers-page .teacher-directory tbody td:last-child::before { content: "Hawlgal"; width: 100%; }
+  .school-people-teachers-page .teacher-directory tbody td:last-child button {
+    flex: 1 1 calc(50% - 7px); min-height: 40px; justify-content: center;
+    margin: 0 !important; padding: 8px 10px; border-radius: 10px;
+  }
+  .school-people-teachers-page .inline-flex.items-center.rounded-xl[role="group"] { width: 100%; }
+  .school-people-teachers-page .inline-flex.items-center.rounded-xl[role="group"] button { flex: 1; justify-content: center; min-height: 40px; }
+  .school-people-teachers-page form { max-height: 88dvh !important; padding: 16px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-students-page *, .school-people-teachers-page * { transition-duration: .01ms !important; }
+}
