@@ -73,7 +73,14 @@ type ParentContactsCacheEntry = { expiresAt: number; items: any[]; total: number
 const parentContactsResponseCache = new Map<string, ParentContactsCacheEntry>();
 const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
 const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
+const teacherAssignmentReadinessCache = new SchoolReadinessCache<any>(30_000);
 const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
+const schoolReportSummaryCache = new SchoolReadinessCache<any>(60_000);
+const classYearlyRankingsCache = new SchoolReadinessCache<any>(5 * 60_000);
+const classDetailsCache = new SchoolReadinessCache<any>(60_000);
+type StudentListCacheEntry = { expiresAt: number; body: any[]; headers: Record<string, string> };
+const studentListResponseCache = new Map<string, StudentListCacheEntry>();
+const STUDENT_LIST_CACHE_TTL_MS = 20_000;
 const teacherDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
 
 function getCachedSchoolDashboardSummary(schoolId: string) {
@@ -104,7 +111,12 @@ apiRouter.use((req, res, next) => {
       if (schoolId && res.statusCode >= 200 && res.statusCode < 400) {
         invalidateParentPortalSummaryCache(schoolId);
         schoolReadinessCache.invalidate(schoolId);
+        teacherAssignmentReadinessCache.invalidate(schoolId);
         schoolDashboardSummaryCache.invalidate(schoolId);
+        schoolReportSummaryCache.invalidatePrefix(`${schoolId}:`);
+        classYearlyRankingsCache.invalidatePrefix(`${schoolId}:`);
+        classDetailsCache.invalidatePrefix(`${schoolId}:`);
+        for (const key of studentListResponseCache.keys()) if (key.startsWith(`${schoolId}:`)) studentListResponseCache.delete(key);
         teacherDashboardSummaryCache.invalidatePrefix(`${schoolId}:`);
       }
     });
@@ -232,8 +244,15 @@ apiRouter.use((req, res, next) => {
   void storage.prepareRequestContext(req.path === '/auth/login', `${req.method} ${req.path}`, includePlans).then((context: any) => {
     storage.runWithRequestContext(context, () => {
       res.once('finish', () => {
-        const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0 };
+        const metrics = storage.getRequestQueryMetrics?.() || { count: 0, durationMs: 0, tableCounts: {} };
         const route = req.route?.path ? `${req.baseUrl}${req.route.path}` : req.path;
+        const durationMs = Math.round((performance.now() - requestStarted) * 100) / 100;
+        const dbDurationMs = Number(metrics.durationMs) || 0;
+        const nonDbDurationMs = Math.max(0, Math.round((durationMs - dbDurationMs) * 100) / 100);
+        const tableCounts = metrics.tableCounts || {};
+        const duplicateTables = Object.entries(tableCounts)
+          .filter(([, count]) => Number(count) > 1)
+          .map(([table, count]) => ({ table, queries: count }));
         const schoolId = String((req as any).school?.id || (req as any).user?.schoolId || req.headers['x-school-id'] || req.query.schoolId || '') || null;
         console.info(JSON.stringify({
           event: 'api.request',
@@ -241,11 +260,39 @@ apiRouter.use((req, res, next) => {
           method: req.method,
           route,
           status: res.statusCode,
-          durationMs: Math.round((performance.now() - requestStarted) * 100) / 100,
+          durationMs: durationMs,
           dbQueries: metrics.count,
-          dbDurationMs: metrics.durationMs,
+          dbDurationMs: dbDurationMs,
+          nonDbDurationMs,
+          poolWaitMs: null,
+          queryTables: tableCounts,
           schoolId
         }));
+        if (durationMs > 500 || metrics.count > 3) {
+          console.warn(JSON.stringify({
+            event: 'slow-request',
+            requestId,
+            method: req.method,
+            route,
+            status: res.statusCode,
+            durationMs,
+            dbDurationMs,
+            nonDbDurationMs,
+            dbQueries: metrics.count,
+            queryTables: tableCounts,
+            schoolId
+          }));
+        }
+        if (duplicateTables.length) {
+          console.warn(JSON.stringify({
+            event: 'duplicate-table-queries',
+            requestId,
+            method: req.method,
+            route,
+            duplicates: duplicateTables,
+            schoolId
+          }));
+        }
         const queryBudget = getApiQueryBudget(req.method, route);
         if (queryBudget !== null && metrics.count > queryBudget) {
           console.warn(JSON.stringify({
@@ -3094,38 +3141,46 @@ apiRouter.get('/classes', requireAuth, requireSchoolContext, async (req, res) =>
 
 apiRouter.get('/classes/:id/details', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  const role = normalizeRole((req as any).user.role);
+  const user = (req as any).user as User;
+  const role = normalizeRole(user.role);
   if (!['school_admin', 'super_admin', 'teacher'].includes(role || '')) { res.status(403).json({ error: 'This role cannot view class details.' }); return; }
   let teacherId: string | null = null;
   if (role === 'teacher') {
-    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: (req as any).user.id }, 1, 1, undefined, 'id');
+    const teacher = await db.queryPage('teachers', { school_id: school.id, user_id: user.id }, 1, 1, undefined, 'id');
     teacherId = teacher.items[0]?.id || null;
-    if (!teacherId || !(await getTeacherAssignedClassIds(school.id, (req as any).user.id)).includes(String(req.params.id))) {
+    if (!teacherId || !(await getTeacherAssignedClassIds(school.id, user.id)).includes(String(req.params.id))) {
       res.status(403).json({ error: 'Teacher class scope does not include this class.' }); return;
     }
   }
-  const klass = await db.getClassById(req.params.id, school.id);
-  if (!klass || klass.isArchived) { res.status(404).json({ error: 'Class was not found.' }); return; }
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
   const search = String(req.query.search || '').trim().replace(/[,.()]/g, ' ').slice(0, 60);
-  const orFilter = search ? `first_name.ilike.%${search}%,middle_name.ilike.%${search}%,last_name.ilike.%${search}%` : undefined;
-  const [students, assignments, timetable, attendance] = await Promise.all([
-    db.queryPage('students', { school_id: school.id, class_id: klass.id }, Number(req.query.page) || 1, Number(req.query.pageSize) || 20, orFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id'),
-    db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
-    db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
-    db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
-  ]);
-  const visibleAssignments = teacherId ? assignments.items.filter((item: any) => item.teacherId === teacherId) : assignments.items;
-  const visibleTimetable = teacherId ? timetable.items.filter((item: any) => item.teacherId === teacherId) : timetable.items;
-  const subjectIds = [...new Set(visibleAssignments.map((item: any) => item.subjectId))];
-  const teacherIds = [...new Set(visibleAssignments.map((item: any) => item.teacherId).filter(Boolean))];
-  const [subjectRows, teacherRows] = await Promise.all([
-    subjectIds.length ? db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects) : Promise.resolve({ items: [] as any[] }),
-    teacherIds.length ? db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.teachers) : Promise.resolve({ items: [] as any[] })
-  ]);
-  const subjectById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
-  const teacherById = new Map(teacherRows.items.map((item: any) => [item.id, item]));
-  const classSubjects = visibleAssignments.map((assignment: any) => ({ ...assignment, subject: subjectById.get(assignment.subjectId) || null, teacher: teacherById.has(assignment.teacherId) ? { id: (teacherById.get(assignment.teacherId) as any).id, fullName: (teacherById.get(assignment.teacherId) as any).fullName } : null }));
-  res.json({ class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: visibleTimetable, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } });
+  const cacheKey = `${school.id}:${req.params.id}:${role}:${user.id}:${page}:${pageSize}:${search}`;
+  const details = await classDetailsCache.get(cacheKey, async () => {
+    const klass = await db.getClassById(req.params.id, school.id);
+    if (!klass || klass.isArchived) return null;
+    const orFilter = search ? `first_name.ilike.%${search}%,middle_name.ilike.%${search}%,last_name.ilike.%${search}%` : undefined;
+    const [students, assignments, timetable, attendance] = await Promise.all([
+      db.queryPage('students', { school_id: school.id, class_id: klass.id }, page, pageSize, orFilter, LIST_QUERY_COLUMNS.students, 'first_name,middle_name,last_name,student_id'),
+      db.queryPage('class_subjects', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, LIST_QUERY_COLUMNS.class_subjects),
+      db.queryPage('timetable_slots', { school_id: school.id, class_id: klass.id, is_active: 'true' }, 1, 100, undefined, 'id,school_id,class_id,day_of_week,period_number,start_time,end_time,subject_id,teacher_id,room_number,is_active,is_locked,term_id'),
+      db.queryPage('attendance_records', { school_id: school.id, class_id: klass.id, date: new Date().toISOString().slice(0, 10) }, 1, 1, undefined, 'id')
+    ]);
+    const visibleAssignments = teacherId ? assignments.items.filter((item: any) => item.teacherId === teacherId) : assignments.items;
+    const visibleTimetable = teacherId ? timetable.items.filter((item: any) => item.teacherId === teacherId) : timetable.items;
+    const subjectIds = [...new Set(visibleAssignments.map((item: any) => item.subjectId))];
+    const teacherIds = [...new Set(visibleAssignments.map((item: any) => item.teacherId).filter(Boolean))];
+    const [subjectRows, teacherRows] = await Promise.all([
+      subjectIds.length ? db.queryPage('subjects', { school_id: school.id, id: subjectIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.subjects) : Promise.resolve({ items: [] as any[] }),
+      teacherIds.length ? db.queryPage('teachers', { school_id: school.id, id: teacherIds }, 1, 100, undefined, LIST_QUERY_COLUMNS.teachers) : Promise.resolve({ items: [] as any[] })
+    ]);
+    const subjectById = new Map(subjectRows.items.map((item: any) => [item.id, item]));
+    const teacherById = new Map(teacherRows.items.map((item: any) => [item.id, item]));
+    const classSubjects = visibleAssignments.map((assignment: any) => ({ ...assignment, subject: subjectById.get(assignment.subjectId) || null, teacher: teacherById.has(assignment.teacherId) ? { id: (teacherById.get(assignment.teacherId) as any).id, fullName: (teacherById.get(assignment.teacherId) as any).fullName } : null }));
+    return { class: klass, students: { items: students.items, page: students.page, pageSize: students.pageSize, total: students.total }, subjects: classSubjects, timetable: visibleTimetable, attendance: { date: new Date().toISOString().slice(0, 10), recordedStudents: attendance.total } };
+  });
+  if (!details) { res.status(404).json({ error: 'Class was not found.' }); return; }
+  res.json(details);
 });
 
 apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, async (req, res) => {
@@ -3179,48 +3234,14 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'This role cannot view school reports.' }); return; }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'reports_export')) { res.status(403).json({ error: 'Your staff account does not have permission to view reports.' }); return; }
   try {
-    const summary = await getCachedSchoolDashboardSummary(school.id);
-    const stats = summary?.stats || {};
-    const approvedMarks = (await queryAllRows('student_marks', {
-      school_id: school.id,
-      academic_year: school.academicYear
-    }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
-    const examConfig = await db.getExamConfig(school.id, school.academicYear);
-    const passMark = Number(examConfig.passMarkPercentage) || 50;
-    const [schoolStudents, schoolClasses, schoolTeachers] = await Promise.all([
-      queryAllRows('students', { school_id: school.id }, 'id,class_id,status'),
-      queryAllRows('classes', { school_id: school.id }, 'id,name,grade_level,section,is_archived'),
-      queryAllRows('teachers', { school_id: school.id }, 'id,status')
-    ]);
-    const activeStudents = schoolStudents.filter((student: any) => student.status === 'active');
-    const activeTeachers = schoolTeachers.filter((teacher: any) => teacher.status === 'active');
-    const activeClassRows = schoolClasses.filter((klass: any) => !klass.isArchived);
-    const result: Record<string, unknown> = {
-      studentCount: Number(stats.totalStudents) || activeStudents.length,
-      teacherCount: activeTeachers.length,
-      studentTeacherRatio: activeTeachers.length ? Number((activeStudents.length / activeTeachers.length).toFixed(1)) : null,
-      classEnrollment: activeClassRows.map((klass: any) => ({
-        classId: klass.id,
-        className: klass.name,
-        gradeLevel: klass.gradeLevel,
-        section: klass.section,
-        studentCount: activeStudents.filter((student: any) => student.classId === klass.id).length
-      })).sort((a: any, b: any) => Number(a.gradeLevel) - Number(b.gradeLevel) || String(a.className).localeCompare(String(b.className))),
-      attendanceRate: Number(stats.attendanceRate) || 0,
-      passRate: approvedMarks.length
-        ? Math.round(approvedMarks.filter((mark: any) => Number(mark.percentage) >= passMark).length * 100 / approvedMarks.length)
-        : null
-    };
-    if (user.role === 'accountant' || user.role === 'super_admin') {
-      const allPayments = await db.getFeePayments(school.id);
-      const payments = allPayments.filter(payment => !payment.voidedAt);
-      // Voided receipts are excluded from every live finance total.
-      result.totalDue = payments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
-      result.totalCollected = payments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
-      result.totalArrears = payments.reduce((total, payment) => total + Number(payment.remainingAmount || 0), 0);
-      result.paymentCount = payments.length;
-      result.recentPayments = payments.slice(-20).reverse();
-    }
+    const includeFinance = user.role === 'accountant' || user.role === 'super_admin';
+    const result = await schoolReportSummaryCache.get(`${school.id}:${user.role}`, () =>
+      db.callRpc<Record<string, unknown>>('schoolos_school_reports_summary', {
+        p_school_id: school.id,
+        p_academic_year: String(school.academicYear || ''),
+        p_include_finance: includeFinance
+      })
+    );
     res.json(result);
   } catch {
     res.status(503).json({ error: 'Unable to load school reports.' });
@@ -4381,10 +4402,10 @@ async function getStudentFeeStatusMap(schoolId: string, studentIds?: string[], a
   return statuses;
 }
 
-async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string, orFilter?: string) {
+async function queryAllRows(table: string, filters: Record<string, string | string[] | undefined>, columns: string, orderBy?: string, orFilter?: string, pageSize = 100) {
   const rows: any[] = [];
   for (let page = 1;; page += 1) {
-    const result = await db.queryPage(table, filters, page, 100, orFilter, columns, orderBy);
+    const result = await db.queryPage(table, filters, page, pageSize, orFilter, columns, orderBy, true, pageSize);
     rows.push(...result.items);
     if (rows.length >= result.total || result.items.length === 0) break;
   }
@@ -5720,6 +5741,67 @@ apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res)
   });
 });
 
+apiRouter.get('/students/options', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
+  const school = (req as any).school;
+  const user = (req as any).user as User;
+  const search = String(req.query.q || req.query.search || '').trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80);
+  const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
+  const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: requestedClassId };
+  if (user.role === 'teacher') {
+    const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
+    if (requestedClassId && !assignedClassIds.includes(requestedClassId)) {
+      res.status(403).json({ error: 'Student access is limited to your assigned classes.' });
+      return;
+    }
+    if (!assignedClassIds.length) { res.json([]); return; }
+    filters.class_id = requestedClassId || assignedClassIds;
+  } else if (user.role === 'student') {
+    const studentId = String(user.studentId || '').trim();
+    if (!studentId) { res.json([]); return; }
+    filters.student_id = studentId;
+    filters.class_id = undefined;
+  } else if (user.role === 'parent') {
+    const linkedStudentIds = await getParentLinkedStudentIds(school.id, user.id);
+    if (!linkedStudentIds.length) { res.json([]); return; }
+    filters.id = linkedStudentIds;
+    filters.class_id = undefined;
+  } else if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) {
+    res.status(403).json({ error: 'This role cannot view student options.' });
+    return;
+  }
+  const searchFilter = search
+    ? ['student_id', 'first_name', 'middle_name', 'last_name'].map(column => `${column}.ilike.*${search}*`).join(',')
+    : undefined;
+  const students = await db.queryPage(
+    'students',
+    filters,
+    1,
+    20,
+    searchFilter,
+    'id,student_id,first_name,middle_name,last_name,status,class_id',
+    'first_name,middle_name,last_name'
+  );
+  const classIds = [...new Set(students.items.map((student: any) => String(student.classId || '')).filter(Boolean))];
+  const classes = classIds.length
+    ? await db.queryPage('classes', { school_id: school.id, id: classIds }, 1, 100, undefined, 'id,name,section')
+    : { items: [] as any[] };
+  const classById = new Map(classes.items.map((klass: any) => [String(klass.id), klass]));
+  res.set('Cache-Control', 'private, no-store');
+  res.json(students.items.map((student: any) => {
+    const klass: any = classById.get(String(student.classId || ''));
+    return {
+      id: student.id,
+      studentId: student.studentId,
+      firstName: student.firstName,
+      middleName: student.middleName,
+      lastName: student.lastName,
+      status: student.status,
+      classId: student.classId || '',
+      className: klass ? [klass.name, klass.section].filter(Boolean).join(' · ') : ''
+    };
+  }));
+});
+
 apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
@@ -5764,6 +5846,45 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
       .map(column => `${column}.ilike.*${search}*`).join(',')
     : undefined;
 
+  // Cache only successful paginated responses after role/teacher/parent scope checks.
+  // Cache keys include the authenticated identity and every response-shaping filter.
+  const studentCacheKey = `${school.id}:${JSON.stringify({
+    userId: user.id, role: user.role, filters, roleFilter, page, pageSize, search, feeStatus,
+    allClass: req.query.allClass === 'true'
+  })}`;
+  const cachedStudentPage = req.query.allClass === 'true' ? undefined : studentListResponseCache.get(studentCacheKey);
+  if (cachedStudentPage && cachedStudentPage.expiresAt > Date.now()) {
+    res.set({ ...cachedStudentPage.headers, 'Cache-Control': 'private, no-cache' });
+    const etag = cachedStudentPage.headers.ETag;
+    const requestedEtags = String(req.headers['if-none-match'] || '').split(',').map(value => value.trim());
+    if (etag && requestedEtags.includes(etag)) { res.status(304).end(); return; }
+    res.json(cachedStudentPage.body);
+    return;
+  }
+  if (cachedStudentPage) studentListResponseCache.delete(studentCacheKey);
+  if (req.query.allClass !== 'true') {
+    const originalJson = res.json.bind(res);
+    res.json = ((body: any) => {
+      if (res.statusCode === 200 && Array.isArray(body)) {
+        const headers: Record<string, string> = {};
+        for (const name of ['X-Page', 'X-Page-Size', 'X-Total-Count', 'X-Total-Pages']) {
+          const value = res.getHeader(name);
+          if (value !== undefined) headers[name] = String(value);
+        }
+        const etag = `"${createHash('sha256').update(JSON.stringify(body)).digest('hex')}"`;
+        headers.ETag = etag;
+        res.set({ ETag: etag, 'Cache-Control': 'private, no-cache' });
+        studentListResponseCache.set(studentCacheKey, { expiresAt: Date.now() + STUDENT_LIST_CACHE_TTL_MS, body, headers });
+        while (studentListResponseCache.size > 200) {
+          const oldest = studentListResponseCache.keys().next().value;
+          if (oldest === undefined) break;
+          studentListResponseCache.delete(oldest);
+        }
+      }
+      return originalJson(body);
+    }) as Response['json'];
+  }
+
   // Resolve the displayed/filtered class from active enrollments for the current year.
   // When a class or teacher scope is known, constrain enrollment reads at the database
   // instead of loading every active enrollment in the school for a single-class roster.
@@ -5775,7 +5896,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
       academic_year_id: currentYearId,
       status: 'active',
       class_id: enrollmentClassScope
-    }, 'id,student_id,class_id,section_id,roll_number')
+    }, 'id,student_id,class_id,section_id,roll_number', undefined, undefined, 1_000)
     : [];
   const enrollmentByStudent = new Map<string, any>(currentEnrollments.map((row: any) => [String(row.studentId), row]));
   const enrollmentClassIds = [...new Set(currentEnrollments.map((row: any) => String(row.classId || '')).filter(Boolean))];
@@ -7187,7 +7308,7 @@ apiRouter.put('/attendance', requireAuth, requireSchoolContext, requireSchoolSet
 
 apiRouter.get('/exams/config', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school;
-  res.json(await db.getExamConfig(school.id, school.academicYear));
+  res.json(await db.getExamConfig(school.id, school.academicYear, false));
 });
 
 apiRouter.put('/exams/config', requireAuth, requireSchoolAdminOrSuperAdmin, requireSchoolContext, async (req, res) => {
@@ -8419,21 +8540,30 @@ apiRouter.get('/exams/rankings/semester', requireAuth, requireSchoolContext, asy
 // Semester 2 Combined Yearly Results & Ranking (for Final Report Card)
 apiRouter.get('/exams/rankings/yearly', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
+  const user = (req as any).user as User;
   const { classId } = req.query;
   if (!classId || typeof classId !== 'string') { res.status(400).json({ error: 'classId is required.' }); return; }
   if (!await canReadClassResults(req, res, classId)) return;
-  const [rankings, klass] = await Promise.all([db.getClassYearlyRankings(school.id, classId), db.getClassById(classId, school.id)]);
-  const studentIds = rankings.map(row => row.student.id);
-  const commentsResult = studentIds.length
-    ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
-    : { data: [], error: null };
-  const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
-  for (const row of commentsResult.data || []) {
-    const comments = commentsByStudent.get(row.student_id) || [];
-    comments.push({ semester: row.semester, comment: row.comment || '' });
-    commentsByStudent.set(row.student_id, comments);
-  }
-  res.json(rankings.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] })));
+  const role = normalizeRole(user.role) || user.role;
+  const cacheKey = `${school.id}:${school.academicYear}:${classId}:${role}:${user.id}`;
+  const rankings = await classYearlyRankingsCache.get(cacheKey, async () => {
+    const [rows, klass] = await Promise.all([
+      db.getClassYearlyRankings(school.id, classId, false),
+      db.getClassById(classId, school.id)
+    ]);
+    const studentIds = rows.map(row => row.student.id);
+    const commentsResult = studentIds.length
+      ? await classGroupsClient().from('form_teacher_comments').select('student_id,semester,comment').eq('school_id', school.id).eq('academic_year', klass?.academicYear || school.academicYear).in('student_id', studentIds)
+      : { data: [], error: null };
+    const commentsByStudent = new Map<string, Array<{ semester: string; comment: string }>>();
+    for (const row of commentsResult.data || []) {
+      const comments = commentsByStudent.get(row.student_id) || [];
+      comments.push({ semester: row.semester, comment: row.comment || '' });
+      commentsByStudent.set(row.student_id, comments);
+    }
+    return rows.map(row => ({ ...row, formTeacherComments: commentsByStudent.get(row.student.id) || [] }));
+  });
+  res.json(rankings);
 });
 
 // Year-End Promotion Confirmation
@@ -9833,7 +9963,20 @@ apiRouter.get('/messages/contacts', requireAuth, requireSchoolContext, requirePa
         : [];
     }
   } else {
-    const users = await db.getUsers(school.id);
+    if (!allowedRoles[user.role]?.length) { res.json([]); return; }
+    const rawSearch = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const search = rawSearch.replace(/[%(),*\\"]/g, '').slice(0, 80);
+    const searchFilter = search
+      ? `full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,student_id.ilike.%${search}%`
+      : undefined;
+    const users = (await db.queryPage(
+      'users',
+      { school_id: school.id, role: allowedRoles[user.role] || [] },
+      1,
+      100,
+      searchFilter,
+      'id,role,full_name,email,phone,student_id'
+    )).items;
     contacts = users.filter(contact => (allowedRoles[user.role] || []).includes(contact.role) && contact.id !== user.id);
     if (user.role === 'teacher') {
       const assignedClassIds = await getTeacherAssignedClassIds(school.id, user.id);
@@ -10695,19 +10838,21 @@ function requireParentPortalSetupReady(req: any, res: any, next: (error?: unknow
 
 
 async function getTeacherAssignmentReadinessForSchool(school: School) {
-  const [classes, teachers, curriculum, subjects] = await Promise.all([
-    queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
-    queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,school_id,user_id,full_name,status'),
-    queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
-    queryAllRows('subjects', { school_id: school.id }, 'id,school_id,name')
-  ]);
-  return evaluateTeacherAssignmentReadiness(
-    school.id,
-    classes.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name, section: row.section, classTeacherId: row.classTeacherId, isArchived: row.isArchived })),
-    teachers.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, userId: row.userId, fullName: row.fullName, status: row.status })),
-    curriculum.map((row: any) => ({ schoolId: row.schoolId, classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
-    subjects.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name }))
-  );
+  return teacherAssignmentReadinessCache.get(school.id, async () => {
+    const [classes, teachers, curriculum, subjects] = await Promise.all([
+      queryAllRows('classes', { school_id: school.id }, 'id,school_id,name,section,class_teacher_id,is_archived'),
+      queryAllRows('teachers', { school_id: school.id, status: 'active' }, 'id,school_id,user_id,full_name,status'),
+      queryAllRows('class_subjects', { school_id: school.id, is_active: 'true' }, 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,is_active'),
+      queryAllRows('subjects', { school_id: school.id }, 'id,school_id,name')
+    ]);
+    return evaluateTeacherAssignmentReadiness(
+      school.id,
+      classes.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name, section: row.section, classTeacherId: row.classTeacherId, isArchived: row.isArchived })),
+      teachers.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, userId: row.userId, fullName: row.fullName, status: row.status })),
+      curriculum.map((row: any) => ({ schoolId: row.schoolId, classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
+      subjects.map((row: any) => ({ id: String(row.id), schoolId: row.schoolId, name: row.name }))
+    );
+  });
 }
 
 async function ensureTeacherAssignmentReadyForTeacher(school: School, res: any): Promise<boolean> {

@@ -20,6 +20,13 @@ CREATE TABLE public.schools (
   id varchar(64) PRIMARY KEY,
   timezone text
 );
+
+CREATE TABLE public.exam_configs (
+  id varchar(64) PRIMARY KEY,
+  school_id varchar(64) NOT NULL,
+  academic_year varchar(50) NOT NULL,
+  pass_mark_percentage numeric(5,2) NOT NULL DEFAULT 50
+);
 CREATE TABLE public.students (
   id varchar(64) PRIMARY KEY,
   school_id varchar(64) NOT NULL,
@@ -42,6 +49,7 @@ CREATE TABLE public.classes (
   school_id varchar(64) NOT NULL,
   name text,
   grade_level text,
+  section text NOT NULL DEFAULT '',
   is_archived boolean NOT NULL DEFAULT false
 );
 CREATE TABLE public.attendance_records (
@@ -57,17 +65,25 @@ CREATE TABLE public.fee_payments (
   school_id varchar(64) NOT NULL,
   student_id varchar(64),
   receipt_number text,
+  reference_number text,
   academic_year text,
   month text,
   fee_type text,
+  fee_structure_id varchar(64),
+  idempotency_key text,
   amount_due numeric(12,2),
   amount_paid numeric(12,2),
   remaining_amount numeric(12,2),
   payment_method text,
   status text,
   date date NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  voided_at timestamptz
+  recorded_by varchar(64),
+  notes text,
+  voided_at timestamptz,
+  voided_by varchar(64),
+  void_reason text,
+  idempotency_keys jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE public.school_notices (
   id varchar(64) PRIMARY KEY,
@@ -84,6 +100,9 @@ CREATE TABLE public.school_notices (
 
 INSERT INTO public.schools (id, timezone)
 VALUES ('school-a', 'Africa/Addis_Ababa'), ('school-b', 'Africa/Addis_Ababa');
+
+INSERT INTO public.exam_configs (id, school_id, academic_year, pass_mark_percentage)
+VALUES ('config-a', 'school-a', '2026-2027', 50);
 
 INSERT INTO public.classes (id, school_id, name, grade_level, is_archived)
 VALUES
@@ -238,3 +257,206 @@ END $$;
 
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT public.teacher_dashboard_summary('school-a', 'teacher-a');
+
+
+-- Large synthetic tenant fixture for the CI performance regression budget.
+-- This is an isolated PostgreSQL service database; it never connects to live Supabase.
+INSERT INTO public.schools (id, timezone)
+VALUES ('school-load', 'Africa/Addis_Ababa')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.classes (id, school_id, name, grade_level, is_archived, class_teacher_id)
+SELECT
+  'load-class-' || lpad(g::text, 2, '0'),
+  'school-load',
+  'Grade ' || g,
+  g::text,
+  false,
+  'load-user-' || lpad(g::text, 2, '0')
+FROM generate_series(1, 40) AS g
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.teachers (id, school_id, status, user_id)
+SELECT
+  'load-teacher-' || lpad(g::text, 2, '0'),
+  'school-load',
+  'active',
+  'load-user-' || lpad(g::text, 2, '0')
+FROM generate_series(1, 80) AS g
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.students (id, school_id, student_id, first_name, middle_name, last_name, class_id, admission_date, status, created_at)
+SELECT
+  'load-student-' || lpad(g::text, 4, '0'),
+  'school-load',
+  'L' || lpad(g::text, 4, '0'),
+  'Student',
+  '',
+  g::text,
+  'load-class-' || lpad((((g - 1) % 40) + 1)::text, 2, '0'),
+  CURRENT_DATE,
+  'active',
+  now() - (g || ' seconds')::interval
+FROM generate_series(1, 1500) AS g
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.attendance_records (id, school_id, class_id, student_id, date, status)
+SELECT
+  'load-attendance-' || lpad(g::text, 6, '0'),
+  'school-load',
+  'load-class-' || lpad(((((g - 1) % 1500) % 40) + 1)::text, 2, '0'),
+  'load-student-' || lpad(((((g - 1) % 1500) + 1))::text, 4, '0'),
+  CURRENT_DATE - (g % 30),
+  CASE WHEN g % 10 = 0 THEN 'absent' WHEN g % 7 = 0 THEN 'late' ELSE 'present' END
+FROM generate_series(1, 100000) AS g
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.student_marks (
+  id varchar(64) PRIMARY KEY,
+  school_id varchar(64) NOT NULL,
+  class_id varchar(64) NOT NULL,
+  subject_id varchar(64) NOT NULL,
+  student_id varchar(64) NOT NULL,
+  academic_year varchar(50) NOT NULL,
+  semester varchar(50) NOT NULL CHECK (semester IN ('Semester 1', 'Semester 2')),
+  percentage numeric(5,2) NOT NULL DEFAULT 0,
+  status text NOT NULL
+);
+
+INSERT INTO public.student_marks (id, school_id, class_id, subject_id, student_id, academic_year, semester, percentage, status)
+SELECT
+  'load-mark-' || lpad(g::text, 6, '0'),
+  'school-load',
+  'load-class-' || lpad(((((g - 1) % 1500) % 40) + 1)::text, 2, '0'),
+  'load-subject-' || ((g - 1) % 12 + 1),
+  'load-student-' || lpad(((((g - 1) % 1500) + 1))::text, 4, '0'),
+  '2026-2027',
+  CASE WHEN g % 2 = 0 THEN 'Semester 1' ELSE 'Semester 2' END,
+  (g % 101)::numeric(5,2),
+  CASE WHEN g % 5 = 0 THEN 'draft' ELSE 'approved' END
+FROM generate_series(1, 20000) AS g
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.student_marks
+  (id, school_id, class_id, subject_id, student_id, academic_year, semester, percentage, status)
+VALUES
+  ('report-mark-a1', 'school-a', 'class-a', 'subject-a1', 'a1', '2026-2027', 'Semester 1', 75, 'approved'),
+  ('report-mark-a2', 'school-a', 'class-a', 'subject-a2', 'a2', '2026-2027', 'Semester 1', 40, 'approved');
+
+\ir ../../supabase/migrations/20261124100000_school_reports_summary_rpc.sql
+\ir ../../supabase/migrations/20261124100000_school_reports_summary_rpc.sql
+
+DO $report$
+DECLARE
+  report jsonb;
+  school_admin_report jsonb;
+BEGIN
+  report := public.schoolos_school_reports_summary('school-a', '2026-2027', true);
+  ASSERT report->>'studentCount' = '3', 'report student count must include active students only';
+  ASSERT report->>'teacherCount' = '1', 'report teacher count must be school scoped';
+  ASSERT report->>'studentTeacherRatio' = '3.0', 'student-teacher ratio must preserve one-decimal precision';
+  ASSERT jsonb_array_length(report->'classEnrollment') = 1, 'archived and cross-school classes must be excluded';
+  ASSERT report->'classEnrollment'->0->>'classId' = 'class-a', 'class enrollment must remain school scoped';
+  ASSERT (report->>'attendanceRate')::numeric = 50, 'attendance rate must preserve dashboard summary semantics';
+  ASSERT (report->>'passRate')::numeric = 50, 'pass rate must use approved marks and school pass mark';
+  ASSERT (report->>'totalDue')::numeric = 100, 'finance total due must exclude voided and other-school payments';
+  ASSERT (report->>'totalCollected')::numeric = 70, 'finance collected total must exclude voided and other-school payments';
+  ASSERT (report->>'totalArrears')::numeric = 30, 'finance arrears must exclude voided and other-school payments';
+  ASSERT (report->>'paymentCount')::integer = 2, 'finance payment count must exclude voided payments';
+  ASSERT jsonb_array_length(report->'recentPayments') = 2, 'recent payments must be bounded and school scoped';
+
+  school_admin_report := public.schoolos_school_reports_summary('school-a', '2026-2027', false);
+  ASSERT NOT (school_admin_report ? 'totalDue'), 'school-admin report must not contain finance totals';
+  ASSERT NOT (school_admin_report ? 'recentPayments'), 'school-admin report must not contain payment rows';
+  ASSERT has_function_privilege('service_role',
+    'public.schoolos_school_reports_summary(character varying, character varying, boolean)', 'EXECUTE'),
+    'service_role must execute the report summary RPC';
+  ASSERT NOT has_function_privilege('anon',
+    'public.schoolos_school_reports_summary(character varying, character varying, boolean)', 'EXECUTE'),
+    'anon must not execute the report summary RPC';
+  ASSERT NOT has_function_privilege('authenticated',
+    'public.schoolos_school_reports_summary(character varying, character varying, boolean)', 'EXECUTE'),
+    'authenticated must not execute the report summary RPC directly';
+END $report$;
+
+-- Match baseline production attendance index, then apply the additive
+-- performance migration twice to prove idempotency on the actual schema.
+CREATE INDEX IF NOT EXISTS idx_attendance_date
+  ON public.attendance_records (school_id, class_id, date);
+
+\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
+\ir ../../supabase/migrations/20261124090000_schoolos_read_path_indexes.sql
+
+DO $$
+BEGIN
+  ASSERT to_regclass('public.idx_student_marks_school_class_year_student_term') IS NOT NULL,
+    'class/year/semester marks lookup index must be installed';
+  ASSERT to_regclass('public.idx_attendance_school_student_date') IS NOT NULL,
+    'school/student/date attendance lookup index must be installed';
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_student_marks_school_exam_student'
+  ), 'the production marks schema must not assume a nonexistent exam_id column';
+END $$;
+
+-- Preserve the legacy API fallback where a configured zero pass mark defaults to 50.
+UPDATE public.exam_configs SET pass_mark_percentage = 0 WHERE id = 'config-a';
+DO $zero$
+DECLARE
+  report jsonb;
+BEGIN
+  report := public.schoolos_school_reports_summary('school-a', '2026-2027', false);
+  ASSERT (report->>'passRate')::numeric = 50,
+    'zero configured pass mark must retain the legacy 50 percent fallback';
+END $zero$;
+UPDATE public.exam_configs SET pass_mark_percentage = 50 WHERE id = 'config-a';
+
+ANALYZE public.students;
+ANALYZE public.teachers;
+ANALYZE public.classes;
+ANALYZE public.attendance_records;
+ANALYZE public.student_marks;
+
+DO $$
+DECLARE
+  summary jsonb;
+BEGIN
+  ASSERT (SELECT count(*) FROM public.classes WHERE school_id = 'school-load') = 40,
+    'large fixture must contain 40 classes';
+  ASSERT (SELECT count(*) FROM public.students WHERE school_id = 'school-load') = 1500,
+    'large fixture must contain 1500 students';
+  ASSERT (SELECT count(*) FROM public.teachers WHERE school_id = 'school-load') = 80,
+    'large fixture must contain 80 teachers';
+  ASSERT (SELECT count(*) FROM public.attendance_records WHERE school_id = 'school-load') = 100000,
+    'large fixture must contain 100000 attendance rows';
+  ASSERT (SELECT count(*) FROM public.student_marks WHERE school_id = 'school-load') = 20000,
+    'large fixture must contain 20000 student marks rows';
+  summary := public.school_dashboard_summary('school-load');
+  ASSERT summary->'stats'->>'totalStudents' = '1500',
+    'large tenant dashboard must return the seeded student count';
+  ASSERT summary->'stats'->>'totalTeachers' = '80',
+    'large tenant dashboard must return the seeded teacher count';
+  ASSERT summary->>'totalClasses' = '40',
+    'large tenant dashboard must return the seeded class count';
+END $$;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT public.school_dashboard_summary('school-load');
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT count(*)
+FROM public.attendance_records
+WHERE school_id = 'school-load'
+  AND class_id = 'load-class-01'
+  AND date >= CURRENT_DATE - 30;
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT class_id, student_id, sum(percentage)
+FROM public.student_marks
+WHERE school_id = 'school-load'
+  AND class_id = 'load-class-01'
+  AND academic_year = '2026-2027'
+  AND status = 'approved'
+GROUP BY class_id, student_id;
+

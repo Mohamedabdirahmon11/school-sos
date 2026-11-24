@@ -10,6 +10,11 @@ test('high-frequency school endpoints have explicit query ceilings', () => {
     'GET /parent/children',
     'GET /student/me',
     'GET /students',
+    'GET /students/options',
+    'GET /messages/contacts',
+    'GET /classes/:id/details',
+    'GET /school/reports/summary',
+    'GET /exams/rankings/yearly',
     'GET /teachers',
     'GET /classes',
     'GET /attendance',
@@ -29,14 +34,15 @@ test('high-frequency school endpoints have explicit query ceilings', () => {
 });
 
 test('query budgets match route templates exactly and are case insensitive for methods', () => {
-  assert.equal(getApiQueryBudget('get', '/students'), 20);
-  assert.equal(getApiQueryBudget('GET', '/api/students'), 20);
+  assert.equal(getApiQueryBudget('get', '/students'), 8);
+  assert.equal(getApiQueryBudget('GET', '/school/reports/summary'), 2);
+  assert.equal(getApiQueryBudget('GET', '/api/students'), 8);
   assert.equal(getApiQueryBudget('GET', '/students/:id'), null);
   assert.equal(getApiQueryBudget('GET', '/unknown'), null);
 });
 
 test('query budget guard trips only above the configured ceiling', () => {
-  assert.equal(isApiQueryBudgetExceeded('GET', '/students', 20), false);
-  assert.equal(isApiQueryBudgetExceeded('GET', '/students', 21), true);
+  assert.equal(isApiQueryBudgetExceeded('GET', '/students', 8), false);
+  assert.equal(isApiQueryBudgetExceeded('GET', '/students', 9), true);
   assert.equal(isApiQueryBudgetExceeded('GET', '/unknown', 999), false);
 });

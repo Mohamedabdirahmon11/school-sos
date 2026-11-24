@@ -36,6 +36,8 @@ import {
   SchoolSetupData
 } from '../types/index.ts';
 
+export type StudentOption = Pick<Student, 'id' | 'studentId' | 'firstName' | 'middleName' | 'lastName' | 'status' | 'classId'> & { className: string };
+
 const LANG_KEY = 'schoolos_lang';
 
 export class ApiClient {
@@ -148,7 +150,7 @@ export class ApiClient {
   public static async request<T>(endpoint: string, options: RequestInit & { suppressGlobalApiError?: boolean } = {}): Promise<T> {
     const { suppressGlobalApiError = false, ...requestOptions } = options;
     const method = (requestOptions.method || 'GET').toUpperCase();
-    const listEndpoint = /^\/(branches|classes|subjects|teachers)$/.test(endpoint.split('?')[0]);
+    const listEndpoint = /^\/(branches|classes|subjects|teachers|students)$/.test(endpoint.split('?')[0]);
     const cachedList = method === 'GET' && listEndpoint ? this.listResponseCache.get(endpoint) : undefined;
     let response: Response;
     try {
@@ -1013,6 +1015,13 @@ export class ApiClient {
     return this.request<Student[]>(`/students?${params.toString()}`, { signal: filters?.signal });
   }
 
+  public static async getStudentOptions(search = '', classId?: string): Promise<StudentOption[]> {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('q', search.trim());
+    if (classId) params.set('classId', classId);
+    return this.request<StudentOption[]>(`/students/options?${params.toString()}`);
+  }
+
   public static async getAllStudents(classId?: string, branchId?: string, pageSize = 100): Promise<Student[]> {
     const firstPage = await this.getStudents(classId, branchId, 1, pageSize);
     const pagination = (firstPage as any).pagination;
@@ -1720,11 +1729,11 @@ export class ApiClient {
     return this.request<any[]>(`/messages?${query.toString()}`);
   }
 
-  public static async getMessageContacts(params?: { studentId?: string }) {
-    const endpoint = params?.studentId
-      ? '/messages/contacts?studentId=' + encodeURIComponent(params.studentId)
-      : '/messages/contacts';
-    return this.request<any[]>(endpoint);
+  public static async getMessageContacts(params?: { studentId?: string; search?: string }) {
+    const query = new URLSearchParams();
+    if (params?.studentId) query.set('studentId', params.studentId);
+    if (params?.search?.trim()) query.set('q', params.search.trim());
+    return this.request<any[]>(`/messages/contacts?${query.toString()}`);
   }
 
   public static async markMessagesRead(contactId: string, studentId?: string) {
