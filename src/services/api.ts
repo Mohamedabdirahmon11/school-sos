@@ -36,6 +36,8 @@ import {
   SchoolSetupData
 } from '../types/index.ts';
 
+export type StudentOption = Pick<Student, 'id' | 'studentId' | 'firstName' | 'middleName' | 'lastName' | 'status' | 'classId'> & { className: string };
+
 const LANG_KEY = 'schoolos_lang';
 
 export class ApiClient {
@@ -1011,6 +1013,13 @@ export class ApiClient {
     if (filters?.gender && filters.gender !== 'all') params.append('gender', filters.gender);
     if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
     return this.request<Student[]>(`/students?${params.toString()}`, { signal: filters?.signal });
+  }
+
+  public static async getStudentOptions(search = '', classId?: string): Promise<StudentOption[]> {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('q', search.trim());
+    if (classId) params.set('classId', classId);
+    return this.request<StudentOption[]>(`/students/options?${params.toString()}`);
   }
 
   public static async getAllStudents(classId?: string, branchId?: string, pageSize = 100): Promise<Student[]> {
