@@ -5889,7 +5889,10 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
   })}`;
   const cachedStudentPage = req.query.allClass === 'true' ? undefined : studentListResponseCache.get(studentCacheKey);
   if (cachedStudentPage && cachedStudentPage.expiresAt > Date.now()) {
-    res.set(cachedStudentPage.headers);
+    res.set({ ...cachedStudentPage.headers, 'Cache-Control': 'private, no-cache' });
+    const etag = cachedStudentPage.headers.ETag;
+    const requestedEtags = String(req.headers['if-none-match'] || '').split(',').map(value => value.trim());
+    if (etag && requestedEtags.includes(etag)) { res.status(304).end(); return; }
     res.json(cachedStudentPage.body);
     return;
   }
@@ -5903,6 +5906,9 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
           const value = res.getHeader(name);
           if (value !== undefined) headers[name] = String(value);
         }
+        const etag = `"${createHash('sha256').update(JSON.stringify(body)).digest('hex')}"`;
+        headers.ETag = etag;
+        res.set({ ETag: etag, 'Cache-Control': 'private, no-cache' });
         studentListResponseCache.set(studentCacheKey, { expiresAt: Date.now() + STUDENT_LIST_CACHE_TTL_MS, body, headers });
         while (studentListResponseCache.size > 200) {
           const oldest = studentListResponseCache.keys().next().value;
