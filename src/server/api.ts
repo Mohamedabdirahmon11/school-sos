@@ -74,6 +74,7 @@ const parentContactsResponseCache = new Map<string, ParentContactsCacheEntry>();
 const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
 const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
 const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
+const schoolReportSummaryCache = new SchoolReadinessCache<any>(60_000);
 const teacherDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
 
 function getCachedSchoolDashboardSummary(schoolId: string) {
@@ -105,6 +106,7 @@ apiRouter.use((req, res, next) => {
         invalidateParentPortalSummaryCache(schoolId);
         schoolReadinessCache.invalidate(schoolId);
         schoolDashboardSummaryCache.invalidate(schoolId);
+        schoolReportSummaryCache.invalidatePrefix(`${schoolId}:`);
         teacherDashboardSummaryCache.invalidatePrefix(`${schoolId}:`);
       }
     });
@@ -3214,48 +3216,51 @@ apiRouter.get('/school/reports/summary', requireAuth, requireSchoolContext, asyn
   if (!['school_admin', 'accountant', 'super_admin'].includes(user.role)) { res.status(403).json({ error: 'This role cannot view school reports.' }); return; }
   if (user.role === 'accountant' && !staffHasPermission(await getStaffForRequest(req, user.id, school.id), 'reports_export')) { res.status(403).json({ error: 'Your staff account does not have permission to view reports.' }); return; }
   try {
-    const summary = await getCachedSchoolDashboardSummary(school.id);
-    const stats = summary?.stats || {};
-    const approvedMarks = (await queryAllRows('student_marks', {
-      school_id: school.id,
-      academic_year: school.academicYear
-    }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
-    const examConfig = await db.getExamConfig(school.id, school.academicYear, false);
-    const passMark = Number(examConfig.passMarkPercentage) || 50;
-    const [schoolStudents, schoolClasses, schoolTeachers] = await Promise.all([
-      queryAllRows('students', { school_id: school.id }, 'id,class_id,status'),
-      queryAllRows('classes', { school_id: school.id }, 'id,name,grade_level,section,is_archived'),
-      queryAllRows('teachers', { school_id: school.id }, 'id,status')
-    ]);
-    const activeStudents = schoolStudents.filter((student: any) => student.status === 'active');
-    const activeTeachers = schoolTeachers.filter((teacher: any) => teacher.status === 'active');
-    const activeClassRows = schoolClasses.filter((klass: any) => !klass.isArchived);
-    const result: Record<string, unknown> = {
-      studentCount: Number(stats.totalStudents) || activeStudents.length,
-      teacherCount: activeTeachers.length,
-      studentTeacherRatio: activeTeachers.length ? Number((activeStudents.length / activeTeachers.length).toFixed(1)) : null,
-      classEnrollment: activeClassRows.map((klass: any) => ({
-        classId: klass.id,
-        className: klass.name,
-        gradeLevel: klass.gradeLevel,
-        section: klass.section,
-        studentCount: activeStudents.filter((student: any) => student.classId === klass.id).length
-      })).sort((a: any, b: any) => Number(a.gradeLevel) - Number(b.gradeLevel) || String(a.className).localeCompare(String(b.className))),
-      attendanceRate: Number(stats.attendanceRate) || 0,
-      passRate: approvedMarks.length
-        ? Math.round(approvedMarks.filter((mark: any) => Number(mark.percentage) >= passMark).length * 100 / approvedMarks.length)
-        : null
-    };
-    if (user.role === 'accountant' || user.role === 'super_admin') {
-      const allPayments = await db.getFeePayments(school.id);
-      const payments = allPayments.filter(payment => !payment.voidedAt);
-      // Voided receipts are excluded from every live finance total.
-      result.totalDue = payments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
-      result.totalCollected = payments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
-      result.totalArrears = payments.reduce((total, payment) => total + Number(payment.remainingAmount || 0), 0);
-      result.paymentCount = payments.length;
-      result.recentPayments = payments.slice(-20).reverse();
-    }
+    const result = await schoolReportSummaryCache.get(`${school.id}:${user.role}`, async () => {
+      const summary = await getCachedSchoolDashboardSummary(school.id);
+      const stats = summary?.stats || {};
+      const approvedMarks = (await queryAllRows('student_marks', {
+        school_id: school.id,
+        academic_year: school.academicYear
+      }, 'percentage,status')).filter((mark: any) => mark.status === 'approved');
+      const examConfig = await db.getExamConfig(school.id, school.academicYear, false);
+      const passMark = Number(examConfig.passMarkPercentage) || 50;
+      const [schoolStudents, schoolClasses, schoolTeachers] = await Promise.all([
+        queryAllRows('students', { school_id: school.id }, 'id,class_id,status'),
+        queryAllRows('classes', { school_id: school.id }, 'id,name,grade_level,section,is_archived'),
+        queryAllRows('teachers', { school_id: school.id }, 'id,status')
+      ]);
+      const activeStudents = schoolStudents.filter((student: any) => student.status === 'active');
+      const activeTeachers = schoolTeachers.filter((teacher: any) => teacher.status === 'active');
+      const activeClassRows = schoolClasses.filter((klass: any) => !klass.isArchived);
+      const report: Record<string, unknown> = {
+        studentCount: Number(stats.totalStudents) || activeStudents.length,
+        teacherCount: activeTeachers.length,
+        studentTeacherRatio: activeTeachers.length ? Number((activeStudents.length / activeTeachers.length).toFixed(1)) : null,
+        classEnrollment: activeClassRows.map((klass: any) => ({
+          classId: klass.id,
+          className: klass.name,
+          gradeLevel: klass.gradeLevel,
+          section: klass.section,
+          studentCount: activeStudents.filter((student: any) => student.classId === klass.id).length
+        })).sort((a: any, b: any) => Number(a.gradeLevel) - Number(b.gradeLevel) || String(a.className).localeCompare(String(b.className))),
+        attendanceRate: Number(stats.attendanceRate) || 0,
+        passRate: approvedMarks.length
+          ? Math.round(approvedMarks.filter((mark: any) => Number(mark.percentage) >= passMark).length * 100 / approvedMarks.length)
+          : null
+      };
+      if (user.role === 'accountant' || user.role === 'super_admin') {
+        const allPayments = await db.getFeePayments(school.id);
+        const payments = allPayments.filter(payment => !payment.voidedAt);
+        // Voided receipts are excluded from every live finance total.
+        report.totalDue = payments.reduce((total, payment) => total + Number(payment.amountDue || 0), 0);
+        report.totalCollected = payments.reduce((total, payment) => total + Number(payment.amountPaid || 0), 0);
+        report.totalArrears = payments.reduce((total, payment) => total + Number(payment.remainingAmount || 0), 0);
+        report.paymentCount = payments.length;
+        report.recentPayments = payments.slice(-20).reverse();
+      }
+      return report;
+    });
     res.json(result);
   } catch {
     res.status(503).json({ error: 'Unable to load school reports.' });
