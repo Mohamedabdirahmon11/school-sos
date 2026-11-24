@@ -90,11 +90,15 @@ const AppContent: React.FC = () => {
     return () => { active = false; };
   }, [currentView, user?.id]);
 
-  if (isLoading) return <LoadingState label="Initializing SchoolOS Platform…" className="min-h-screen border-0 bg-[#F3F6F6]" />;
+  // Public login is rendered immediately while the HttpOnly session cookie is
+  // checked in the background. The form cannot submit until that check ends.
+  // Authenticated users still wait for their server-verified identity before
+  // any protected dashboard or portal is mounted.
+  if (isLoading && user) return <LoadingState label="Initializing SchoolOS Platform…" className="min-h-screen border-0 bg-[#F3F6F6]" />;
 
-  // Not logged in -> Show Multi-Role Login Screen
+  // Not logged in (or session check pending) -> show the public login screen.
   if (!user) {
-    return <LoginView />;
+    return <LoginView authCheckPending={isLoading} />;
   }
 
   // First-login accounts must finish password setup before any dashboard
