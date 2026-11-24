@@ -512,6 +512,20 @@ class StorageEngine {
     }
   }
 
+  public async callRpc<T = unknown>(functionName: string, args: Record<string, unknown>): Promise<T> {
+    const client = this.testClient || supabase;
+    if (!client || typeof client.rpc !== 'function') throw new Error(`Database RPC "${functionName}" is unavailable.`);
+    const startedAt = performance.now();
+    const { data, error } = await client.rpc(functionName, args);
+    this.recordQuery(`rpc:${functionName}`, 'call', startedAt);
+    if (error) {
+      const wrapped = new Error(error.message || `Database RPC "${functionName}" failed.`);
+      Object.assign(wrapped, { code: error.code, details: error.details, hint: error.hint });
+      throw wrapped;
+    }
+    return data as T;
+  }
+
   public async approveAdmissionAtomically(payload: Record<string, unknown>): Promise<void> {
     const client = this.testClient || supabase;
     if (!client || typeof client.rpc !== 'function') throw new Error('Atomic admission approval is unavailable.');
