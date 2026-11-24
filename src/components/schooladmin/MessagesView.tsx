@@ -36,22 +36,9 @@ export const MessagesView: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [msgData, uData] = await Promise.all([
-        ApiClient.getMessages({ page, pageSize: 20, contactId: selectedContact?.id }),
-        ApiClient.getMessageContacts()
-      ]);
-
+      const msgData = await ApiClient.getMessages({ page, pageSize: 20, contactId: selectedContact?.id });
       setMessages(msgData);
       setPageInfo((msgData as any).pagination || null);
-
-      const permittedContacts = uData as User[];
-      setContacts(permittedContacts);
-      if (!hasInitializedContact.current) {
-        hasInitializedContact.current = true;
-        setSelectedContact(permittedContacts[0] || null);
-      } else if (selectedContact && !permittedContacts.some((contact: User) => contact.id === selectedContact.id)) {
-        setSelectedContact(permittedContacts[0] || null);
-      }
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'Unable to load messages and contacts.');
@@ -63,6 +50,26 @@ export const MessagesView: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [school, user, page, selectedContact?.id]);
+
+  useEffect(() => {
+    if (!school || !user) return;
+    let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      void ApiClient.getMessageContacts({ search: searchContact }).then(permittedContacts => {
+        if (cancelled) return;
+        setContacts(permittedContacts as User[]);
+        if (!hasInitializedContact.current) {
+          hasInitializedContact.current = true;
+          setSelectedContact((permittedContacts[0] as User) || null);
+        } else if (!searchContact && selectedContact && !permittedContacts.some((contact: any) => contact.id === selectedContact.id)) {
+          setSelectedContact((permittedContacts[0] as User) || null);
+        }
+      }).catch(err => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Unable to load message contacts.');
+      });
+    }, 250);
+    return () => { cancelled = true; window.clearTimeout(timeout); };
+  }, [school?.id, user?.id, searchContact]);
 
   useEffect(() => {
     if (!selectedContact || !user) return;
