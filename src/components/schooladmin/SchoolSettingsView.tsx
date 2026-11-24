@@ -551,7 +551,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   };
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-5 p-3 md:p-6">
+    <div className="school-admin-settings-page mx-auto min-w-0 w-full max-w-[1600px] space-y-5 p-3 md:p-6">
       {/* Header */}
       <div className="space-y-4">
         <div>
