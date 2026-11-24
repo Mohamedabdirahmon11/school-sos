@@ -2982,3 +2982,97 @@ main :is(.flex, .inline-flex) > * {
     padding: 17px !important;
   }
 }
+
+
+/* Dashboard refresh: make the School Admin visual hierarchy unmistakable. */
+.school-admin-role .school-dashboard-page {
+  color: #203a34 !important;
+  background: #f3f6f4;
+  border-radius: 16px;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-hero {
+  background: #e8f0eb !important;
+  border: 1px solid #c8d8cf !important;
+  border-left: 5px solid #236b61 !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  padding: 25px 28px !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-hero h1 {
+  color: #173d35 !important;
+  font-size: clamp(27px, 3vw, 34px) !important;
+  font-weight: 800 !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-hero p {
+  color: #526a60 !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric {
+  min-height: 132px !important;
+  border: 1px solid #d5e0da !important;
+  border-top: 4px solid #236b61 !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  padding: 19px 20px !important;
+  box-shadow: 0 3px 10px rgba(27, 57, 47, .055) !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric::before {
+  display: none !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="green"] {
+  border-top-color: #6c8972 !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="purple"] {
+  border-top-color: #78858a !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric[data-tone="amber"] {
+  border-top-color: #b18b57 !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-label {
+  color: #62736b !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: .055em !important;
+  text-transform: uppercase;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-value {
+  color: #173d35 !important;
+  font-size: clamp(29px, 2.5vw, 36px) !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+}
+.school-admin-role .school-dashboard-page .school-admin-metric .metric-icon {
+  width: 43px !important;
+  height: 43px !important;
+  border-radius: 12px !important;
+  background: #eaf2ed !important;
+  border-color: #d1e0d7 !important;
+  color: #236b61 !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel {
+  border: 1px solid #d7e1db !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: 0 3px 10px rgba(27, 57, 47, .04) !important;
+  padding: 21px !important;
+}
+.school-admin-role .school-dashboard-page .school-dashboard-panel h2 {
+  color: #203a34 !important;
+  font-size: 16px !important;
+  font-weight: 750 !important;
+}
+@media (max-width: 767px) {
+  .school-admin-role .school-dashboard-page {
+    padding: 12px !important;
+    border-radius: 12px;
+  }
+  .school-admin-role .school-dashboard-page .school-dashboard-hero {
+    padding: 18px !important;
+  }
+  .school-admin-role .school-dashboard-page .school-admin-metric {
+    min-height: 116px !important;
+    padding: 15px !important;
+  }
+  .school-admin-role .school-dashboard-page .school-dashboard-panel {
+    padding: 16px !important;
+  }
+}
