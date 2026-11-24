@@ -178,3 +178,14 @@ test('teacher assignment readiness is cached per school and invalidated after se
   assert.match(helper, /teacherAssignmentReadinessCache\.get\(school\.id, async \(\) =>/);
   assert.match(helper, /Promise\.all\(\[/);
 });
+
+
+test('critical list and report routes have explicit query-count ceilings', () => {
+  const budgets = readFileSync(new URL('../src/server/query-budgets.ts', import.meta.url), 'utf8');
+  assert.match(budgets, /'GET \/students': 8/);
+  assert.match(budgets, /'GET \/students\/options': 4/);
+  assert.match(budgets, /'GET \/messages\/contacts': 12/);
+  assert.match(budgets, /'GET \/classes\/:id\/details': 8/);
+  assert.match(budgets, /'GET \/school\/reports\/summary': 8/);
+  assert.match(budgets, /'GET \/exams\/rankings\/yearly': 12/);
+});
