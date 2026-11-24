@@ -93,7 +93,7 @@ export const StaffAccessView: React.FC = () => {
             phone,
             monthlySalary: parseFloat(salary) || 0,
             permissions: selectedPermissions,
-            roleId: selectedRoleId || undefined
+            roleId: selectedRoleId || null
           })
         });
         setMessage('Staff profile and permissions updated successfully.');
