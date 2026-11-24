@@ -5758,7 +5758,7 @@ apiRouter.get('/student/me', requireAuth, requireSchoolContext, async (req, res)
 apiRouter.get('/students/options', requireAuth, requireSchoolContext, requireParentPortalSetupReady, async (req, res) => {
   const school = (req as any).school;
   const user = (req as any).user as User;
-  const search = String(req.query.q || req.query.search || '').trim().replace(/[^\\p{L}\\p{N}\\s._-]/gu, '').slice(0, 80);
+  const search = String(req.query.q || req.query.search || '').trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80);
   const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId : undefined;
   const filters: Record<string, string | string[] | undefined> = { school_id: school.id, class_id: requestedClassId };
   if (user.role === 'teacher') {
