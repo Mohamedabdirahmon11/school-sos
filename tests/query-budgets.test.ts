@@ -35,6 +35,7 @@ test('high-frequency school endpoints have explicit query ceilings', () => {
 
 test('query budgets match route templates exactly and are case insensitive for methods', () => {
   assert.equal(getApiQueryBudget('get', '/students'), 8);
+  assert.equal(getApiQueryBudget('GET', '/school/reports/summary'), 2);
   assert.equal(getApiQueryBudget('GET', '/api/students'), 8);
   assert.equal(getApiQueryBudget('GET', '/students/:id'), null);
   assert.equal(getApiQueryBudget('GET', '/unknown'), null);
