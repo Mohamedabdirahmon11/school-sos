@@ -1596,7 +1596,7 @@ class StorageEngine {
   }
 
   public createAdmissionApplication(application: Omit<AdmissionApplication, 'id' | 'appliedDate' | 'status'>): AdmissionApplication {
-    const record: AdmissionApplication = { ...application, id: `adm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, appliedDate: new Date().toISOString().slice(0, 10), status: 'pending' };
+    const record: AdmissionApplication = { ...application, id: `adm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, appliedDate: new Date().toISOString().slice(0, 10), status: 'pending', pipelineStage: 'applied' };
     this.data.admissionApplications.push(record);
     this.save();
     return record;
