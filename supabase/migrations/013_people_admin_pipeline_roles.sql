@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.staff_roles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT staff_roles_school_name_unique UNIQUE (school_id,name)
 );
-ALTER TABLE public.staff_members ADD COLUMN IF NOT EXISTS role_id VARCHAR(64);
+ALTER TABLE public.staff_members ADD COLUMN IF NOT EXISTS role_id VARCHAR(64);\nDO $ BEGIN\n  ALTER TABLE public.staff_members ADD CONSTRAINT staff_members_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.staff_roles(id) ON DELETE RESTRICT;\nEXCEPTION WHEN duplicate_object THEN NULL; END $;
 CREATE INDEX IF NOT EXISTS idx_staff_roles_school ON public.staff_roles(school_id,name);
 CREATE INDEX IF NOT EXISTS idx_staff_members_role ON public.staff_members(school_id,role_id);
 ALTER TABLE public.staff_roles ENABLE ROW LEVEL SECURITY;
