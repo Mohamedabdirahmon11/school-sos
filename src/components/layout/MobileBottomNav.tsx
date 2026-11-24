@@ -1,7 +1,7 @@
 /**
  * Five role-aware mobile shortcuts plus a dedicated full-menu entry.
  * School Admin uses a fixed five-column bar so every destination stays visible on phones.
- * Teacher quick tabs remain registry entries: t_timetable, t_attendance, t_grades.
+ * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
 import { Menu } from 'lucide-react';
