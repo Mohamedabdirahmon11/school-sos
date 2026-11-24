@@ -173,3 +173,11 @@ test('legacy completion markers cannot unlock a new-school dashboard without Tea
   assert.equal(isSchoolSetupProgressCompleteWithTeacherAssignment(base), false);
   assert.equal(isSchoolSetupProgressCompleteWithTeacherAssignment({ ...base, completedSteps: [0, ...base.completedSteps] }), true);
 });
+
+test('eligible new schools repair stale completion markers before resuming setup', () => {
+  const api = read('src/server/api.ts');
+  const wizard = read('src/components/schooladmin/SchoolSetupWizard.tsx');
+  assert.match(api, /canFinish: isSchoolSetupWizardEligible\\(school\\.createdAt\\)/);
+  assert.match(api, /const progressBase = isSchoolSetupWizardEligible\\(school\\.createdAt\\)[\\s\\S]*?completedAt: null/);
+  assert.match(wizard, /current\\.progress\\.completedAt && \\(!isSchoolSetupWizardEligible\\(school\\?\\.createdAt\\) \\|\\| \\(current\\.canFinish && isSchoolSetupProgressCompleteWithTeacherAssignment\\(current\\.progress\\)\\)\\)/);
+});
