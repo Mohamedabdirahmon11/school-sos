@@ -33,7 +33,8 @@
     "test": "tsx --test --test-concurrency=1 \"tests/*.test.ts\" \"tests/*.test.tsx\"",
     "typecheck:ci": "tsc --noEmit -p tsconfig.ci.json",
     "test:ci": "npm test",
-    "audit:navigation": "tsx scripts/check-navigation-parity.ts"
+    "audit:navigation": "tsx scripts/check-navigation-parity.ts",
+    "perf:bundle": "node scripts/check-bundle-budget.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
