@@ -156,3 +156,14 @@ test('student pages use a short-lived per-school, role, user and filter cache in
   assert.match(route, /userId: user\.id, role: user\.role, filters, roleFilter, page, pageSize, search, feeStatus/);
   assert.match(route, /req\.query\.allClass !== 'true'/);
 });
+
+
+test('student list ETag hits return 304 before enrollment or student database queries', () => {
+  const start = api.indexOf("apiRouter.get('/students'");
+  const end = api.indexOf("apiRouter.get('/teachers'", start);
+  const route = api.slice(start, end);
+  assert.ok(route.indexOf('studentListResponseCache.get') < route.indexOf('getCurrentAcademicYearId'));
+  assert.match(route, /req\.headers\['if-none-match'\]/);
+  assert.match(route, /res\.status\(304\)\.end\(\)/);
+  assert.match(route, /createHash\('sha256'\)/);
+});
