@@ -550,10 +550,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <div><h2 className="font-bold text-[#102522]">Student directory</h2><p className="mt-1 text-xs text-[#71817d]">Select a student to open their full profile</p></div>
             <span className="rounded-full bg-[#e8f4f1] px-3 py-1 text-xs font-semibold text-[#0e8078]">{visibleStudents.length} shown</span>
           </div>
-          <div className="grid gap-2 p-3 md:hidden">
+          <div className="student-mobile-list grid gap-3 p-3 md:hidden">
             {visibleStudents.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No students found.</p> :
               visibleStudents.map((student:any) => (
-                <div key={student.id} className="w-full rounded-xl border border-[#dce7e4] bg-white p-3 text-left hover:bg-[#f8fbfa]">
+                <div key={student.id} className="student-mobile-card w-full rounded-2xl border border-[#dce7e4] bg-white p-4 text-left hover:bg-[#f8fbfa]">
                   <div className="flex items-start justify-between gap-2"><button type="button" onClick={() => void loadStudentDetails(student)} className="text-left font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</button><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
                   <div className="mt-1 flex justify-between gap-2 text-xs text-slate-500"><span>{resolveStudentClassName(student, classes)}</span><span>{guardianPhoneLookupErrors[student.id] && !(student.fatherPhone || student.father_phone || student.motherPhone || student.mother_phone) ? <button type="button" onClick={event => { event.stopPropagation(); void loadGuardianPhone(student.id); }} className="text-rose-700 underline">Phone unavailable · Try again</button> : resolveStudentParentPhone(student, guardianPhoneByStudent[student.id])}</span></div>
                   {resolveStudentClassName(student, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(student); }} className="mt-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}
