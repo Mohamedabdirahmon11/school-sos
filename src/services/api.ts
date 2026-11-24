@@ -150,7 +150,7 @@ export class ApiClient {
   public static async request<T>(endpoint: string, options: RequestInit & { suppressGlobalApiError?: boolean } = {}): Promise<T> {
     const { suppressGlobalApiError = false, ...requestOptions } = options;
     const method = (requestOptions.method || 'GET').toUpperCase();
-    const listEndpoint = /^\/(branches|classes|subjects|teachers)$/.test(endpoint.split('?')[0]);
+    const listEndpoint = /^\/(branches|classes|subjects|teachers|students)$/.test(endpoint.split('?')[0]);
     const cachedList = method === 'GET' && listEndpoint ? this.listResponseCache.get(endpoint) : undefined;
     let response: Response;
     try {
