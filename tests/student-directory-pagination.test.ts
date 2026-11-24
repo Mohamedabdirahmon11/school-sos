@@ -6,9 +6,9 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 const api = read('../src/server/api.ts');
 const view = read('../src/components/schooladmin/StudentsView.tsx');
 
-test('student directory uses student ID order before name fallback', () => {
+test('student directory uses class roll number order with student ID fallback', () => {
   assert.match(api, /aStudentId\.localeCompare\(bStudentId, undefined, \{ sensitivity: 'base', numeric: true \}\)/);
-  assert.match(api, /queryPage\('students', filters, page, pageSize, roleFilter \|\| searchFilter, LIST_QUERY_COLUMNS\.students, 'student_id'\)/);
+  assert.match(api, /queryPage\('students', filters, page, pageSize, roleFilter \|\| searchFilter, LIST_QUERY_COLUMNS\.students, 'roll_number'\)/);
 });
 
 test('student directory defaults to 50 rows per page and does not force every class roster open', () => {
@@ -27,7 +27,7 @@ test('School Admin can explicitly show all students in the selected class', () =
 test('gender and status filters are sent to the server before pagination', () => {
   assert.match(view, /gender: genderFilter, status: studentStatusFilter/);
   assert.match(api, /gender, status: studentStatus/);
-  assert.match(view, /const visibleStudents = students;/);
+  assert.match(view, /const visibleStudents = \[\.\.\.students\]\.sort\(compareRollNumber\);/);
 });
 
 test('changing search and filters resets student pagination', () => {

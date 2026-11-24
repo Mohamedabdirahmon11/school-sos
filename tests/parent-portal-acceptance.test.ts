@@ -177,3 +177,10 @@ test('parent data endpoints are gated by the existing setup 423 readiness check'
  assert.match(api,/requireParentPortalSetupReady/);
  assert.match(api,/SCHOOL_SETUP_REQUIRED/);
 });
+
+test('parent routes open the matching portal section and fees use the selected linked child',()=>{
+ assert.match(portal,/parentRouteToView: Record<string, View>/);
+ assert.match(portal,/p_fees: 'fees'/);
+ assert.match(portal,/ApiClient\.getFeePayments\(child\.id\)/);
+ assert.match(portal,/view==='fees'/);
+});

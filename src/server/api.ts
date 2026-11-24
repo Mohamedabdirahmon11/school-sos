@@ -4430,6 +4430,13 @@ const compareStudentsByName = (a: any, b: any) => {
   if (bStudentId) return 1;
   return studentNameKey(a).localeCompare(studentNameKey(b), undefined, { sensitivity: 'base', numeric: true });
 };
+const compareStudentsByRollNumber = (a: any, b: any, enrollmentByStudent: Map<string, any>) => {
+  const aRoll = String(enrollmentByStudent.get(String(a.id))?.rollNumber ?? a.rollNumber ?? '').trim();
+  const bRoll = String(enrollmentByStudent.get(String(b.id))?.rollNumber ?? b.rollNumber ?? '').trim();
+  if (!aRoll && bRoll) return 1;
+  if (aRoll && !bRoll) return -1;
+  return aRoll.localeCompare(bRoll, undefined, { numeric: true, sensitivity: 'base' }) || compareStudentsByName(a, b);
+};
 const getTimetablePeriodTimes = (settings: any, period: number, shift: number = 1) => {
   const afternoon = Number(shift) === 2;
   const firstPeriodStart = afternoon ? settings.shift2FirstPeriodStart || '13:00' : settings.firstPeriodStart || '08:00';
@@ -5959,7 +5966,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
     const classStudents = rawClassStudents
       .filter((student: any) => !search || [student.studentId, student.firstName, student.middleName, student.lastName, student.studentPhone, student.fatherPhone, student.motherPhone]
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase())))
-      .sort(compareStudentsByName);
+      .sort((a: any, b: any) => compareStudentsByRollNumber(a, b, enrollmentByStudent));
     res.set({ 'X-Page': '1', 'X-Page-Size': String(Math.max(classStudents.length, 1)), 'X-Total-Count': String(classStudents.length), 'X-Total-Pages': '1' });
     if (!canViewFeeStatus) { res.json(sanitizeStudents(decorateWithCurrentEnrollment(classStudents))); return; }
     const classStatusMap = await getStudentFeeStatusMap(school.id, classStudents.map((student: any) => student.id), school.academicYear);
@@ -5980,7 +5987,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
         .some(value => String(value || '').toLowerCase().includes(search.toLowerCase()));
       return matchesSearch && (statusMap.get(student.id) || 'unpaid') === feeStatus;
     });
-    filtered.sort(compareStudentsByName);
+    filtered.sort((a: any, b: any) => compareStudentsByRollNumber(a, b, enrollmentByStudent));
     const total = filtered.length;
     const items = filtered.slice((page - 1) * pageSize, page * pageSize)
       .map((student: any) => ({ ...student, feeStatus: statusMap.get(student.id) || 'unpaid' }));
@@ -5990,7 +5997,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
   }
 
   const [result, classRows, sectionRows] = await Promise.all([
-    db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'student_id'),
+    db.queryPage('students', filters, page, pageSize, roleFilter || searchFilter, LIST_QUERY_COLUMNS.students, 'roll_number'),
     classRowsPromise,
     sectionRowsPromise
   ]);
