@@ -71,13 +71,13 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
   ];
 
   return (
-    <header className="schoolos-topbar h-14 bg-white border-b border-[#E2E8F0] px-4 md:px-6 flex items-center justify-between gap-4 shrink-0 z-20">
+    <header className="schoolos-topbar min-h-14 h-auto bg-white border-b border-[#E2E8F0] px-4 py-2 md:px-6 flex items-center justify-between gap-3 shrink-0 z-20">
       {/* Zone 1: Contextual Breadcrumb */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         {school && <div title={school.name} className={`grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg md:hidden ${school.logoUrl ? "border border-slate-200 bg-white p-0.5" : ""}`} style={!school.logoUrl ? { backgroundColor: "var(--brand-color)", color: "var(--brand-foreground)" } : undefined}>
           {school.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-xs font-black">{school.name.trim().charAt(0).toUpperCase() || "S"}</span>}
         </div>}
-        <span className="text-sm font-semibold text-[#132A29] truncate">
+        <span className="min-w-0 text-sm font-semibold leading-snug text-[#132A29] whitespace-normal break-words [overflow-wrap:anywhere]">
           {formatBreadcrumb()}
         </span>
         {inspectedSchool && (
@@ -194,8 +194,8 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
             <div className="w-7 h-7 rounded-full bg-[#0B2B2A] text-white flex items-center justify-center font-semibold text-xs">
               {user?.fullName.charAt(0) || 'U'}
             </div>
-            <div className="hidden md:block">
-              <p className="text-xs font-semibold text-[#132A29] leading-tight truncate max-w-[120px]">
+            <div className="hidden min-w-0 max-w-[180px] md:block">
+              <p className="text-xs font-semibold text-[#132A29] leading-tight whitespace-normal break-words [overflow-wrap:anywhere]">
                 {user?.fullName}
               </p>
               <p className="text-[10px] text-[#64748B] uppercase font-mono">
