@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { TimetableSlot, SchoolClass, Subject, Teacher } from '../../types/index.ts';
 import { getSchoolPeriodsPerDay, getSchoolWorkingDays } from '../../lib/school-calendar.ts';
 import { CalendarDays, AlertTriangle, CheckCircle2, Plus, X, Printer, Settings2, WandSparkles } from 'lucide-react';
+import './timetable-reference.css';
 
 export const TimetableView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
