@@ -6947,7 +6947,7 @@ CREATE TABLE IF NOT EXISTS public.staff_roles (
 ALTER TABLE public.staff_members ADD COLUMN IF NOT EXISTS role_id VARCHAR(64);
 DO $body$ BEGIN
   ALTER TABLE public.staff_members ADD CONSTRAINT staff_members_role_id_fkey FOREIGN KEY (role_id) REFERENCES public.staff_roles(id) ON DELETE RESTRICT;
-EXCEPTION WHEN duplicate_object THEN NULL; END $body$;
+EXCEPTION WHEN duplicate_object THEN NULL; END; $body$;
 CREATE INDEX IF NOT EXISTS idx_staff_roles_school ON public.staff_roles(school_id,name);
 CREATE INDEX IF NOT EXISTS idx_staff_members_role ON public.staff_members(school_id,role_id);
 ALTER TABLE public.staff_roles ENABLE ROW LEVEL SECURITY;
