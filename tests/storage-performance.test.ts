@@ -171,3 +171,15 @@ test('yearly rankings load one class-year marks set and parallelize independent 
   assert.match(method, /allMarks\.filter\(mark => mark\.status === 'approved' && mark\.semester === 'Semester 2'\)/);
   assert.doesNotMatch(method, /this\.getMarks\(/);
 });
+
+
+test('read-only exam configuration reads do not create or upsert missing defaults', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async getExamConfig(');
+  const end = storage.indexOf('public async updateExamConfig(', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /persistIfMissing = true/);
+  assert.match(method, /if \(persistIfMissing\) \{[\s\S]*?this\.data\.examConfigs\.push\(conf\)[\s\S]*?this\.save\(\)/);
+  assert.match(method, /if \(!persistIfMissing\)/);
+  assert.match(method, /return conf;/);
+});
