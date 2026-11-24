@@ -1540,6 +1540,57 @@ class StorageEngine {
     return this.data.staffMembers[index];
   }
 
+  public async getStaffRoles(schoolId: string): Promise<any[]> {
+    const rows: any[] = [];
+    for (let page = 1;; page += 1) {
+      const result = await this.queryPage<any>('staff_roles', { school_id: schoolId }, page, 100, undefined, '*', 'name', true);
+      rows.push(...result.items);
+      if (rows.length >= result.total || result.items.length === 0) break;
+    }
+    return rows;
+  }
+
+  public async createStaffRole(input: { schoolId: string; name: string; description?: string; permissions: string[] }): Promise<any> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Staff role storage is unavailable.');
+    const row = { id: `role-${randomUUID()}`, ...input, description: input.description || '', isSystem: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const startedAt = performance.now();
+    const { data, error } = await client.from('staff_roles').insert(toSupabaseRow(row, 'staff_roles')).select('*').single();
+    this.recordQuery('staff_roles', 'insert', startedAt);
+    if (error || !data) throw new Error(`Unable to create staff role: ${error?.message || 'no row returned'}`);
+    return fromSupabaseRow(data, 'staff_roles');
+  }
+
+  public async updateStaffRole(id: string, schoolId: string, updates: { name?: string; description?: string; permissions?: string[] }): Promise<any | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Staff role storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('staff_roles').update(toSupabaseRow({ ...updates, updatedAt: new Date().toISOString() }, 'staff_roles')).eq('id', id).eq('school_id', schoolId).select('*').maybeSingle();
+    this.recordQuery('staff_roles', 'update', startedAt);
+    if (error) throw new Error(`Unable to update staff role: ${error.message}`);
+    return data ? fromSupabaseRow(data, 'staff_roles') : null;
+  }
+
+  public async deleteStaffRole(id: string, schoolId: string): Promise<boolean> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Staff role storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('staff_roles').delete().eq('id', id).eq('school_id', schoolId).select('id');
+    this.recordQuery('staff_roles', 'delete', startedAt);
+    if (error) throw new Error(`Unable to delete staff role: ${error.message}`);
+    return Array.isArray(data) && data.length > 0;
+  }
+
+  public async updateAdmissionPipelineStage(id: string, schoolId: string, pipelineStage: string): Promise<AdmissionApplication | null> {
+    const client = this.testClient || supabase;
+    if (!client) throw new Error('Admissions storage is unavailable.');
+    const startedAt = performance.now();
+    const { data, error } = await client.from('admission_applications').update({ pipeline_stage: pipelineStage }).eq('id', id).eq('school_id', schoolId).select('*').maybeSingle();
+    this.recordQuery('admission_applications', 'update-stage', startedAt);
+    if (error) throw new Error(`Unable to update admissions stage: ${error.message}`);
+    return data ? fromSupabaseRow(data, 'admission_applications') as AdmissionApplication : null;
+  }
+
   public async getAdmissionApplications(schoolId: string): Promise<AdmissionApplication[]> {
     return this.queryRows<AdmissionApplication>('admission_applications', { school_id: schoolId });
   }
