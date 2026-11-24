@@ -12,13 +12,14 @@ import { Teacher, SchoolClass, Subject } from '../../types/index.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { LoadingState } from '../common/AsyncState.tsx';
-import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download, Pencil } from 'lucide-react';
+import { UserCheck, Plus, Search, Phone, BookOpen, Layers, X, CheckCircle2, Download, Pencil, Grid2X2, List } from 'lucide-react';
 
 export const TeachersView: React.FC = () => {
   const { school, isReadOnly, t } = useAuth();
   const [pageInfo, setPageInfo] = useState<PageInfo | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [teacherView, setTeacherView] = useState<'cards' | 'rows'>('cards');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
@@ -274,8 +275,15 @@ export const TeachersView: React.FC = () => {
         <span className="text-xs text-[#64748B]">{filteredTeachers.length} / {teachers.length} macallin</span>
       </div>
 
-      {/* Teachers Directory: reference-style table, retaining all existing teacher details */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 className="text-sm font-bold text-[#18312b]">Liiska macallimiinta</h2><p className="text-xs text-[#64748B]">Dooro sida aad u rabto in macallimiintu u muuqdaan.</p></div>
+        <div className="inline-flex items-center rounded-xl border border-[#d9d6cb] bg-white p-1" role="group" aria-label="Teacher display mode">
+          <button type="button" data-testid="teacher-view-cards" aria-pressed={teacherView === 'cards'} onClick={() => setTeacherView('cards')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${teacherView === 'cards' ? 'bg-[#1f4d3f] text-white' : 'text-[#52645c] hover:bg-[#f2f5f1]'}`}><Grid2X2 className="h-4 w-4" /> Cards</button>
+          <button type="button" data-testid="teacher-view-rows" aria-pressed={teacherView === 'rows'} onClick={() => setTeacherView('rows')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${teacherView === 'rows' ? 'bg-[#1f4d3f] text-white' : 'text-[#52645c] hover:bg-[#f2f5f1]'}`}><List className="h-4 w-4" /> Rows</button>
+        </div>
+      </div>
+      {/* Switch between responsive teacher cards and the full data table. */}
+      <div className={"teacher-directory teacher-directory-" + teacherView + " bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden"}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-xs">
             <thead>
