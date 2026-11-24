@@ -1,5 +1,6 @@
 const studentMode = new URLSearchParams(window.location.search).get('component') === 'student';
 const parentMode = new URLSearchParams(window.location.search).get('component') === 'parent';
+const peopleAdminMode = new URLSearchParams(window.location.search).get('component') === 'people-admin';
 const klass = { id: 'class-4a', name: 'Grade 4', section: 'A', classTeacherId: 'teacher-visual-001', academicYear: '2026-2027' };
 const math = { id: 'subject-math', name: 'Mathematics', code: 'MATH' };
 const science = { id: 'subject-science', name: 'Environmental Science', code: 'ENV' };
@@ -81,6 +82,29 @@ const parentNotices = [
 ];
 const parentMessages = [{id:'msg-parent-1',senderId:'teacher-user-visual-001',recipientId:'parent-user-visual-001',content:'Fadlan la soco layliska guriga ee toddobaadkan.',timestamp:'2026-11-20T08:00:00Z'}];
 const studentMessages = [{ id: 'msg-1', senderId: 'teacher-user-visual-001', recipientId: 'student-user-visual-001', content: 'Ku soo dhawoow fasalka.', timestamp: '2026-11-20T08:00:00Z' }];
+const peopleParentContacts = [
+  { id: 'parent-visual-001', phone: '+251911000101', name: 'Axmed Cabdi', relationships: ['Father'], students: [
+    { id: 'student-001', studentId: 'ST-001', fullName: 'Ayaan Axmed Cabdi', className: 'Grade 4 · A' },
+    { id: 'student-002', studentId: 'ST-002', fullName: 'Bilal Axmed Cabdi', className: 'Grade 2 · B' }
+  ] },
+  { id: 'parent-visual-002', phone: '+251911000102', name: 'Hodan Maxamed', relationships: ['Mother'], students: [
+    { id: 'student-003', studentId: 'ST-003', fullName: 'Hodan Cali Maxamed', className: 'Grade 4 · A' }
+  ] }
+] as any;
+const peopleStaff = [
+  { id: 'staff-visual-001', userId: 'staff-user-001', staffId: 'STF-001', fullName: 'Maryan Cabdi', roleTitle: 'School Accountant', email: 'maryan@example.test', phone: '+251911000201', monthlySalary: 850, permissions: ['fees_manage', 'reports_export'], roleId: 'role-visual-001', status: 'active' },
+  { id: 'staff-visual-002', userId: 'staff-user-002', staffId: 'STF-002', fullName: 'Faarax Daahir', roleTitle: 'Admissions Registrar', email: 'faarax@example.test', phone: '+251911000202', monthlySalary: 700, permissions: ['admissions_manage'], roleId: 'role-visual-002', status: 'active' }
+] as any;
+const peopleRoles = [
+  { id: 'role-visual-001', name: 'Finance Officer', description: 'Finance and reporting access', permissions: ['fees_manage', 'reports_export'] },
+  { id: 'role-visual-002', name: 'Admissions Officer', description: 'Admissions review and enrollment', permissions: ['admissions_manage'] }
+];
+const peopleAdmissions = [
+  { id: 'app-visual-001', firstName: 'Ayaan', middleName: 'Jaamac', lastName: 'Nuur', gender: 'female', gradeApplying: 'Grade 4', classId: klass.id, fatherPhone: '+251911000301', motherPhone: '+251911000302', appliedDate: '2026-11-20', status: 'pending', pipelineStage: 'applied' },
+  { id: 'app-visual-002', firstName: 'Ismaaciil', middleName: '', lastName: 'Cali', gender: 'male', gradeApplying: 'Grade 2', classId: klass.id, fatherPhone: '+251911000303', motherPhone: '', appliedDate: '2026-11-19', status: 'pending', pipelineStage: 'review' },
+  { id: 'app-visual-003', firstName: 'Nasra', middleName: 'Axmed', lastName: 'Warsame', gender: 'female', gradeApplying: 'Grade 1', classId: klass.id, fatherPhone: '+251911000304', motherPhone: '', appliedDate: '2026-11-18', status: 'pending', pipelineStage: 'interview' },
+  { id: 'app-visual-004', firstName: 'Bashiir', middleName: 'Cumar', lastName: 'Nuur', gender: 'male', gradeApplying: 'Grade 3', classId: klass.id, fatherPhone: '+251911000305', motherPhone: '', appliedDate: '2026-11-17', status: 'approved', pipelineStage: 'accepted' }
+];
 const values: Record<string, (...args: any[]) => Promise<any>> = {
   getAllStudents: async () => students,
   selectParentChild: async (studentId?: string) => ({ success: true, selectedStudentId: studentId || null }),
@@ -103,6 +127,7 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   getClasses: async () => [klass],
   getSubjects: async () => [math, science],
   getTeachers: async () => [teacher],
+  getParentContacts: async () => Object.assign([...peopleParentContacts], { pagination: { page: 1, pageSize: 50, total: peopleParentContacts.length, totalPages: 1 } }),
   getStudents: async () => students,
   getTimetableTerms: async () => [term],
   getExamConfig: async () => examConfig,
@@ -122,6 +147,10 @@ const values: Record<string, (...args: any[]) => Promise<any>> = {
   updateSchoolSetupProgress: async () => setupState,
   getTimetableSettings: async () => ({ shiftCount: 1, firstPeriodStart: '08:00', periodMinutes: 40, breakAfterPeriod: 3, breakMinutes: 20, shift2FirstPeriodStart: '13:00', shift2PeriodMinutes: 40, shift2BreakAfterPeriod: 3, shift2BreakMinutes: 20 }),
   request: async (endpoint: string) => {
+    if (peopleAdminMode && endpoint === '/school/admissions') return peopleAdmissions;
+    if (peopleAdminMode && endpoint === '/school/staff') return peopleStaff;
+    if (peopleAdminMode && endpoint === '/school/staff/roles') return peopleRoles;
+    if (peopleAdminMode && endpoint.startsWith('/school/admissions/')) return peopleAdmissions[0];
     if (endpoint === '/teacher-assignments') return { selectedAcademicYearId: 'year-visual-001', selectedTermId: 'term-visual-001', classes: [klass], subjects: [math, science], teachers: [teacher], assignments, unassigned: [] };
     if (parentMode && endpoint === '/parent/children') return { ok: true, data: { parent: { id: 'parent-user-visual-001', fullName: 'Axmed Cabdi', phone: '+251911000001' }, children: new URLSearchParams(window.location.search).get('oneChild') === '1' ? parentChildren.slice(0,1) : parentChildren }, error: null };
     if (parentMode && endpoint.startsWith('/parent/notices')) return { ok: true, data: { items: parentNotices, pagination: { page: 1, pageSize: 20, total: 2, totalPages: 1 } }, error: null };
