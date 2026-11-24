@@ -260,9 +260,6 @@
   .school-people-page label,
   .school-people-page td,
   .school-people-page th,
-  .school-people-page span {
-    color: var(--people-ink);
-  }
   .school-people-page input,
   .school-people-page select,
   .school-people-page textarea {
