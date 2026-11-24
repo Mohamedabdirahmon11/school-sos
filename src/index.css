@@ -3597,8 +3597,7 @@ main :is(.flex, .inline-flex) > * {
   /* School settings: configuration choices become thumb-friendly, single-column panels. */
   .school-admin-settings-page { padding:12px 11px calc(28px + env(safe-area-inset-bottom)) !important; }
   .school-admin-settings-page h1 { font-size:22px !important; }
-  .school-admin-settings-page section > .grid,
-  .school-admin-settings-page .grid.grid-cols-1.gap-3.sm\\:grid-cols-2.xl\\:grid-cols-4 { grid-template-columns:minmax(0,1fr) !important; }
+  .school-admin-settings-page section > .grid { grid-template-columns:minmax(0,1fr) !important; }
   .school-admin-settings-page section button { min-height:46px; padding:11px 12px !important; font-size:12px !important; line-height:1.4; }
   .school-admin-settings-page input,
   .school-admin-settings-page select,
