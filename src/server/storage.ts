@@ -109,6 +109,7 @@ interface StorageContext {
   persistedRows: Map<string, Map<string, string>>;
   queryCount: number;
   queryDurationMs: number;
+  queryTables: Map<string, number>;
   routeLabel: string;
 }
 
@@ -378,7 +379,7 @@ class StorageEngine {
   private feePaymentQueues = new Map<string, Promise<void>>();
   private globalContext: StorageContext = {
     data: this.createEmptySchema(), initialized: false, writeQueue: Promise.resolve(),
-    writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, routeLabel: ''
+    writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, queryTables: new Map(), routeLabel: ''
   };
   private get state(): StorageContext { return this.contexts.getStore() || this.globalContext; }
   private get data(): DatabaseSchema { return this.state.data; }
@@ -471,6 +472,7 @@ class StorageEngine {
     const durationMs = performance.now() - startedAt;
     this.state.queryCount += 1;
     this.state.queryDurationMs += durationMs;
+    this.state.queryTables.set(table, (this.state.queryTables.get(table) || 0) + 1);
     if (process.env.NODE_ENV === 'development') {
       console.info(`[api-query] ${this.state.routeLabel || 'non-request'} ${table}.${operation} ${Math.round(durationMs)}ms`);
     }
@@ -595,7 +597,7 @@ class StorageEngine {
   public async createRequestContext(routeLabel = ''): Promise<StorageContext> {
     return {
       data: this.createEmptySchema(), initialized: true, writeQueue: Promise.resolve(),
-      writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, routeLabel
+      writeFailure: null, persistedIds: new Map(), persistedRows: new Map(), queryCount: 0, queryDurationMs: 0, queryTables: new Map(), routeLabel
     };
   }
 
@@ -614,8 +616,12 @@ class StorageEngine {
     return this.contexts.run(context, callback);
   }
 
-  public getRequestQueryMetrics(): { count: number; durationMs: number } {
-    return { count: this.state.queryCount, durationMs: Math.round(this.state.queryDurationMs * 100) / 100 };
+  public getRequestQueryMetrics(): { count: number; durationMs: number; tableCounts: Record<string, number> } {
+    return {
+      count: this.state.queryCount,
+      durationMs: Math.round(this.state.queryDurationMs * 100) / 100,
+      tableCounts: Object.fromEntries(this.state.queryTables)
+    };
   }
 
   public async checkSupabaseHealth(): Promise<{ ok: boolean; roundTripMs: number }> {
