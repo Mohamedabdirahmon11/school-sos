@@ -736,7 +736,13 @@ class StorageEngine {
     ];
     const settingsRows = [{ id: 'default', ...snapshot.settings }];
     await this.persistTable(client, 'super_admin_settings', settingsRows, toRows('super_admin_settings'), knownIds, knownRows);
-    for (const [table, rows] of tables) await this.persistTable(client, table, rows, toRows(table), knownIds, knownRows);
+    for (const [table, rows] of tables) {
+      // Request contexts that intentionally skip global plan loading still carry
+      // built-in defaults in memory. Never persist those defaults as database
+      // writes when a session refresh or unrelated mutation flushes the context.
+      if (table === 'plans' && !knownIds.has('plans') && !knownRows.has('plans')) continue;
+      await this.persistTable(client, table, rows, toRows(table), knownIds, knownRows);
+    }
   }
 
   public setTestClient(client: any): void {
