@@ -11198,7 +11198,7 @@ apiRouter.put('/school/setup-progress', requireAuth, requireSchoolAdminOrSuperAd
     const progressBase = isSchoolSetupWizardEligible(school.createdAt)
       && state.progress.completedAt
       && (!state.canFinish || !isSchoolSetupProgressCompleteWithTeacherAssignment(state.progress))
-      ? { ...state.progress, completedAt: null, completedSteps: state.progress.completedSteps.filter(id => id !== 10) }
+      ? { ...state.progress, completedAt: null, completedSteps: state.progress.completedSteps.filter((id: number) => id !== 10) }
       : state.progress;
     progress = applySchoolSetupProgressUpdate(progressBase, input, state.checklist, new Date().toISOString());
   } catch (error) {
