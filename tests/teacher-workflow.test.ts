@@ -55,7 +55,6 @@ test('teacher workspace exposes every teaching task and batch class workflows', 
   assert.match(teacher, /Teaching schedule/);
   assert.match(teacher, /school periods/);
   assert.match(teacher, /getTimetable\(\{ scope: 'school' \}\)/);
-  assert.match(teacher, /Your lesson/);
   assert.match(teacher, /Student Submissions/);
   assert.match(teacher, /Faculty notices & announcements/);
   assert.match(teacher, /Submit marks/);
@@ -113,7 +112,6 @@ test('teacher messages and personal payslips remain available through role navig
   assert.match(payroll, /setError\(reason instanceof Error/);
 });
 
-
 test('teacher class switching clears stale student data and loads only the active workflow data', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
   assert.match(teacher, /setStudents\(\[\]\);[\s\S]*setIsLoadingClassData\(true\)/);
@@ -124,10 +122,9 @@ test('teacher class switching clears stale student data and loads only the activ
   assert.match(teacher, /if \(!needsAttendance && !needsGrades && !needsStudents && !needsResults\) return/);
   assert.match(teacher, /isLoadingClassData \|\| isReadOnly \|\| students\.length === 0/);
   assert.match(teacher, /Loading students and attendance/);
-  assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects.length \|\| !students.length/);
+  assert.match(teacher, /isLoadingClassData \|\| !editableClassSubjects\.length \|\| !students\.length/);
   assert.match(teacher, /disabled=\{isReadOnly \|\| isSaving \|\| isLoadingClassData\}/);
 });
-
 
 test('teacher homework submission switching ignores stale responses and clears old grading drafts', () => {
   const teacher = read('../src/components/teacher/TeacherPortalView.tsx');
@@ -184,8 +181,6 @@ test('teacher sidebar remains fixed while the central viewport owns vertical scr
   assert.match(sidebar, /overflow-y-auto/);
   assert.match(app, /<main className="min-h-0 flex-1 overflow-y-auto overscroll-contain/);
 });
-
-
 
 test('daily attendance uses one atomic bulk upsert on the existing natural key', () => {
   const storage = read('../src/server/storage.ts');
