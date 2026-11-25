@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './exams-reference.css';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { getGradeLabel } from '../../lib/grading.ts';
