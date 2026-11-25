@@ -496,3 +496,203 @@
 @media (prefers-reduced-motion: reduce) {
   .school-students-page *, .school-people-teachers-page * { transition-duration: .01ms !important; }
 }
+
+
+/* Mobile readability pass: guardian directory cards and admission pipeline controls. */
+@media (max-width: 767px) {
+  .school-people-parents-page > div:nth-of-type(2) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px !important;
+  }
+  .school-people-parents-page > div:nth-of-type(2) select,
+  .school-people-parents-page > div:nth-of-type(2) input {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .school-people-parents-page > div:nth-of-type(2) > span {
+    margin-left: 0;
+    padding: 2px 0;
+  }
+  .school-people-parents-page > div.bg-white.rounded-xl.border.overflow-hidden {
+    overflow: visible !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .school-people-parents-page .overflow-x-auto {
+    overflow: visible !important;
+  }
+  .school-people-parents-page table,
+  .school-people-parents-page tbody {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+  }
+  .school-people-parents-page thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .school-people-parents-page tbody {
+    display: grid;
+    gap: 10px;
+  }
+  .school-people-parents-page tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    padding: 8px 0;
+    overflow: hidden;
+    border: 1px solid var(--people-line);
+    border-radius: 14px;
+    background: var(--people-card);
+    box-shadow: 0 2px 8px rgb(28 43 38 / 5%);
+  }
+  .school-people-parents-page tbody td {
+    display: grid;
+    grid-template-columns: minmax(96px, 34%) minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    min-width: 0;
+    padding: 9px 13px !important;
+    border: 0 !important;
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .school-people-parents-page tbody td::before {
+    color: var(--people-muted);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: .035em;
+    text-transform: uppercase;
+  }
+  .school-people-parents-page tbody td:first-child {
+    display: block;
+    padding: 5px 13px 9px !important;
+    border-bottom: 1px solid var(--people-line) !important;
+    color: var(--people-muted);
+  }
+  .school-people-parents-page tbody td:nth-child(2)::before { content: "Parent contact"; }
+  .school-people-parents-page tbody td:nth-child(3)::before { content: "Relationship"; }
+  .school-people-parents-page tbody td:nth-child(4)::before { content: "Linked children"; }
+  .school-people-parents-page tbody td:nth-child(5)::before { content: "Children"; }
+  .school-people-parents-page tbody td:nth-child(6)::before { content: "Account"; }
+  .school-people-parents-page tbody td:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    border-top: 1px solid var(--people-line) !important;
+    margin-top: 5px;
+    padding-top: 12px !important;
+  }
+  .school-people-parents-page tbody td:last-child::before {
+    content: "Account actions";
+    width: 100%;
+  }
+  .school-people-parents-page tbody td:last-child button,
+  .school-people-parents-page tbody td:last-child a {
+    min-height: 38px;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  .school-people-admissions-page { padding: 12px !important; }
+  .school-people-admissions-page > div:first-child {
+    align-items: stretch;
+    gap: 12px;
+    padding: 15px !important;
+  }
+  .school-people-admissions-page > div:first-child h1 { font-size: 21px !important; line-height: 1.2; }
+  .school-people-admissions-page > div:first-child button {
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .school-people-admissions-page .people-admissions-board {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(260px, 86vw);
+    grid-template-columns: none;
+    gap: 10px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding: 2px 2px 14px;
+  }
+  .school-people-admissions-page .people-admissions-board > section {
+    min-width: 0;
+    scroll-snap-align: start;
+    padding: 12px;
+  }
+  .school-people-admissions-page .people-admissions-board article h3 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+  .school-people-admissions-page .people-admissions-board article button {
+    min-height: 38px;
+    max-width: 100%;
+    white-space: normal;
+    line-height: 1.25;
+  }
+  .school-people-staff-page { padding: 12px !important; }
+  .school-people-staff-page > div:first-child {
+    align-items: stretch;
+    padding: 15px !important;
+  }
+  .school-people-staff-page > div:first-child > div:last-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .school-people-staff-page > div:first-child button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+    white-space: normal;
+  }
+  .school-people-staff-page section { padding: 13px !important; }
+  .school-people-staff-page section > div:first-child {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .school-people-staff-page .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .school-people-staff-page table { min-width: 700px; }
+  .school-people-staff-page input,
+  .school-people-staff-page select,
+  .school-people-staff-page textarea {
+    min-height: 42px;
+    max-width: 100%;
+    font-size: 14px;
+  }
+  .school-people-staff-page [role="dialog"] {
+    width: min(100%, calc(100vw - 20px)) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 88dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+:root[data-theme="dark"] .school-people-parents-page tbody tr {
+  background: var(--people-card);
+  border-color: var(--people-line);
+}
+:root[data-theme="dark"] .school-people-parents-page tbody td::before {
+  color: var(--people-muted);
+}
