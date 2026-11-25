@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './attendance-reference.css';
 import { ApiClient } from '../../services/api.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
