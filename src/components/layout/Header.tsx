@@ -59,6 +59,41 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
       };
       return `Platform / ${labels[currentView] || section}`;
     }
+    if (user?.role === 'school_admin') {
+      const schoolAdminLabels: Record<string, string> = {
+        sch_dashboard: 'Dashboard',
+        sch_students: 'Students',
+        sch_teachers: 'Teachers',
+        sch_parents: 'Parents & Contacts',
+        sch_admissions: 'Admissions',
+        sch_staff: 'Staff Access',
+        sch_classes: 'Classes & Sections',
+        sch_subjects: 'Subjects',
+        sch_curriculum: 'Class Curriculum',
+        sch_teacher_assignments: 'Teacher Assignments',
+        sch_timetable: 'Timetable',
+        sch_attendance: 'Student Attendance',
+        sch_marks: 'Marks Entry',
+        sch_marks_approval: 'Marks Approval',
+        sch_report_cards: 'Report Cards',
+        sch_documents: 'School Documents',
+        sch_promotion: 'Student Progression',
+        sch_notices: 'Notices',
+        sch_messages: 'Messages',
+        sch_whatsapp: 'WhatsApp Parent Alerts',
+        sch_events: 'Academic Calendar',
+        sch_student_invoices: 'Fee Invoices',
+        sch_reports: 'Reports',
+        sch_library: 'Library',
+        sch_transport: 'Transport',
+        sch_inventory: 'Inventory',
+        sch_discipline: 'Discipline',
+        sch_health: 'Health Records',
+        sch_settings: 'School Settings',
+        sch_support: 'Help Centre'
+      };
+      return `${t('school_admin' as any)} / ${schoolAdminLabels[currentView] || section}`;
+    }
     const roleLabel = user ? t(user.role as any) : '';
     return `${roleLabel} / ${section}`;
   };
