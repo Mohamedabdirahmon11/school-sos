@@ -14,6 +14,24 @@ test('School Dashboard handles an undefined response with zero metrics and empty
   assert.deepEqual(model.recentStudents, []);
   assert.deepEqual(model.recentPayments, []);
   assert.deepEqual(model.notices, []);
+  assert.deepEqual(model.upcomingEvents, []);
+  assert.deepEqual(model.recentActivity, []);
+  assert.deepEqual(model.setupReadiness, { checklist: [], canFinish: false });
+  assert.equal(model.pendingAdmissions, 0);
+});
+
+test('School Dashboard normalizes live readiness, events, activity and admissions data', () => {
+  const model = normalizeSchoolDashboardData({
+    setupReadiness: { checklist: [{ id: 1, label: 'Classes', ready: true }], canFinish: true },
+    upcomingEvents: [{ id: 'event-1', title: 'Parent meeting' }],
+    recentActivity: [{ id: 'log-1', action: 'STUDENT_CREATED' }],
+    pendingAdmissions: 3
+  });
+  assert.deepEqual(model.setupReadiness.checklist, [{ id: 1, label: 'Classes', ready: true }]);
+  assert.equal(model.setupReadiness.canFinish, true);
+  assert.equal(model.upcomingEvents[0].title, 'Parent meeting');
+  assert.equal(model.recentActivity[0].action, 'STUDENT_CREATED');
+  assert.equal(model.pendingAdmissions, 3);
 });
 
 test('School Dashboard error state renders a 403 with a retry control', () => {

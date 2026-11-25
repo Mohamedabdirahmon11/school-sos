@@ -40,7 +40,16 @@ export function normalizeSchoolDashboardData(data: unknown) {
     notices: Array.isArray(value.notices) ? value.notices : [],
     attendanceTrend: Array.isArray(value.attendanceTrend) ? value.attendanceTrend : [],
     absentStudents: Array.isArray(value.absentStudents) ? value.absentStudents : [],
-    recentActivity: Array.isArray(value.recentActivity) ? value.recentActivity : []
+    recentActivity: Array.isArray(value.recentActivity) ? value.recentActivity : [],
+    upcomingEvents: Array.isArray(value.upcomingEvents) ? value.upcomingEvents : [],
+    setupReadiness: {
+      checklist: value.setupReadiness && typeof value.setupReadiness === 'object'
+        && Array.isArray((value.setupReadiness as DashboardRecord).checklist)
+        ? (value.setupReadiness as DashboardRecord).checklist
+        : [],
+      canFinish: Boolean((value.setupReadiness as DashboardRecord | undefined)?.canFinish)
+    },
+    pendingAdmissions: number(value.pendingAdmissions)
   };
 }
 
@@ -131,6 +140,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
         <StatCard label="Joogay maanta" value={attendanceRecordedToday > 0 ? todayAttendance.toLocaleString() : '—'} note={attendanceRecordedToday > 0 ? `${attendanceRate}% heerka imaanshaha` : 'Weli lama diiwaangelin'} icon={CalendarCheck} tone="green" onClick={() => onNavigate('sch_attendance')} />
         <StatCard label="Maqan maanta" value={result.absentStudents.length.toLocaleString()} note="Ardayda u baahan dabagal" icon={AlertCircle} tone="red" onClick={() => onNavigate('sch_attendance')} />
         <StatCard label="Ogeysiisyada firfircoon" value={result.notices.length.toLocaleString()} note="Ogeysiisyadii ugu dambeeyay" icon={Bell} tone="blue" onClick={() => onNavigate('sch_notices')} />
+        {canManageStudents && <StatCard label="Codsiyada cusub" value={result.pendingAdmissions.toLocaleString()} note="Codsiyo sugaya dib-u-eegis" icon={UserPlus} tone="gold" onClick={() => onNavigate('sch_admissions')} />}
         {canViewFinance && <StatCard label="Lacag maanta la qabtay" value={formatMoney(todayCollection, currency)} note="Wadarta lacag ururinta maanta" icon={Wallet} tone="gold" onClick={() => onNavigate('sch_fees')} />}
         {canViewFinance && <StatCard label="Lacagta dhiman" value={formatMoney(totalOutstanding, currency)} note="Haraaga lacagaha" icon={CreditCard} tone="red" onClick={() => onNavigate('sch_fees')} />}
       </section>
@@ -189,6 +199,60 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
             </div>)}
           </div> : <EmptyState title="Ogeysiis ma jiro" description="Ogeysiisyada dugsiga halkan ayay ka soo muuqan doonaan." className="schoolos-dash-empty" />}
         </article>
+      </section>
+
+      <section className="schoolos-dash-grid schoolos-dash-grid-lower">
+        <article className="schoolos-dash-panel">
+          <PanelTitle eyebrow="DIYAAR-GAROW" title="Diyaarnimada Setup" icon={CheckCircle2} />
+          {result.setupReadiness.checklist.length ? (
+            <div className="schoolos-dash-list">
+              {result.setupReadiness.checklist.map((item: DashboardRecord) => (
+                <div className="schoolos-dash-list-row" key={item.id}>
+                  <span className={`schoolos-dash-status ${item.ready ? 'schoolos-dash-status-green' : 'schoolos-dash-status-red'}`}>
+                    {item.ready ? 'Diyaar' : 'Maqan'}
+                  </span>
+                  <span className="schoolos-dash-list-copy">
+                    <b>{item.label}</b>
+                    {item.reason && !item.ready && <small>{item.reason}</small>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : <EmptyState title="Xogta diyaar-garowga lama helin" description="Dib u cusboonaysii si loo hubiyo setup-ka dugsiga." className="schoolos-dash-empty" />}
+        </article>
+        <article className="schoolos-dash-panel">
+          <PanelTitle eyebrow="JADWALKA" title="Dhacdooyinka soo socda" icon={CalendarCheck} />
+          {result.upcomingEvents.length ? (
+            <div className="schoolos-dash-list">
+              {result.upcomingEvents.map((event: DashboardRecord) => (
+                <div className="schoolos-dash-list-row" key={event.id}>
+                  <span className="schoolos-dash-notice-mark"><CalendarCheck size={15} /></span>
+                  <span className="schoolos-dash-list-copy">
+                    <b>{event.title || 'Dhacdo dugsi'}</b>
+                    <small>{event.startDate || event.start_date}{event.endDate && event.endDate !== event.startDate ? ` – ${event.endDate}` : ''} · {event.type || 'Dhacdo'}</small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : <EmptyState title="Dhacdo soo socota ma jirto" description="Dhacdooyinka lagu daro Academic Calendar halkan ayay ka muuqanayaan." className="schoolos-dash-empty" />}
+        </article>
+      </section>
+
+      <section className="schoolos-dash-panel">
+        <PanelTitle eyebrow="DHAQDHAQAAQ" title="Waxqabadkii ugu dambeeyay" icon={Activity} />
+        {result.recentActivity.length ? (
+          <div className="schoolos-dash-list">
+            {result.recentActivity.map((item: DashboardRecord) => (
+              <div className="schoolos-dash-list-row" key={item.id}>
+                <span className="schoolos-dash-notice-mark"><Activity size={15} /></span>
+                <span className="schoolos-dash-list-copy">
+                  <b>{item.details || item.action || 'Waxqabad cusub'}</b>
+                  <small>{item.userName || item.user_name || 'Shaqaale'} · {item.timestamp ? new Date(item.timestamp).toLocaleString('so-ET') : ''}</small>
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : <EmptyState title="Waxqabad cusub lama hayo" description="Dhaqdhaqaaqyada maamulka dugsiga halkan ayay ka muuqanayaan." className="schoolos-dash-empty" />}
       </section>
 
       <section className="schoolos-dash-panel schoolos-dash-actions-panel">
