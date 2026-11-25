@@ -159,7 +159,7 @@ export const NoticesEventsView: React.FC<{ initialTab?: 'events' | 'notices' }> 
 
   return (
     <div className="schoolos-operations-page mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="schoolos-operation-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
             Academic Calendar
