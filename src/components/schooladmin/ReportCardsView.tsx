@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './report-cards-reference.css';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { School, SchoolBranch, SchoolClass, ExamConfig, ReportCardDesign } from '../../types/index.ts';
