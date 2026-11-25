@@ -389,6 +389,8 @@ const AppContent: React.FC = () => {
           currentView={activeView}
           onNavigate={handleNavigate}
           onOpenMenu={() => setMobileMenuOpen(true)}
+          isMenuOpen={mobileMenuOpen}
+          onCloseMenu={() => setMobileMenuOpen(false)}
         />
       )}
     </div>

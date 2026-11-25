@@ -700,3 +700,6 @@ pm run dev and apply migrations 001-014.
 - DONE: added a validated school-wide workspace zoom preference (90–100%, default 96%) alongside sidebar width in School Settings → Appearance.
 - No database migration or school-data changes were required; the preference uses the existing school sidebarTheme settings JSON.
 - VERIFIED: GitHub Actions run 44924076640 passed TypeScript checks, all 501 tests, route parity, navigation registry, RLS source audit, and production build.
+
+## School Admin mobile navigation (2026-11-25)
+- PARTIAL: bottom bar reduced to Dashboard, Students, Attendance, Menu; Menu opens a full-screen sheet. Page contents unchanged. Lint, tests and build not run locally (no dependencies); awaiting CI. Not yet checked on a phone.

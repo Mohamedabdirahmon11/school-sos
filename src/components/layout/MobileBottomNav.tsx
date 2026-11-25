@@ -1,10 +1,10 @@
 /**
- * Five role-aware mobile shortcuts plus a dedicated full-menu entry.
- * School Admin uses a fixed five-column bar so every destination stays visible on phones.
+ * Role-aware mobile shortcuts plus a dedicated full-menu entry.
+ * School Admin has three shortcuts and a Menu toggle for the full-screen menu.
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import { getMobileNavigation, type SchoolOSRole } from '../../lib/navigation-registry.ts';
@@ -13,9 +13,11 @@ interface MobileBottomNavProps {
   currentView: string;
   onNavigate: (view: string) => void;
   onOpenMenu: () => void;
+  isMenuOpen?: boolean;
+  onCloseMenu?: () => void;
 }
 
-export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, onNavigate, onOpenMenu }) => {
+export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, onNavigate, onOpenMenu, isMenuOpen = false, onCloseMenu }) => {
   const { user, t } = useAuth();
   const role = (user?.role || 'school_admin') as SchoolOSRole;
   const isSchoolAdmin = role === 'school_admin';
@@ -33,13 +35,13 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
       <div className={`flex min-h-[68px] items-stretch px-2 ${isSchoolAdmin ? 'school-admin-mobile-quick-grid' : 'gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
         {tabs.map(route => {
           const Icon = route.icon;
-          const isActive = currentView === route.id;
+          const isActive = !(isSchoolAdmin && isMenuOpen) && currentView === route.id;
           const label = route.labelKey ? t(route.labelKey as any) : route.label;
           return (
             <button
               key={route.id}
               type="button"
-              onClick={() => onNavigate(route.id)}
+              onClick={() => { onCloseMenu?.(); onNavigate(route.id); }}
               aria-label={label}
               aria-current={isActive ? 'page' : undefined}
               title={label}
@@ -53,13 +55,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
         })}
         <button
           type="button"
-          onClick={onOpenMenu}
-          aria-label="Open full navigation menu"
+          onClick={isSchoolAdmin && isMenuOpen ? onCloseMenu : onOpenMenu}
+          aria-label={isSchoolAdmin && isMenuOpen ? 'Close full navigation menu' : 'Open full navigation menu'}
+          aria-expanded={isMenuOpen}
           aria-haspopup="dialog"
           title="Menu"
-          className={`schoolos-mobile-menu-action flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'w-[52px] shrink-0 px-1' : 'min-w-[68px] shrink-0 px-2'}`}
+          className={`schoolos-mobile-menu-action flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'min-w-0 px-1' : 'min-w-[68px] shrink-0 px-2'}`}
         >
-          <Menu aria-hidden="true" className="h-5 w-5 shrink-0" />
+          {isSchoolAdmin && isMenuOpen ? <X aria-hidden="true" className="h-5 w-5 shrink-0" /> : <Menu aria-hidden="true" className="h-5 w-5 shrink-0" />}
           <span className="text-[10px] font-semibold leading-tight">Menu</span>
         </button>
       </div>
