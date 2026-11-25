@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './people-admin.css';
 import * as XLSX from 'xlsx';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
