@@ -296,8 +296,6 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
           <span className="spacer" />
           <span className={`pill ${classViewUnassigned ? 'bad' : ''}`}>{classViewUnassigned ? classViewUnassigned + " maaddo macallin la’aan" : "Dhammaan waa la qoondeeyay"}</span>
         </div>
-        {notice && <div role="status" className="msg ok">{notice}</div>}
-        {error && <div role="alert" className="msg bad">{error}</div>}
         <p className="mut" style={{ marginBottom: 10 }}>Form Teacher: <b style={{ color: 'var(--fg)' }}>{formTeacherName}</b> · {Number(formTeacherClass?.shift || 1) === 2 ? 'Afternoon' : 'Morning'} shift</p>
         <div className="scroll"><table><thead><tr><th>Subject</th><th className="n">Periods</th><th>Teacher</th></tr></thead><tbody>
           {classViewRows.map(row => {

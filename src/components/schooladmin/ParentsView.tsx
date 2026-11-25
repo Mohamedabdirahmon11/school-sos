@@ -8,7 +8,7 @@ import './people-admin.css';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
-import { Search, ExternalLink, Phone, MessageSquare, Users, KeyRound, Copy } from 'lucide-react';
+import { Search, ExternalLink, Phone, MessageSquare, KeyRound, Copy } from 'lucide-react';
 
 type ParentContact = {
   id: string;
@@ -200,13 +200,12 @@ export const ParentsView: React.FC = () => {
                     <th className="px-4 py-3">Parent Contact</th>
                     <th className="px-4 py-3">Relationship</th>
                     <th className="px-4 py-3">Linked Children</th>
-                    <th className="px-4 py-3">Children</th>
                     <th className="px-4 py-3">Account</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E2E8F0]">
                   {contacts.length === 0 ? (
-                    <tr><td colSpan={6} className="p-8 text-center text-[#64748B]">No parent contacts found for this school and class.</td></tr>
+                    <tr><td colSpan={5} className="p-8 text-center text-[#64748B]">No parent contacts found for this school and class.</td></tr>
                   ) : contacts.map((contact, rowIndex) => (
                     <tr key={contact.id} className="align-top hover:bg-[#F8FAFC]">
                       <td className="px-4 py-3 text-slate-400">{((pageInfo?.page || page) - 1) * (pageInfo?.pageSize || 50) + rowIndex + 1}</td>
@@ -225,11 +224,6 @@ export const ParentsView: React.FC = () => {
                             </div>
                           ))}
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700">
-                          <Users className="h-3 w-3" /> {contact.students.length}
-                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <button type="button" onClick={() => void handleResetParentPin(contact)} disabled={Boolean(resettingParentId)} className="inline-flex items-center gap-1 rounded-lg border border-[#CBD5E1] px-2.5 py-1.5 text-[10px] font-semibold text-[#334155] disabled:opacity-50">
