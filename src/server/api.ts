@@ -3226,7 +3226,8 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
         `end_date.gte.${today}`,
         'id,title,start_date,end_date,type', 'start_date', true),
       db.queryPage('audit_logs', { school_id: school.id }, 1, 5,
-        undefined, 'id,timestamp,action,category,user_name,details,severity', 'timestamp', false),
+        'or(category.eq.school,category.eq.academics)',
+        'id,timestamp,action,category,user_name,details,severity', 'timestamp', false),
       db.queryPage('admission_applications', { school_id: school.id, status: 'pending' },
         1, 1, undefined, 'id')
     ]);
