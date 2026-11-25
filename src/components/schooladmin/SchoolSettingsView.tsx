@@ -554,7 +554,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   return (
     <div className="schoolos-operations-page school-admin-settings-page mx-auto min-w-0 w-full max-w-[1600px] space-y-5 p-3 md:p-6">
       {/* Header */}
-      <div className="space-y-4">
+      <div className="schoolos-operation-header space-y-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <Sliders className="w-6 h-6 text-[#0F766E]" />
