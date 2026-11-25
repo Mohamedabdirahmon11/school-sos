@@ -78,6 +78,7 @@ test('Step 6 keeps GET read-only and syncs Setup Wizard academic records only wh
   const setupRoute = api.slice(setupStart, setupEnd);
   assert.match(setupRoute, /if \(step === 2 \|\| step === 3\)/);
   assert.match(setupRoute, /await syncWizardAcademicRecords\(teacherAssignmentClient\(\), school\.id/);
-  assert.match(setupRoute, /startDate: savedTerms\.semester1Start/);
-  assert.match(setupRoute, /endDate: savedTerms\.semester2End/);
+  assert.match(setupRoute, /academicYear: nextData\.academicYear/);
+  assert.match(setupRoute, /terms: Array\.isArray\(nextData\.terms\) \? nextData\.terms : \[\]/);
+  assert.ok(setupRoute.indexOf('await syncWizardAcademicRecords') < setupRoute.indexOf('db.updateSchoolFromDatabase'), 'academic records must sync before the setup step is persisted');
 });
