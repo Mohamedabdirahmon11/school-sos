@@ -90,7 +90,7 @@ export const BulkImportWizard: React.FC<{ open: boolean; onClose: () => void; on
     <>
       <style>{`@media print { body * { visibility: hidden !important; } .bulk-import-print, .bulk-import-print * { visibility: visible !important; } .bulk-import-print { position: fixed; inset: 0; overflow: auto; background: white; padding: 24px; } .bulk-import-dialog { display: none !important; } }`}</style>
       <div className="bulk-import-dialog fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-        <section role="dialog" aria-modal="true" aria-label={t('bulk_import')} className="w-full max-w-5xl max-h-[94vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white p-4 sm:p-6 shadow-xl">
+        <section role="dialog" aria-modal="true" aria-label={t('bulk_import')} className="bulk-import-panel">
           <header className="flex items-start justify-between gap-4 border-b border-[#E2E8F0] pb-4">
             <div><h2 className="text-lg font-bold text-[#132A29]">{t('bulk_import')}</h2><p className="mt-1 text-xs text-[#64748B]">{step}</p></div>
             <button onClick={onClose} aria-label={t('import_close')} className="rounded-lg p-2 text-[#64748B] hover:bg-slate-100"><X className="h-5 w-5" /></button>

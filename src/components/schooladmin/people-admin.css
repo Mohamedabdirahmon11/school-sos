@@ -760,237 +760,251 @@
 :root[data-theme="dark"] .school-people-parents-page > div:nth-of-type(2) { background: var(--people-card); color: var(--people-ink); border-color: var(--people-line); }
 
 
-/* Students directory refinement: restrained color, reliable contrast and clear action hierarchy. */
-.school-students-page {
-  --students-ink: #202b38;
-  --students-muted: #596779;
-  --students-line: #dce2e8;
-  --students-surface: #ffffff;
-  --students-canvas: #f7f8fa;
-  --students-accent: #176b60;
-  --students-accent-soft: #edf5f3;
-  color: var(--students-ink);
-  background: transparent;
+
+/* STUDENTS — production layout, restrained palette, readable contrast. */
+.school-people-students-page {
+  --student-ink:#24313f;
+  --student-muted:#586779;
+  --student-line:#dce2e8;
+  --student-surface:#fff;
+  --student-canvas:#f5f7f8;
+  --student-accent:#176b60;
+  --student-accent-hover:#11574f;
+  color:var(--student-ink);
+  background:var(--student-canvas);
+  border:1px solid #e3e7eb;
+  border-radius:16px;
 }
-.school-students-page h1,
-.school-students-page h2,
-.school-students-page h3 { color: var(--students-ink) !important; font-family: inherit; letter-spacing: -.015em; }
-.school-students-page p,
-.school-students-page label,
-.school-students-page td,
-.school-students-page th,
-.school-students-page span { overflow-wrap: anywhere; }
-.school-students-page p,
-.school-students-page label { line-height: 1.5; }
-.school-students-page .text-slate-400,
-.school-students-page .text-slate-500,
-.school-students-page .text-slate-600,
-.school-students-page .schoolos-people-header {
-  display:flex; align-items:flex-start; justify-content:space-between; gap:20px;
-  padding:20px 22px; background:var(--students-surface); border:1px solid var(--students-line);
-  border-radius:14px; box-shadow:0 1px 3px rgb(20 32 45 / 4%);
+.school-people-students-page h1,
+.school-people-students-page h2,
+.school-people-students-page h3 { color:var(--student-ink)!important; letter-spacing:-.018em; }
+.school-people-students-page p,
+.school-people-students-page label,
+.school-people-students-page th,
+.school-people-students-page td,
+.school-people-students-page span { overflow-wrap:anywhere; }
+.school-people-students-page p,
+.school-people-students-page label { line-height:1.5; }
+.school-people-students-page .schoolos-people-header {
+  display:grid!important;
+  grid-template-columns:minmax(180px,1fr) minmax(0,2fr);
+  align-items:center!important;
+  gap:22px!important;
+  padding:22px!important;
+  background:var(--student-surface)!important;
+  border:1px solid var(--student-line)!important;
+  border-radius:13px!important;
+  box-shadow:0 1px 3px rgb(15 23 42 / 4%)!important;
 }
-.school-students-page .schoolos-people-header h1 { margin:3px 0 0; font-size:clamp(22px,2.2vw,28px); line-height:1.2; font-weight:750; }
-.school-students-page .schoolos-people-header p { margin-top:7px; color:var(--students-muted)!important; font-size:13px; }
-.school-students-page .schoolos-people-kicker { color:#526477!important; font-size:10px; font-weight:700; letter-spacing:.1em; }
-.school-students-page .students-header-actions {
-  display:flex; flex:1 1 620px; min-width:0; flex-direction:column; align-items:flex-end; gap:9px;
+.school-people-students-page .schoolos-people-header h1 { margin:4px 0 0; font-size:clamp(23px,2.4vw,30px)!important; line-height:1.18!important; font-weight:750; }
+.school-people-students-page .schoolos-people-header p { margin-top:7px; color:var(--student-muted)!important; font-size:13px; opacity:1!important; }
+.school-people-students-page .schoolos-people-kicker { color:#586779!important; font-size:10px; font-weight:750; letter-spacing:.12em; }
+.school-people-students-page .students-header-actions { display:grid; grid-template-columns:1fr; gap:10px; min-width:0; width:100%; }
+.school-people-students-page .students-export-actions,
+.school-people-students-page .students-primary-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; min-width:0; width:100%; }
+.school-people-students-page .students-export-actions { padding-bottom:9px; border-bottom:1px solid #edf0f3; }
+.school-people-students-page .students-utility-button,
+.school-people-students-page .students-import-button,
+.school-people-students-page .students-pin-button,
+.school-people-students-page .students-admit-button {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  min-width:0; min-height:42px; padding:9px 13px;
+  border:1px solid var(--student-line); border-radius:8px;
+  font-size:12px; font-weight:650; line-height:1.35;
+  white-space:normal; overflow-wrap:anywhere;
+  box-shadow:none!important; transition:background .15s,border-color .15s,color .15s;
 }
-.school-students-page .students-export-actions,
-.school-students-page .students-primary-actions {
-  display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; width:100%;
+.school-people-students-page .students-utility-button { background:#fff; color:#3c4a5a; }
+.school-people-students-page .students-utility-button:hover { background:#f3f5f7; border-color:#aeb9c4; }
+.school-people-students-page .students-import-button,
+.school-people-students-page .students-pin-button { background:#f8fafb; color:#334255; }
+.school-people-students-page .students-import-button:hover,
+.school-people-students-page .students-pin-button:hover { background:#eef2f5; border-color:#aeb9c4; }
+.school-people-students-page .students-admit-button { background:var(--student-accent)!important; border-color:var(--student-accent)!important; color:#fff!important; padding-inline:18px; font-size:13px; }
+.school-people-students-page .students-admit-button:hover { background:var(--student-accent-hover)!important; border-color:var(--student-accent-hover)!important; }
+.school-people-students-page button:disabled { opacity:.5; cursor:not-allowed; }
+.school-people-students-page button:focus-visible,
+.school-people-students-page input:focus-visible,
+.school-people-students-page select:focus-visible,
+.school-people-students-page textarea:focus-visible { outline:3px solid rgb(23 107 96 / 22%); outline-offset:2px; }
+.school-people-students-page .schoolos-people-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px; }
+.school-people-students-page .schoolos-people-stat {
+  min-width:0; padding:16px 17px!important; background:#fff!important;
+  border:1px solid var(--student-line)!important; border-radius:11px!important; box-shadow:none!important;
 }
-.school-students-page .students-utility-button,
-.school-students-page .students-import-button,
-.school-students-page .students-pin-button,
-.school-students-page .students-admit-button {
-  display:inline-flex; min-height:42px; min-width:0; align-items:center; justify-content:center; gap:8px;
-  border-radius:9px; padding:9px 13px; font-size:12px; font-weight:650; line-height:1.3;
-  white-space:normal; overflow-wrap:anywhere; transition:background .15s,border-color .15s;
+.school-people-students-page .schoolos-people-stat p { color:var(--student-muted)!important; font-size:12px; font-weight:600; }
+.school-people-students-page .schoolos-people-stat strong { display:block; margin-top:5px; color:var(--student-ink)!important; font-size:25px; line-height:1.15; }
+.school-people-students-page .schoolos-people-stat small { display:block; margin-top:5px; color:var(--student-muted)!important; font-size:11px; }
+.school-people-students-page .schoolos-people-filter,
+.school-people-students-page .schoolos-people-table-card {
+  background:#fff!important; border:1px solid var(--student-line)!important;
+  border-radius:12px!important; box-shadow:none!important;
 }
-.school-students-page .students-utility-button {
-  border:1px solid var(--students-line); background:#fff; color:#344256;
-}
-.school-students-page .students-utility-button:hover { background:#f3f5f7; border-color:#b9c4cf; }
-.school-students-page .students-import-button,
-.school-students-page .students-pin-button {
-  border:1px solid #cbd5df; background:#fff; color:#344256;
-}
-.school-students-page .students-import-button:hover,
-.school-students-page .students-pin-button:hover { background:#f3f6f8; border-color:#aebbc8; }
-.school-students-page .students-admit-button {
-  border:1px solid var(--students-accent); background:var(--students-accent); color:#fff;
-  padding-inline:17px; font-size:13px; box-shadow:none;
-}
-.school-students-page .students-admit-button:hover { background:#10574e; }
-.school-students-page .students-utility-button:focus-visible,
-.school-students-page .students-import-button:focus-visible,
-.school-students-page .students-pin-button:focus-visible,
-.school-students-page .students-admit-button:focus-visible { outline:3px solid #7aa99f; outline-offset:2px; }
-.school-students-page button:disabled { opacity:.52; cursor:not-allowed; }
-.school-students-page .schoolos-people-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
-.school-students-page .schoolos-people-stat {
-  min-width:0; padding:14px 16px; border:1px solid var(--students-line); border-radius:12px;
-  background:#fff; box-shadow:none;
-}
-.school-students-page .schoolos-people-stat p { color:var(--students-muted)!important; font-size:12px; font-weight:600; }
-.school-students-page .schoolos-people-stat strong { display:block; margin-top:5px; color:var(--students-ink)!important; font-size:24px; line-height:1.2; }
-.school-students-page .schoolos-people-stat small { display:block; margin-top:4px; color:var(--students-muted)!important; font-size:11px; }
-.school-students-page .schoolos-people-filter,
-.school-students-page .schoolos-people-table-card,
-.school-students-page > .bg-white {
-  border-color:var(--students-line)!important; border-radius:12px!important; background:#fff!important; box-shadow:none!important;
-}
-.school-students-page input,
-.school-students-page select,
-.school-students-page textarea {
-  min-width:0; max-width:100%; min-height:40px; color:#263446!important;
-  background:#fff!important; border:1px solid #cbd4de!important; border-radius:8px!important;
+.school-people-students-page .schoolos-people-filter { padding:17px!important; }
+.school-people-students-page input,
+.school-people-students-page select,
+.school-people-students-page textarea {
+  min-width:0; max-width:100%; min-height:42px;
+  color:#273647!important; background:#fff!important;
+  border:1px solid #c9d2dc!important; border-radius:8px!important;
   font-size:13px; line-height:1.4;
 }
-.school-students-page input::placeholder,
-.school-students-page textarea::placeholder { color:#687789!important; opacity:1; }
-.school-students-page input:focus,
-.school-students-page select:focus,
-.school-students-page textarea:focus { border-color:#397e72!important; box-shadow:0 0 0 3px rgb(57 126 114 / 12%)!important; outline:0; }
-.school-students-page .student-mobile-list { padding:10px!important; }
-.school-students-page .student-mobile-card {
-  min-width:0; border:1px solid var(--students-line)!important; border-radius:12px!important;
-  background:#fff!important; color:var(--students-ink)!important; box-shadow:none!important;
+.school-people-students-page input::placeholder,
+.school-people-students-page textarea::placeholder { color:#687789!important; opacity:1; }
+.school-people-students-page .schoolos-people-filter input { min-height:46px; background:#f9fafb!important; }
+.school-people-students-page .student-mobile-list { display:grid; grid-template-columns:1fr; gap:10px; padding:12px!important; }
+.school-people-students-page .student-mobile-card {
+  min-width:0; padding:15px!important; background:#fff!important;
+  border:1px solid var(--student-line)!important; border-radius:11px!important;
+  color:var(--student-ink)!important; box-shadow:none!important;
 }
-.school-students-page .student-mobile-card > div { min-width:0; }
-.school-students-page .student-mobile-card button { min-height:32px; max-width:100%; white-space:normal; text-align:left; overflow-wrap:anywhere; }
-.school-students-page .student-mobile-card .student-mobile-class,
-.school-students-page .student-mobile-card .student-mobile-roll { color:#526174!important; }
-.school-students-page .student-mobile-card .text-slate-500,
-.school-students-page .student-mobile-card .text-slate-600 { color:#526174!important; }
-.school-students-page .schoolos-people-table-card > div:first-child { background:#fff!important; border-color:var(--students-line)!important; }
-.school-students-page .schoolos-people-table-card > div:first-child h2 { color:var(--students-ink)!important; font-size:16px; }
-.school-students-page .schoolos-people-table-card > div:first-child p { color:var(--students-muted)!important; }
-.school-students-page .schoolos-people-table-card table { min-width:1120px; }
-.school-students-page .schoolos-people-table-card thead th { color:#536174!important; background:#f3f5f7!important; white-space:nowrap; }
-.school-students-page .schoolos-people-table-card tbody td { color:#344256; line-height:1.45; vertical-align:middle; }
-.school-students-page .schoolos-people-table-card tbody tr:hover { background:#f7f9fa!important; }
-.school-students-page .schoolos-people-table-card .pagination,
-.school-students-page nav[aria-label*="pagination"] { color:#344256; }
-.school-students-page [role="alert"],
-.school-students-page [role="status"] { overflow-wrap:anywhere; line-height:1.5; }
-.school-students-page .bulk-import-dialog { padding:12px; }
-.bulk-import-dialog > section {
-  color:#253244!important; background:#fff!important; border:1px solid #d9e0e7;
-  border-radius:14px!important; max-height:min(94dvh,900px)!important; padding:clamp(14px,2.5vw,26px)!important;
+.school-people-students-page .student-mobile-card > div { min-width:0; }
+.school-people-students-page .student-mobile-card > div:first-child { align-items:flex-start; }
+.school-people-students-page .student-mobile-card > div:first-child button { color:#263648!important; font-size:14px; line-height:1.4; overflow-wrap:anywhere; }
+.school-people-students-page .student-mobile-card .student-mobile-class,
+.school-people-students-page .student-mobile-card .student-mobile-roll,
+.school-people-students-page .student-mobile-card .text-slate-500,
+.school-people-students-page .student-mobile-card .text-slate-600 { color:#59697a!important; }
+.school-people-students-page .student-mobile-card button { min-height:34px; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.school-people-students-page .schoolos-people-table-card { overflow:hidden; }
+.school-people-students-page .schoolos-people-table-card > div:first-child { background:#fff!important; border-bottom:1px solid var(--student-line)!important; }
+.school-people-students-page .schoolos-people-table-card > div:first-child h2 { color:var(--student-ink)!important; font-size:16px; }
+.school-people-students-page .schoolos-people-table-card > div:first-child p { color:var(--student-muted)!important; }
+.school-people-students-page .schoolos-people-table-card table { min-width:1120px; }
+.school-people-students-page .schoolos-people-table-card thead th { color:#526174!important; background:#f1f4f6!important; font-size:10px; white-space:nowrap; }
+.school-people-students-page .schoolos-people-table-card tbody td { color:#344256; line-height:1.45; vertical-align:middle; }
+.school-people-students-page .schoolos-people-table-card tbody tr:hover { background:#f7f9fa!important; }
+.school-people-students-page .overflow-x-auto { max-width:100%; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
+.school-people-students-page [role="alert"],
+.school-people-students-page [role="status"] { overflow-wrap:anywhere; line-height:1.5; }
+.school-people-students-page .student-modal-overlay {
+  position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center;
+  padding:18px; background:rgb(15 23 42 / 52%); backdrop-filter:blur(2px);
 }
-.bulk-import-dialog > section h2,
-.bulk-import-dialog > section h3,
-.bulk-import-dialog > section p,
-.bulk-import-dialog > section label,
-.bulk-import-dialog > section th,
-.bulk-import-dialog > section td { color:#29384a; overflow-wrap:anywhere; }
-.bulk-import-dialog > section button { min-height:40px; max-width:100%; white-space:normal; line-height:1.35; }
-.bulk-import-dialog > section .overflow-auto { max-width:100%; overscroll-behavior:contain; }
-.bulk-import-dialog > section table { min-width:1100px; }
-.bulk-import-dialog > section input,
-.bulk-import-dialog > section select { min-height:36px; background:#fff!important; color:#253244!important; border:1px solid #c7d0da!important; }
-@media(max-width:900px) {
-  .school-students-page .schoolos-people-header { flex-direction:column; align-items:stretch; }
-  .school-students-page .students-header-actions { flex:1 1 auto; align-items:stretch; width:100%; }
-  .school-students-page .students-export-actions,
-  .school-students-page .students-primary-actions { justify-content:flex-start; }
+.school-people-students-page .student-modal-panel {
+  width:min(100%,620px); max-height:min(92dvh,880px); overflow-y:auto; overscroll-behavior:contain;
+  padding:22px!important; background:#fff!important; color:#263446!important;
+  border:1px solid #d7dfe7!important; border-radius:14px!important;
+  box-shadow:0 20px 60px rgb(15 23 42 / 22%)!important;
+}
+.school-people-students-page .student-modal-panel h2 { color:#243244!important; line-height:1.3; overflow-wrap:anywhere; }
+.school-people-students-page .student-modal-panel label { display:block; min-width:0; color:#344256!important; font-size:12px; font-weight:650; line-height:1.5; }
+.school-people-students-page .student-modal-panel label input,
+.school-people-students-page .student-modal-panel label select,
+.school-people-students-page .student-modal-panel label textarea { display:block; width:100%; margin-top:6px; }
+.school-people-students-page .student-modal-panel .student-name-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.school-people-students-page .student-modal-panel .student-modal-section {
+  padding:15px!important; background:#f6f8f9!important; border:1px solid #e0e5e9!important; border-radius:10px!important;
+}
+.school-people-students-page .student-modal-panel .student-modal-section > span { color:#263648!important; font-size:13px; font-weight:700; }
+.school-people-students-page .student-modal-panel .student-modal-hint {
+  padding:11px 13px!important; background:#f0f5f3!important; border:1px solid #d9e7e1!important;
+  border-radius:8px!important; color:#36574d!important; line-height:1.5;
+}
+.school-people-students-page .student-modal-panel button { min-height:42px; max-width:100%; white-space:normal; line-height:1.35; }
+.school-people-students-page .student-modal-panel button[type="submit"] { background:var(--student-accent)!important; color:#fff!important; }
+.school-people-students-page .student-modal-panel button[type="submit"]:hover { background:var(--student-accent-hover)!important; }
+.school-people-students-page .bulk-import-dialog {
+  position:fixed!important; inset:0!important; z-index:100!important;
+  display:flex!important; align-items:center!important; justify-content:center!important;
+  padding:18px!important; background:rgb(15 23 42 / 58%)!important;
+}
+.school-people-students-page .bulk-import-panel {
+  width:min(100%,1040px)!important; max-height:94dvh!important; overflow-y:auto!important;
+  overscroll-behavior:contain; padding:22px!important; border:1px solid #d9e0e7!important;
+  border-radius:14px!important; background:#fff!important; color:#29384a!important;
+  box-shadow:0 20px 60px rgb(15 23 42 / 24%)!important;
+}
+.school-people-students-page .bulk-import-panel h2,
+.school-people-students-page .bulk-import-panel h3,
+.school-people-students-page .bulk-import-panel p,
+.school-people-students-page .bulk-import-panel label,
+.school-people-students-page .bulk-import-panel th,
+.school-people-students-page .bulk-import-panel td { color:#29384a; overflow-wrap:anywhere; line-height:1.5; }
+.school-people-students-page .bulk-import-panel header { position:sticky; top:-22px; z-index:3; padding-top:4px; background:#fff; }
+.school-people-students-page .bulk-import-panel button { min-height:42px; max-width:100%; white-space:normal; line-height:1.35; }
+.school-people-students-page .bulk-import-panel .overflow-auto { max-width:100%; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.school-people-students-page .bulk-import-panel table { min-width:1180px; }
+.school-people-students-page .bulk-import-panel input,
+.school-people-students-page .bulk-import-panel select { min-height:38px; background:#fff!important; color:#253244!important; border:1px solid #c7d0da!important; }
+@media(max-width:1000px) {
+  .school-people-students-page .schoolos-people-header { grid-template-columns:1fr; align-items:stretch!important; gap:15px!important; }
+  .school-people-students-page .students-header-actions { gap:9px; }
+  .school-people-students-page .students-export-actions,
+  .school-people-students-page .students-primary-actions { justify-content:flex-start; }
 }
 @media(max-width:767px) {
-  .school-students-page { padding:12px!important; gap:14px!important; }
-  .school-students-page .schoolos-people-header { padding:15px!important; gap:14px; border-radius:12px!important; }
-  .school-students-page .schoolos-people-header h1 { font-size:23px; }
-  .school-students-page .schoolos-people-header p { font-size:12px; }
-  .school-students-page .students-header-actions { gap:10px; }
-  .school-students-page .students-export-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
-  .school-students-page .students-primary-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
-  .school-students-page .students-utility-button,
-  .school-students-page .students-import-button,
-  .school-students-page .students-pin-button,
-  .school-students-page .students-admit-button { width:100%; min-height:44px; padding:8px 6px; font-size:11px; }
-  .school-students-page .students-admit-button { grid-column:1/-1; min-height:48px; font-size:14px; }
-  .school-students-page .schoolos-people-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-  .school-students-page .schoolos-people-stat { padding:12px; }
-  .school-students-page .schoolos-people-stat strong { font-size:21px; }
-  .school-students-page .schoolos-people-filter { padding:12px!important; }
-  .school-students-page .schoolos-people-filter > div { min-width:0; }
-  .school-students-page .schoolos-people-filter select { flex:1 1 145px; min-width:0; max-width:100%; }
-  .school-students-page .schoolos-people-table-card { border-radius:12px!important; }
-  .school-students-page .student-mobile-card { padding:13px!important; }
-  .bulk-import-dialog { align-items:flex-end!important; padding:0!important; }
-  .bulk-import-dialog > section { width:100%!important; max-height:94dvh!important; border-radius:16px 16px 0 0!important; }
-  .bulk-import-dialog > section .grid { min-width:0; }
-  .bulk-import-dialog > section .flex { min-width:0; }
+  .school-people-students-page { padding:12px!important; gap:13px!important; border-radius:12px; }
+  .school-people-students-page .schoolos-people-header { padding:15px!important; gap:13px!important; }
+  .school-people-students-page .schoolos-people-header h1 { font-size:24px!important; }
+  .school-people-students-page .students-header-actions { width:100%; }
+  .school-people-students-page .students-export-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .school-people-students-page .students-primary-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+  .school-people-students-page .students-utility-button,
+  .school-people-students-page .students-import-button,
+  .school-people-students-page .students-pin-button { width:100%; min-height:46px; padding:8px 5px; font-size:11px; }
+  .school-people-students-page .students-admit-button { grid-column:1/-1; width:100%; min-height:49px; font-size:14px; }
+  .school-people-students-page .schoolos-people-stats { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .school-people-students-page .schoolos-people-stat { padding:12px!important; }
+  .school-people-students-page .schoolos-people-stat strong { font-size:22px; }
+  .school-people-students-page .schoolos-people-filter { padding:12px!important; }
+  .school-people-students-page .schoolos-people-filter > div { min-width:0; }
+  .school-people-students-page .schoolos-people-filter select { flex:1 1 145px; min-width:0; width:100%; }
+  .school-people-students-page .student-mobile-card { padding:13px!important; }
+  .school-people-students-page .student-modal-overlay { align-items:flex-end; padding:0!important; }
+  .school-people-students-page .student-modal-panel {
+    width:100%; max-width:none; max-height:95dvh; padding:16px!important;
+    border-radius:17px 17px 0 0!important;
+  }
+  .school-people-students-page .student-modal-panel .student-name-grid { grid-template-columns:1fr; gap:10px; }
+  .school-people-students-page .student-modal-panel .student-modal-section { padding:12px!important; }
+  .school-people-students-page .bulk-import-dialog { align-items:flex-end!important; padding:0!important; }
+  .school-people-students-page .bulk-import-panel {
+    width:100%!important; max-width:none!important; max-height:96dvh!important;
+    padding:15px!important; border-radius:17px 17px 0 0!important;
+  }
+  .school-people-students-page .bulk-import-panel header { top:-15px; }
+  .school-people-students-page .bulk-import-panel .grid { min-width:0; }
+  .school-people-students-page .bulk-import-panel .flex { min-width:0; }
+}
+@media(max-width:390px) {
+  .school-people-students-page { padding:10px!important; }
+  .school-people-students-page .students-utility-button,
+  .school-people-students-page .students-import-button,
+  .school-people-students-page .students-pin-button { font-size:10px; gap:5px; }
+  .school-people-students-page .schoolos-people-stat { padding:10px!important; }
 }
 @media(min-width:768px) {
-  .school-students-page .schoolos-people-table-card .student-mobile-list { display:none!important; }
+  .school-people-students-page .student-mobile-list { display:none!important; }
 }
-:root[data-theme="dark"] .school-students-page {
-  --students-ink:#e7edf2; --students-muted:#b3bfca; --students-line:#35424e;
-  --students-surface:#1d2833; --students-canvas:#17212b; color:var(--students-ink);
+:root[data-theme="dark"] .school-people-students-page {
+  --student-ink:#e8edf2; --student-muted:#b2bfca; --student-line:#3a4652;
+  --student-surface:#202b36; --student-canvas:#17212b; color:var(--student-ink);
+  background:var(--student-canvas); border-color:#2e3a45;
 }
-:root[data-theme="dark"] .school-students-page .schoolos-people-header,
-:root[data-theme="dark"] .school-students-page .schoolos-people-stat,
-:root[data-theme="dark"] .school-students-page .schoolos-people-filter,
-:root[data-theme="dark"] .school-students-page .schoolos-people-table-card,
-:root[data-theme="dark"] .school-students-page .student-mobile-card,
-:root[data-theme="dark"] .bulk-import-dialog > section { background:#1d2833!important; border-color:#35424e!important; color:#e7edf2!important; }
-:root[data-theme="dark"] .school-students-page .schoolos-people-header h1,
-:root[data-theme="dark"] .school-students-page .schoolos-people-header p,
-:root[data-theme="dark"] .school-students-page .schoolos-people-stat p,
-:root[data-theme="dark"] .school-students-page .schoolos-people-stat strong,
-:root[data-theme="dark"] .school-students-page .schoolos-people-stat small,
-:root[data-theme="dark"] .school-students-page .schoolos-people-table-card h2,
-:root[data-theme="dark"] .school-students-page .schoolos-people-table-card p,
-:root[data-theme="dark"] .bulk-import-dialog > section h2,
-:root[data-theme="dark"] .bulk-import-dialog > section h3,
-:root[data-theme="dark"] .bulk-import-dialog > section p,
-:root[data-theme="dark"] .bulk-import-dialog > section label,
-:root[data-theme="dark"] .bulk-import-dialog > section th,
-:root[data-theme="dark"] .bulk-import-dialog > section td { color:#e7edf2!important; }
-:root[data-theme="dark"] .school-students-page input,
-:root[data-theme="dark"] .school-students-page select,
-:root[data-theme="dark"] .school-students-page textarea,
-:root[data-theme="dark"] .bulk-import-dialog > section input,
-:root[data-theme="dark"] .bulk-import-dialog > section select { background:#17212b!important; color:#e7edf2!important; border-color:#455463!important; }
-
-
-/* Admission and edit forms: keep every field label visible on narrow phones. */
-.school-students-page > .fixed.inset-0.z-50 {
-  z-index:70; padding:16px; align-items:center; justify-content:center;
-}
-.school-students-page > .fixed.inset-0.z-50 > .bg-white {
-  width:min(100%,620px); max-height:min(92dvh,860px); overflow-y:auto; overscroll-behavior:contain;
-  padding:clamp(14px,2.5vw,24px)!important; border:1px solid #d7dfe7!important;
-  border-radius:14px!important; color:#263446; box-shadow:0 18px 55px rgb(15 23 42 / 18%)!important;
-}
-.school-students-page > .fixed.inset-0.z-50 h2 { color:#243244!important; line-height:1.3; overflow-wrap:anywhere; }
-.school-students-page > .fixed.inset-0.z-50 label {
-  display:block; min-width:0; color:#344256!important; font-size:12px; font-weight:600; line-height:1.45;
-}
-.school-students-page > .fixed.inset-0.z-50 label input,
-.school-students-page > .fixed.inset-0.z-50 label select,
-.school-students-page > .fixed.inset-0.z-50 label textarea { display:block; width:100%; margin-top:6px; }
-.school-students-page > .fixed.inset-0.z-50 form > .grid[class~="grid-cols-3"] { grid-template-columns:repeat(3,minmax(0,1fr)); }
-.school-students-page > .fixed.inset-0.z-50 form > div { min-width:0; }
-.school-students-page > .fixed.inset-0.z-50 form > div > span { display:block; color:#263446!important; line-height:1.45; }
-.school-students-page > .fixed.inset-0.z-50 button { min-height:42px; max-width:100%; white-space:normal; line-height:1.35; }
-@media(max-width:767px) {
-  .school-students-page > .fixed.inset-0.z-50 { padding:8px!important; align-items:flex-end; }
-  .school-students-page > .fixed.inset-0.z-50 > .bg-white {
-    width:100%; max-height:94dvh; border-radius:16px 16px 0 0!important; padding:15px!important;
-  }
-  .school-students-page > .fixed.inset-0.z-50 form > .grid[class~="grid-cols-3"] { grid-template-columns:1fr; gap:10px; }
-  .school-students-page > .fixed.inset-0.z-50 form > .grid[class~="grid-cols-2"] { grid-template-columns:1fr; }
-  .school-students-page > .fixed.inset-0.z-50 form > div.p-3 { padding:12px!important; }
-  .school-students-page > .fixed.inset-0.z-50 h2 { font-size:15px; }
-  .school-students-page > .fixed.inset-0.z-50 form > div:last-child { display:flex; flex-wrap:wrap; gap:8px; }
-  .school-students-page > .fixed.inset-0.z-50 form > div:last-child button { flex:1 1 130px; }
-}
-:root[data-theme="dark"] .school-students-page > .fixed.inset-0.z-50 > .bg-white {
-  background:#1d2833!important; border-color:#35424e!important; color:#e7edf2!important;
-}
-:root[data-theme="dark"] .school-students-page > .fixed.inset-0.z-50 h2,
-:root[data-theme="dark"] .school-students-page > .fixed.inset-0.z-50 label,
-:root[data-theme="dark"] .school-students-page > .fixed.inset-0.z-50 form > div > span { color:#e7edf2!important; }
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-header,
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-stat,
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-filter,
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-table-card,
+:root[data-theme="dark"] .school-people-students-page .student-mobile-card,
+:root[data-theme="dark"] .school-people-students-page .student-modal-panel,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel { background:#202b36!important; border-color:#3a4652!important; color:#e8edf2!important; }
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-header h1,
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-header p,
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-stat p,
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-stat strong,
+:root[data-theme="dark"] .school-people-students-page .schoolos-people-stat small,
+:root[data-theme="dark"] .school-people-students-page .student-modal-panel h2,
+:root[data-theme="dark"] .school-people-students-page .student-modal-panel label,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel h2,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel h3,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel p,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel label,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel th,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel td { color:#e8edf2!important; }
+:root[data-theme="dark"] .school-people-students-page input,
+:root[data-theme="dark"] .school-people-students-page select,
+:root[data-theme="dark"] .school-people-students-page textarea,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel input,
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel select { background:#17212b!important; color:#e8edf2!important; border-color:#4a5865!important; }
+:root[data-theme="dark"] .school-people-students-page .bulk-import-panel header { background:#202b36!important; }
