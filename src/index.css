@@ -4443,3 +4443,59 @@ main :is(.flex, .inline-flex) > * {
   background:#1f3028!important;
   color:#4cc58a!important;
 }
+
+
+/* Responsive QA fixes from the People Admin screenshot matrix. */
+.school-admin-mobile-content .school-people-teachers-page > header :is(h1,h2,h3) {
+  color:#fff!important;
+}
+.school-admin-mobile-content .school-people-teachers-page > header p,
+.school-admin-mobile-content .school-people-teachers-page > header .text-teal-100 {
+  color:#e0eee7!important;
+}
+.school-admin-mobile-content .school-people-teachers-page > header .text-teal-100\\/90 {
+  color:rgba(224,238,231,.92)!important;
+}
+.school-admin-mobile-content .school-people-admissions-page .people-admissions-board {
+  display:flex!important;
+  flex-flow:row nowrap;
+  width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+}
+.school-admin-mobile-content .school-people-admissions-page .people-admissions-board > section {
+  flex:0 0 280px;
+  min-width:260px;
+  max-width:320px;
+  scroll-snap-align:start;
+}
+.school-admin-mobile-content .school-people-staff-page .overflow-x-auto {
+  display:block;
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.school-admin-mobile-content .school-people-staff-page table {
+  width:max-content;
+  min-width:760px!important;
+  table-layout:auto;
+}
+.school-admin-mobile-content .school-people-staff-page table th {
+  white-space:nowrap!important;
+  word-break:normal!important;
+}
+@media(max-width:767px) {
+  .school-admin-mobile-content .school-people-admissions-page .people-admissions-board > section {
+    flex-basis:82vw;
+    min-width:240px;
+    max-width:320px;
+  }
+  .school-admin-mobile-content .school-people-staff-page .overflow-x-auto {
+    max-width:calc(100vw - 52px);
+  }
+}
