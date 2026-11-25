@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import './operations-reference.css';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
@@ -211,7 +212,7 @@ export const FeesLedgerView: React.FC = () => {
 
   if (feeLoad.error) return <ErrorState error={feeLoad.error} onRetry={feeLoad.retry} />;
   return (
-    <div className="school-admin-fees-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+    <div className="schoolos-operations-page school-admin-fees-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
