@@ -703,3 +703,7 @@ pm run dev and apply migrations 001-014.
 
 ## School Admin mobile navigation (2026-11-25)
 - PARTIAL: bottom bar reduced to Dashboard, Students, Attendance, Menu; Menu opens a full-screen sheet. Page contents unchanged. Lint, tests and build not run locally (no dependencies); awaiting CI. Not yet checked on a phone.
+
+## School Admin people pages — mobile polish (2026-11-25)
+- PARTIAL: CSS-only pass in `people-admin.css` for Students, Teachers, and Parents & Contacts on phones (<768px): 16px inputs (no iOS zoom), Teachers always shown as readable cards with a 2-column action grid, larger touch targets for Parents account actions. Desktop unchanged.
+- NOT VERIFIED: lint/tests/build and real phone screenshots not run locally (no dependencies installed, no network); awaiting CI and a manual mobile check.

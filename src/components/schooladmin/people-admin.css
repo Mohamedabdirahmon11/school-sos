@@ -1031,3 +1031,61 @@
 }
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .school-people-admissions-page .people-admissions-board>section{background:#202b26!important;border-color:#3b4a42!important}}
 :root[data-theme="dark"] .school-people-admissions-page .people-admissions-board>section{background:#202b26!important;border-color:#3b4a42!important}
+
+/* Mobile polish for School Admin Students, Teachers, and Parents & Contacts.
+   Scoped to phones; desktop layouts are unchanged. 16px inputs stop iOS zoom-on-focus. */
+@media (max-width: 767px) {
+  .school-students-page input,
+  .school-students-page select,
+  .school-people-parents-page input,
+  .school-people-parents-page select,
+  .school-people-teachers-page input,
+  .school-people-teachers-page select {
+    font-size: 16px !important;
+    min-height: 44px;
+    width: 100%;
+    max-width: 100%;
+  }
+  .school-people-teachers-page .relative input[type="search"] { padding-left: 36px; }
+
+  /* Teachers: always use readable cards on phones (no sideways table scrolling). */
+  .school-people-teachers-page [role="group"][aria-label="Teacher display mode"] { display: none; }
+  .school-people-teachers-page .teacher-directory { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+  .school-people-teachers-page .teacher-directory .overflow-x-auto { overflow: visible !important; }
+  .school-people-teachers-page .teacher-directory table { display: block; width: 100%; min-width: 0 !important; background: transparent; }
+  .school-people-teachers-page .teacher-directory thead { position: absolute; display: block; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+  .school-people-teachers-page .teacher-directory tbody { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 !important; }
+  .school-people-teachers-page .teacher-directory tbody tr {
+    display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+    border: 1px solid var(--people-line); border-radius: 16px;
+    background: var(--people-card); box-shadow: 0 3px 12px rgb(16 37 34 / 5%);
+  }
+  .school-people-teachers-page .teacher-directory tbody td {
+    display: grid; grid-template-columns: minmax(96px, 34%) minmax(0, 1fr); align-items: start; gap: 10px;
+    min-width: 0 !important; padding: 9px 14px !important; border: 0 !important;
+    font-size: 12px; line-height: 1.45; white-space: normal !important; overflow-wrap: anywhere;
+  }
+  .school-people-teachers-page .teacher-directory tbody td::before {
+    color: var(--people-muted); font-size: 10px; font-weight: 750; letter-spacing: .035em; text-transform: uppercase;
+  }
+  .school-people-teachers-page .teacher-directory tbody td:first-child {
+    display: block; padding: 14px 14px 10px !important; border-bottom: 1px solid var(--people-line) !important; background: transparent;
+  }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(2)::before { content: "Maaddooyin"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(3)::before { content: "Classes taught"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(4)::before { content: "Form Teacher"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(5)::before { content: "Telefoon"; }
+  .school-people-teachers-page .teacher-directory tbody td:nth-child(6)::before { content: "Xaalad"; }
+  .school-people-teachers-page .teacher-directory tbody td:last-child {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+    margin-top: 4px; padding: 12px 14px 14px !important; border-top: 1px solid var(--people-line) !important;
+  }
+  .school-people-teachers-page .teacher-directory tbody td:last-child button {
+    margin: 0 !important; min-height: 44px; justify-content: center; font-size: 12px; white-space: normal; line-height: 1.25;
+  }
+  .school-people-teachers-page .teacher-directory tbody td:last-child button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  /* Parents & Contacts: larger touch targets for account actions. */
+  .school-people-parents-page tbody td:last-child button,
+  .school-people-parents-page tbody td:last-child a { min-height: 44px; font-size: 12px; flex: 1 1 calc(50% - 7px); }
+}
