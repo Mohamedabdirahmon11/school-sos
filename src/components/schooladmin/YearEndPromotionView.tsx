@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './operations-reference.css';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolClass, ExamConfig } from '../../types/index.ts';
@@ -188,9 +189,9 @@ export const YearEndPromotionView: React.FC = () => {
   const repeatCandidatesCount = Object.values(decisionMap).filter(d => d.decision === 'repeated').length;
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="schoolos-operations-page mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="schoolos-operation-header flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[#132A29] flex items-center gap-2">
             <ArrowUpRight className="w-6 h-6 text-[#0F766E]" />
