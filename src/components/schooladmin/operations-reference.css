@@ -1,0 +1,97 @@
+/* Shared HTML-reference styling for communication, finance, resources and settings. Loaded with these lazy views. */
+.schoolos-operations-page {
+  --ops-bg:#f6f4ee; --ops-card:#fff; --ops-ink:#1c2b26; --ops-muted:#5f6f68; --ops-line:#d9d6cb;
+  --ops-green:#1f4d3f; --ops-green-soft:#eaf2ed;
+  min-width:0; max-width:1600px!important; margin-inline:auto;
+  padding:18px clamp(12px,2.2vw,30px) 42px!important;
+  color:var(--ops-ink); background:var(--ops-bg);
+  font-family:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+}
+.schoolos-operations-page * { box-sizing:border-box; }
+.schoolos-operations-page h1 {
+  color:var(--ops-ink)!important; font:700 clamp(24px,2.4vw,31px)/1.15 Georgia,"Times New Roman",serif!important;
+  letter-spacing:-.025em;
+}
+.schoolos-operations-page h2,.schoolos-operations-page h3 { color:var(--ops-ink); font-family:Georgia,"Times New Roman",serif; }
+.schoolos-operations-page p { overflow-wrap:anywhere; }
+.schoolos-operations-page > header,.schoolos-operations-page > div:first-child:not(.schoolos-chat-layout) {
+  min-width:0;
+}
+.schoolos-operations-page .rounded-xl,.schoolos-operations-page .rounded-2xl,.schoolos-operations-page .rounded-3xl {
+  border-radius:11px!important;
+}
+.schoolos-operations-page .border-slate-200,.schoolos-operations-page .border-\[\#E2E8F0\],
+.schoolos-operations-page .border-\[\#dce7e4\],.schoolos-operations-page .border-\[\#DCE7E4\] {
+  border-color:var(--ops-line)!important;
+}
+.schoolos-operations-page .bg-white { background:var(--ops-card); }
+.schoolos-operations-page .text-slate-900,.schoolos-operations-page .text-\[\#132A29\],
+.schoolos-operations-page .text-\[\#102522\],.schoolos-operations-page .text-\[\#18312d\] { color:var(--ops-ink)!important; }
+.schoolos-operations-page .text-slate-500,.schoolos-operations-page .text-slate-600,
+.schoolos-operations-page .text-\[\#64748B\],.schoolos-operations-page .text-\[\#71817d\] { color:var(--ops-muted)!important; }
+.schoolos-operations-page button[class*="bg-teal-700"],.schoolos-operations-page button[class*="bg-teal-600"],
+.schoolos-operations-page button[class*="bg-[#0F766E]"],.schoolos-operations-page button[class*="bg-[#0e8078]"],
+.schoolos-operations-page button[class*="bg-[#0D655E]"] {
+  color:#fff!important; background:var(--ops-green)!important; border-color:var(--ops-green)!important; box-shadow:none!important;
+}
+.schoolos-operations-page button[class*="text-teal-700"],.schoolos-operations-page button[class*="text-[#0F766E]"] { color:var(--ops-green)!important; }
+.schoolos-operations-page input:not([type=checkbox]):not([type=radio]),.schoolos-operations-page select,.schoolos-operations-page textarea {
+  min-width:0; max-width:100%; min-height:38px; border-color:var(--ops-line)!important; border-radius:8px!important;
+  color:var(--ops-ink); background:var(--ops-card);
+}
+.schoolos-operations-page input:focus-visible,.schoolos-operations-page select:focus-visible,.schoolos-operations-page textarea:focus-visible,
+.schoolos-operations-page button:focus-visible { outline:3px solid rgba(31,77,63,.2); outline-offset:2px; }
+.schoolos-operations-page table { border-collapse:separate; border-spacing:0; }
+.schoolos-operations-page thead { background:var(--ops-green-soft); }
+.schoolos-operations-page thead th { color:#52665c!important; font-size:10px!important; letter-spacing:.06em; font-weight:800; }
+.schoolos-operations-page tbody tr:hover { background:var(--ops-green-soft); }
+.schoolos-operations-page .shadow-sm,.schoolos-operations-page .shadow-md,.schoolos-operations-page .shadow-lg {
+  box-shadow:0 1px 3px rgba(20,40,30,.04)!important;
+}
+.schoolos-operations-page .overflow-x-auto { max-width:100%; overscroll-behavior-x:contain; scrollbar-width:thin; }
+.schoolos-operations-page .grid { min-width:0; }
+.schoolos-operations-page .schoolos-operation-header {
+  display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:14px;
+  padding:18px 20px; border:1px solid var(--ops-line); border-radius:12px; background:var(--ops-card);
+  box-shadow:0 1px 3px rgba(20,40,30,.035);
+}
+.schoolos-operations-page .schoolos-operation-header p { color:var(--ops-muted)!important; font-size:12px; }
+.schoolos-operations-page .schoolos-operation-kicker { color:var(--ops-muted); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.schoolos-operations-page .schoolos-operation-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.schoolos-operations-page .schoolos-operation-stat { min-width:0; padding:13px; border:1px solid var(--ops-line); border-radius:10px; background:var(--ops-card); }
+.schoolos-operations-page .schoolos-operation-stat span { display:block; color:var(--ops-muted); font-size:11px; font-weight:700; }
+.schoolos-operations-page .schoolos-operation-stat strong { display:block; margin-top:5px; color:var(--ops-ink); font:700 24px/1.1 Georgia,serif; overflow-wrap:anywhere; }
+.schoolos-operations-page .schoolos-operation-tabs { display:flex; flex-wrap:wrap; gap:6px; padding:5px; border:1px solid var(--ops-line); border-radius:10px; background:var(--ops-card); }
+.schoolos-operations-page .schoolos-operation-tabs button[aria-current="page"],
+.schoolos-operations-page .schoolos-operation-tabs button[aria-pressed="true"] { background:var(--ops-green)!important; color:#fff!important; }
+.schoolos-operations-page .schoolos-chat-layout { min-height:0; border:1px solid var(--ops-line); border-radius:12px; background:var(--ops-card); overflow:hidden; }
+.schoolos-operations-page .schoolos-chat-layout > * { min-width:0; }
+.dark .schoolos-operations-page,[data-theme="dark"] .schoolos-operations-page,:root[data-theme="dark"] .schoolos-operations-page {
+  --ops-bg:#121a17; --ops-card:#1a2420; --ops-ink:#e6efe9; --ops-muted:#a7b8af; --ops-line:#34453d;
+  --ops-green:#65c697; --ops-green-soft:#20372d; color:var(--ops-ink); background:var(--ops-bg);
+}
+.dark .schoolos-operations-page .bg-white,[data-theme="dark"] .schoolos-operations-page .bg-white,
+:root[data-theme="dark"] .schoolos-operations-page .bg-white { background:var(--ops-card)!important; }
+.dark .schoolos-operations-page thead,[data-theme="dark"] .schoolos-operations-page thead { background:#20372d!important; }
+.dark .schoolos-operations-page thead th,[data-theme="dark"] .schoolos-operations-page thead th { color:#c1d7ca!important; }
+.dark .schoolos-operations-page input,.dark .schoolos-operations-page select,.dark .schoolos-operations-page textarea,
+[data-theme="dark"] .schoolos-operations-page input,[data-theme="dark"] .schoolos-operations-page select,[data-theme="dark"] .schoolos-operations-page textarea {
+  color:var(--ops-ink)!important; background:#121a17!important; border-color:var(--ops-line)!important;
+}
+.dark .schoolos-operations-page .text-slate-900,[data-theme="dark"] .schoolos-operations-page .text-slate-900 { color:var(--ops-ink)!important; }
+@media(max-width:900px) {
+  .schoolos-operations-page .schoolos-operation-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:640px) {
+  .schoolos-operations-page { padding:12px 10px 28px!important; }
+  .schoolos-operations-page h1 { font-size:24px!important; }
+  .schoolos-operations-page .schoolos-operation-header { align-items:flex-start; padding:14px; }
+  .schoolos-operations-page .schoolos-operation-header > div:last-child { width:100%; display:flex; flex-wrap:wrap; gap:7px; }
+  .schoolos-operations-page .schoolos-operation-header button { min-height:40px; }
+  .schoolos-operations-page .schoolos-operation-stat { padding:10px; }
+  .schoolos-operations-page .schoolos-operation-stat strong { font-size:21px; }
+  .schoolos-operations-page .overflow-x-auto { max-width:100%; }
+}
+@media(max-width:360px) {
+  .schoolos-operations-page .schoolos-operation-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
