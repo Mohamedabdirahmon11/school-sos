@@ -444,45 +444,29 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
           <p>{pageInfo?.total ?? students.length} arday · Diiwaanka ardayda iyo xogtooda</p>
         </div>
 
-        <div className="schoolos-people-header-actions">
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]"
-          >
-            <Download className="w-3.5 h-3.5 text-[#0F766E]" />
-            <span>Export CSV</span>
-          </button>
-          <button type="button" onClick={handleExportExcel} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]">
-            <FileSpreadsheet className="w-3.5 h-3.5 text-[#0F766E]" /><span>Excel</span>
-          </button>
-          <button type="button" onClick={handleExportPDF} className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]">
-            <FileText className="w-3.5 h-3.5 text-[#0F766E]" /><span>PDF</span>
-          </button>
-          <button
-            onClick={() => setShowBulkImport(true)}
-            disabled={isReadOnly}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8] disabled:opacity-50"
-          >
-            <Upload className="w-3.5 h-3.5 text-[#0F766E]" />
-            <span>{t('bulk_import')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowBulkPinReset(true)}
-            disabled={isReadOnly}
-            className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8] disabled:opacity-50"
-          >
-            <CreditCard className="w-3.5 h-3.5 text-[#0F766E]" />
-            <span>Bulk PIN reset</span>
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            disabled={isReadOnly}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#0e8078] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0b6f68] disabled:opacity-50"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Admit Student</span>
-          </button>
+        <div className="schoolos-people-header-actions students-header-actions">
+          <div className="students-export-actions" aria-label="Student export actions">
+            <button type="button" onClick={handleExportCSV} className="students-utility-button">
+              <Download className="w-4 h-4" /><span>Export CSV</span>
+            </button>
+            <button type="button" onClick={handleExportExcel} className="students-utility-button">
+              <FileSpreadsheet className="w-4 h-4" /><span>Export Excel</span>
+            </button>
+            <button type="button" onClick={handleExportPDF} className="students-utility-button">
+              <FileText className="w-4 h-4" /><span>Export PDF</span>
+            </button>
+          </div>
+          <div className="students-primary-actions" aria-label="Student admission tools">
+            <button type="button" onClick={() => setShowBulkImport(true)} disabled={isReadOnly} className="students-import-button">
+              <Upload className="w-4 h-4" /><span>{t('bulk_import')}</span>
+            </button>
+            <button type="button" onClick={() => setShowBulkPinReset(true)} disabled={isReadOnly} className="students-pin-button">
+              <CreditCard className="w-4 h-4" /><span>Bulk PIN reset</span>
+            </button>
+            <button type="button" onClick={() => setShowAddModal(true)} disabled={isReadOnly} className="students-admit-button">
+              <Plus className="w-4 h-4" /><span>Admit Student</span>
+            </button>
+          </div>
         </div>
       </header>
 
