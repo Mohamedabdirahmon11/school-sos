@@ -3439,8 +3439,8 @@ main :is(.flex, .inline-flex) > * {
 @media(max-width:380px) {
   .school-admin-mobile-quick-grid { grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding-left:4px;padding-right:4px; }
   .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action svg { width:18px;height:18px; }
-  .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action span { font-size:8px; }
-  .schoolos-mobile-bottom-nav .schoolos-mobile-menu-action { width:46px; }
+  .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action span { font-size:9px; }
+  .schoolos-mobile-bottom-nav .schoolos-mobile-menu-action { width:100%; min-width:0; }
 }
 @media(prefers-reduced-motion:reduce) {
   .schoolos-mobile-bottom-nav *,
