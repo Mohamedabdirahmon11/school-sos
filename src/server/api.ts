@@ -3214,6 +3214,36 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
       return;
     }
 
+    // The School Admin dashboard uses the same tenant-scoped data sources as
+    // the corresponding workspaces. Keep the extra reads bounded and parallel;
+    // the core KPI summary remains served by its single aggregate RPC.
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: school.timezone || 'Africa/Addis_Ababa'
+    }).format(new Date());
+    const [readiness, eventsPage, activityPage, admissionsPage] = await Promise.all([
+      evaluateReadiness(school.id),
+      db.queryPage('school_events', { school_id: school.id }, 1, 5,
+        `end_date.gte.${today}`,
+        'id,title,start_date,end_date,type', 'start_date', true),
+      db.queryPage('audit_logs', { school_id: school.id }, 1, 5,
+        undefined, 'id,timestamp,action,category,user_name,details,severity', 'timestamp', false),
+      db.queryPage('admission_applications', { school_id: school.id, status: 'pending' },
+        1, 1, undefined, 'id')
+    ]);
+    const dashboard = {
+      ...summary,
+      setupReadiness: {
+        checklist: Object.entries(readiness.checklist || {}).map(([id, item]: [string, any]) => ({
+          id: Number(id), label: String(item?.label || item?.title || `Setup ${id}`),
+          ready: Boolean(item?.ready), reason: String(item?.reason || '')
+        })),
+        canFinish: Boolean(readiness.canFinish)
+      },
+      upcomingEvents: eventsPage.items,
+      recentActivity: activityPage.items,
+      pendingAdmissions: admissionsPage.total
+    };
+
     // School admins may see academic dashboard data, never finance data.
     const redactFinance = (value: any): any => {
       if (Array.isArray(value)) return value.map(redactFinance);
