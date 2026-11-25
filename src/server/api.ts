@@ -5413,7 +5413,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
   const classId = requestedClassId;
   const search = typeof req.query.search === 'string'
-    ? req.query.search.trim().replace(/[^\\p{L}\\p{N}\s+()._-]/gu, '').slice(0, 80)
+    ? req.query.search.trim().replace(/[^\\p{L}\\p{N}\\s+()._-]/gu, '').slice(0, 80)
     : '';
   const cacheKey = [school.id, role, role === 'teacher' ? user.id : 'school', classId || '*', page, pageSize, search.toLowerCase()].join(':');
   const cachedResponse = parentContactsResponseCache.get(cacheKey);
@@ -5859,7 +5859,7 @@ apiRouter.get('/students', requireAuth, requireSchoolContext, requireParentPorta
   const gender = typeof req.query.gender === 'string' && ['male', 'female'].includes(req.query.gender) ? req.query.gender : undefined;
   const studentStatus = typeof req.query.status === 'string' && ['active', 'inactive', 'graduated', 'transferred'].includes(req.query.status) ? req.query.status : undefined;
   const search = typeof req.query.search === 'string'
-    ? req.query.search.trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80)
+    ? req.query.search.trim().replace(/[^\p{L}\p{N}\\s._-]/gu, '').slice(0, 80)
     : '';
   const requestedFeeStatus = typeof req.query.feeStatus === 'string' ? req.query.feeStatus.toLowerCase() : 'all';
   const canViewFeeStatus = ['school_admin', 'accountant', 'super_admin'].includes(user.role);
@@ -6746,7 +6746,7 @@ apiRouter.get('/teachers', requireAuth, requireSchoolContext, async (req, res) =
   const user = (req as any).user as User;
   const canViewSalary = ['school_admin', 'super_admin', 'accountant'].includes(user.role);
   const search = typeof req.query.search === 'string'
-    ? req.query.search.trim().replace(/[^\p{L}\p{N}\s._-]/gu, '').slice(0, 80)
+    ? req.query.search.trim().replace(/[^\p{L}\p{N}\\s._-]/gu, '').slice(0, 80)
     : '';
   const subjectId = typeof req.query.subjectId === 'string' ? req.query.subjectId.trim() : '';
   const searchFilter = search
