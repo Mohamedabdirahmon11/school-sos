@@ -11133,7 +11133,10 @@ async function syncWizardAcademicRecords(client: any, schoolId: string, setupDat
     const startDate = String(term?.startDate || '');
     const endDate = String(term?.endDate || '');
     if (!name || !startDate || !endDate) continue;
-    const existing = (termRows || []).find((row: any) => String(row.name).trim().toLowerCase() === name.toLowerCase());
+    // Reuse a legacy Term 1/2 row when its date range matches the configured Semester 1/2.
+    // This preserves the existing term ID and its linked assignments instead of creating aliases.
+    const existing = (termRows || []).find((row: any) => String(row.name).trim().toLowerCase() === name.toLowerCase())
+      || (termRows || []).find((row: any) => row.start_date === startDate && row.end_date === endDate);
     const payload = {
       name, start_date: startDate, end_date: endDate,
       is_current: startDate <= today && endDate >= today,
