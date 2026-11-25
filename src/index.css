@@ -1694,7 +1694,7 @@ button:disabled, [aria-disabled="true"] {
 
 
 /* Unified compact sidebar finish — shared by every portal role. */
-.school-admin-sidebar {
+:root:has(.school-admin-mobile-content) .school-admin-sidebar {
   --sidebar-item-height: 40px;
   border-right: 1px solid rgba(255,255,255,.09);
   box-shadow: 8px 0 26px rgba(10, 27, 52, .12);
@@ -1857,7 +1857,7 @@ button:disabled, [aria-disabled="true"] {
 
 
 /* Premium SchoolOS navigation refresh — consistent across all role portals. */
-.school-admin-sidebar {
+:root:has(.school-admin-mobile-content) .school-admin-sidebar {
   background:
     radial-gradient(ellipse at 12% 0%, rgba(77,139,255,.20), transparent 34%),
     var(--sidebar-background, linear-gradient(180deg, #102b55 0%, #0d2142 48%, #0a1b36 100%)) !important;
@@ -1949,7 +1949,7 @@ button:disabled, [aria-disabled="true"] {
   margin-inline:7px;
   padding-inline:4px !important;
 }
-.schoolos-topbar {
+:root:has(.school-admin-mobile-content) .schoolos-topbar {
   min-height:60px !important;
   height:60px !important;
   border-bottom:1px solid #e5ebf4 !important;
@@ -3328,8 +3328,8 @@ main :is(.flex, .inline-flex) > * {
   box-shadow:0 -10px 34px rgba(15,45,40,.13);
 }
 .school-admin-mobile-quick-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) 52px; gap:3px; }
-.schoolos-mobile-bottom-nav .schoolos-mobile-quick-action { min-width:0; overflow:hidden; }
-.schoolos-mobile-bottom-nav .schoolos-mobile-quick-action[aria-current="page"] {
+:root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action { min-width:0; overflow:hidden; }
+:root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action[aria-current="page"] {
   background:linear-gradient(180deg,#e8f5f1 0%,#f3faf7 100%);
   box-shadow:inset 0 0 0 1px #d2e9df;
 }
@@ -4115,4 +4115,515 @@ main :is(.flex, .inline-flex) > * {
     -webkit-line-clamp: unset !important;
     line-clamp: unset !important;
   }
+}
+
+
+/* Bind the reference theme to the actual School Admin React layout selectors. */
+.school-admin-mobile-content {
+  --admin-canvas:#f6f4ee;
+  --admin-card:#fff;
+  --admin-ink:#1c2b26;
+  --admin-muted:#5f6f68;
+  --admin-line:#d9d6cb;
+  --admin-accent:#1f4d3f;
+  background:var(--admin-canvas)!important;
+  color:var(--admin-ink)!important;
+}
+:root:has(.school-admin-mobile-content) .school-admin-sidebar {
+  background:linear-gradient(180deg,#1f4d3f 0%,#143a2e 100%)!important;
+  color:#e8f1ec!important;
+}
+:root:has(.school-admin-mobile-content) .school-admin-sidebar [aria-current="page"] {
+  background:rgba(255,255,255,.16)!important;
+  color:#fff!important;
+  box-shadow:inset 3px 0 0 #b7d6c6;
+}
+:root:has(.school-admin-mobile-content) .schoolos-topbar {
+  background:var(--admin-card,#fff)!important;
+  border-color:var(--admin-line,#d9d6cb)!important;
+  color:var(--admin-ink,#1c2b26);
+}
+.school-admin-mobile-content :is(h1,h2,h3) {
+  color:var(--admin-ink)!important;
+  letter-spacing:-.018em;
+}
+.school-admin-mobile-content h1 {
+  font-family:Georgia,"Times New Roman",serif;
+  font-size:clamp(23px,2.4vw,29px);
+}
+.school-admin-mobile-content :is(.bg-white,.bg-white\\/95) {
+  background-color:var(--admin-card)!important;
+}
+.school-admin-mobile-content :is(.border-slate-100,.border-slate-200,.border-\\[\\#E2E8F0\\],.border-\\[\\#F1F5F9\\]) {
+  border-color:var(--admin-line)!important;
+}
+.school-admin-mobile-content :is(.text-slate-400,.text-slate-500,.text-\\[\\#64748B\\]) {
+  color:var(--admin-muted)!important;
+}
+.school-admin-mobile-content :is(.text-slate-700,.text-slate-800,.text-slate-900,.text-\\[\\#132A29\\]) {
+  color:var(--admin-ink)!important;
+}
+.school-admin-mobile-content :is([class*="bg-[#0F766E]"],[class*="bg-teal-700"],[class*="bg-teal-600"]) {
+  background-color:var(--admin-accent)!important;
+  color:#fff!important;
+}
+.school-admin-mobile-content :is([class*="text-[#0F766E]"],[class*="text-teal-700"],[class*="text-teal-600"]) {
+  color:var(--admin-accent)!important;
+}
+.school-admin-mobile-content :is(input,select,textarea) {
+  border-color:var(--admin-line);
+  border-radius:8px;
+  color:var(--admin-ink);
+}
+.school-admin-mobile-content :is(input,select,textarea):focus-visible {
+  outline:3px solid color-mix(in srgb,var(--admin-accent) 22%,transparent);
+  outline-offset:1px;
+}
+.school-admin-mobile-content :is(.rounded-xl,.rounded-2xl,.rounded-3xl) {
+  border-radius:12px;
+}
+.school-admin-mobile-content .school-dashboard-hero {
+  border-color:var(--admin-line)!important;
+  background:linear-gradient(112deg,#fff 0%,#eef4ee 100%)!important;
+  box-shadow:0 2px 8px rgba(20,40,30,.045);
+}
+.school-admin-mobile-content .school-dashboard-hero :is(h1,p) {
+  color:var(--admin-ink)!important;
+}
+.school-admin-mobile-content :is(.school-dashboard-panel,.school-admin-showcase-panel,.school-admin-metric) {
+  border:1px solid var(--admin-line);
+  border-radius:12px;
+  background:var(--admin-card);
+  box-shadow:0 1px 3px rgba(20,40,30,.06);
+}
+.school-admin-mobile-content .school-admin-metric:hover {
+  border-color:#a9c4b4;
+  box-shadow:0 5px 16px rgba(31,77,63,.09);
+}
+.school-admin-mobile-content .school-students-page {
+  color:var(--admin-ink);
+}
+.school-admin-mobile-content .school-students-page :is(h1,h2,h3) {
+  color:var(--admin-ink)!important;
+  font-family:Georgia,"Times New Roman",serif;
+}
+.school-admin-mobile-content .school-students-page :is(input,select,textarea) {
+  border-color:var(--admin-line);
+  border-radius:8px;
+}
+.school-admin-mobile-content .school-people-page {
+  color:var(--admin-ink);
+}
+.school-admin-mobile-content .school-people-page :is(input,select,textarea) {
+  border-color:var(--admin-line);
+  border-radius:8px;
+}
+.school-admin-mobile-content .school-people-page .overflow-x-auto {
+  border-radius:10px;
+  scrollbar-width:thin;
+}
+.school-admin-mobile-content .school-people-page table {
+  border-collapse:collapse;
+}
+.school-admin-mobile-content .school-people-page table thead {
+  background:#f2f3ed;
+}
+.school-admin-mobile-content .school-people-page table th {
+  color:var(--admin-muted)!important;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+  white-space:nowrap;
+}
+.school-admin-mobile-content .school-people-page table :is(th,td) {
+  border-color:var(--admin-line)!important;
+}
+.school-admin-mobile-content .school-people-page table tbody tr:hover {
+  background:#f6f8f3!important;
+}
+@media(max-width:767px) {
+  .school-admin-mobile-content {
+    overflow-x:hidden;
+    padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));
+  }
+  .school-admin-mobile-content .school-dashboard-page,
+  .school-admin-mobile-content .school-students-page,
+  .school-admin-mobile-content .school-people-page {
+    width:100%;
+    min-width:0;
+    padding:14px 12px 22px;
+  }
+  .school-admin-mobile-content .school-people-page :is(input,select,textarea),
+  .school-admin-mobile-content .school-students-page :is(input,select,textarea) {
+    min-height:44px;
+    font-size:16px;
+  }
+  .school-admin-mobile-content .school-people-page .overflow-x-auto,
+  .school-admin-mobile-content .school-students-page .overflow-x-auto {
+    max-width:100%;
+    overscroll-behavior-x:contain;
+  }
+}
+
+
+/* Keep the mobile quick actions consistent with the selected sidebar palette. */
+:root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav {
+  border-color:#d9d6cb!important;
+  background:rgba(255,255,255,.97)!important;
+}
+:root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action {
+  color:#5f6f68;
+}
+:root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action[aria-current="page"] {
+  background:#eaf2ed!important;
+  color:#1f4d3f!important;
+  font-weight:700;
+}
+:root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action:focus-visible {
+  outline-color:#1f4d3f!important;
+}
+.school-admin-mobile-content .school-people-page :is(button,[role="button"]) {
+  transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease;
+}
+.school-admin-mobile-content .school-people-page :is(button,[role="button"]):focus-visible {
+  outline:3px solid rgba(31,77,63,.25);
+  outline-offset:2px;
+}
+.school-admin-mobile-content .school-dashboard-page :is(button,[role="button"]):focus-visible {
+  outline:3px solid rgba(31,77,63,.25);
+  outline-offset:2px;
+}
+.school-admin-mobile-content .school-students-page :is(button,[role="button"]):focus-visible {
+  outline:3px solid rgba(31,77,63,.25);
+  outline-offset:2px;
+}
+
+
+/* Mobile readability: keep copy visible and confine wide content to its own scroller. */
+@media(max-width:767px) {
+  .school-admin-mobile-content :is(.school-dashboard-page,.school-students-page,.school-people-page) {
+    max-width:100%;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+  .school-admin-mobile-content :is(.school-dashboard-page,.school-students-page,.school-people-page) :is(.grid,.flex) > * {
+    min-width:0;
+  }
+  .school-admin-mobile-content .school-dashboard-page :is(p,span,h1,h2,h3) {
+    overflow-wrap:anywhere;
+  }
+  .school-admin-mobile-content .school-dashboard-page .school-admin-metric .metric-label,
+  .school-admin-mobile-content .school-dashboard-page .school-admin-metric .metric-hint {
+    white-space:normal;
+    overflow-wrap:anywhere;
+  }
+  .school-admin-mobile-content .school-people-page .overflow-x-auto,
+  .school-admin-mobile-content .school-students-page .overflow-x-auto {
+    display:block;
+    width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .school-admin-mobile-content .school-people-page table,
+  .school-admin-mobile-content .school-students-page table {
+    width:max-content;
+    min-width:100%;
+  }
+  .school-admin-mobile-content .school-people-page :is(th,td),
+  .school-admin-mobile-content .school-students-page :is(th,td) {
+    overflow-wrap:normal;
+  }
+}
+
+
+/* Shared School Admin component skin, so the remaining admin workspaces inherit
+   the reference design without replacing their existing React workflows. */
+.school-admin-mobile-content table {
+  border-collapse:collapse;
+  background:var(--admin-card,#fff);
+}
+.school-admin-mobile-content table thead {
+  background:#f2f3ed;
+}
+.school-admin-mobile-content table th {
+  color:var(--admin-muted,#5f6f68)!important;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+}
+.school-admin-mobile-content table :is(th,td) {
+  border-color:var(--admin-line,#d9d6cb)!important;
+}
+.school-admin-mobile-content table tbody tr:hover {
+  background:#f6f8f3;
+}
+.school-admin-mobile-content :is([role="dialog"],[role="alertdialog"]) {
+  background:var(--admin-card,#fff);
+  border-color:var(--admin-line,#d9d6cb);
+  color:var(--admin-ink,#1c2b26);
+}
+.school-admin-mobile-content :is(input,select,textarea) {
+  background:var(--admin-card,#fff);
+}
+.school-admin-mobile-content :is(button,a,[role="button"]) {
+  text-underline-offset:3px;
+}
+.school-admin-mobile-content :is(button,a,[role="button"]):focus-visible {
+  outline-color:rgba(31,77,63,.45);
+}
+.school-admin-mobile-content :is(.bg-slate-50,.bg-gray-50,.bg-\\[\\#F8FAFC\\],.bg-\\[\\#F1F5F9\\]) {
+  background:#f2f3ed!important;
+}
+.school-admin-mobile-content :is(.text-blue-700,.text-blue-600,.text-teal-700,.text-teal-600) {
+  color:var(--admin-accent,#1f4d3f)!important;
+}
+.school-admin-mobile-content :is(.border-blue-100,.border-blue-200,.border-teal-100,.border-teal-200) {
+  border-color:#cbdacf!important;
+}
+.school-admin-mobile-content .school-dashboard-page,
+.school-admin-mobile-content .school-students-page,
+.school-admin-mobile-content .school-people-page {
+  color:var(--admin-ink,#1c2b26);
+}
+@media(max-width:767px) {
+  .school-admin-mobile-content :is(.grid,.flex) > * { min-width:0; }
+  .school-admin-mobile-content :is(h1,h2,h3,p,span,label) { overflow-wrap:anywhere; }
+  .school-admin-mobile-content table { min-width:0; }
+  .school-admin-mobile-content .overflow-x-auto table { min-width:max-content; }
+  .school-admin-mobile-content :is(.overflow-x-auto,.overflow-auto) {
+    max-width:100%;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+}
+
+
+/* Honour the app's existing Tailwind dark-mode switch just like the HTML reference. */
+.dark .school-admin-mobile-content {
+  --admin-canvas:#121a17;
+  --admin-card:#1a2420;
+  --admin-ink:#e6efe9;
+  --admin-muted:#9db0a7;
+  --admin-line:#2d3b35;
+  --admin-accent:#4cc58a;
+  color-scheme:dark;
+}
+.dark .school-admin-mobile-content .school-dashboard-hero {
+  background:linear-gradient(112deg,#1a2420 0%,#1f3028 100%)!important;
+}
+.dark .school-admin-mobile-content table thead {
+  background:#1f2f28;
+}
+.dark .school-admin-mobile-content table tbody tr:hover {
+  background:#1f2f28;
+}
+.dark .school-admin-mobile-content :is(.bg-slate-50,.bg-gray-50,.bg-\\[\\#F8FAFC\\],.bg-\\[\\#F1F5F9\\]) {
+  background:#1f2f28!important;
+}
+.dark .school-admin-mobile-content :is(.text-slate-400,.text-slate-500,.text-slate-600,.text-slate-700,.text-slate-800,.text-slate-900) {
+  color:var(--admin-ink)!important;
+}
+.dark .school-admin-mobile-content :is(input,select,textarea) {
+  background:var(--admin-card);
+  color:var(--admin-ink);
+  border-color:var(--admin-line);
+}
+:root:has(.school-admin-mobile-content) .dark .schoolos-topbar {
+  background:#1a2420!important;
+  border-color:#2d3b35!important;
+  color:#e6efe9!important;
+}
+:root:has(.school-admin-mobile-content) .dark .schoolos-mobile-bottom-nav {
+  background:rgba(26,36,32,.97)!important;
+  border-color:#2d3b35!important;
+}
+:root:has(.school-admin-mobile-content) .dark .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action[aria-current="page"] {
+  background:#1f3028!important;
+  color:#4cc58a!important;
+}
+
+
+/* Responsive QA fixes from the People Admin screenshot matrix. */
+.school-admin-mobile-content .school-people-teachers-page > header :is(h1,h2,h3) {
+  color:#fff!important;
+}
+.school-admin-mobile-content .school-people-teachers-page > header p,
+.school-admin-mobile-content .school-people-teachers-page > header .text-teal-100 {
+  color:#e0eee7!important;
+}
+.school-admin-mobile-content .school-people-teachers-page > header .text-teal-100\\/90 {
+  color:rgba(224,238,231,.92)!important;
+}
+.school-admin-mobile-content .school-people-admissions-page .people-admissions-board {
+  display:flex!important;
+  flex-flow:row nowrap;
+  width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+}
+.school-admin-mobile-content .school-people-admissions-page .people-admissions-board > section {
+  flex:0 0 280px;
+  min-width:260px;
+  max-width:320px;
+  scroll-snap-align:start;
+}
+.school-admin-mobile-content .school-people-staff-page .overflow-x-auto {
+  display:block;
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.school-admin-mobile-content .school-people-staff-page table {
+  width:max-content;
+  min-width:760px!important;
+  table-layout:auto;
+}
+.school-admin-mobile-content .school-people-staff-page table th {
+  white-space:nowrap!important;
+  word-break:normal!important;
+}
+@media(max-width:767px) {
+  .school-admin-mobile-content .school-people-admissions-page .people-admissions-board > section {
+    flex-basis:82vw;
+    min-width:240px;
+    max-width:320px;
+  }
+  .school-admin-mobile-content .school-people-staff-page .overflow-x-auto {
+    max-width:calc(100vw - 52px);
+  }
+}
+
+
+/* People workspaces are role-viewable inside the admin shell; scope by page,
+   not by the signed-in role, so school-admin and inspected-school views match. */
+.school-people-teachers-page > header:first-child {
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  color:var(--people-ink,#1c2b26)!important;
+  padding:0!important;
+  overflow:visible!important;
+}
+.school-people-teachers-page > header:first-child > .pointer-events-none {
+  display:none!important;
+}
+.school-people-teachers-page > header:first-child :is(h1,h2,h3) {
+  color:var(--people-ink,#1c2b26)!important;
+}
+.school-people-teachers-page > header:first-child p {
+  color:var(--people-muted,#5f6f68)!important;
+}
+.school-people-admissions-page .people-admissions-board {
+  display:flex!important;
+  flex-flow:row nowrap!important;
+  width:100%;
+  min-width:0;
+  overflow-x:auto!important;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+}
+.school-people-admissions-page .people-admissions-board > section {
+  flex:0 0 280px!important;
+  width:280px!important;
+  min-width:260px!important;
+  max-width:320px!important;
+  scroll-snap-align:start;
+}
+.school-people-staff-page .overflow-x-auto {
+  display:block;
+  width:100%;
+  max-width:100%;
+  overflow-x:auto!important;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.school-people-staff-page .overflow-x-auto > table {
+  width:max-content!important;
+  min-width:760px!important;
+  table-layout:auto;
+}
+.school-people-staff-page table th {
+  white-space:nowrap!important;
+  word-break:normal!important;
+}
+@media(max-width:767px) {
+  .school-people-admissions-page .people-admissions-board > section {
+    flex-basis:82vw!important;
+    width:82vw!important;
+    min-width:240px!important;
+    max-width:320px!important;
+  }
+  .school-people-staff-page .overflow-x-auto {
+    max-width:calc(100vw - 52px);
+  }
+}
+
+
+/* Explicit data-theme dark mode: the app toggles the root attribute, not only .dark. */
+:root[data-theme="dark"] .school-admin-mobile-content {
+  --admin-canvas:#121a17;
+  --admin-card:#1a2420;
+  --admin-ink:#e6efe9;
+  --admin-muted:#9db0a7;
+  --admin-line:#2d3b35;
+  --admin-accent:#4cc58a;
+  color-scheme:dark;
+}
+:root[data-theme="dark"] .school-admin-mobile-content :is(.bg-white,.bg-slate-50,.bg-gray-50) {
+  background-color:var(--admin-card)!important;
+}
+:root[data-theme="dark"] .school-admin-mobile-content :is(.text-slate-400,.text-slate-500,.text-slate-600,.text-slate-700,.text-slate-800,.text-slate-900) {
+  color:var(--admin-ink)!important;
+}
+:root[data-theme="dark"] .school-people-page {
+  --people-bg:#121a17;
+  --people-card:#1a2420;
+  --people-ink:#e6efe9;
+  --people-muted:#9db0a7;
+  --people-line:#2d3b35;
+  --people-accent:#4cc58a;
+  --people-soft:#1f2f28;
+  background:var(--people-bg)!important;
+  color:var(--people-ink)!important;
+}
+:root[data-theme="dark"] .school-people-page :is(h1,h2,h3,p,label,small,th,td) {
+  color:var(--people-ink)!important;
+}
+:root[data-theme="dark"] .school-people-page :is(.text-slate-400,.text-slate-500,.text-slate-600,.text-slate-700,.text-slate-800,.text-slate-900) {
+  color:var(--people-muted)!important;
+  background-color:transparent!important;
+}
+:root[data-theme="dark"] .school-people-page .bg-white,
+:root[data-theme="dark"] .school-people-page .bg-white\\/95 {
+  background:var(--people-card)!important;
+}
+:root[data-theme="dark"] .school-people-page .bg-slate-50,
+:root[data-theme="dark"] .school-people-page .bg-gray-50 {
+  background:var(--people-soft)!important;
+}
+:root[data-theme="dark"] .school-people-admissions-page .people-admissions-board > section {
+  background:var(--people-soft)!important;
+}
+:root[data-theme="dark"] .school-people-admissions-page .people-admissions-board article {
+  background:var(--people-card)!important;
+}
+:root[data-theme="dark"] .school-people-teachers-page section[aria-label="Teacher directory summary"] article {
+  background:var(--people-card)!important;
+}
+:root[data-theme="dark"] .school-people-teachers-page section[aria-label="Teacher directory summary"] article :is(p,span) {
+  color:var(--people-ink)!important;
+  background:transparent!important;
+}
+:root[data-theme="dark"] .school-people-teachers-page > header:first-child :is(h1,h2,h3,p) {
+  color:var(--people-ink)!important;
+  background:transparent!important;
 }
