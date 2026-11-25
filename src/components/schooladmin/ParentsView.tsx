@@ -8,7 +8,7 @@ import './people-admin.css';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { PaginationControls, PageInfo } from '../common/PaginationControls.tsx';
-import { Search, ExternalLink, Phone, MessageSquare, Users, KeyRound, Copy } from 'lucide-react';
+import { Search, ExternalLink, Phone, MessageSquare, KeyRound, Copy } from 'lucide-react';
 
 type ParentContact = {
   id: string;
