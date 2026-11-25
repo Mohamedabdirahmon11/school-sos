@@ -205,3 +205,47 @@ test('incomplete setup returns HTTP 423 and the missing checklist to student tim
  const response=await request('/timetable',setupStudentCookie);assert.equal(response.status,423,await response.clone().text());
  const payload=await response.json() as any;assert.equal(payload.code,'SCHOOL_SETUP_REQUIRED');assert.ok(Array.isArray(payload.missing)&&payload.missing.length>0);
 });
+
+
+test('bulk-reset Student ID + school code + PIN completes first login and opens the student portal',async()=>{
+ const reset=await post('/students/bulk-reset-pin',cookies.admin,{rows:[{studentId:student.studentId}]});
+ assert.equal(reset.status,200,await reset.clone().text());
+ const receipt=await reset.json() as any;
+ assert.equal(receipt.success,true);
+ assert.equal(receipt.pinSlips.length,1);
+ const temporaryPin=String(receipt.pinSlips[0].newPin);
+ assert.match(temporaryPin,/^\\d{6}$/);
+
+ // The production bulk-reset RPC sets must_change_password=true and updates
+ // the student user hash. Mirror that flag in the in-memory HTTP adapter.
+ const rotatedUser=db.updateUser(studentUser.id,{mustChangePassword:true});
+ assert.ok(rotatedUser);
+ await db.flush();
+
+ const firstLogin=await post('/auth/login','',{role:'student',schoolCode:school.code,studentId:student.studentId,pin:temporaryPin});
+ assert.equal(firstLogin.status,200,await firstLogin.clone().text());
+ const challenge=await firstLogin.json() as any;
+ assert.equal(challenge.requirePinChange,true);
+ assert.ok(challenge.challengeToken);
+
+ const changed=await fetch(base+'/auth/change-pin',{
+  method:'POST',
+  headers:{Authorization:'Bearer '+challenge.challengeToken,'Content-Type':'application/json'},
+  body:JSON.stringify({newPin:'864209'})
+ });
+ assert.equal(changed.status,200,await changed.clone().text());
+ assert.equal((await changed.json() as any).success,true);
+
+ const finalLogin=await post('/auth/login','',{role:'student',schoolCode:school.code,studentId:student.studentId,pin:'864209'});
+ assert.equal(finalLogin.status,200,await finalLogin.clone().text());
+ const finalPayload=await finalLogin.json() as any;
+ assert.equal(finalPayload.user.role,'student');
+ const cookie=finalLogin.headers.get('set-cookie')?.split(';')[0] || '';
+ assert.match(cookie,/^schoolos_session=/);
+
+ // Authenticated student requests now resolve their own record, and App.tsx
+ // maps student role to st_dashboard as the default post-login screen.
+ const profile=await request('/student/me',cookie);
+ assert.equal(profile.status,200,await profile.clone().text());
+ assert.equal((await profile.json() as any).data.student.id,student.id);
+});
