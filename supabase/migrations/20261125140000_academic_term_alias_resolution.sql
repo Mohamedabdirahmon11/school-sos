@@ -111,7 +111,11 @@ BEGIN
     FROM public.terms
     WHERE school_id=p_school_id AND academic_year_id=p_academic_year_id
     ORDER BY start_date,end_date,
-      CASE WHEN lower(name) ~ '^semester[[:space:]]*[12]
+      CASE WHEN lower(name) ~ '^semester[[:space:]]*[12]$' THEN 0
+           WHEN lower(name) ~ '^term[[:space:]]*[12]$' THEN 1 ELSE 2 END,
+      id
+  ) logical_terms;
+  IF COALESCE(array_length(v_terms,1),0)<>2 THEN
     RAISE EXCEPTION 'Sanad-dugsiyeedkan waa inuu leeyahay laba term oo keliya.';
   END IF;
   v_term1:=v_terms[1]; v_term2:=v_terms[2];
