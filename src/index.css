@@ -4128,7 +4128,6 @@ main :is(.flex, .inline-flex) > * {
   --admin-accent:#1f4d3f;
   background:var(--admin-canvas)!important;
   color:var(--admin-ink)!important;
-  color-scheme:light;
 }
 :root:has(.school-admin-mobile-content) .school-admin-sidebar {
   background:linear-gradient(180deg,#1f4d3f 0%,#143a2e 100%)!important;
@@ -4397,4 +4396,49 @@ main :is(.flex, .inline-flex) > * {
     overscroll-behavior-x:contain;
     -webkit-overflow-scrolling:touch;
   }
+}
+
+
+/* Honour the app's existing Tailwind dark-mode switch just like the HTML reference. */
+.dark .school-admin-mobile-content {
+  --admin-canvas:#121a17;
+  --admin-card:#1a2420;
+  --admin-ink:#e6efe9;
+  --admin-muted:#9db0a7;
+  --admin-line:#2d3b35;
+  --admin-accent:#4cc58a;
+  color-scheme:dark;
+}
+.dark .school-admin-mobile-content .school-dashboard-hero {
+  background:linear-gradient(112deg,#1a2420 0%,#1f3028 100%)!important;
+}
+.dark .school-admin-mobile-content table thead {
+  background:#1f2f28;
+}
+.dark .school-admin-mobile-content table tbody tr:hover {
+  background:#1f2f28;
+}
+.dark .school-admin-mobile-content :is(.bg-slate-50,.bg-gray-50,.bg-\\[\\#F8FAFC\\],.bg-\\[\\#F1F5F9\\]) {
+  background:#1f2f28!important;
+}
+.dark .school-admin-mobile-content :is(.text-slate-400,.text-slate-500,.text-slate-600,.text-slate-700,.text-slate-800,.text-slate-900) {
+  color:var(--admin-ink)!important;
+}
+.dark .school-admin-mobile-content :is(input,select,textarea) {
+  background:var(--admin-card);
+  color:var(--admin-ink);
+  border-color:var(--admin-line);
+}
+:root:has(.school-admin-mobile-content) .dark .schoolos-topbar {
+  background:#1a2420!important;
+  border-color:#2d3b35!important;
+  color:#e6efe9!important;
+}
+:root:has(.school-admin-mobile-content) .dark .schoolos-mobile-bottom-nav {
+  background:rgba(26,36,32,.97)!important;
+  border-color:#2d3b35!important;
+}
+:root:has(.school-admin-mobile-content) .dark .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action[aria-current="page"] {
+  background:#1f3028!important;
+  color:#4cc58a!important;
 }
