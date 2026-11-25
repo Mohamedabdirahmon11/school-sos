@@ -32,7 +32,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
       className="schoolos-mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#dce7e4] bg-white/95 shadow-[0_-8px_28px_rgba(15,45,40,0.10)] backdrop-blur-xl"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 6px)' }}
     >
-      <div className={`flex min-h-[68px] items-stretch px-2 ${isSchoolAdmin ? 'school-admin-mobile-quick-grid' : 'gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'}`}>
+      <div className={`${isSchoolAdmin ? 'grid grid-cols-4 school-admin-mobile-quick-grid' : 'flex gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'} min-h-[68px] items-stretch px-2`}>
         {tabs.map(route => {
           const Icon = route.icon;
           const isActive = !(isSchoolAdmin && isMenuOpen) && currentView === route.id;
@@ -45,7 +45,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
               aria-label={label}
               aria-current={isActive ? 'page' : undefined}
               title={label}
-              className={`schoolos-mobile-quick-action relative flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'min-w-0 flex-1 px-0.5' : 'min-w-[68px] flex-1 shrink-0 snap-start px-2'} ${isActive ? 'bg-[#e8f4f1] text-[#0F766E]' : 'text-[#64748B] hover:bg-[#f4f8f7] hover:text-[#132A29]'}`}
+              className={`schoolos-mobile-quick-action relative flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'w-full min-w-0 px-0.5' : 'min-w-[68px] flex-1 shrink-0 snap-start px-2'} ${isActive ? 'bg-[#e8f4f1] text-[#0F766E]' : 'text-[#64748B] hover:bg-[#f4f8f7] hover:text-[#132A29]'}`}
             >
               {isActive && <span aria-hidden="true" className="absolute top-0 h-[3px] w-7 rounded-b-full bg-[#0F766E]" />}
               <Icon aria-hidden="true" className="h-5 w-5 shrink-0" />
@@ -60,7 +60,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
           aria-expanded={isMenuOpen}
           aria-haspopup="dialog"
           title="Menu"
-          className={`schoolos-mobile-menu-action flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'min-w-0 px-1' : 'min-w-[68px] shrink-0 px-2'}`}
+          className={`schoolos-mobile-menu-action flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'w-full min-w-0 px-0.5' : 'min-w-[68px] shrink-0 px-2'}`}
         >
           {isSchoolAdmin && isMenuOpen ? <X aria-hidden="true" className="h-5 w-5 shrink-0" /> : <Menu aria-hidden="true" className="h-5 w-5 shrink-0" />}
           <span className="text-[10px] font-semibold leading-tight">Menu</span>
