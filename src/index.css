@@ -4390,7 +4390,8 @@ main :is(.flex, .inline-flex) > * {
 @media(max-width:767px) {
   .school-admin-mobile-content :is(.grid,.flex) > * { min-width:0; }
   .school-admin-mobile-content :is(h1,h2,h3,p,span,label) { overflow-wrap:anywhere; }
-  .school-admin-mobile-content table { min-width:max-content; }
+  .school-admin-mobile-content table { min-width:0; }
+  .school-admin-mobile-content .overflow-x-auto table { min-width:max-content; }
   .school-admin-mobile-content :is(.overflow-x-auto,.overflow-auto) {
     max-width:100%;
     overscroll-behavior-x:contain;
