@@ -70,7 +70,7 @@ test('two configured semesters map to the legacy semester date fields', () => {
   ] };
   const updates = buildSchoolSetupSchoolUpdates(3, data, school, undefined);
   assert.deepEqual(updates.terms, {
-    semester1Start: '2026-09-01', semester1End: '2026-11-30',
-    semester2Start: '2027-03-02', semester2End: '2027-06-30'
+    semester1Start: '2026-09-01', semester1End: '2027-01-01',
+    semester2Start: '2027-01-02', semester2End: '2027-06-30'
   });
 });
