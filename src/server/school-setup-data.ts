@@ -35,7 +35,7 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   }
   if (step === 3) {
     const terms = data.terms;
-    if (!Array.isArray(terms) || terms.length < 1 || terms.length > 3 || terms.some((t: any) => !String(t.name || '').trim() || !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) return 'Add 1–3 terms with valid names and start/end dates.';
+    if (!Array.isArray(terms) || terms.length !== 2 || terms.some((t: any) => !String(t.name || '').trim() || !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) return 'Ku dar laba semester oo keliya, mid kastaana ha lahaado magac iyo taariikho sax ah.';
     const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
     if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
     const academicYear = existingData?.academicYear;
