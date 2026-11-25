@@ -5044,25 +5044,42 @@ main :is(.flex, .inline-flex) > * {
   color:#183b2d;
 }
 
-/* School Admin phone layout: themed bottom bar and a full-screen menu that slides up above it. */
+/* School Admin phone layout: keep the quick bar readable with the light surface
+   defined above; do not force white labels onto its white background. */
 @media (max-width:767px) {
-  .school-admin-mobile-quick-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
   .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
     z-index:60;
-    background:var(--sidebar-background,#0f2a5c);
-    border-color:rgba(255,255,255,.14);
+    background:rgba(255,255,255,.98) !important;
+    border-color:#d9e5df !important;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] > div.school-admin-mobile-quick-grid {
+    display:grid !important;
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+    gap:4px !important;
+    width:100%;
   }
   .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] :is(.schoolos-mobile-quick-action,.schoolos-mobile-menu-action) {
-    width:auto;
+    width:100% !important;
+    min-width:0 !important;
     border:0;
     background:transparent !important;
     box-shadow:none !important;
-    color:var(--sidebar-text,#fff) !important;
+    color:#52665e !important;
   }
-  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] :is(.schoolos-mobile-quick-action[aria-current="page"],.schoolos-mobile-menu-action[aria-expanded="true"]) {
-    background:rgba(255,255,255,.16) !important;
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action[aria-current="page"] {
+    background:#eaf2ed !important;
+    color:#1f4d3f !important;
   }
-  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action span { font-size:11px; }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action {
+    border-left:1px solid #e6eeeb;
+    color:#1f4d3f !important;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action span,
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action span {
+    font-size:10px;
+    line-height:1.2;
+    white-space:nowrap;
+  }
   :root:has(.school-admin-mobile-content) .school-admin-sidebar {
     translate:0 100% !important;
     visibility:hidden;
