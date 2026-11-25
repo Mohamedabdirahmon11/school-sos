@@ -3255,7 +3255,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
       }
       return safe;
     };
-    res.json(redactFinance(summary));
+    res.json(redactFinance(dashboard));
   }
   catch { res.status(503).json({ error: 'Unable to load the school dashboard.' }); }
 });
