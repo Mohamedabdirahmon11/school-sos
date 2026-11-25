@@ -12682,6 +12682,14 @@ function termReportCardPdfPage(school: School, card: any, student: any, classNam
   return { lines };
 }
 
+function effectiveTermAssignments(rows: any[], termId: string, teacherId: string) {
+  const key = (row: any) => [row.class_id, row.subject_id, row.section_id || ''].join(':');
+  const canonical = new Set((rows || []).filter((row: any) => row.term_id === termId).map(key));
+  return (rows || []).filter((row: any) =>
+    row.term_id == null || row.term_id === termId || !canonical.has(key(row))
+  ).filter((row: any) => row.teacher_id === teacherId);
+}
+
 apiRouter.get('/term-marks/terms', requireAuth, requireSchoolContext, async (req, res) => {
   const school = (req as any).school as School;
   const client = termMarksServiceClient(res); if (!client) return;
@@ -12771,10 +12779,11 @@ apiRouter.get('/term-marks/assignments', requireAuth, requireSchoolContext, requ
   if(!teacher||!term){res.status(403).json({error:'Macallinka ama term-ka lama xaqiijin.'});return;}
   const {data:aliases}=await client.from('terms').select('id').eq('school_id',school.id).eq('academic_year_id',term.academic_year_id).eq('start_date',term.start_date).eq('end_date',term.end_date);
   const aliasIds=(aliases||[]).map((row:any)=>row.id);
-  const {data:assignments,error}=await client.from('teacher_class_subject_assignments')
-    .select('class_id,subject_id,section_id').eq('school_id',school.id).eq('teacher_id',teacher.id)
+  const {data:assignmentRows,error}=await client.from('teacher_class_subject_assignments')
+    .select('class_id,subject_id,section_id,teacher_id,term_id').eq('school_id',school.id)
     .eq('academic_year_id',term.academic_year_id).or(`term_id.is.null,term_id.in.(${aliasIds.join(',')})`);
   if(error){res.status(503).json({error:error.message});return;}
+  const assignments=effectiveTermAssignments(assignmentRows||[],termId,teacher.id);
   const classIds=[...new Set((assignments||[]).map((a:any)=>a.class_id))];
   const subjectIds=[...new Set((assignments||[]).map((a:any)=>a.subject_id))];
   const [{data:classes},{data:subjects}]=await Promise.all([
@@ -12805,11 +12814,12 @@ apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSch
   if (!term) { res.status(404).json({ error: 'Term-kan lama helin.' }); return; }
   const { data: aliases } = await client.from('terms').select('id').eq('school_id',school.id).eq('academic_year_id',term.academic_year_id).eq('start_date',term.start_date).eq('end_date',term.end_date);
   const aliasIds=(aliases||[]).map((row:any)=>row.id);
-  const { data: assignments } = await client.from('teacher_class_subject_assignments')
-    .select('section_id').eq('school_id',school.id).eq('teacher_id',teacher.id)
+  const { data: assignmentRows } = await client.from('teacher_class_subject_assignments')
+    .select('section_id,teacher_id,term_id,class_id,subject_id').eq('school_id',school.id)
     .eq('academic_year_id',term.academic_year_id).eq('class_id',classId).eq('subject_id',subjectId)
     .or(`term_id.is.null,term_id.in.(${aliasIds.join(',')})`);
-  if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
+  const assignments=effectiveTermAssignments(assignmentRows||[],termId,teacher.id);
+  if (!assignments.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
   if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const { data: component } = await client.from('mark_components').select('id,structure_id,max_marks')
     .eq('school_id',school.id).eq('id',componentId).maybeSingle();
@@ -12850,10 +12860,11 @@ apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireSc
   if (!term) { res.status(404).json({ error: 'Term-kan lama helin.' }); return; }
   const { data: aliases } = await client.from('terms').select('id').eq('school_id',school.id).eq('academic_year_id',term.academic_year_id).eq('start_date',term.start_date).eq('end_date',term.end_date);
   const aliasIds=(aliases||[]).map((row:any)=>row.id);
-  const { data: assignments } = await client.from('teacher_class_subject_assignments').select('id')
-    .eq('school_id', school.id).eq('teacher_id', teacher.id).eq('academic_year_id', term.academic_year_id)
-    .eq('class_id', classId).eq('subject_id', subjectId).or(`term_id.is.null,term_id.in.(${aliasIds.join(',')})`).limit(1);
-  if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
+  const { data: assignmentRows } = await client.from('teacher_class_subject_assignments').select('id,teacher_id,term_id,class_id,subject_id,section_id')
+    .eq('school_id', school.id).eq('academic_year_id', term.academic_year_id)
+    .eq('class_id', classId).eq('subject_id', subjectId).or(`term_id.is.null,term_id.in.(${aliasIds.join(',')})`);
+  const assignments=effectiveTermAssignments(assignmentRows||[],structure.term_id,teacher.id);
+  if (!assignments.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
   if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const { data, error } = await client.rpc('schoolos_save_component_marks', {
     p_school_id: school.id, p_actor_id: user.id, p_component_id: componentId,
