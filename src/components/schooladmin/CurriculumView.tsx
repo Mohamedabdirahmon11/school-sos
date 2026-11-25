@@ -150,6 +150,12 @@ export const CurriculumView: React.FC<{ onNavigate: (view: string) => void }> = 
         <AcademicSetupHeader active="sch_curriculum" onNavigate={onNavigate} />
         <h2>Class Curriculum</h2>
         <p className="lead">Dooro maaddooyinka fasalka iyo xiisadaha toddobaadkii. Wadarta xiisaduhu ma dhaafi karto awoodda dugsiga (5 maalmood × 6 xiisadood = 30).</p>
+        <section className="schoolos-academic-stats" aria-label="Curriculum summary">
+          <div className="schoolos-academic-stat"><span>Fasalka la doortay</span><strong>{selectedClass ? classLabel(selectedClass) : '—'}</strong></div>
+          <div className="schoolos-academic-stat"><span>Maaddooyinka la doortay</span><strong>{selectedById.size}</strong></div>
+          <div className="schoolos-academic-stat"><span>Periods / usbuuc</span><strong>{totalPeriods}</strong></div>
+          <div className="schoolos-academic-stat"><span>Awoodda usbuuca</span><strong>{capacity.weeklyCapacity}</strong></div>
+        </section>
         {notice && <div role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite" className={`msg ${notice.kind === 'error' ? 'bad' : 'ok'}`}>{notice.text}</div>}
         <section className="card">
           <div className="bar">
