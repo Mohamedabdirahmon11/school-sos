@@ -49,7 +49,8 @@ export function normalizeSchoolDashboardData(data: unknown) {
         : [],
       canFinish: Boolean((value.setupReadiness as DashboardRecord | undefined)?.canFinish)
     },
-    pendingAdmissions: number(value.pendingAdmissions)
+    pendingAdmissions: number(value.pendingAdmissions),
+    pendingMarks: number(value.pendingMarks)
   };
 }
 
@@ -141,6 +142,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
         <StatCard label="Maqan maanta" value={result.absentStudents.length.toLocaleString()} note="Ardayda u baahan dabagal" icon={AlertCircle} tone="red" onClick={() => onNavigate('sch_attendance')} />
         <StatCard label="Ogeysiisyada firfircoon" value={result.notices.length.toLocaleString()} note="Ogeysiisyadii ugu dambeeyay" icon={Bell} tone="blue" onClick={() => onNavigate('sch_notices')} />
         {canManageStudents && <StatCard label="Codsiyada cusub" value={result.pendingAdmissions.toLocaleString()} note="Codsiyo sugaya dib-u-eegis" icon={UserPlus} tone="gold" onClick={() => onNavigate('sch_admissions')} />}
+        {canManageStudents && <StatCard label="Natiijooyin sugaya ansixin" value={result.pendingMarks.toLocaleString()} note="Dhibcaha macallimiintu soo gudbiyeen" icon={ClipboardCheck} tone="blue" onClick={() => onNavigate('sch_marks_approval')} />}
         {canViewFinance && <StatCard label="Lacag maanta la qabtay" value={formatMoney(todayCollection, currency)} note="Wadarta lacag ururinta maanta" icon={Wallet} tone="gold" onClick={() => onNavigate('sch_fees')} />}
         {canViewFinance && <StatCard label="Lacagta dhiman" value={formatMoney(totalOutstanding, currency)} note="Haraaga lacagaha" icon={CreditCard} tone="red" onClick={() => onNavigate('sch_fees')} />}
       </section>
