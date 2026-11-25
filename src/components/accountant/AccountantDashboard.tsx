@@ -138,7 +138,7 @@ export const AccountantDashboard: React.FC = () => {
   if (loading) return <LoadingState label="Loading finance dashboard…" className="max-w-7xl" />;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="accountant-dashboard p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Printable Receipt Modal */}
       {selectedReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">

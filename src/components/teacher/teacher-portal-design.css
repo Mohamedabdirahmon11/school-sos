@@ -59,3 +59,10 @@
 .teacher-portal-design button[class*="bg-teal-700"],.teacher-portal-design button[class*="bg-[#0F766E]"]{
   background:var(--tp-brand)!important;border-color:var(--tp-brand)!important;color:var(--tp-brand-fg)!important;
 }
+
+
+/* Teacher workspace palette harmonized with SchoolOS. */
+.teacher-portal-design{--tp-bg:#f4f7f6;--tp-surface:#fff;--tp-fg:#243247;--tp-muted:#64748b;--tp-line:#dce5e2;--tp-brand:var(--school-brand-color,#176b60);--tp-soft:#edf5f2}
+.teacher-portal-design .tp-card,.teacher-portal-design .tp-stat{box-shadow:0 2px 8px rgb(24 55 39 / 3%)!important}
+.teacher-portal-design :is(button,input,select,textarea){font-family:inherit}
+.teacher-portal-design button[class*="bg-indigo-"],.teacher-portal-design button[class*="bg-blue-"]{background:var(--tp-brand)!important;border-color:var(--tp-brand)!important;color:var(--tp-brand-fg)!important}

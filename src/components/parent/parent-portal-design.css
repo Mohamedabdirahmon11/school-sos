@@ -43,3 +43,16 @@
 .pp-bottom-nav{box-shadow:0 -8px 28px rgba(19,42,41,.12);backdrop-filter:blur(16px)}
 @media(max-width:760px){.pp-main{padding:16px 13px 26px}.pp-page-head{align-items:flex-start}.pp-card,.pp-kid-card{padding:15px;border-radius:15px}.pp-stat-grid{gap:9px}.pp-stat-grid>.pp-card>strong{font-size:26px}.pp-nav-item.is-mobile{min-height:58px}.pp-more-sheet{min-width:210px;border-radius:15px}.pp-fee-row{grid-template-columns:minmax(0,1fr) auto;gap:8px}.pp-fee-row>em{grid-column:2;justify-self:end}.pp-fee-amounts{grid-column:2;grid-row:1;text-align:right}}
 @media(prefers-reduced-motion:reduce){.pp-nav-item{transition:none}}
+
+
+/* Keep parent portal accent colors consistent with SchoolOS; retain clear status colors. */
+.parent-portal-shell{--pp-bg:#f4f7f6;--pp-card:#fff;--pp-ink:#243247;--pp-muted:#64748b;--pp-line:#dce5e2;--pp-nav:#173f35;--pp-nav-ink:#eef5f1;--pp-accent:#2b8b77;--pp-soft:#edf5f2}
+.parent-portal-shell .pp-avatar,.parent-portal-shell .pp-child-avatar{background:#dcefe9!important;color:#17584d!important}
+.parent-portal-shell .pp-child-strip button.is-active{background:#176b60!important;border-color:#176b60!important;color:#fff!important}
+.parent-portal-shell .pp-kid-actions button:first-child{background:#176b60!important;border-color:#176b60!important;color:#fff!important}
+.parent-portal-shell .pp-primary-button{background:#176b60!important;color:#fff!important}
+.parent-portal-shell .pp-primary-button:hover{background:#14594f!important}
+.parent-portal-shell .pp-fee-row em{background:#e8f3ef!important;color:#176b60!important}
+.parent-portal-shell button:focus-visible,.parent-portal-shell input:focus-visible,.parent-portal-shell textarea:focus-visible{outline-color:#176b60!important}
+.parent-portal-shell.pp-theme-dark{--pp-bg:#121a17;--pp-card:#1a2420;--pp-ink:#e6efe9;--pp-muted:#a7b8af;--pp-line:#34453d;--pp-nav:#101b17;--pp-nav-ink:#e6efe9;--pp-accent:#65c697;--pp-soft:#20372d}
+@media(prefers-color-scheme:dark){.parent-portal-shell[data-theme="auto"]{--pp-bg:#121a17;--pp-card:#1a2420;--pp-ink:#e6efe9;--pp-muted:#a7b8af;--pp-line:#34453d;--pp-nav:#101b17;--pp-nav-ink:#e6efe9;--pp-accent:#65c697;--pp-soft:#20372d}}
