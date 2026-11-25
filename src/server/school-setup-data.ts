@@ -42,7 +42,13 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
     if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
     const academicYear = existingData?.academicYear;
-    if (academicYear && validIsoDate(academicYear.startDate) && validIsoDate(academicYear.endDate)) {
+    if (academicYear) {
+      const yearName = String(academicYear.name || '');
+      const years = yearName.split('/').map(Number);
+      if (!/^\\d{4}\\/\\d{4}$/.test(yearName) || years[1] !== years[0] + 1 || !validIsoDate(academicYear.startDate) || !validIsoDate(academicYear.endDate)
+        || Number(academicYear.startDate.slice(0, 4)) !== years[0] || Number(academicYear.endDate.slice(0, 4)) !== years[1]) {
+        return 'Fix the academic year dates before saving semesters.';
+      }
       if (terms.some((term: any) => term.startDate < academicYear.startDate || term.endDate > academicYear.endDate)) return 'Each term must fall within the selected academic year.';
     }
   }
