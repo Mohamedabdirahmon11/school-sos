@@ -568,7 +568,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
 
       <section className="space-y-3">
         <div className="rounded-2xl border border-[#DCE7E4] bg-white px-4 py-3 shadow-sm">
-          <h2 className="text-sm font-bold uppercase tracking-[0.12em] text-[#132A29]">School Configuration</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.12em] text-[#132A29]">School Settings</h2>
           <p className="mt-1 text-xs text-[#64748B]">Choose a section to manage</p>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
