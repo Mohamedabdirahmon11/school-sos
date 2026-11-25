@@ -18,6 +18,12 @@ test('academic year requires consecutive years and valid Gregorian dates', () =>
   assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2028', isCurrent: true, startDate: '2026-02-31', endDate: '2027-06-30' } }) || '', /valid academic year/);
 });
 
+test('academic year dates must match the two years in its name', () => {
+  assert.equal(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2027-06-30' } }), null);
+  assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2028-06-08' } }) || '', /dates must match its name/);
+  assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2025-09-01', endDate: '2027-06-30' } }) || '', /dates must match its name/);
+});
+
 test('academic year cannot be changed to exclude already saved terms', () => {
   const existingData = { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-01-01' }] };
   assert.equal(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2027-06-30' } }, existingData), null);
