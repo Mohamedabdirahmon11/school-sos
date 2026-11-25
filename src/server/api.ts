@@ -3223,7 +3223,7 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
       timeZone: school.timezone || 'Africa/Addis_Ababa'
     }).format(new Date());
     const details = await schoolDashboardDetailsCache.get(`${school.id}:${today}`, async () => {
-      const [readiness, eventsPage, activityPage, admissionsPage] = await Promise.all([
+      const [readiness, eventsPage, activityPage, admissionsPage, pendingMarksPage] = await Promise.all([
         evaluateReadiness(school.id),
         db.queryPage('school_events', { school_id: school.id }, 1, 5,
           `end_date.gte.${today}`,
@@ -3232,11 +3232,13 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
           'or(category.eq.school,category.eq.academics)',
           'id,timestamp,action,category,user_name,details,severity', 'timestamp', false),
         db.queryPage('admission_applications', { school_id: school.id, status: 'pending' },
+          1, 1, undefined, 'id'),
+        db.queryPage('student_marks', { school_id: school.id, status: 'submitted' },
           1, 1, undefined, 'id')
       ]);
-      return { readiness, eventsPage, activityPage, admissionsPage };
+      return { readiness, eventsPage, activityPage, admissionsPage, pendingMarksPage };
     });
-    const { readiness, eventsPage, activityPage, admissionsPage } = details;
+    const { readiness, eventsPage, activityPage, admissionsPage, pendingMarksPage } = details;
     const dashboard = {
       ...summary,
       setupReadiness: {
@@ -3248,7 +3250,8 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
       },
       upcomingEvents: eventsPage.items,
       recentActivity: activityPage.items,
-      pendingAdmissions: admissionsPage.total
+      pendingAdmissions: admissionsPage.total,
+      pendingMarks: pendingMarksPage.total
     };
 
     // School admins may see academic dashboard data, never finance data.
