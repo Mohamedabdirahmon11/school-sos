@@ -201,6 +201,6 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
           </button>)}
         </div>
       </section>
-    </main>
+    </div>
   );
 };
