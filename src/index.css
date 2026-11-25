@@ -4336,3 +4336,65 @@ main :is(.flex, .inline-flex) > * {
     overflow-wrap:normal;
   }
 }
+
+
+/* Shared School Admin component skin, so the remaining admin workspaces inherit
+   the reference design without replacing their existing React workflows. */
+.school-admin-mobile-content table {
+  border-collapse:collapse;
+  background:var(--admin-card,#fff);
+}
+.school-admin-mobile-content table thead {
+  background:#f2f3ed;
+}
+.school-admin-mobile-content table th {
+  color:var(--admin-muted,#5f6f68)!important;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.045em;
+  text-transform:uppercase;
+}
+.school-admin-mobile-content table :is(th,td) {
+  border-color:var(--admin-line,#d9d6cb)!important;
+}
+.school-admin-mobile-content table tbody tr:hover {
+  background:#f6f8f3;
+}
+.school-admin-mobile-content :is([role="dialog"],[role="alertdialog"]) {
+  background:var(--admin-card,#fff);
+  border-color:var(--admin-line,#d9d6cb);
+  color:var(--admin-ink,#1c2b26);
+}
+.school-admin-mobile-content :is(input,select,textarea) {
+  background:var(--admin-card,#fff);
+}
+.school-admin-mobile-content :is(button,a,[role="button"]) {
+  text-underline-offset:3px;
+}
+.school-admin-mobile-content :is(button,a,[role="button"]):focus-visible {
+  outline-color:rgba(31,77,63,.45);
+}
+.school-admin-mobile-content :is(.bg-slate-50,.bg-gray-50,.bg-\\[\\#F8FAFC\\],.bg-\\[\\#F1F5F9\\]) {
+  background:#f2f3ed!important;
+}
+.school-admin-mobile-content :is(.text-blue-700,.text-blue-600,.text-teal-700,.text-teal-600) {
+  color:var(--admin-accent,#1f4d3f)!important;
+}
+.school-admin-mobile-content :is(.border-blue-100,.border-blue-200,.border-teal-100,.border-teal-200) {
+  border-color:#cbdacf!important;
+}
+.school-admin-mobile-content .school-dashboard-page,
+.school-admin-mobile-content .school-students-page,
+.school-admin-mobile-content .school-people-page {
+  color:var(--admin-ink,#1c2b26);
+}
+@media(max-width:767px) {
+  .school-admin-mobile-content :is(.grid,.flex) > * { min-width:0; }
+  .school-admin-mobile-content :is(h1,h2,h3,p,span,label) { overflow-wrap:anywhere; }
+  .school-admin-mobile-content table { min-width:max-content; }
+  .school-admin-mobile-content :is(.overflow-x-auto,.overflow-auto) {
+    max-width:100%;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+}
