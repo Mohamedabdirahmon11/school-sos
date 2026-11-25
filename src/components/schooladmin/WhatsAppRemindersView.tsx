@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import './operations-reference.css';
 import { AlertCircle, CheckCircle2, ExternalLink, Loader2, MessageCircle, RefreshCw, Search, Send, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
@@ -112,7 +113,7 @@ export const WhatsAppRemindersView: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
+    <div className="schoolos-operations-page mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-teal-700"><MessageCircle size={19}/><span className="text-xs font-bold uppercase tracking-wider">School Admin · Communication</span></div>
