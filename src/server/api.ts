@@ -12689,12 +12689,23 @@ apiRouter.get('/term-marks/terms', requireAuth, requireSchoolContext, async (req
     .select('id,name,academic_year_id,start_date,end_date,is_current')
     .eq('school_id', school.id).order('start_date', { ascending: true });
   if (error) { res.status(503).json({ error: error.message }); return; }
-  const ids = (terms || []).map((term: any) => term.id);
+  // Collapse legacy Term 1/2 aliases that share the exact same academic dates.
+  const groups = new Map<string, any[]>();
+  for (const term of terms || []) {
+    const key = String(term.academic_year_id) + ':' + String(term.start_date) + ':' + String(term.end_date);
+    groups.set(key, [...(groups.get(key) || []), term]);
+  }
+  const canonicalTerms = [...groups.values()].map(group => {
+    const rank = (name: string) => /^semester\\s*[12]$/i.test(name) ? 0 : /^term\\s*[12]$/i.test(name) ? 1 : 2;
+    const sorted = [...group].sort((a: any,b: any) => rank(String(a.name || '')) - rank(String(b.name || '')) || String(a.name).localeCompare(String(b.name)));
+    return { ...sorted[0], aliasTermIds: group.map((row: any) => row.id) };
+  }).sort((a: any,b: any) => String(a.start_date).localeCompare(String(b.start_date)));
+  const ids = canonicalTerms.map((term: any) => term.id);
   const { data: statuses } = ids.length
     ? await client.from('term_status').select('term_id,status,closed_by,closed_at').eq('school_id', school.id).in('term_id', ids)
     : { data: [] as any[] };
   const statusByTerm = new Map((statuses || []).map((row: any) => [row.term_id, row]));
-  res.json((terms || []).map((term: any) => ({ ...term, status: statusByTerm.get(term.id)?.status || 'open', closedAt: statusByTerm.get(term.id)?.closed_at || null })));
+  res.json(canonicalTerms.map((term: any) => ({ ...term, status: statusByTerm.get(term.id)?.status || 'open', closedAt: statusByTerm.get(term.id)?.closed_at || null })));
 });
 
 apiRouter.get('/term-marks/structures', requireAuth, requireSchoolContext, async (req, res) => {
@@ -12756,11 +12767,13 @@ apiRouter.get('/term-marks/assignments', requireAuth, requireSchoolContext, requ
   if(!termId){res.status(400).json({error:'Dooro term-ka.'});return;}
   const client=termMarksServiceClient(res);if(!client)return;
   const {data:teacher}=await client.from('teachers').select('id').eq('school_id',school.id).eq('user_id',user.id).maybeSingle();
-  const {data:term}=await client.from('terms').select('academic_year_id').eq('school_id',school.id).eq('id',termId).maybeSingle();
+  const {data:term}=await client.from('terms').select('academic_year_id,start_date,end_date').eq('school_id',school.id).eq('id',termId).maybeSingle();
   if(!teacher||!term){res.status(403).json({error:'Macallinka ama term-ka lama xaqiijin.'});return;}
+  const {data:aliases}=await client.from('terms').select('id').eq('school_id',school.id).eq('academic_year_id',term.academic_year_id).eq('start_date',term.start_date).eq('end_date',term.end_date);
+  const aliasIds=(aliases||[]).map((row:any)=>row.id);
   const {data:assignments,error}=await client.from('teacher_class_subject_assignments')
     .select('class_id,subject_id,section_id').eq('school_id',school.id).eq('teacher_id',teacher.id)
-    .eq('academic_year_id',term.academic_year_id).or(`term_id.is.null,term_id.eq.${termId}`);
+    .eq('academic_year_id',term.academic_year_id).or(`term_id.is.null,term_id.in.(${aliasIds.join(',')})`);
   if(error){res.status(503).json({error:error.message});return;}
   const classIds=[...new Set((assignments||[]).map((a:any)=>a.class_id))];
   const subjectIds=[...new Set((assignments||[]).map((a:any)=>a.subject_id))];
@@ -12788,12 +12801,14 @@ apiRouter.get('/term-marks/entry', requireAuth, requireSchoolContext, requireSch
   const client = termMarksServiceClient(res); if (!client) return;
   const { data: teacher } = await client.from('teachers').select('id').eq('school_id',school.id).eq('user_id',user.id).maybeSingle();
   if (!teacher) { res.status(403).json({ error: 'Akoonka macallinka lama helin.' }); return; }
-  const { data: term } = await client.from('terms').select('academic_year_id').eq('school_id',school.id).eq('id',termId).maybeSingle();
+  const { data: term } = await client.from('terms').select('academic_year_id,start_date,end_date').eq('school_id',school.id).eq('id',termId).maybeSingle();
   if (!term) { res.status(404).json({ error: 'Term-kan lama helin.' }); return; }
+  const { data: aliases } = await client.from('terms').select('id').eq('school_id',school.id).eq('academic_year_id',term.academic_year_id).eq('start_date',term.start_date).eq('end_date',term.end_date);
+  const aliasIds=(aliases||[]).map((row:any)=>row.id);
   const { data: assignments } = await client.from('teacher_class_subject_assignments')
     .select('section_id').eq('school_id',school.id).eq('teacher_id',teacher.id)
     .eq('academic_year_id',term.academic_year_id).eq('class_id',classId).eq('subject_id',subjectId)
-    .or(`term_id.is.null,term_id.eq.${termId}`);
+    .or(`term_id.is.null,term_id.in.(${aliasIds.join(',')})`);
   if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
   if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const { data: component } = await client.from('mark_components').select('id,structure_id,max_marks')
@@ -12831,11 +12846,13 @@ apiRouter.post('/term-marks/entry', requireAuth, requireSchoolContext, requireSc
   if (!component) { res.status(404).json({ error: 'Qaybtan dhibcaha lama helin.' }); return; }
   const { data: structure } = await client.from('mark_structures').select('term_id').eq('school_id', school.id).eq('id', component.structure_id).maybeSingle();
   if (!structure) { res.status(404).json({ error: 'Qaab-dhismeedka dhibcaha lama helin.' }); return; }
-  const { data: term } = await client.from('terms').select('academic_year_id').eq('school_id', school.id).eq('id', structure.term_id).maybeSingle();
+  const { data: term } = await client.from('terms').select('academic_year_id,start_date,end_date').eq('school_id', school.id).eq('id', structure.term_id).maybeSingle();
   if (!term) { res.status(404).json({ error: 'Term-kan lama helin.' }); return; }
+  const { data: aliases } = await client.from('terms').select('id').eq('school_id',school.id).eq('academic_year_id',term.academic_year_id).eq('start_date',term.start_date).eq('end_date',term.end_date);
+  const aliasIds=(aliases||[]).map((row:any)=>row.id);
   const { data: assignments } = await client.from('teacher_class_subject_assignments').select('id')
     .eq('school_id', school.id).eq('teacher_id', teacher.id).eq('academic_year_id', term.academic_year_id)
-    .eq('class_id', classId).eq('subject_id', subjectId).or(`term_id.is.null,term_id.eq.${structure.term_id}`).limit(1);
+    .eq('class_id', classId).eq('subject_id', subjectId).or(`term_id.is.null,term_id.in.(${aliasIds.join(',')})`).limit(1);
   if (!assignments?.length) { res.status(403).json({ error: 'Maaddadan fasalkan laguu qoondeyn.' }); return; }
   if (!await ensureTeacherAssignmentReadyForTeacher(school, res)) return;
   const { data, error } = await client.rpc('schoolos_save_component_marks', {
