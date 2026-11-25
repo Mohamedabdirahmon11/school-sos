@@ -696,3 +696,65 @@
 :root[data-theme="dark"] .school-people-parents-page tbody td::before {
   color: var(--people-muted);
 }
+
+
+/* SchoolOS people directories — focused mobile redesign (360px–767px). */
+@media (max-width: 767px) {
+  .school-people-students-page,
+  .school-people-parents-page,
+  .school-people-teachers-page {
+    width: 100%; max-width: 100%; min-width: 0; margin-inline: auto;
+    padding: 12px !important; border-radius: 0; overflow-x: clip;
+    gap: 14px !important;
+  }
+  .school-people-students-page h1,
+  .school-people-parents-page h1,
+  .school-people-teachers-page h1 { font-size: clamp(20px, 5vw, 25px) !important; line-height: 1.2 !important; overflow-wrap: anywhere; }
+  .school-people-students-page p,
+  .school-people-parents-page p,
+  .school-people-teachers-page p { overflow-wrap: anywhere; }
+  .school-people-students-page input,
+  .school-people-students-page select,
+  .school-people-students-page textarea,
+  .school-people-parents-page input,
+  .school-people-parents-page select,
+  .school-people-parents-page textarea,
+  .school-people-teachers-page input,
+  .school-people-teachers-page select,
+  .school-people-teachers-page textarea { min-width: 0; max-width: 100%; min-height: 44px; font-size: 14px !important; }
+  .school-people-students-page button,
+  .school-people-parents-page button,
+  .school-people-teachers-page button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .school-people-students-page .student-mobile-list { display: grid; grid-template-columns: minmax(0,1fr); gap: 10px; padding: 0 !important; }
+  .school-people-students-page .student-mobile-card { min-width: 0; border-radius: 16px; padding: 14px !important; background: var(--people-card,#fff); box-shadow: 0 3px 12px rgb(18 48 41 / 6%); }
+  .school-people-students-page .student-mobile-card > div { min-width: 0; }
+  .school-people-students-page .student-mobile-card button { min-height: 38px; }
+  .school-people-students-page .overflow-x-auto { max-width: 100%; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  .school-people-students-page table { min-width: 980px; }
+  .school-people-students-page form .grid.grid-cols-3 { grid-template-columns: minmax(0,1fr) !important; }
+  .school-people-students-page [class*="fixed inset-0"] > form,
+  .school-people-students-page [class*="fixed inset-0"] > div,
+  .school-people-parents-page [role="dialog"],
+  .school-people-teachers-page [role="dialog"] { width: min(100%, calc(100vw - 20px)) !important; max-width: calc(100vw - 20px) !important; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; padding: 14px !important; }
+  .school-people-parents-page > div:nth-of-type(2) { border-radius: 15px !important; background: var(--people-card,#fff); border: 1px solid var(--people-line,#e5e3da); }
+  .school-people-parents-page tbody tr { border-radius: 16px; box-shadow: 0 3px 12px rgb(18 48 41 / 6%); }
+  .school-people-parents-page tbody td { grid-template-columns: minmax(84px,30%) minmax(0,1fr); }
+  .school-people-parents-page tbody td:last-child button,
+  .school-people-parents-page tbody td:last-child a { flex: 1 1 auto; min-height: 42px; }
+  .school-people-teachers-page > header:first-child { padding: 17px !important; border-radius: 18px !important; }
+  .school-people-teachers-page section[aria-label="Teacher directory summary"] { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .school-people-teachers-page section[aria-label="Teacher directory summary"] article { min-width: 0; padding: 12px !important; }
+  .school-people-teachers-page .teacher-directory tbody tr { min-width: 0; border-radius: 16px; }
+  .school-people-teachers-page .teacher-directory tbody td { grid-template-columns: minmax(78px,30%) minmax(0,1fr); }
+  .school-people-teachers-page .teacher-directory tbody td:last-child button { flex: 1 1 calc(50% - 7px); min-width: 0; }
+}
+@media (max-width: 390px) {
+  .school-people-students-page,
+  .school-people-parents-page,
+  .school-people-teachers-page { padding: 10px !important; }
+  .school-people-parents-page tbody td,
+  .school-people-teachers-page .teacher-directory tbody td { grid-template-columns: minmax(70px,27%) minmax(0,1fr); gap: 7px; padding-inline: 10px !important; }
+  .school-people-teachers-page section[aria-label="Teacher directory summary"] article p:nth-child(2) { font-size: 22px !important; }
+}
+:root[data-theme="dark"] .school-people-students-page .student-mobile-card,
+:root[data-theme="dark"] .school-people-parents-page > div:nth-of-type(2) { background: var(--people-card); color: var(--people-ink); border-color: var(--people-line); }
