@@ -4811,3 +4811,90 @@ main :is(.flex, .inline-flex) > * {
 }
 .dark .schoolos-dash-button-primary,[data-theme="dark"] .schoolos-dash-button-primary { background: #2d805b; border-color: #2d805b; color: #fff; }
 .dark .schoolos-dash-chart-track,[data-theme="dark"] .schoolos-dash-chart-track { background: #20372d; }
+
+
+/* ===== People workspaces: shared HTML-reference visual language ===== */
+.school-people-page,.school-students-page {
+  --people-bg:#f6f4ee; --people-card:#fff; --people-ink:#1c2b26; --people-muted:#5f6f68;
+  --people-line:#d9d6cb; --people-green:#1f4d3f; --people-soft:#eaf2ed;
+  color:var(--people-ink); min-width:0;
+}
+.school-people-page { background:var(--people-bg); border-radius:14px; }
+.schoolos-people-header {
+  display:flex; align-items:flex-end; justify-content:space-between; gap:18px;
+  min-width:0; padding:22px 24px; border:1px solid var(--people-line);
+  border-radius:12px; background:var(--people-card); box-shadow:0 1px 3px rgba(20,40,30,.04);
+}
+.schoolos-people-header > div:first-child { min-width:0; }
+.schoolos-people-kicker { display:block; color:var(--people-muted); font-size:10px; font-weight:800; letter-spacing:.12em; }
+.schoolos-people-header h1 { margin:4px 0 3px; color:var(--people-ink); font:700 clamp(25px,2.6vw,32px)/1.15 Georgia,serif; letter-spacing:-.025em; }
+.schoolos-people-header p { margin:5px 0 0; color:var(--people-muted); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.schoolos-people-header-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; min-width:0; }
+.schoolos-people-header-actions button { min-height:38px; padding:7px 11px !important; border-radius:8px !important; font-size:11px !important; box-shadow:none !important; }
+.schoolos-people-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; min-width:0; }
+.schoolos-people-stat { min-width:0; padding:13px 14px; border:1px solid var(--people-line); border-radius:11px; background:var(--people-card); box-shadow:0 1px 3px rgba(20,40,30,.035); }
+.schoolos-people-stat p { margin:0; color:var(--people-muted); font-size:11px; font-weight:700; }
+.schoolos-people-stat strong { display:block; margin-top:5px; color:var(--people-ink); font:700 25px/1.15 Georgia,serif; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.schoolos-people-stat small { display:block; margin-top:4px; color:var(--people-muted); font-size:10px; }
+.schoolos-people-filter { border-color:var(--people-line)!important; border-radius:11px!important; box-shadow:0 1px 3px rgba(20,40,30,.03); }
+.schoolos-people-filter input,.schoolos-people-filter select,.school-people-page input:not([type=checkbox]),.school-people-page select,.school-people-page textarea {
+  max-width:100%; min-width:0; border-color:var(--people-line); color:var(--people-ink);
+}
+.school-people-page input:focus-visible,.school-people-page select:focus-visible,.school-people-page textarea:focus-visible {
+  outline:2px solid var(--people-green); outline-offset:2px;
+}
+.schoolos-people-table-card { border-color:var(--people-line)!important; border-radius:11px!important; box-shadow:0 1px 3px rgba(20,40,30,.035)!important; }
+.school-people-page table { border-collapse:separate; border-spacing:0; }
+.school-people-page thead th { color:var(--people-muted)!important; font-size:10px!important; font-weight:800!important; letter-spacing:.055em; }
+.school-people-page tbody td { color:var(--people-ink); }
+.school-people-page tbody tr:hover { background:var(--people-soft); }
+.school-people-page .rounded-2xl,.school-people-page .rounded-3xl { border-radius:12px!important; }
+.school-people-page .shadow-lg,.school-people-page .shadow-md { box-shadow:0 1px 3px rgba(20,40,30,.05)!important; }
+.school-people-page .people-admissions-board > section { border-color:var(--people-line)!important; border-radius:11px!important; background:var(--people-soft)!important; }
+.school-people-page .people-admissions-board article { border-color:var(--people-line)!important; border-radius:9px!important; box-shadow:0 1px 2px rgba(20,40,30,.035); }
+.school-people-teachers-page > header {
+  background:var(--people-card)!important; color:var(--people-ink)!important; border:1px solid var(--people-line);
+  border-radius:12px!important; box-shadow:0 1px 3px rgba(20,40,30,.04)!important;
+}
+.school-people-teachers-page > header .pointer-events-none { display:none; }
+.school-people-teachers-page > header p,.school-people-teachers-page > header span { color:var(--people-muted)!important; }
+.school-people-teachers-page > header h1 { color:var(--people-ink)!important; font:700 28px/1.15 Georgia,serif!important; }
+.school-people-teachers-page > section article { border-color:var(--people-line)!important; border-radius:11px!important; box-shadow:0 1px 3px rgba(20,40,30,.035)!important; }
+.school-people-parents-page > div:first-child h1,.school-people-admissions-page > div:first-child h1,.school-people-staff-page > div:first-child h1 {
+  color:var(--people-ink)!important; font:700 27px/1.2 Georgia,serif!important;
+}
+.school-people-parents-page > div:first-child,.school-people-admissions-page > div:first-child,.school-people-staff-page > div:first-child {
+  padding:18px 20px; border:1px solid var(--people-line); border-radius:12px; background:var(--people-card);
+}
+.school-people-parents-page > div:first-child p,.school-people-admissions-page > div:first-child p { color:var(--people-muted)!important; font-size:12px!important; }
+.school-people-staff-page > section,.school-people-staff-page > div.bg-white { border-color:var(--people-line)!important; border-radius:11px!important; box-shadow:0 1px 3px rgba(20,40,30,.035)!important; }
+.school-people-page button:not(:disabled) { transition:background-color .14s,border-color .14s,transform .14s; }
+.school-people-page button:disabled { cursor:not-allowed; opacity:.5; }
+@media(max-width:900px) {
+  .schoolos-people-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .schoolos-people-header { align-items:flex-start; flex-direction:column; }
+  .schoolos-people-header-actions { justify-content:flex-start; width:100%; }
+}
+@media(max-width:640px) {
+  .school-people-page,.school-students-page { padding:12px!important; }
+  .schoolos-people-header { padding:15px; gap:12px; }
+  .schoolos-people-header h1 { font-size:25px; }
+  .schoolos-people-header-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .schoolos-people-header-actions button { justify-content:center; padding:7px 6px!important; white-space:normal; }
+  .schoolos-people-stats { gap:8px; }
+  .schoolos-people-stat { padding:10px; }
+  .schoolos-people-stat strong { font-size:22px; }
+  .schoolos-people-filter { padding:11px!important; }
+  .school-people-page .overflow-x-auto { max-width:100%; }
+  .school-people-staff-page > div:first-child { align-items:flex-start; flex-direction:column; }
+  .school-people-staff-page > div:first-child > div:last-child { width:100%; display:grid; grid-template-columns:1fr 1fr; }
+}
+@media(max-width:360px) {
+  .schoolos-people-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .schoolos-people-header-actions { grid-template-columns:minmax(0,1fr); }
+  .schoolos-people-stat { padding:9px; }
+}
+.dark .school-people-page,.dark .school-students-page,[data-theme="dark"] .school-people-page,[data-theme="dark"] .school-students-page,:root[data-theme="dark"] .school-people-page,:root[data-theme="dark"] .school-students-page {
+  --people-bg:#121a17; --people-card:#1a2420; --people-ink:#e6efe9; --people-muted:#a7b8af;
+  --people-line:#34453d; --people-green:#65c697; --people-soft:#20372d;
+}
