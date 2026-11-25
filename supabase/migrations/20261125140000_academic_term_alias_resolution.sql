@@ -21,7 +21,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$
     WHERE u.id=private.auth_user_id()
       AND u.role='teacher' AND u.school_id=p_school_id
       AND a.class_id=p_class_id AND a.subject_id=p_subject_id
-      AND (a.term_id IS NULL OR a.term_id=p_term_id OR EXISTS (SELECT 1 FROM public.terms assigned_term JOIN public.terms selected_term ON selected_term.id=p_term_id AND selected_term.school_id=p_school_id AND assigned_term.school_id=selected_term.school_id AND assigned_term.academic_year_id=selected_term.academic_year_id AND assigned_term.start_date=selected_term.start_date AND assigned_term.end_date=selected_term.end_date WHERE assigned_term.id=a.term_id))
+      AND (a.term_id IS NULL OR a.term_id=p_term_id OR (EXISTS (SELECT 1 FROM public.terms assigned_term JOIN public.terms selected_term ON selected_term.id=p_term_id AND selected_term.school_id=p_school_id AND assigned_term.school_id=selected_term.school_id AND assigned_term.academic_year_id=selected_term.academic_year_id AND assigned_term.start_date=selected_term.start_date AND assigned_term.end_date=selected_term.end_date WHERE assigned_term.id=a.term_id) AND NOT EXISTS (SELECT 1 FROM public.teacher_class_subject_assignments preferred WHERE preferred.school_id=a.school_id AND preferred.academic_year_id=a.academic_year_id AND preferred.class_id=a.class_id AND preferred.subject_id=a.subject_id AND preferred.term_id=p_term_id AND preferred.section_id IS NOT DISTINCT FROM a.section_id)))
       AND (p_student_id IS NULL OR a.section_id IS NULL OR a.section_id=e.section_id)
   );
 $$;
@@ -77,7 +77,7 @@ BEGIN
     IF NOT FOUND THEN RAISE EXCEPTION 'Ardaygu fasalkan kuma jiro diiwaanka term-kan.'; END IF;
     IF NOT EXISTS (SELECT 1 FROM public.teacher_class_subject_assignments a
       WHERE a.school_id=p_school_id AND a.teacher_id=v_teacher_id AND a.academic_year_id=v_year_id
-        AND (a.term_id IS NULL OR a.term_id=v_term_id OR EXISTS (SELECT 1 FROM public.terms assigned_term JOIN public.terms selected_term ON selected_term.id=v_term_id AND selected_term.school_id=p_school_id AND assigned_term.school_id=selected_term.school_id AND assigned_term.academic_year_id=selected_term.academic_year_id AND assigned_term.start_date=selected_term.start_date AND assigned_term.end_date=selected_term.end_date WHERE assigned_term.id=a.term_id)) AND a.class_id=p_class_id
+        AND (a.term_id IS NULL OR a.term_id=v_term_id OR (EXISTS (SELECT 1 FROM public.terms assigned_term JOIN public.terms selected_term ON selected_term.id=v_term_id AND selected_term.school_id=p_school_id AND assigned_term.school_id=selected_term.school_id AND assigned_term.academic_year_id=selected_term.academic_year_id AND assigned_term.start_date=selected_term.start_date AND assigned_term.end_date=selected_term.end_date WHERE assigned_term.id=a.term_id) AND NOT EXISTS (SELECT 1 FROM public.teacher_class_subject_assignments preferred WHERE preferred.school_id=a.school_id AND preferred.academic_year_id=a.academic_year_id AND preferred.class_id=a.class_id AND preferred.subject_id=a.subject_id AND preferred.term_id=v_term_id AND preferred.section_id IS NOT DISTINCT FROM a.section_id))) AND a.class_id=p_class_id
         AND a.subject_id=p_subject_id AND (a.section_id IS NULL OR a.section_id=v_enrollment.section_id)) THEN
       RAISE EXCEPTION 'Macallinku fasalkan iyo maaddadan looma qoondeyn.';
     END IF;
