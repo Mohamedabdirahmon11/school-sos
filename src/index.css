@@ -4566,3 +4566,64 @@ main :is(.flex, .inline-flex) > * {
     max-width:calc(100vw - 52px);
   }
 }
+
+
+/* Explicit data-theme dark mode: the app toggles the root attribute, not only .dark. */
+:root[data-theme="dark"] .school-admin-mobile-content {
+  --admin-canvas:#121a17;
+  --admin-card:#1a2420;
+  --admin-ink:#e6efe9;
+  --admin-muted:#9db0a7;
+  --admin-line:#2d3b35;
+  --admin-accent:#4cc58a;
+  color-scheme:dark;
+}
+:root[data-theme="dark"] .school-admin-mobile-content :is(.bg-white,.bg-slate-50,.bg-gray-50) {
+  background-color:var(--admin-card)!important;
+}
+:root[data-theme="dark"] .school-admin-mobile-content :is(.text-slate-400,.text-slate-500,.text-slate-600,.text-slate-700,.text-slate-800,.text-slate-900) {
+  color:var(--admin-ink)!important;
+}
+:root[data-theme="dark"] .school-people-page {
+  --people-bg:#121a17;
+  --people-card:#1a2420;
+  --people-ink:#e6efe9;
+  --people-muted:#9db0a7;
+  --people-line:#2d3b35;
+  --people-accent:#4cc58a;
+  --people-soft:#1f2f28;
+  background:var(--people-bg)!important;
+  color:var(--people-ink)!important;
+}
+:root[data-theme="dark"] .school-people-page :is(h1,h2,h3,p,label,small,th,td) {
+  color:var(--people-ink)!important;
+}
+:root[data-theme="dark"] .school-people-page :is(.text-slate-400,.text-slate-500,.text-slate-600,.text-slate-700,.text-slate-800,.text-slate-900) {
+  color:var(--people-muted)!important;
+  background-color:transparent!important;
+}
+:root[data-theme="dark"] .school-people-page .bg-white,
+:root[data-theme="dark"] .school-people-page .bg-white\\/95 {
+  background:var(--people-card)!important;
+}
+:root[data-theme="dark"] .school-people-page .bg-slate-50,
+:root[data-theme="dark"] .school-people-page .bg-gray-50 {
+  background:var(--people-soft)!important;
+}
+:root[data-theme="dark"] .school-people-admissions-page .people-admissions-board > section {
+  background:var(--people-soft)!important;
+}
+:root[data-theme="dark"] .school-people-admissions-page .people-admissions-board article {
+  background:var(--people-card)!important;
+}
+:root[data-theme="dark"] .school-people-teachers-page section[aria-label="Teacher directory summary"] article {
+  background:var(--people-card)!important;
+}
+:root[data-theme="dark"] .school-people-teachers-page section[aria-label="Teacher directory summary"] article :is(p,span) {
+  color:var(--people-ink)!important;
+  background:transparent!important;
+}
+:root[data-theme="dark"] .school-people-teachers-page > header:first-child :is(h1,h2,h3,p) {
+  color:var(--people-ink)!important;
+  background:transparent!important;
+}
