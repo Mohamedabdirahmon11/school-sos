@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './operations-reference.css';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { GradingBand, SchoolBranch, SchoolClass, Subject, Teacher } from '../../types/index.ts';
@@ -238,7 +239,7 @@ export const ClassesSubjectsView: React.FC = () => {
   if (classLoad.loading) return <div className="p-6 space-y-4" aria-label="Loading classes"><div className="h-8 w-1/3 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded-xl bg-white" /></div>;
   if (classLoad.error) return <ErrorState error={classLoad.error} onRetry={classLoad.retry} />;
   return (
-    <div className="mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+    <div className="schoolos-operations-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Classes & Subjects</h1>
       </div>
