@@ -45,6 +45,7 @@ const sameClassStudent=db.createStudent({schoolId:school.id,studentId:'SP-ST-002
 const tenantStudent=db.createStudent({schoolId:otherSchool.id,studentId:'SP-OTHER-001',firstName:'Tenant',middleName:'',lastName:'Student',gender:'male',admissionDate:today,fatherPhone:'',classId:tenantClass.id,status:'active'} as any);
 const studentUser=await db.getUserById('usr-student-'+student.id,school.id);
 if(!studentUser) throw new Error('Student registration did not provision its portal account.');
+db.updateUser(studentUser.id,{mustChangePassword:false});
 const sameClassStudentUser=makeUser(school.id,'student','Other Student',{studentId:sameClassStudent.studentId});
 const wrongTenantLink=makeUser(school.id,'student','Wrong Tenant Link',{studentId:tenantStudent.studentId});
 parentUser.linkedStudentIds=[student.id];
