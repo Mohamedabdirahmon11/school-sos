@@ -845,8 +845,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       {pinSlip && <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div className="w-full max-w-sm bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-xl"><h2 className="text-base font-bold text-[#132A29]">Student PIN slip</h2><p className="mt-3 text-sm">{pinSlip.studentName}</p><p className="text-xs text-[#64748B]">{pinSlip.studentId}</p><p className="mt-4 text-xl font-mono font-bold tracking-widest">{pinSlip.pin}</p><p className="mt-2 text-xs text-[#64748B]">This PIN is for the student account only. Parent accounts have separate PINs. It is shown once; share it securely.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => window.print()} className="px-3 py-2 bg-[#0F766E] text-white rounded-lg text-xs font-semibold">Print PIN slip</button><button onClick={() => setPinSlip(null)} className="px-3 py-2 border border-slate-300 rounded-lg text-xs">Close</button></div></div></div>}
 
       {showEditModal && selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form onSubmit={handleSaveStudent} className="max-h-[90vh] w-full max-w-xl space-y-3 overflow-y-auto rounded-xl border bg-white p-6 shadow-xl">
+        <div className="student-modal-overlay">
+          <form onSubmit={handleSaveStudent} className="student-modal-panel space-y-3">
             <div className="flex items-center justify-between"><h2 className="text-lg font-bold">Edit student information</h2><button type="button" onClick={() => setShowEditModal(false)} aria-label="Close"><X className="h-5 w-5"/></button></div>
             {modalError && <p role="alert" className="rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{modalError}</p>}
             {['firstName','middleName','lastName'].map((field,index) => <label key={field} className="block text-xs font-medium">{['First name','Father name','Grandfather name'][index]}<input required value={editForm[field] || ''} onChange={e => setEditForm((value:any) => ({...value,[field]:e.target.value}))} className="mt-1 w-full rounded-lg border p-2 text-sm"/></label>)}
@@ -861,8 +861,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       )}
       {/* ADMISSION FORM MODAL (Three-Part Name, NO Date of Birth) */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 border border-[#E2E8F0] max-h-[90vh] overflow-y-auto">
+        <div className="student-modal-overlay">
+          <div className="student-modal-panel space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] mb-4">
               <h2 className="text-base font-bold text-[#132A29] flex items-center gap-2">
                 <GraduationCap className="w-5 h-5 text-[#0F766E]" />
@@ -881,9 +881,9 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
 
             <form onSubmit={handleAddStudent} className="space-y-4 text-xs">
               {/* Three-Part Name Fields */}
-              <div className="p-3 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] space-y-3">
+              <div className="student-modal-section space-y-3">
                 <span className="font-semibold text-[#132A29] block">Student Three-Part Name</span>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="student-name-grid">
                   <div>
                     <label className="block text-[11px] font-medium text-[#334155]">First Name *</label>
                     <input
@@ -993,7 +993,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 </div>
               </div>
 
-              <div className="p-2.5 bg-[#F0FDFA] rounded border border-[#CCFBF1] text-[11px] text-[#0F766E]">
+              <div className="student-modal-hint text-xs">
                 Student ID is created automatically in order: <code className="font-mono font-bold">S001, S002, S003…</code>
               </div>
 
