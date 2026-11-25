@@ -1216,7 +1216,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     if (candidateUsers.length > 1) {
-      res.status(400).json({ error: 'Multiple accounts linked to this phone. Please contact your school administrator.' });
+      res.status(400).json({ error: role === 'student' ? 'Multiple student accounts match this Student ID. Contact your school administrator.' : 'Multiple parent accounts match this phone number. Contact your school administrator.' });
       return;
     }
 
