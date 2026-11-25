@@ -276,6 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_events', 'Academic Calendar', CalendarDays)
       ] },
       { title: 'Finance & Reports', items: [
+        item('sch_fees', menuT('fees_payments'), CreditCard),
         { ...item('sch_student_invoices', 'Fee Invoices', FileText), permission: 'fees_manage' },
         item('sch_reports', menuT('reports_export'), BarChart3)
       ] },
@@ -296,8 +297,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   const visibleGroups = groups.map(group => ({ ...group, items: group.items.filter(entry => {
     const route = getNavigationRoute(entry.id);
-    return Boolean(route && route.roles.includes(role as any)
-      && `${group.title} ${entry.label}`.toLowerCase().includes(menuSearch.trim().toLowerCase()));
+    const hasRole = Boolean(route && route.roles.includes(role as any));
+    const hasPermission = role !== 'accountant' || !entry.permission
+      || hasStaffNavigationPermission(user?.permissions, entry.permission);
+    const matchesSearch = `${group.title} ${entry.label}`.toLowerCase().includes(menuSearch.trim().toLowerCase());
+    return hasRole && hasPermission && matchesSearch;
   }) })).filter(group => group.items.length > 0);
 
   const handleNavigate = (id: string) => {
