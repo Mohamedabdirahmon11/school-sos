@@ -214,7 +214,7 @@ test('bulk-reset Student ID + school code + PIN completes first login and opens 
  assert.equal(receipt.success,true);
  assert.equal(receipt.pinSlips.length,1);
  const temporaryPin=String(receipt.pinSlips[0].newPin);
- assert.match(temporaryPin,/^\\d{6}$/);
+ assert.match(temporaryPin,/^\d{6}$/);
 
  // The production bulk-reset RPC sets must_change_password=true and updates
  // the student user hash. Mirror that flag in the in-memory HTTP adapter.
