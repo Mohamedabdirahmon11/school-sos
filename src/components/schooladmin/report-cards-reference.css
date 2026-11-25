@@ -1,0 +1,54 @@
+.schoolos-report-cards-workspace {
+  --report-bg:#f6f4ee; --report-card:#fff; --report-ink:#1c2b26; --report-muted:#5f6f68; --report-line:#d9d6cb;
+  max-width:1500px!important; color:var(--report-ink); background:var(--report-bg);
+  font-family:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+}
+.schoolos-report-cards-workspace .no-print {
+  padding:18px 20px; border:1px solid var(--report-line); border-radius:12px; background:var(--report-card);
+  box-shadow:0 1px 3px rgba(20,40,30,.04);
+}
+.schoolos-report-cards-workspace .no-print h1 {
+  color:var(--report-ink)!important; font:700 27px/1.15 Georgia,"Times New Roman",serif!important;
+}
+.schoolos-report-cards-workspace .no-print h1 svg { color:#1f4d3f!important; }
+.schoolos-report-cards-workspace .no-print select {
+  min-height:38px; border-color:var(--report-line)!important; border-radius:8px!important; background:#fff!important; color:var(--report-ink)!important;
+}
+.schoolos-report-cards-workspace .no-print button {
+  min-height:38px; border-radius:8px!important; box-shadow:none!important; font-size:11px!important;
+}
+.schoolos-report-cards-workspace .no-print button[class*="bg-[#0F766E]"] {
+  background:#1f4d3f!important; border-color:#1f4d3f!important; color:#fff!important;
+}
+.schoolos-report-cards-workspace .rounded-xl.border,.schoolos-report-cards-workspace .rounded-2xl.border,
+.schoolos-report-cards-workspace .bg-white.rounded-xl,.schoolos-report-cards-workspace .bg-white.rounded-2xl {
+  border-color:var(--report-line)!important; border-radius:11px!important; box-shadow:0 1px 3px rgba(20,40,30,.035)!important;
+}
+.schoolos-report-cards-workspace table { border-collapse:separate; border-spacing:0; }
+.schoolos-report-cards-workspace thead { background:#eaf2ed!important; }
+.schoolos-report-cards-workspace thead th { color:#52665c!important; font-size:10px!important; }
+.schoolos-report-cards-workspace tbody tr:hover { background:#eaf2ed!important; }
+.dark .schoolos-report-cards-workspace,[data-theme="dark"] .schoolos-report-cards-workspace,:root[data-theme="dark"] .schoolos-report-cards-workspace {
+  --report-bg:#121a17; --report-card:#1a2420; --report-ink:#e6efe9; --report-muted:#a7b8af; --report-line:#34453d;
+  color:var(--report-ink); background:var(--report-bg);
+}
+.dark .schoolos-report-cards-workspace .no-print,[data-theme="dark"] .schoolos-report-cards-workspace .no-print,
+.dark .schoolos-report-cards-workspace .bg-white.rounded-xl,[data-theme="dark"] .schoolos-report-cards-workspace .bg-white.rounded-xl,
+.dark .schoolos-report-cards-workspace .bg-white.rounded-2xl,[data-theme="dark"] .schoolos-report-cards-workspace .bg-white.rounded-2xl {
+  background:var(--report-card)!important; border-color:var(--report-line)!important;
+}
+.dark .schoolos-report-cards-workspace .no-print h1,[data-theme="dark"] .schoolos-report-cards-workspace .no-print h1 { color:var(--report-ink)!important; }
+.dark .schoolos-report-cards-workspace .no-print select,[data-theme="dark"] .schoolos-report-cards-workspace .no-print select {
+  background:#121a17!important; color:var(--report-ink)!important; border-color:var(--report-line)!important;
+}
+.dark .schoolos-report-cards-workspace thead,[data-theme="dark"] .schoolos-report-cards-workspace thead { background:#20372d!important; }
+.dark .schoolos-report-cards-workspace thead th,[data-theme="dark"] .schoolos-report-cards-workspace thead th { color:#c1d7ca!important; }
+@media(max-width:640px) {
+  .schoolos-report-cards-workspace { padding:12px!important; }
+  .schoolos-report-cards-workspace .no-print { padding:14px; }
+  .schoolos-report-cards-workspace .no-print h1 { font-size:24px!important; }
+}
+@media print {
+  .schoolos-report-cards-workspace { background:#fff!important; }
+  .schoolos-report-cards-workspace .no-print { display:none!important; }
+}

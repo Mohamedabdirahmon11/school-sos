@@ -186,6 +186,12 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         <AcademicSetupHeader active="sch_classes" onNavigate={onNavigate} />
         <h2>Classes &amp; Sections</h2>
         <p className="lead">Fasal kasta waa Grade iyo Section (tusaale Grade 4 · A). Fasal kasta hal shift ayuu ku jiraa, hal Form Teacherna wuu leeyahay.</p>
+        <section className="schoolos-academic-stats" aria-label="Class setup summary">
+          <div className="schoolos-academic-stat"><span>Fasallada firfircoon</span><strong>{rows.length}</strong></div>
+          <div className="schoolos-academic-stat"><span>Awoodda guud</span><strong>{rows.reduce((sum, row) => sum + (Number(row.capacity) || 0), 0).toLocaleString()}</strong></div>
+          <div className="schoolos-academic-stat"><span>Form Teacher maqan</span><strong>{rows.filter(row => !row.classTeacherId).length}</strong></div>
+          <div className="schoolos-academic-stat"><span>Maaddooyinka fasallada</span><strong>{Object.values(subjectCounts).reduce((sum, count) => sum + count, 0)}</strong></div>
+        </section>
         <section className="card">
           {!isReadOnly && (
             <form className="bar" onSubmit={add}>

@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './attendance-reference.css';
 import { ApiClient } from '../../services/api.ts';
 import { normalizeWhatsAppNumber } from '../../lib/whatsapp.ts';
 import { getEthiopianCalendarInfo, getSchoolLocalDate } from '../../lib/ethiopian-calendar.ts';
@@ -190,27 +191,27 @@ export const AttendanceView: React.FC = () => {
       <div className="school-admin-attendance-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">School-wide daily report</p>
-            <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-[#102522]"><CalendarCheck className="h-7 w-7 text-[#0e8078]" /> Daily Absences</h1>
-            <p className="mt-1 text-sm text-[#71817d]">All classes are included automatically. Only students marked absent by their class teachers appear here.</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">IMAANSHAHA · WARBITAAN MAALINLE</p>
+            <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-[#102522]"><CalendarCheck className="h-7 w-7 text-[#0e8078]" /> Daily Attendance</h1>
+            <p className="mt-1 text-sm text-[#71817d]">Dhammaan fasallada dugsiga waa lagu daray. Halkan waxaa ka muuqda ardayda maqnaanshaha loo diiwaangeliyey.</p>
           </div>
           <div className="flex items-end gap-2">
-            <label className="text-xs font-semibold text-[#475569]">Attendance date
+            <label className="text-xs font-semibold text-[#475569]">Taariikhda imaanshaha
               <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block rounded-lg border border-[#CBD5E1] px-3 py-2 text-sm" />
               <span className="mt-1 block text-[10px] font-normal text-[#64748B]">{calendarDateLabel}</span>
             </label>
-            <button type="button" onClick={() => void loadSchoolAbsences()} className="rounded-lg bg-[#0e8078] px-4 py-2 text-sm font-semibold text-white">Refresh</button>
+            <button type="button" onClick={() => void loadSchoolAbsences()} className="rounded-lg bg-[#0e8078] px-4 py-2 text-sm font-semibold text-white">Cusboonaysii</button>
           </div>
         </div>
         {loadError && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{loadError}</div>}
         {(calendarStatus.isWeeklyHoliday || calendarStatus.holidayName) && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{calendarStatus.isWeeklyHoliday ? 'This date is configured as a weekly school holiday.' : 'School holiday: ' + calendarStatus.holidayName}</p>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-medium text-rose-700">Absent students</p><p className="mt-1 text-2xl font-bold text-rose-800">{schoolAbsences.length}</p></div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Classes covered</p><p className="mt-1 text-2xl font-bold text-slate-800">{new Set(schoolAbsences.map(row => row.student.classId)).size}</p></div>
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4"><p className="text-xs font-medium text-rose-700">Arday maqan</p><p className="mt-1 text-2xl font-bold text-rose-800">{schoolAbsences.length}</p></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs font-medium text-slate-500">Fasallada la daboolay</p><p className="mt-1 text-2xl font-bold text-slate-800">{new Set(schoolAbsences.map(row => row.student.classId)).size}</p></div>
         </div>
         <div className="overflow-hidden rounded-2xl border border-[#dce7e4] bg-white">
           {absencesLoading ? <p className="p-8 text-center text-sm text-slate-500">Loading absent students…</p> : schoolAbsences.length === 0 ? (
-            <div className="p-10 text-center"><CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" /><p className="mt-2 font-semibold text-slate-800">No absences recorded</p><p className="mt-1 text-xs text-slate-500">No students have been marked absent for this date.</p></div>
+            <div className="p-10 text-center"><CheckCircle2 className="mx-auto h-8 w-8 text-emerald-600" /><p className="mt-2 font-semibold text-slate-800">Maqnaansho lama diiwaangelin</p><p className="mt-1 text-xs text-slate-500">Ma jiro arday loo calaamadeeyey inuu maqan yahay taariikhdan.</p></div>
           ) : (
             <div className="overflow-x-auto" role="region" aria-label="Attendance records table. Scroll horizontally to view all columns." tabIndex={0}>
               <table className="w-full min-w-[700px] text-left text-xs">
