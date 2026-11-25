@@ -434,14 +434,16 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
   if (isLoading) return <><LoadingState label="Loading students…" />{pinResetWizard}</>;
   if (studentLoad.error) return <><ErrorState error={studentLoad.error} onRetry={studentLoad.retry} />{pinResetWizard}</>;
   return (
-    <div className="school-students-page mx-auto max-w-[1600px] space-y-6 p-4 md:p-6">
+    <div className="school-people-page school-people-students-page school-students-page mx-auto max-w-[1600px] space-y-5 p-4 md:p-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#102522]">Students</h1>
+      <header className="schoolos-people-header">
+        <div className="min-w-0">
+          <span className="schoolos-people-kicker">PEOPLE · DIIWAANGELINTA</span>
+          <h1>Students</h1>
+          <p>{pageInfo?.total ?? students.length} arday · Diiwaanka ardayda iyo xogtooda</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        <div className="schoolos-people-header-actions">
           <button
             onClick={handleExportCSV}
             className="inline-flex items-center gap-2 rounded-xl border border-[#d5e2de] bg-white px-4 py-3 text-sm font-semibold text-[#18312d] transition hover:bg-[#f6faf8]"
@@ -481,7 +483,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <span>Admit Student</span>
           </button>
         </div>
-      </div>
+      </header>
 
       {notice && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2">
@@ -490,14 +492,15 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Tirada ardayda</p><p className="mt-1 text-2xl font-bold text-[#102522]">{pageInfo?.total ?? students.length}</p></div>
-        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Fasallada</p><p className="mt-1 text-2xl font-bold text-[#102522]">{classes.length}</p></div>
-        <div className="rounded-2xl border border-[#dce7e4] bg-white p-4"><p className="text-xs text-[#71817d]">Laamaha</p><p className="mt-1 text-2xl font-bold text-[#102522]">{branches.length}</p></div>
-      </div>
+      <section className="schoolos-people-stats" aria-label="Student directory summary">
+        <article className="schoolos-people-stat"><p>Tirada ardayda</p><strong>{pageInfo?.total ?? students.length}</strong><small>Wadarta dugsiga</small></article>
+        <article className="schoolos-people-stat"><p>Fasallada</p><strong>{classes.length}</strong><small>Fasallo la heli karo</small></article>
+        <article className="schoolos-people-stat"><p>Laamaha</p><strong>{branches.length}</strong><small>Laamaha dugsiga</small></article>
+        <article className="schoolos-people-stat"><p>Hadda muuqda</p><strong>{visibleStudents.length}</strong><small>Ardayga boggan ku jira</small></article>
+      </section>
 
       {/* Filter Bar */}
-      <div className="rounded-2xl border border-[#dce7e4] bg-white p-4 md:p-5">
+      <div className="schoolos-people-filter rounded-2xl border border-[#dce7e4] bg-white p-4 md:p-5">
         <div className="relative w-full md:max-w-md">
           <Search className="w-4 h-4 text-[#64748B] absolute left-3 top-2.5" />
           <input
@@ -553,7 +556,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Students Table */}
-        <div className={`overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-[0_2px_8px_rgba(16,37,34,.025)] ${selectedStudent ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+        <div className={`schoolos-people-table-card overflow-hidden rounded-2xl border border-[#dce7e4] bg-white shadow-[0_2px_8px_rgba(16,37,34,.025)] ${selectedStudent ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <div className="flex items-center justify-between border-b border-[#e6efec] px-5 py-4">
             <div><h2 className="font-bold text-[#102522]">Student directory</h2><p className="mt-1 text-xs text-[#71817d]">Select a student to open their full profile</p></div>
             <span className="rounded-full bg-[#e8f4f1] px-3 py-1 text-xs font-semibold text-[#0e8078]">{visibleStudents.length} shown</span>
