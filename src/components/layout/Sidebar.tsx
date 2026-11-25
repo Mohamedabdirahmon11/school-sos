@@ -37,10 +37,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   useEffect(() => {
     const theme = school?.sidebarTheme;
     const presets: Record<string, { background: string; text: string; accent: string }> = {
-      light: { background: '#f8fafc', text: '#172033', accent: '#2563eb' },
-      dark: { background: '#0a101b', text: '#ffffff', accent: '#6b9bff' },
-      brand: { background: '#0f2a5c', text: '#ffffff', accent: '#2563eb' },
-      soft: { background: '#e8f0ff', text: '#18202c', accent: '#2563eb' }
+      light: { background: '#f8fafc', text: '#172033', accent: '#176b60' },
+      dark: { background: '#101b17', text: '#ffffff', accent: '#65c697' },
+      brand: { background: '#173f35', text: '#ffffff', accent: '#2b8b77' },
+      soft: { background: '#edf5f2', text: '#243247', accent: '#176b60' }
     };
     const preset = presets[theme?.preset || 'brand'];
     const background = theme?.preset === 'gradient'
