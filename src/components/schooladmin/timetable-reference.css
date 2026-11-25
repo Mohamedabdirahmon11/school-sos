@@ -75,3 +75,146 @@
   .schoolos-timetable-page>div:first-child h1 { font-size:24px!important; }
   .schoolos-timetable-page table { min-width:650px; }
 }
+
+
+/* Mobile-first timetable controls: keep the matrix usable without clipping labels. */
+@media (max-width: 767px) {
+  .schoolos-timetable-page {
+    width: 100%;
+    min-width: 0;
+    padding: 10px 8px 22px !important;
+    overflow: clip;
+  }
+  .schoolos-timetable-page > div:first-child {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 13px !important;
+  }
+  .schoolos-timetable-page > div:first-child h1 {
+    font-size: 23px !important;
+    line-height: 1.2 !important;
+    overflow-wrap: anywhere;
+  }
+  .schoolos-timetable-page > div:first-child p {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+  }
+  .schoolos-timetable-page > div:first-child > div {
+    width: 100%;
+    min-width: 0;
+  }
+  .schoolos-timetable-page > div:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px !important;
+  }
+  .schoolos-timetable-page select,
+  .schoolos-timetable-page input:not([type="checkbox"]),
+  .schoolos-timetable-page button {
+    min-height: 42px;
+    max-width: 100%;
+    font-size: 13px;
+  }
+  .schoolos-timetable-page select {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+  }
+  .schoolos-timetable-page button {
+    white-space: normal;
+    line-height: 1.3;
+  }
+  .schoolos-timetable-page section,
+  .schoolos-timetable-page article {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .schoolos-timetable-page .overflow-x-auto {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    border: 1px solid var(--tt-line);
+    border-radius: 10px;
+  }
+  .schoolos-timetable-page table {
+    width: max-content;
+    min-width: 650px;
+    table-layout: auto;
+  }
+  .schoolos-timetable-page td {
+    min-width: 105px;
+  }
+  .schoolos-timetable-page td > div {
+    min-height: 66px;
+    padding: 8px 7px !important;
+  }
+  .schoolos-timetable-page td strong,
+  .schoolos-timetable-page td span {
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+  .schoolos-timetable-page [role="dialog"] {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: 88dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px !important;
+    border-radius: 14px !important;
+  }
+  .schoolos-timetable-page [role="dialog"] form > div,
+  .schoolos-timetable-page [role="dialog"] .grid {
+    min-width: 0;
+  }
+  .schoolos-timetable-page [role="dialog"] label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  .schoolos-timetable-page [role="dialog"] input,
+  .schoolos-timetable-page [role="dialog"] select,
+  .schoolos-timetable-page [role="dialog"] textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 43px;
+    font-size: 14px;
+  }
+  .schoolos-timetable-page [role="dialog"] footer,
+  .schoolos-timetable-page [role="dialog"] > div:last-child {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .schoolos-timetable-page [role="dialog"] button {
+    min-height: 42px;
+  }
+  .schoolos-timetable-page .timetable-print-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 380px) {
+  .schoolos-timetable-page .grid.grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .schoolos-timetable-page [role="dialog"] {
+    padding: 11px !important;
+  }
+}
+.dark .schoolos-timetable-page [role="dialog"],
+[data-theme="dark"] .schoolos-timetable-page [role="dialog"] {
+  background: #1a2420 !important;
+  color: #e6efe9 !important;
+  border-color: #34453d !important;
+}
+.dark .schoolos-timetable-page [role="dialog"] label,
+[data-theme="dark"] .schoolos-timetable-page [role="dialog"] label {
+  color: #d7e4dc !important;
+}
