@@ -11133,7 +11133,10 @@ async function syncWizardAcademicRecords(client: any, schoolId: string, setupDat
     const startDate = String(term?.startDate || '');
     const endDate = String(term?.endDate || '');
     if (!name || !startDate || !endDate) continue;
-    const existing = (termRows || []).find((row: any) => String(row.name).trim().toLowerCase() === name.toLowerCase());
+    // Reuse a legacy Term 1/2 row when its date range matches the configured Semester 1/2.
+    // This preserves the existing term ID and its linked assignments instead of creating aliases.
+    const existing = (termRows || []).find((row: any) => String(row.name).trim().toLowerCase() === name.toLowerCase())
+      || (termRows || []).find((row: any) => row.start_date === startDate && row.end_date === endDate);
     const payload = {
       name, start_date: startDate, end_date: endDate,
       is_current: startDate <= today && endDate >= today,
@@ -11171,6 +11174,18 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   // onboarding checklist. The dashboard is unlocked only by /school/setup-progress.
   const progress = normalizeSchoolSetupProgress(school.setupProgress);
   const updates = buildSchoolSetupSchoolUpdates(step, nextData, school, progress);
+  // Synchronize academic records from the explicit wizard dates before saving completion.
+  if (step === 2 || step === 3) {
+    try {
+      await syncWizardAcademicRecords(teacherAssignmentClient(), school.id, {
+        academicYear: nextData.academicYear,
+        terms: Array.isArray(nextData.terms) ? nextData.terms : []
+      });
+    } catch (error: any) {
+      res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin. Dib u sax taariikhaha oo mar kale keydi.' });
+      return;
+    }
+  }
   let updated: School | null;
   try {
     updated = await db.updateSchoolFromDatabase(school.id, updates);
@@ -11180,26 +11195,6 @@ apiRouter.put('/school/setup-data', requireAuth, requireSchoolAdminOrSuperAdmin,
   }
   if (!updated) { res.status(404).json({ error: 'School was not found.' }); return; }
   try { await db.flush(); } catch { res.status(503).json({ error: 'Setup step could not be saved. Please retry.' }); return; }
-  if (step === 2 || step === 3) {
-    const savedTerms: Partial<NonNullable<School['terms']>> = updated.terms || {};
-    try {
-      await syncWizardAcademicRecords(teacherAssignmentClient(), school.id, {
-        academicYear: {
-          name: updated.academicYear,
-          startDate: savedTerms.semester1Start || '',
-          endDate: savedTerms.semester2End || '',
-          isCurrent: true
-        },
-        terms: [
-          { name: 'Semester 1', startDate: savedTerms.semester1Start, endDate: savedTerms.semester1End },
-          { name: 'Semester 2', startDate: savedTerms.semester2Start, endDate: savedTerms.semester2End }
-        ]
-      });
-    } catch (error: any) {
-      res.status(503).json({ error: error?.message || 'Sannadka iyo xiisadaha Setup Wizard lama waafajin karin. Dib u keydi qaybta sannadka iyo terms-ka.' });
-      return;
-    }
-  }
   res.json({ data: nextData, progress, completed: isSchoolSetupProgressComplete(progress), coreSetupCompleted });
 });
 

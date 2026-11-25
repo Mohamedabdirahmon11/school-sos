@@ -18,6 +18,12 @@ test('academic year requires consecutive years and valid Gregorian dates', () =>
   assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2028', isCurrent: true, startDate: '2026-02-31', endDate: '2027-06-30' } }) || '', /valid academic year/);
 });
 
+test('academic year dates must match the two years in its name', () => {
+  assert.equal(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2027-06-30' } }), null);
+  assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2028-06-08' } }) || '', /dates must match its name/);
+  assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2025-09-01', endDate: '2027-06-30' } }) || '', /dates must match its name/);
+});
+
 test('academic year cannot be changed to exclude already saved terms', () => {
   const existingData = { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-01-01' }] };
   assert.equal(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2027-06-30' } }, existingData), null);
@@ -36,6 +42,15 @@ test('terms must stay within the configured academic year', () => {
   assert.equal(validateSchoolSetupStep(3, { terms: [{ name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-01' }, { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-06-30' }] }, { academicYear }), null);
   assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Semester 1', startDate: '2026-08-31', endDate: '2027-01-01' }, { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-06-30' }] }, { academicYear }) || '', /within the selected academic year/);
   assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-01' }, { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-07-01' }] }, { academicYear }) || '', /within the selected academic year/);
+});
+
+test('semesters cannot be saved against an academic year with mismatched name and dates', () => {
+  const invalidAcademicYear = { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2028-06-08' };
+  const terms = [
+    { name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-01' },
+    { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-06-30' }
+  ];
+  assert.match(validateSchoolSetupStep(3, { terms }, { academicYear: invalidAcademicYear }) || '', /Fix the academic year dates/);
 });
 
 test('academic calendar requires non-overlapping working days and valid holidays', () => {

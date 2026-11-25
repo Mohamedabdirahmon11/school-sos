@@ -30,6 +30,9 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     if (!y || typeof y.isCurrent !== 'boolean' || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
     const years = String(y.name).split('/').map(Number);
     if (years[1] !== years[0] + 1) return 'Academic year must contain consecutive years, such as 2026/2027.';
+    if (Number(y.startDate.slice(0, 4)) !== years[0] || Number(y.endDate.slice(0, 4)) !== years[1]) {
+      return 'Academic year dates must match its name: the start date must be in the first year and the end date in the second year.';
+    }
     const existingTerms = existingData?.terms;
     if (Array.isArray(existingTerms) && existingTerms.some((term: any) => validIsoDate(term.startDate) && validIsoDate(term.endDate) && (term.startDate < y.startDate || term.endDate > y.endDate))) return 'The new academic year would exclude saved terms. Update the term dates first.';
   }
@@ -39,7 +42,13 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
     if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
     const academicYear = existingData?.academicYear;
-    if (academicYear && validIsoDate(academicYear.startDate) && validIsoDate(academicYear.endDate)) {
+    if (academicYear) {
+      const yearName = String(academicYear.name || '');
+      const years = yearName.split('/').map(Number);
+      if (!/^\d{4}\/\d{4}$/.test(yearName) || years[1] !== years[0] + 1 || !validIsoDate(academicYear.startDate) || !validIsoDate(academicYear.endDate)
+        || Number(academicYear.startDate.slice(0, 4)) !== years[0] || Number(academicYear.endDate.slice(0, 4)) !== years[1]) {
+        return 'Fix the academic year dates before saving semesters.';
+      }
       if (terms.some((term: any) => term.startDate < academicYear.startDate || term.endDate > academicYear.endDate)) return 'Each term must fall within the selected academic year.';
     }
   }

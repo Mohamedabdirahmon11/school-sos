@@ -69,6 +69,7 @@ test('Assignment page is reachable from the School Admin app and sidebar', () =>
 
 test('Step 6 keeps GET read-only and syncs Setup Wizard academic records only when steps 2/3 are saved', () => {
   assert.match(api, /async function syncWizardAcademicRecords/);
+  assert.match(api, /row\.start_date === startDate && row\.end_date === endDate/, 'legacy term rows with the same dates should be reused rather than duplicated');
   const routeStart = api.indexOf("apiRouter.get('\/teacher-assignments'");
   const routeEnd = api.indexOf("apiRouter.post('\/teacher-assignments'", routeStart);
   const getRoute = api.slice(routeStart, routeEnd);
@@ -78,6 +79,7 @@ test('Step 6 keeps GET read-only and syncs Setup Wizard academic records only wh
   const setupRoute = api.slice(setupStart, setupEnd);
   assert.match(setupRoute, /if \(step === 2 \|\| step === 3\)/);
   assert.match(setupRoute, /await syncWizardAcademicRecords\(teacherAssignmentClient\(\), school\.id/);
-  assert.match(setupRoute, /startDate: savedTerms\.semester1Start/);
-  assert.match(setupRoute, /endDate: savedTerms\.semester2End/);
+  assert.match(setupRoute, /academicYear: nextData\.academicYear/);
+  assert.match(setupRoute, /terms: Array\.isArray\(nextData\.terms\) \? nextData\.terms : \[\]/);
+  assert.ok(setupRoute.indexOf('await syncWizardAcademicRecords') < setupRoute.indexOf('db.updateSchoolFromDatabase'), 'academic records must sync before the setup step is persisted');
 });
