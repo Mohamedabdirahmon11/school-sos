@@ -1868,8 +1868,10 @@ class StorageEngine {
     return this.queryRows<UserSession>('user_sessions', { school_id: schoolId });
   }
 
-  public async touchSession(id: string, expiresAt: string): Promise<void> {
-    const session = await this.getSessionById(id);
+  public async touchSession(id: string, expiresAt: string, validatedSession?: UserSession): Promise<void> {
+    // Authentication already fetched and validated this exact session in the same request.
+    // Reuse it rather than issuing a second user_sessions SELECT during cookie refresh.
+    const session = validatedSession?.id === id ? validatedSession : await this.getSessionById(id);
     if (!session || !shouldTouchSession(session.expiresAt, expiresAt)) return;
     // Keep a valid cache entry when the throttled refresh does not write.
     authSessionValidationCache.delete(id);
