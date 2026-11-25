@@ -1,3 +1,4 @@
+import { isSchoolSetupProgressCompleteWithTeacherAssignment } from '../src/lib/school-setup-navigation.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -5,16 +6,22 @@ import path from 'node:path';
 
 const read = (relative: string) => fs.readFileSync(path.join(process.cwd(), relative), 'utf8');
 
-test('School Setup UI exposes the nine reference steps in order and the responsive 290px/860px layout', () => {
+test('School Setup UI exposes the ten requested steps in order and the responsive 290px/860px layout', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  const ids = ['profile', 'year', 'classes', 'subjects', 'teachers', 'assign', 'students', 'timetable', 'finish'];
+  const ids = ['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'timetable', 'attendance', 'fees', 'finish'];
   const positions = ids.map(id => source.indexOf("id: '" + id + "'"));
-  assert.ok(positions.every(position => position >= 0), 'all nine setup steps must exist');
+  assert.ok(positions.every(position => position >= 0), 'all ten setup steps must exist');
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'steps must follow the requested order');
   assert.ok(source.includes("view: 'sch_setup_academics'"));
   assert.ok(source.includes("view: 'sch_settings'"));
-  assert.ok(source.includes("id: 'assign'"));
-  assert.ok(source.includes("<SchoolSetupInlineEditor step=\"assign\""));
+  assert.ok(source.includes('assignmentEvidence: 0'));
+  assert.ok(source.includes('<SchoolSetupInlineEditor step="assign"'));
+  assert.ok(source.includes("current.id === 'attendance'"));
+  assert.ok(source.includes("id: 'attendance', title: 'Attendance & Exams', required: true"));
+  assert.ok(source.includes("needs: ['students', 'timetable']"));
+  assert.ok(source.includes('KG 1 iyo KG 2 waa la taageerayaa'));
+  assert.ok(source.includes("!unlockedFor(wizardSteps[referenceStep + 1]?.id || '')"));
+  assert.ok(source.includes("current.id === 'fees'"));
   assert.ok(source.includes('REFERENCE_STEP_BY_PROGRESS_ID'));
   assert.ok(source.includes('Tallaabada {referenceStep + 1} ee {wizardSteps.length}'));
   assert.ok(source.includes('{completedCount}/{wizardSteps.length} diyaar'));
@@ -25,8 +32,9 @@ test('School Setup UI exposes the nine reference steps in order and the responsi
   assert.ok(source.includes('Wax ka maqan'));
   assert.ok(source.includes('prefers-color-scheme:dark'));
   assert.ok(source.includes("id: 'finish'"));
-  assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'assign', 'students'\]/);
-  assert.ok(source.includes('Dashboard-ka lama furi karo ilaa dhammaan toddobada tallaabo ee aasaasiga ah la xaqiijiyo.'));
+  assert.match(source, /needs: \['year', 'profile', 'classes', 'subjects', 'teachers', 'students', 'timetable', 'attendance', 'fees'\]/);
+  assert.ok(source.includes('Dashboard-ka lama furi karo ilaa Academic Year, School Profile, Classes, Subjects, Teachers & Assignments, Students & Parents, iyo Attendance & Exams la xaqiijiyo; Timetable iyo Fees/Modules waa in la dhammeystiro ama si cad loo skip-gareeyo.'));
+  assert.doesNotMatch(source, /Dabagal ayaa dhiman; Dashboard ma xannibayo/);
 });
 
 test('setup readiness is shared by API reads and writes and protects attendance, marks, and timetable routes', () => {
@@ -49,6 +57,16 @@ test('setup readiness is shared by API reads and writes and protects attendance,
   assert.match(source, /res\.status\(403\)\.json\(\{ error: 'Your role cannot access school setup operations/);
 });
 
+test('eligible School Admin dashboard API requires the full Final Review marker', () => {
+  const source = read('src/server/api.ts');
+  assert.match(source, /async function requireSchoolAdminDashboardSetupComplete/);
+  assert.match(source, /isSchoolSetupProgressCompleteWithTeacherAssignment\(state\.progress\)/);
+  assert.match(source, /apiRouter\.get\('\/school\/dashboard', requireAuth, requireSchoolContext, requireSchoolSetupReady, requireSchoolAdminDashboardSetupComplete,/);
+  assert.match(source, /if \(normalizeRole\(req\.user\?\.role\) !== 'school_admin' \|\| !isSchoolSetupWizardEligible\(school\.createdAt\)\)/);
+  assert.match(source, /Final Review lama xaqiijin/);
+  assert.ok(source.includes('const requiredIds = [1, 2, 3, 4, 5, 0, 6]'), 'Attendance/Exams APIs must stay reachable while the wizard is in progress');
+});
+
 test('completed existing schools are grandfathered and are not relocked by setup gates', () => {
   const source = read('src/server/api.ts');
   assert.match(source, /const savedProgress = normalizeSchoolSetupProgress\(school\.setupProgress\)/);
@@ -61,9 +79,10 @@ test('completed existing schools are grandfathered and are not relocked by setup
 
 test('legacy setup checklist identifiers remain mapped to the new wizard evidence', () => {
   const source = read('src/components/schooladmin/SchoolSetupWizard.tsx');
-  for (const evidence of ['evidence: 1', 'evidence: 2', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'evidence: 0', 'evidence: 6', 'evidence: 7']) {
+  for (const evidence of ['evidence: 1', 'evidence: 2', 'evidence: 3', 'evidence: 4', 'evidence: 5', 'evidence: 6', 'evidence: 7', 'evidence: 8', 'evidence: 9']) {
     assert.ok(source.includes(evidence), `legacy checklist mapping missing: ${evidence}`);
   }
+  assert.ok(source.includes('assignmentEvidence: 0'), 'teacher assignment remains a required part of the teacher step');
 });
 
 
@@ -148,4 +167,18 @@ test('six setup modules render inside the wizard and use existing database-backe
   assert.match(editor, /request<any>\('\/teacher-assignments'/);
   assert.match(editor, /request\(.*timetable/);
   assert.doesNotMatch(editor, /localStorage/);
+});
+test('legacy completion markers cannot unlock a new-school dashboard without Teacher Assignment', () => {
+  const base = { completedAt: '2026-11-23T12:00:00.000Z', completedSteps: [1, 2, 3, 4, 5, 6, 8, 10], skippedSteps: [7, 9] };
+  assert.equal(isSchoolSetupProgressCompleteWithTeacherAssignment(base), false);
+  assert.equal(isSchoolSetupProgressCompleteWithTeacherAssignment({ ...base, completedSteps: [0, ...base.completedSteps] }), true);
+});
+
+test('eligible new schools repair stale completion markers before resuming setup', () => {
+  const api = read('src/server/api.ts');
+  const wizard = read('src/components/schooladmin/SchoolSetupWizard.tsx');
+  assert.ok(api.includes('canFinish: isSchoolSetupWizardEligible(school.createdAt)'));
+  assert.ok(api.includes('const progressBase = isSchoolSetupWizardEligible(school.createdAt)'));
+  assert.ok(api.includes('completedAt: null, completedSteps: state.progress.completedSteps.filter((id: number) => id !== 10)'));
+  assert.ok(wizard.includes('current.progress.completedAt && (!isSchoolSetupWizardEligible(school?.createdAt) || (current.canFinish && isSchoolSetupProgressCompleteWithTeacherAssignment(current.progress)))'));
 });
