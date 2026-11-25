@@ -4057,3 +4057,62 @@ main :is(.flex, .inline-flex) > * {
     animation-duration: .01ms !important;
   }
 }
+
+
+/* Mobile readability hotfix: never hide labels or values just to fit a narrow row. */
+@media (max-width: 767px) {
+  /* Tailwind's truncate/line-clamp utilities were clipping real content on phones. */
+  main .truncate,
+  main [class*="line-clamp-"] {
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+  }
+
+  main .whitespace-nowrap {
+    white-space: normal !important;
+  }
+
+  /* Let long names, labels, IDs and helper text wrap instead of disappearing. */
+  main :is(span, p, label, a, button, th, td, li, strong, em, small) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  /* Flex/grid children must be allowed to shrink and reveal their full text. */
+  main :is(.flex, .inline-flex, [class*="grid"]) > * {
+    min-width: 0;
+  }
+
+  /* Do not clip text inside cards, badges, tabs, navigation items or action rows. */
+  main :is([role="tab"], [role="button"]) {
+    min-width: 0;
+    height: auto;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+
+  main :is(.text-xs, .text-sm) {
+    line-height: 1.45;
+  }
+  main :is(input, select, textarea) {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* Smallest phones: prioritize complete labels over one-line layouts. */
+@media (max-width: 390px) {
+  main :is(button, a, label, th, td) { overflow-wrap: anywhere; }
+  main :is(.truncate, [class*="line-clamp-"], .whitespace-nowrap) {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+  }
+}
