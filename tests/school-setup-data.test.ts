@@ -24,17 +24,18 @@ test('academic year cannot be changed to exclude already saved terms', () => {
   assert.match(validateSchoolSetupStep(2, { academicYear: { name: '2026/2027', isCurrent: true, startDate: '2026-10-01', endDate: '2027-06-30' } }, existingData) || '', /would exclude saved terms/);
 });
 
-test('terms allow one to three non-overlapping periods only', () => {
+test('terms require exactly two non-overlapping semesters', () => {
   assert.equal(validateSchoolSetupStep(3, { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-01-01' }, { name: 'Term 2', startDate: '2027-01-02', endDate: '2027-06-30' }] }), null);
   assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-02-01' }, { name: 'Term 2', startDate: '2027-01-15', endDate: '2027-06-30' }] }) || '', /must not overlap/);
-  assert.match(validateSchoolSetupStep(3, { terms: [] }) || '', /1–3 terms/);
+  assert.match(validateSchoolSetupStep(3, { terms: [] }) || '', /laba semester/);
+  assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-01-01' }] }) || '', /laba semester/);
 });
 
 test('terms must stay within the configured academic year', () => {
   const academicYear = { name: '2026/2027', isCurrent: true, startDate: '2026-09-01', endDate: '2027-06-30' };
-  assert.equal(validateSchoolSetupStep(3, { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-01-01' }] }, { academicYear }), null);
-  assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Term 1', startDate: '2026-08-31', endDate: '2027-01-01' }] }, { academicYear }) || '', /within the selected academic year/);
-  assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Term 1', startDate: '2026-09-01', endDate: '2027-07-01' }] }, { academicYear }) || '', /within the selected academic year/);
+  assert.equal(validateSchoolSetupStep(3, { terms: [{ name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-01' }, { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-06-30' }] }, { academicYear }), null);
+  assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Semester 1', startDate: '2026-08-31', endDate: '2027-01-01' }, { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-06-30' }] }, { academicYear }) || '', /within the selected academic year/);
+  assert.match(validateSchoolSetupStep(3, { terms: [{ name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-01' }, { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-07-01' }] }, { academicYear }) || '', /within the selected academic year/);
 });
 
 test('academic calendar requires non-overlapping working days and valid holidays', () => {
@@ -61,12 +62,11 @@ test('academic year is only made current when the administrator selects the curr
   assert.equal(currentUpdates.academicYear, '2026-2027');
 });
 
-test('three configured terms are preserved and legacy semester dates span the first and last terms', () => {
+test('two configured semesters map to the legacy semester date fields', () => {
   const school = { terms: undefined } as any;
   const data = { terms: [
-    { name: 'Term 1', startDate: '2026-09-01', endDate: '2026-11-30' },
-    { name: 'Term 2', startDate: '2026-12-01', endDate: '2027-03-01' },
-    { name: 'Term 3', startDate: '2027-03-02', endDate: '2027-06-30' }
+    { name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-01' },
+    { name: 'Semester 2', startDate: '2027-01-02', endDate: '2027-06-30' }
   ] };
   const updates = buildSchoolSetupSchoolUpdates(3, data, school, undefined);
   assert.deepEqual(updates.terms, {
