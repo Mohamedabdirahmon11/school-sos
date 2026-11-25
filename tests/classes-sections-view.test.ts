@@ -37,7 +37,7 @@ test('Academic setup header preserves the four exact tabs and hash routes', () =
 });
 
 test('Academic setup CSS preserves the reference design tokens and responsive table behavior', () => {
-  for (const token of ['#f2f5f8', '#13202d', '#dbe2ea', '#0e6a62', '#0d141b', '#151e28', '#263342', 'Space Grotesk', 'Inter', 'max-width:1080px']) assert.ok(css.includes(token));
+  for (const token of ['#f6f4ee', '#1c2b26', '#d9d6cb', '#1f4d3f', '#121a17', '#1a2420', '#34453d', 'Georgia', 'Source Sans 3', 'max-width:1320px']) assert.ok(css.includes(token));
   assert.match(css, /overflow-x:auto/);
   assert.match(css, /:focus-visible/);
 });
