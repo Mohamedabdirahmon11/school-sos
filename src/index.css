@@ -5043,3 +5043,38 @@ main :is(.flex, .inline-flex) > * {
   border-color:#e8d39e;
   color:#183b2d;
 }
+
+/* School Admin phone layout: themed bottom bar and a full-screen menu that slides up above it. */
+@media (max-width:767px) {
+  .school-admin-mobile-quick-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
+    z-index:60;
+    background:var(--sidebar-background,#0f2a5c);
+    border-color:rgba(255,255,255,.14);
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] :is(.schoolos-mobile-quick-action,.schoolos-mobile-menu-action) {
+    width:auto;
+    border:0;
+    background:transparent !important;
+    box-shadow:none !important;
+    color:var(--sidebar-text,#fff) !important;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] :is(.schoolos-mobile-quick-action[aria-current="page"],.schoolos-mobile-menu-action[aria-expanded="true"]) {
+    background:rgba(255,255,255,.16) !important;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action span { font-size:11px; }
+  :root:has(.school-admin-mobile-content) .school-admin-sidebar {
+    translate:0 100% !important;
+    visibility:hidden;
+    transition:translate .2s ease-out,visibility .2s;
+  }
+  :root:has(.school-admin-mobile-content) .school-admin-sidebar[data-mobile-open="true"] {
+    translate:0 0 !important;
+    visibility:visible;
+    width:100% !important;
+    max-width:none;
+    border:0;
+    border-radius:0;
+    padding-bottom:calc(76px + max(env(safe-area-inset-bottom),6px));
+  }
+}
