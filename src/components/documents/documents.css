@@ -94,3 +94,186 @@
 .documents-view .student-doc-categories button[aria-pressed="true"]{border-color:#2563eb;background:#2563eb;color:#fff}
 @media(prefers-color-scheme:dark){:root:not([data-theme=light]) .documents-view .structured-template-panel,:root:not([data-theme=light]) .documents-view .student-doc-card{background:#161e2b!important;border-color:#2a3649!important}:root:not([data-theme=light]) .documents-view .student-doc-card strong{color:#e8edf5}:root:not([data-theme=light]) .documents-view .student-doc-card p{color:#aab6ca}}
 @media(max-width:640px){.documents-view .student-doc-catalog{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.documents-view .student-doc-card{min-height:165px;padding:11px}.documents-view .student-doc-card p{font-size:11px}}
+
+
+/* School Documents: mobile-first workspace and editor controls. */
+@media (max-width: 767px) {
+  .documents-view { padding:10px!important; }
+  .documents-view > .schoolos-operation-header {
+    display:flex;
+    flex-direction:column;
+    align-items:stretch!important;
+    gap:13px!important;
+    padding:17px!important;
+    border-radius:15px!important;
+  }
+  .documents-view > .schoolos-operation-header > div:first-child { min-width:0; }
+  .documents-view > .schoolos-operation-header h1 {
+    font-size:22px!important;
+    line-height:1.2;
+    overflow-wrap:anywhere;
+  }
+  .documents-view > .schoolos-operation-header p {
+    font-size:12px!important;
+    line-height:1.5;
+  }
+  .documents-view > .schoolos-operation-header > div:last-child {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    width:100%;
+    gap:8px;
+  }
+  .documents-view > .schoolos-operation-header button {
+    width:100%;
+    min-width:0;
+    min-height:43px;
+    white-space:normal;
+    line-height:1.3;
+    padding:8px!important;
+    font-size:12px!important;
+  }
+  .documents-view .grid.min-w-0.gap-4 {
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:11px!important;
+  }
+  .documents-view aside {
+    max-height:none!important;
+    padding:11px!important;
+    overflow:visible!important;
+  }
+  .documents-view aside > div:first-child {
+    gap:7px;
+  }
+  .documents-view aside input,
+  .documents-view aside select {
+    min-width:0;
+    min-height:42px;
+    font-size:13px!important;
+  }
+  .documents-view aside > div:last-child {
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    gap:6px;
+    max-height:240px!important;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  .documents-view aside > div:last-child > div {
+    min-width:0;
+    padding:9px!important;
+  }
+  .documents-view aside > div:last-child > div > button:first-child {
+    min-width:0;
+  }
+  .documents-view aside > div:last-child > div > button:first-child span {
+    overflow-wrap:anywhere;
+  }
+  .documents-view aside > div:last-child > div > div {
+    flex-wrap:wrap;
+  }
+  .documents-view main { min-width:0; }
+  .documents-view main > div > div:first-child {
+    min-width:0;
+    gap:9px;
+    padding:12px!important;
+  }
+  .documents-view main input[aria-label="Cinwaanka dukumentiga"] {
+    width:100%;
+    min-width:0;
+    min-height:44px;
+    font-size:15px!important;
+  }
+  .documents-view main button,
+  .documents-view main select,
+  .documents-view main input:not([type="checkbox"]) {
+    min-height:40px;
+    max-width:100%;
+  }
+  .documents-editor-shell {
+    min-width:0;
+    padding:8px!important;
+    border-radius:13px!important;
+  }
+  .documents-toolbar { min-width:0; }
+  .documents-toolbar-main {
+    display:flex;
+    flex-wrap:nowrap!important;
+    gap:6px!important;
+    overflow-x:auto!important;
+    overflow-y:hidden;
+    max-width:100%;
+    padding:8px!important;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  .documents-toolbar-main > *,
+  .documents-toolbar-main button {
+    flex:0 0 auto;
+    min-height:40px;
+    white-space:nowrap;
+  }
+  .documents-toolbar-extra {
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+  }
+  .documents-toolbar-extra > * {
+    max-width:100%;
+    min-width:0;
+  }
+  .documents-advanced-tools,
+  .documents-page-settings,
+  .documents-admin-details {
+    min-width:0;
+    padding:10px!important;
+  }
+  .documents-advanced-tools > div,
+  .documents-page-settings > div,
+  .documents-admin-details section {
+    min-width:0;
+    max-width:100%;
+    overflow-wrap:anywhere;
+  }
+  .documents-paper {
+    width:100%!important;
+    min-width:0!important;
+    min-height:0!important;
+    max-width:100%!important;
+    padding:8mm!important;
+    overflow-wrap:anywhere;
+    box-shadow:0 5px 18px rgba(20,35,55,.08)!important;
+  }
+  .documents-paper table {
+    max-width:100%;
+    width:100%;
+    table-layout:fixed;
+  }
+  .documents-paper img {
+    max-width:100%;
+    height:auto;
+  }
+  .documents-view [role="status"] {
+    align-items:flex-start;
+    gap:8px;
+    overflow-wrap:anywhere;
+    line-height:1.5;
+  }
+  .documents-view [role="status"] span { min-width:0; }
+  .documents-view .student-doc-catalog {
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+  .documents-view .student-doc-card {
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+}
+@media (max-width: 380px) {
+  .documents-view > .schoolos-operation-header > div:last-child {
+    grid-template-columns:minmax(0,1fr);
+  }
+  .documents-view .student-doc-catalog {
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .documents-paper { padding:6mm!important; }
+}
