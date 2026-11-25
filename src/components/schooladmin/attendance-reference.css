@@ -1,1 +1,47 @@
-
+/* ===== Academics / attendance / marks: match the supplied HTML reference ===== */
+.school-admin-attendance-page {
+  --academic-bg:#f6f4ee; --academic-card:#fff; --academic-ink:#1c2b26; --academic-muted:#5f6f68; --academic-line:#d9d6cb;
+  max-width:1440px!important; padding:18px clamp(12px,2.2vw,28px) 42px!important;
+  color:var(--academic-ink); background:var(--academic-bg); font-family:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+}
+.school-admin-attendance-page > div:first-child {
+  padding:20px 22px; border:1px solid var(--academic-line); border-radius:12px; background:var(--academic-card);
+  box-shadow:0 1px 3px rgba(20,40,30,.04);
+}
+.school-admin-attendance-page > div:first-child h1 {
+  color:var(--academic-ink)!important; font:700 clamp(25px,2.4vw,31px)/1.15 Georgia,"Times New Roman",serif!important;
+  letter-spacing:-.025em;
+}
+.school-admin-attendance-page > div:first-child p { color:var(--academic-muted)!important; }
+.school-admin-attendance-page .grid > div {
+  border-color:var(--academic-line)!important; border-radius:11px!important; box-shadow:0 1px 3px rgba(20,40,30,.035);
+}
+.school-admin-attendance-page .overflow-hidden.rounded-2xl {
+  border:1px solid var(--academic-line)!important; border-radius:11px!important; background:var(--academic-card);
+}
+.school-admin-attendance-page table { min-width:700px; border-collapse:separate; border-spacing:0; }
+.school-admin-attendance-page thead { background:#eaf2ed!important; color:#52665c!important; }
+.school-admin-attendance-page thead th { color:#52665c!important; font-size:10px!important; letter-spacing:.06em; }
+.school-admin-attendance-page tbody tr:hover { background:#eaf2ed!important; }
+.school-admin-attendance-page button { border-radius:8px!important; }
+.school-admin-attendance-page button.bg-\[\#0e8078\] { background:#1f4d3f!important; }
+.school-admin-attendance-page input { border-color:var(--academic-line)!important; border-radius:8px!important; color:var(--academic-ink); }
+.school-admin-attendance-page :focus-visible { outline:3px solid rgba(31,77,63,.2); outline-offset:2px; }
+.dark .school-admin-attendance-page,[data-theme="dark"] .school-admin-attendance-page,:root[data-theme="dark"] .school-admin-attendance-page {
+  --academic-bg:#121a17; --academic-card:#1a2420; --academic-ink:#e6efe9; --academic-muted:#a7b8af; --academic-line:#34453d;
+  color:var(--academic-ink); background:var(--academic-bg);
+}
+.dark .school-admin-attendance-page > div:first-child,[data-theme="dark"] .school-admin-attendance-page > div:first-child,
+.dark .school-admin-attendance-page .overflow-hidden.rounded-2xl,[data-theme="dark"] .school-admin-attendance-page .overflow-hidden.rounded-2xl { background:var(--academic-card)!important; border-color:var(--academic-line)!important; }
+.dark .school-admin-attendance-page > div:first-child h1,.dark .school-admin-attendance-page > div:first-child p,
+[data-theme="dark"] .school-admin-attendance-page > div:first-child h1,[data-theme="dark"] .school-admin-attendance-page > div:first-child p { color:var(--academic-ink)!important; }
+.dark .school-admin-attendance-page thead,[data-theme="dark"] .school-admin-attendance-page thead { background:#20372d!important; }
+.dark .school-admin-attendance-page thead th,[data-theme="dark"] .school-admin-attendance-page thead th { color:#c1d7ca!important; }
+.dark .school-admin-attendance-page input,[data-theme="dark"] .school-admin-attendance-page input { background:#121a17!important; border-color:#34453d!important; color:#e6efe9!important; }
+@media(max-width:640px) {
+  .school-admin-attendance-page { padding:12px 10px 26px!important; }
+  .school-admin-attendance-page > div:first-child { padding:14px; }
+  .school-admin-attendance-page > div:first-child h1 { font-size:24px!important; }
+  .school-admin-attendance-page .grid { gap:8px!important; }
+  .school-admin-attendance-page .grid > div { padding:11px!important; }
+}
