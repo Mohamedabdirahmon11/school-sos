@@ -63,7 +63,7 @@ test('school dashboard schema supplies real weekly attendance trend and absent s
   assert.match(dashboard, /attendance\.status = 'absent'/);
   const dashboardView = source('../src/components/schooladmin/SchoolDashboard.tsx');
   assert.match(dashboardView, /attendanceRecordedToday: number\(value\.attendanceRecordedToday\)/);
-  assert.match(dashboardView, /'Not recorded'/);
+  assert.match(dashboardView, /lama diiwaangelin/i);
   assert.match(dashboard, /active_student\.status = 'active'/);
   assert.match(dashboard, /school_id = p_school_id/);
 });

@@ -5,15 +5,25 @@ import { formatMoney } from '../../lib/money.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { EmptyState, LoadingState } from '../common/AsyncState.tsx';
-import { CalendarCheck, Wallet, UserPlus, CreditCard, ClipboardCheck, BellRing, AlertCircle, GraduationCap, Users, School, ArrowUpRight, Activity, BookOpen } from 'lucide-react';
+import {
+  Activity, AlertCircle, ArrowRight, Bell, BookOpen, CalendarCheck,
+  CheckCircle2, ClipboardCheck, CreditCard, GraduationCap, Megaphone,
+  Plus, School, UserPlus, Users, Wallet
+} from 'lucide-react';
 
-interface SchoolDashboardProps { onNavigate: (view: string) => void; onOpenAddStudent: () => void; }
+interface SchoolDashboardProps {
+  onNavigate: (view: string) => void;
+  onOpenAddStudent: () => void;
+}
 type DashboardRecord = Record<string, any>;
 
 export function normalizeSchoolDashboardData(data: unknown) {
   const value: DashboardRecord = data && typeof data === 'object' ? data as DashboardRecord : {};
   const rawStats: DashboardRecord = value.stats && typeof value.stats === 'object' ? value.stats : {};
-  const number = (input: unknown) => { const parsed = Number(input); return Number.isFinite(parsed) ? parsed : 0; };
+  const number = (input: unknown) => {
+    const parsed = Number(input);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
   return {
     stats: {
       totalStudents: number(rawStats.totalStudents),
@@ -21,9 +31,11 @@ export function normalizeSchoolDashboardData(data: unknown) {
       totalClasses: number(rawStats.totalClasses ?? value.totalClasses),
       attendanceRate: number(rawStats.attendanceRate),
       attendanceRecordedToday: number(value.attendanceRecordedToday),
+      todayAttendance: number(value.todayAttendance),
       todayCollection: number(rawStats.todayCollection ?? rawStats.totalCollected),
       totalOutstanding: number(rawStats.totalOutstanding ?? rawStats.outstandingFees)
     },
+    recentStudents: Array.isArray(value.recentStudents) ? value.recentStudents : [],
     recentPayments: Array.isArray(value.recentPayments) ? value.recentPayments : [],
     notices: Array.isArray(value.notices) ? value.notices : [],
     attendanceTrend: Array.isArray(value.attendanceTrend) ? value.attendanceTrend : [],
@@ -32,115 +44,163 @@ export function normalizeSchoolDashboardData(data: unknown) {
   };
 }
 
-const Metric = ({ label, value, hint, onClick, icon: Icon, tone }: {
-  label: string; value: React.ReactNode; hint?: string; onClick?: () => void;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  tone: 'blue' | 'green' | 'purple' | 'amber';
+const StatCard = ({ label, value, note, icon: Icon, tone, onClick }: {
+  label: string;
+  value: React.ReactNode;
+  note: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  tone: 'green' | 'gold' | 'blue' | 'red';
+  onClick?: () => void;
 }) => (
-  <button type="button" onClick={onClick} data-tone={tone} className="school-admin-metric school-admin-showcase-metric min-w-0 text-left">
-    <div className="flex items-start justify-between gap-3"><div className="min-w-0">
-      <div className="metric-label">{label}</div><div className="metric-value mt-2">{value}</div>
-      {hint && <div className="metric-hint mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold">{hint}</div>}
-    </div><span className="metric-icon shrink-0"><Icon size={21} /></span></div>
+  <button type="button" onClick={onClick} className={`schoolos-dash-stat schoolos-dash-${tone}`} aria-label={label + ': ' + String(value)}>
+    <span className="schoolos-dash-stat-top"><span>{label}</span><Icon size={19} strokeWidth={1.8} /></span>
+    <strong>{value}</strong>
+    <small>{note}</small>
   </button>
+);
+
+const PanelTitle = ({ eyebrow, title, icon: Icon, action }: {
+  eyebrow?: string;
+  title: string;
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
+  action?: React.ReactNode;
+}) => (
+  <div className="schoolos-dash-panel-head">
+    <div className="min-w-0">
+      {eyebrow && <span className="schoolos-dash-eyebrow">{eyebrow}</span>}
+      <h2>{title}</h2>
+    </div>
+    <span className="schoolos-dash-panel-icon"><Icon size={18} strokeWidth={1.8} /></span>
+    {action}
+  </div>
 );
 
 export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, onOpenAddStudent }) => {
   const { school, isReadOnly, user } = useAuth();
-  const { data, loading, error, retry } = useApi(() => ApiClient.getSchoolDashboard(school?.id), [school?.id], Boolean(school));
-  if (loading) return <LoadingState label="Loading school dashboard…" className="max-w-7xl" />;
+  const { data, loading, error, retry } = useApi(
+    () => ApiClient.getSchoolDashboard(school?.id),
+    [school?.id],
+    Boolean(school)
+  );
+
+  if (loading) return <div className="schoolos-dash-loading"><LoadingState label="Dashboard-ka waa la soo rarayaa…" className="max-w-7xl" /></div>;
   if (error) return <ErrorState error={error} onRetry={retry} />;
 
   const result = normalizeSchoolDashboardData(data);
   const canViewFinance = user?.role === 'accountant' || user?.role === 'super_admin';
   const canManageStudents = user?.role === 'school_admin' || user?.role === 'super_admin';
-  const { totalStudents, totalTeachers, totalClasses, attendanceRate, todayCollection, totalOutstanding } = result.stats;
+  const { totalStudents, totalTeachers, totalClasses, attendanceRate, attendanceRecordedToday, todayAttendance, todayCollection, totalOutstanding } = result.stats;
   const currency = school?.currency || 'ETB';
-  const maxTrend = Math.max(1, ...result.attendanceTrend.map((item: DashboardRecord) => Number(item.rate ?? item.attendanceRate ?? item.present) || 0));
-  const collected = Math.max(0, todayCollection), outstanding = Math.max(0, totalOutstanding);
-  const totalFees = collected + outstanding, collectedPercent = totalFees > 0 ? Math.round(collected / totalFees * 100) : 0;
+  const today = new Intl.DateTimeFormat('so-ET', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
+  const greetingName = String(user?.fullName || 'Maamulaha').trim().split(/\s+/)[0];
+  const maxTrend = Math.max(100, ...result.attendanceTrend.map((item: DashboardRecord) => Number(item.rate ?? item.attendanceRate ?? 0) || 0));
   const actions = [
-    { label: 'Mark attendance', detail: 'Open daily register', icon: ClipboardCheck, view: 'sch_attendance' },
-    { label: 'Record payment', detail: 'Update fee ledger', icon: CreditCard, view: 'sch_fees' },
-    { label: 'Post notice', detail: 'Share a school update', icon: BellRing, view: 'sch_notices' },
-    { label: 'New admission', detail: 'Register a student', icon: UserPlus, view: 'sch_students' }
-  ].filter(item => (item.view !== 'sch_fees' || canViewFinance) && (item.view !== 'sch_students' || canManageStudents));
+    { label: 'Diiwaangeli arday', description: 'Ku dar arday cusub', icon: UserPlus, action: onOpenAddStudent, visible: canManageStudents, disabled: isReadOnly },
+    { label: 'Imaanshaha maanta', description: 'Fur diiwaanka fasallada', icon: ClipboardCheck, action: () => onNavigate('sch_attendance'), visible: true },
+    { label: 'Ogeysiis cusub', description: 'La wadaag war dugsiga', icon: Megaphone, action: () => onNavigate('sch_notices'), visible: true },
+    { label: 'Macallimiinta', description: 'Eeg shaqaalaha wax dhiga', icon: Users, action: () => onNavigate('sch_teachers'), visible: true },
+    { label: 'Fasallada', description: 'Maamul fasallada iyo qaybaha', icon: School, action: () => onNavigate('sch_classes'), visible: true },
+    { label: 'Warbixinnada', description: 'Eeg xogta dugsiga', icon: Activity, action: () => onNavigate('sch_reports'), visible: true },
+    { label: 'Diiwaangeli lacag', description: 'Cusboonaysii fee ledger', icon: CreditCard, action: () => onNavigate('sch_fees'), visible: canViewFinance }
+  ].filter(item => item.visible);
 
-  return <div className="school-dashboard-page school-admin-showcase mx-auto w-full max-w-[1600px] space-y-5 p-4 md:p-6">
-    <section className="school-dashboard-hero school-admin-showcase-hero relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 text-slate-800 md:p-6">
-      <div className="relative z-10 flex flex-col justify-between gap-5 md:flex-row md:items-center">
-        <div className="flex min-w-0 items-center gap-4">
-          {school?.logoUrl ? <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white p-2"><img src={school.logoUrl} alt="" className="h-full w-full object-contain" /></div>
-            : <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-slate-100 text-xl font-bold text-slate-700">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</div>}
-          <div className="min-w-0"><p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">School overview</p>
-            <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 md:text-2xl">Dashboard</h1>
-            <p className="mt-1 truncate text-sm text-slate-500">{school?.name || 'Your school'}{school?.academicYear ? ' · ' + school.academicYear : ''}{school?.currentSemester ? ' · ' + school.currentSemester : ''}</p>
+  return (
+    <div className="schoolos-reference-dashboard" aria-label="School dashboard">
+      <header className="schoolos-dash-welcome">
+        <div className="schoolos-dash-welcome-copy">
+          <span className="schoolos-dash-kicker">SCHOOLOS · GUUDMAR</span>
+          <h1>Dashboard</h1>
+          <p>Soo dhawoow, {greetingName} <span aria-hidden="true">·</span> {today}</p>
+          <div className="schoolos-dash-school-line">
+            {school?.logoUrl
+              ? <img src={school.logoUrl} alt="" />
+              : <span className="schoolos-dash-school-mark">{school?.name?.trim().charAt(0).toUpperCase() || 'S'}</span>}
+            <span className="min-w-0"><b>{school?.name || 'Dugsigaaga'}</b><small>{[school?.academicYear, school?.currentSemester].filter(Boolean).join(' · ') || 'Maamulka dugsiga'}</small></span>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {canViewFinance && <button type="button" onClick={() => onNavigate('sch_fees')} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><CreditCard size={16} /> Record payment</button>}
-          {canManageStudents && <button type="button" onClick={onOpenAddStudent} disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-lg bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#0D655E] disabled:opacity-50"><UserPlus size={16} /> Add student</button>}
+        <div className="schoolos-dash-welcome-actions">
+          {canViewFinance && <button type="button" className="schoolos-dash-button schoolos-dash-button-light" onClick={() => onNavigate('sch_fees')}><Wallet size={16} /> Diiwaangeli lacag</button>}
+          {canManageStudents && <button type="button" className="schoolos-dash-button schoolos-dash-button-primary" onClick={onOpenAddStudent} disabled={isReadOnly}><Plus size={17} /> Arday cusub</button>}
         </div>
-      </div>
-    </section>
+      </header>
 
-    <section aria-label="School statistics" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric label="Total students" value={totalStudents.toLocaleString()} hint="Enrolled students" icon={GraduationCap} tone="blue" onClick={() => onNavigate('sch_students')} />
-      <Metric label="Teachers" value={totalTeachers.toLocaleString()} hint="Teaching staff" icon={Users} tone="green" onClick={() => onNavigate('sch_teachers')} />
-      <Metric label="Attendance today" value={result.stats.attendanceRecordedToday > 0 ? String(attendanceRate) + '%' : 'Not recorded'} hint={result.stats.attendanceRecordedToday > 0 ? 'Register recorded' : 'Not recorded yet'} icon={CalendarCheck} tone="purple" onClick={() => onNavigate('sch_attendance')} />
-      <Metric label="Total classes" value={totalClasses.toLocaleString()} hint="School classes" icon={School} tone="amber" onClick={() => onNavigate('sch_classes')} />
-    </section>
+      <section className="schoolos-dash-stats" aria-label="Tirakoobka dugsiga">
+        <StatCard label="Ardayda firfircoon" value={totalStudents.toLocaleString()} note="Arday diiwaangashan" icon={GraduationCap} tone="green" onClick={() => onNavigate('sch_students')} />
+        <StatCard label="Macallimiinta" value={totalTeachers.toLocaleString()} note="Shaqaalaha wax dhiga" icon={Users} tone="blue" onClick={() => onNavigate('sch_teachers')} />
+        <StatCard label="Fasallada" value={totalClasses.toLocaleString()} note="Fasallo aan la xirin" icon={School} tone="gold" onClick={() => onNavigate('sch_classes')} />
+        <StatCard label="Joogay maanta" value={attendanceRecordedToday > 0 ? todayAttendance.toLocaleString() : '—'} note={attendanceRecordedToday > 0 ? `${attendanceRate}% heerka imaanshaha` : 'Weli lama diiwaangelin'} icon={CalendarCheck} tone="green" onClick={() => onNavigate('sch_attendance')} />
+        <StatCard label="Maqan maanta" value={result.absentStudents.length.toLocaleString()} note="Ardayda u baahan dabagal" icon={AlertCircle} tone="red" onClick={() => onNavigate('sch_attendance')} />
+        <StatCard label="Ogeysiisyada firfircoon" value={result.notices.length.toLocaleString()} note="Ogeysiisyadii ugu dambeeyay" icon={Bell} tone="blue" onClick={() => onNavigate('sch_notices')} />
+        {canViewFinance && <StatCard label="Lacag maanta la qabtay" value={formatMoney(todayCollection, currency)} note="Wadarta lacag ururinta maanta" icon={Wallet} tone="gold" onClick={() => onNavigate('sch_fees')} />}
+        {canViewFinance && <StatCard label="Lacagta dhiman" value={formatMoney(totalOutstanding, currency)} note="Haraaga lacagaha" icon={CreditCard} tone="red" onClick={() => onNavigate('sch_fees')} />}
+      </section>
 
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.85fr)]">
-      <div className="school-dashboard-panel school-admin-showcase-panel min-w-0 p-5 md:p-6">
-        <div className="mb-5 flex items-center justify-between gap-3"><div><div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400"><Activity size={14} /> Attendance</div><h2 className="text-base font-semibold text-slate-900">Weekly attendance trend</h2></div>
-          <button type="button" onClick={() => onNavigate('sch_attendance')} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Open register <ArrowUpRight size={14} /></button>
+      <section className="schoolos-dash-grid schoolos-dash-grid-main">
+        <article className="schoolos-dash-panel">
+          <PanelTitle eyebrow="IMAANSHAHA" title="Imaanshaha 7-dii maalmood" icon={Activity} action={<button type="button" className="schoolos-dash-text-link" onClick={() => onNavigate('sch_attendance')}>Fur diiwaanka <ArrowRight size={14} /></button>} />
+          {result.attendanceTrend.length ? (
+            <div className="schoolos-dash-chart" role="img" aria-label="Heerka imaanshaha toddobadii maalmood ee u dambeeyay">
+              {result.attendanceTrend.map((item: DashboardRecord, index: number) => {
+                const rate = Math.max(0, Math.min(100, Number(item.rate ?? item.attendanceRate ?? 0) || 0));
+                return <div className="schoolos-dash-chart-day" key={item.date ?? item.day ?? index}>
+                  <b>{rate}%</b>
+                  <div className="schoolos-dash-chart-track"><span style={{ height: `${Math.max(3, rate / maxTrend * 100)}%` }} /></div>
+                  <small>{item.day ?? (typeof item.date === 'string' ? item.date.slice(5) : `Maalin ${index + 1}`)}</small>
+                </div>;
+              })}
+            </div>
+          ) : <EmptyState title="Xogta imaanshaha wali ma jirto" description="Jaantusku wuxuu soo muuqan doonaa marka imaansho la diiwaangeliyo." className="schoolos-dash-empty" />}
+          <div className="schoolos-dash-chart-foot"><span><i className="schoolos-dash-dot" /> Heerka ardayda joogtay</span><b>{attendanceRecordedToday > 0 ? `${attendanceRate}% maanta` : 'Maanta lama diiwaangelin'}</b></div>
+        </article>
+
+        <article className="schoolos-dash-panel">
+          <PanelTitle eyebrow="DABAGAL" title="Ardayda maanta maqan" icon={AlertCircle} action={<button type="button" className="schoolos-dash-text-link" onClick={() => onNavigate('sch_attendance')}>Dhammaan <ArrowRight size={14} /></button>} />
+          {result.absentStudents.length ? <div className="schoolos-dash-list">
+            {result.absentStudents.slice(0, 5).map((student: DashboardRecord, index: number) => <div className="schoolos-dash-list-row" key={student.id ?? index}>
+              <span className="schoolos-dash-avatar">{String(student.name ?? 'A').trim().charAt(0).toUpperCase()}</span>
+              <span className="schoolos-dash-list-copy"><b>{student.name ?? student.studentName ?? 'Arday'}</b><small>{student.className ?? student.class ?? 'Fasal lama cayimin'} · {student.studentId ?? ''}</small></span>
+              <span className="schoolos-dash-status schoolos-dash-status-red">Maqan</span>
+            </div>)}
+          </div> : <div className="schoolos-dash-success"><CheckCircle2 size={19} /><span><b>Ma jiraan arday maqnaansho loo diiwaangeliyey</b><small>Liiskani wuxuu ku salaysan yahay diiwaanka maanta.</small></span></div>}
+        </article>
+      </section>
+
+      <section className="schoolos-dash-grid schoolos-dash-grid-lower">
+        <article className="schoolos-dash-panel">
+          <PanelTitle eyebrow="DIIWAANGELIN" title="Ardaydii ugu dambeysay" icon={GraduationCap} action={<button type="button" className="schoolos-dash-text-link" onClick={() => onNavigate('sch_students')}>Liiska ardayda <ArrowRight size={14} /></button>} />
+          {result.recentStudents.length ? <div className="schoolos-dash-list">
+            {result.recentStudents.slice(0, 5).map((student: DashboardRecord, index: number) => {
+              const name = [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ') || student.name || 'Arday cusub';
+              return <div className="schoolos-dash-list-row" key={student.id ?? index}>
+                <span className="schoolos-dash-avatar schoolos-dash-avatar-green">{name.charAt(0).toUpperCase()}</span>
+                <span className="schoolos-dash-list-copy"><b>{name}</b><small>{student.studentId ?? 'ID lama hayo'} · {student.admissionDate ?? 'Taariikh lama hayo'}</small></span>
+                <span className="schoolos-dash-status schoolos-dash-status-green">Arday</span>
+              </div>;
+            })}
+          </div> : <EmptyState title="Weli arday cusub ma jiro" description="Marka arday la diiwaangeliyo, halkan ayuu ka muuqan doonaa." className="schoolos-dash-empty" />}
+        </article>
+
+        <article className="schoolos-dash-panel">
+          <PanelTitle eyebrow="ISGAARSIIN" title="Ogeysiisyadii ugu dambeeyay" icon={Megaphone} action={<button type="button" className="schoolos-dash-text-link" onClick={() => onNavigate('sch_notices')}>Dhammaan <ArrowRight size={14} /></button>} />
+          {result.notices.length ? <div className="schoolos-dash-list">
+            {result.notices.slice(0, 4).map((notice: DashboardRecord, index: number) => <div className="schoolos-dash-notice" key={notice.id ?? index}>
+              <span className="schoolos-dash-notice-mark"><Bell size={15} /></span>
+              <div className="schoolos-dash-list-copy"><b>{notice.title ?? 'Ogeysiis dugsi'}</b><small>{notice.publishDate ?? ''}{notice.isPinned ? ' · Muhiim' : ''}</small><p>{notice.content ?? ''}</p></div>
+            </div>)}
+          </div> : <EmptyState title="Ogeysiis ma jiro" description="Ogeysiisyada dugsiga halkan ayay ka soo muuqan doonaan." className="schoolos-dash-empty" />}
+        </article>
+      </section>
+
+      <section className="schoolos-dash-panel schoolos-dash-actions-panel">
+        <PanelTitle eyebrow="HABAB GAAGAABAN" title="Tallaabo degdeg ah" icon={BookOpen} />
+        <div className="schoolos-dash-actions">
+          {actions.map(item => <button type="button" key={item.label} onClick={item.action} disabled={item.disabled} className="schoolos-dash-action">
+            <span className="schoolos-dash-action-icon"><item.icon size={19} /></span>
+            <span><b>{item.label}</b><small>{item.description}</small></span>
+            <ArrowRight size={15} className="schoolos-dash-action-arrow" />
+          </button>)}
         </div>
-        {result.attendanceTrend.length ? <div className="flex h-52 items-end gap-2 border-b border-slate-100 px-1 sm:gap-4">
-          {result.attendanceTrend.map((item: DashboardRecord, index: number) => {
-            const rate = Math.max(0, Math.min(100, Number(item.rate ?? item.attendanceRate ?? item.present) || 0));
-            const height = Math.max(4, rate / maxTrend * 100);
-            return <div key={item.date ?? item.day ?? index} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2">
-              <span className="text-[10px] font-bold tabular-nums text-slate-500">{rate}%</span>
-              <div className="flex h-full w-full max-w-[68px] items-end overflow-hidden rounded-t-md bg-slate-100"><div className="w-full rounded-t-md bg-[#0F766E] transition-all" style={{ height: String(height) + '%' }} /></div>
-              <span className="max-w-full truncate text-[10px] text-slate-400">{item.day ?? (typeof item.date === 'string' ? item.date.slice(0, 3) : 'Day ' + (index + 1))}</span>
-            </div>;
-          })}
-        </div> : <EmptyState title="Weekly trend is not available yet" description="Attendance history will appear here when the dashboard API supplies it." className="min-h-52 border-0 bg-slate-50" />}
-      </div>
-
-      {canViewFinance && <div className="school-dashboard-panel school-admin-showcase-panel p-5 md:p-6">
-        <div className="mb-5 flex items-center gap-2"><Wallet size={17} className="text-blue-600" /><div><h2 className="text-base font-semibold text-slate-900">Fee collection</h2><p className="mt-0.5 text-xs text-slate-500">Collected vs outstanding</p></div></div>
-        {totalFees > 0 ? <div className="flex flex-col items-center gap-5 sm:flex-row xl:flex-col 2xl:flex-row">
-          <div className="relative grid h-36 w-36 shrink-0 place-items-center rounded-full" style={{ background: 'conic-gradient(var(--brand-color) ' + collectedPercent + '%, #f5c24d 0)' }}>
-            <div className="grid h-28 w-28 place-items-center rounded-full bg-white shadow-inner"><div className="text-center"><div className="text-2xl font-extrabold text-[#17264a]">{collectedPercent}%</div><div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">collected</div></div></div>
-          </div>
-          <div className="w-full space-y-4 text-sm">
-            <div><div className="mb-1 flex items-center gap-2 text-xs text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> Collected</div><strong className="pl-5 text-base text-[#17264a]">{formatMoney(collected, currency)}</strong></div>
-            <div><div className="mb-1 flex items-center gap-2 text-xs text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Outstanding</div><strong className="pl-5 text-base text-[#17264a]">{formatMoney(outstanding, currency)}</strong></div>
-          </div>
-        </div> : <div className="flex min-h-36 flex-col items-center justify-center rounded-xl bg-slate-50 text-center"><Wallet className="mb-2 text-blue-600" size={25} /><p className="text-sm font-semibold text-slate-700">Fee summary not available</p><p className="mt-1 text-xs text-slate-500">No collection totals were supplied by the dashboard API.</p></div>}
-        <button type="button" onClick={() => onNavigate('sch_fees')} className="mt-5 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-200 hover:bg-blue-50">Open fee ledger</button>
-      </div>}
-    </section>
-
-    <section className="grid gap-4 lg:grid-cols-3">
-      <div className="school-dashboard-panel school-admin-showcase-panel min-w-0 p-5">
-        <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600"><AlertCircle size={17} /></span><div><h2 className="text-sm font-semibold text-slate-900">Needs attention</h2><p className="text-[11px] text-slate-400">Absence alerts</p></div></div>
-        {result.absentStudents.length ? result.absentStudents.slice(0, 4).map((student: DashboardRecord, index: number) => <div key={student.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{student.name ?? student.studentName ?? 'Student absent'}</p><p className="mt-1 text-xs text-slate-400">{student.className ?? student.class ?? 'Class not provided'} · {student.daysAbsent ? student.daysAbsent + ' days absent' : 'Absent today'}</p></div>) : <EmptyState title="No absence alerts today" description="There are no absence records to review for today." className="min-h-28 border-0 bg-transparent" />}
-      </div>
-
-      <div className="school-dashboard-panel min-w-0 p-5">
-        <div className="mb-4 flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600"><BookOpen size={17} /></span><div><h2 className="text-sm font-semibold text-slate-900">Quick actions</h2><p className="text-[11px] text-slate-400">Common school tasks</p></div></div>
-        <div className="grid grid-cols-2 gap-2">{actions.map(item => <button key={item.view} type="button" onClick={() => item.view === 'sch_students' ? onOpenAddStudent() : onNavigate(item.view)} disabled={item.view === 'sch_students' && isReadOnly} className="group flex min-h-[88px] flex-col items-start justify-between rounded-xl border border-slate-200 p-3 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60 disabled:opacity-50"><item.icon size={18} className="text-blue-600" /><span><span className="block text-xs font-bold text-slate-700">{item.label}</span><span className="mt-1 block text-[10px] text-slate-400">{item.detail}</span></span></button>)}</div>
-      </div>
-
-      <div className="school-dashboard-panel min-w-0 p-5">
-        <div className="mb-3 flex items-center justify-between gap-2"><div><h2 className="text-sm font-semibold text-slate-900">Recent activity</h2><p className="text-[11px] text-slate-400">Latest school updates</p></div><button type="button" onClick={() => onNavigate('sch_notices')} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">View all</button></div>
-        {result.recentActivity.length ? result.recentActivity.slice(0, 4).map((item: DashboardRecord, index: number) => <div key={item.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{item.title ?? item.description ?? item.type ?? 'Activity'}</p><p className="mt-1 text-xs text-slate-400">{item.detail ?? item.name ?? item.date ?? ''}</p></div>)
-          : result.notices.slice(0, 4).map((notice: DashboardRecord, index: number) => <div key={notice.id ?? index} className="border-b border-slate-100 py-3 last:border-0"><p className="text-sm font-semibold text-slate-700">{notice.title ?? 'School notice'}</p><p className="mt-1 line-clamp-2 text-xs text-slate-400">{notice.content ?? ''}</p></div>)}
-        {!result.recentActivity.length && !result.notices.length && <p className="py-8 text-center text-sm text-slate-400">No recent activity available.</p>}
-      </div>
-    </section>
-  </div>;
+      </section>
+    </div>
+  );
 };
