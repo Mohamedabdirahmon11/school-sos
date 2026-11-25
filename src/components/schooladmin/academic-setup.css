@@ -168,3 +168,20 @@
   .academic-setup .schoolos-assignment-page .schoolos-teacher-row { padding:10px; }
   .academic-setup .schoolos-assignment-page .scroll table { min-width:520px; }
 }
+
+
+/* Teacher assignment workspace: clearer tool grouping and mobile controls. */
+.academic-setup .schoolos-assignment-page>.flex.flex-wrap.items-center.justify-between{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.academic-setup .schoolos-assignment-page>.flex.flex-wrap.items-center.justify-between>div{min-width:0;flex-wrap:wrap}
+.academic-setup .schoolos-assignment-page .schoolos-assignment-toolbar{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.academic-setup .schoolos-assignment-page .schoolos-assignment-toolbar label{display:block;margin-bottom:5px;color:var(--muted);font-size:11px;font-weight:700}
+.academic-setup .schoolos-assignment-page .schoolos-assignment-toolbar select,.academic-setup .schoolos-assignment-page .schoolos-assignment-toolbar input{min-height:42px}
+.academic-setup .schoolos-assignment-page .gr>.card{min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.academic-setup .schoolos-assignment-page .gr>aside{max-height:640px;overflow-y:auto}
+@media(max-width:767px){
+.academic-setup .schoolos-assignment-page>.flex.flex-wrap.items-center.justify-between{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.academic-setup .schoolos-assignment-page>.flex.flex-wrap.items-center.justify-between>div{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.academic-setup .schoolos-assignment-page>.flex.flex-wrap.items-center.justify-between>div:last-child{grid-template-columns:repeat(2,minmax(0,1fr))}
+.academic-setup .schoolos-assignment-page>.flex.flex-wrap.items-center.justify-between button{width:100%;min-width:0}
+.academic-setup .schoolos-assignment-page .gr>aside{max-height:none}
+}

@@ -277,3 +277,29 @@
   }
   .documents-paper { padding:6mm!important; }
 }
+
+
+/* School Documents: restrained palette consistent with SchoolOS. */
+.documents-view{--doc-ink:#243247;--doc-muted:#64748b;--doc-line:#dce3e8;--doc-primary:#176b60;--doc-soft:#edf5f2;color:var(--doc-ink)!important}
+.documents-view>.schoolos-operation-header{background:#fff!important;border:1px solid var(--doc-line)!important;border-radius:14px!important;box-shadow:0 2px 8px rgb(25 45 40 / 5%)!important;color:var(--doc-ink)!important}
+.documents-view>.schoolos-operation-header h1,.documents-view>.schoolos-operation-header p{color:var(--doc-ink)!important}
+.documents-view>.schoolos-operation-header p{color:var(--doc-muted)!important}
+.documents-view>.schoolos-operation-header svg{color:var(--doc-primary)!important}
+.documents-view>.schoolos-operation-header button:last-child{background:var(--doc-primary)!important;border-color:var(--doc-primary)!important;color:#fff!important}
+.documents-view>.schoolos-operation-header button:not(:last-child){background:#fff!important;border-color:var(--doc-line)!important;color:#334155!important}
+.documents-view .structured-template-panel>div:first-child{background:#f1f6f4!important;color:var(--doc-ink)!important}
+.documents-view .structured-template-panel>div:first-child h2,.documents-view .structured-template-panel>div:first-child p{color:var(--doc-ink)!important}
+.documents-view .structured-template-panel>div:first-child button{background:#fff!important;border-color:var(--doc-line)!important;color:var(--doc-primary)!important}
+.documents-view .student-doc-categories button[aria-pressed="true"]{background:var(--doc-primary)!important;border-color:var(--doc-primary)!important;color:#fff!important}
+.documents-view .student-doc-card:hover{border-color:#9fc9be!important;box-shadow:0 8px 20px rgb(23 107 96 / 9%)!important}
+@media(max-width:767px){
+.documents-view{padding:10px!important}
+.documents-view>.schoolos-operation-header{padding:14px!important}
+.documents-view>.schoolos-operation-header>div:last-child{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:8px}
+.documents-view>.schoolos-operation-header button{width:100%;min-width:0;min-height:42px;overflow-wrap:anywhere}
+.documents-view .documents-toolbar-main{position:sticky;top:0;z-index:6;max-width:100%}
+}
+:root[data-theme="dark"] .documents-view>.schoolos-operation-header{background:#202b36!important;border-color:#3a4652!important}
+:root[data-theme="dark"] .documents-view>.schoolos-operation-header h1,:root[data-theme="dark"] .documents-view>.schoolos-operation-header p{color:#e8edf2!important}
+:root[data-theme="dark"] .documents-view .structured-template-panel>div:first-child{background:#24362f!important}
+:root[data-theme="dark"] .documents-view .structured-template-panel>div:first-child h2,:root[data-theme="dark"] .documents-view .structured-template-panel>div:first-child p{color:#e8edf2!important}
