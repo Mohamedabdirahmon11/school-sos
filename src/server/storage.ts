@@ -1901,6 +1901,18 @@ class StorageEngine {
     return revoked;
   }
 
+  // Keep the freshly issued session alive while rotating credentials. The
+  // replacement cookie must exist before old sessions are revoked so a
+  // transient cleanup failure cannot strand the user outside the application.
+  public async revokeUserSessionsExcept(userId: string, keepSessionId: string): Promise<number> {
+    const sessions = await this.queryRows<UserSession>('user_sessions', { user_id: userId });
+    let revoked = 0;
+    for (const session of sessions) {
+      if (session.id !== keepSessionId && await this.revokeSession(session.id)) revoked += 1;
+    }
+    return revoked;
+  }
+
   public getSession(id: string): UserSession | null {
     return this.data.sessions.find(s => s.id === id) || null;
   }
