@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './operations-reference.css';
 import { ApiClient } from '../../services/api.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { SupportTicket } from '../../types/index.ts';
@@ -57,7 +58,7 @@ export const SchoolSupportView: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
+    <div className="schoolos-operations-page mx-auto min-w-0 w-full max-w-7xl space-y-6 p-4 md:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-[#132A29]">
