@@ -1,3 +1,4 @@
+import '../schooladmin/operations-reference.css';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Plus, Search, Copy, Trash2, RotateCcw, Printer, Save, X, Files, LayoutTemplate, History, ShieldCheck, Lock, Unlock, Paperclip, Download } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -178,8 +179,8 @@ export const DocumentsView: React.FC = () => {
   };
 
   return (
-    <div className="documents-view mx-auto w-full max-w-[1500px] space-y-4 p-3 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="documents-view schoolos-operations-page mx-auto w-full max-w-[1500px] space-y-4 p-3 sm:p-5">
+      <div className="schoolos-operation-header flex flex-wrap items-center justify-between gap-3">
         <div><div className="flex items-center gap-2"><Files className="h-6 w-6 text-teal-700" /><h1 className="text-2xl font-bold text-slate-900">Dukumentiyada</h1></div><p className="mt-1 text-sm text-slate-500">Qor, habee, samee oo daabac waraaqaha dugsiga.</p></div>
         <div className="flex flex-wrap gap-2">
           {canOpenStructuredTemplates && <button type="button" onClick={() => setShowStructuredTemplates(value=>!value)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"><LayoutTemplate size={16}/> Qaababka A4</button>}
