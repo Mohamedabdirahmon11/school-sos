@@ -5095,3 +5095,29 @@ main :is(.flex, .inline-flex) > * {
     padding-bottom:calc(76px + max(env(safe-area-inset-bottom),6px));
   }
 }
+
+
+/* SchoolOS dashboard: calm, consistent visual hierarchy without mixed accent colors. */
+.schoolos-reference-dashboard{--dash-bg:#f4f7f6;--dash-card:#fff;--dash-line:#dce5e2;--dash-green:#176b60;--dash-green-soft:#edf5f2;--dash-ink:#243247;--dash-muted:#64748b}
+.schoolos-dash-welcome{background:#173f35!important;border:1px solid #173f35!important;box-shadow:0 8px 22px rgb(23 63 53 / 10%)!important}
+.schoolos-dash-welcome::after{display:none!important}
+.schoolos-dash-welcome .schoolos-dash-kicker{color:#c6ddd5!important}
+.schoolos-dash-welcome h1{color:#fff!important}
+.schoolos-dash-welcome-copy>p{color:#e0ece7!important}
+.schoolos-dash-school-line b{color:#fff!important}
+.schoolos-dash-school-line small{color:#c6ddd5!important}
+.schoolos-dash-button-primary{background:#fff!important;border-color:#fff!important;color:#17584d!important;box-shadow:none!important}
+.schoolos-dash-button-primary:hover{background:#edf5f2!important}
+.schoolos-dash-button-light{background:rgb(255 255 255 / 9%)!important;border-color:rgb(255 255 255 / 35%)!important;color:#fff!important}
+.schoolos-dash-stat{background:var(--dash-card)!important;border:1px solid var(--dash-line)!important;box-shadow:0 2px 8px rgb(24 55 39 / 4%)!important}
+.schoolos-dash-stat::before,.schoolos-dash-gold::before,.schoolos-dash-blue::before,.schoolos-dash-red::before{background:var(--dash-green)!important}
+.schoolos-dash-panel{border:1px solid var(--dash-line)!important;box-shadow:0 2px 8px rgb(24 55 39 / 3%)!important}
+.schoolos-dash-panel-icon{background:var(--dash-green-soft)!important;color:var(--dash-green)!important}
+.schoolos-dash-chart-track span{background:#2b8b77!important}
+.schoolos-dash-action{border:1px solid var(--dash-line)!important;background:#fff!important}
+.schoolos-dash-action:hover{border-color:#a9cec4!important;background:#f6faf8!important}
+.schoolos-dash-action-icon{background:var(--dash-green-soft)!important;color:var(--dash-green)!important}
+@media(max-width:760px){.schoolos-dash-welcome{background:#173f35!important}.schoolos-dash-welcome h1{font-size:clamp(27px,7vw,32px)!important}.schoolos-dash-stat{min-height:106px}}
+.dark .schoolos-reference-dashboard,[data-theme="dark"] .schoolos-reference-dashboard,:root[data-theme="dark"] .schoolos-reference-dashboard{--dash-bg:#121a17;--dash-card:#1a2420;--dash-line:#34453d;--dash-ink:#e6efe9;--dash-muted:#a7b8af;--dash-green:#65c697;--dash-green-soft:#20372d}
+.dark .schoolos-dash-stat,[data-theme="dark"] .schoolos-dash-stat,.dark .schoolos-dash-panel,[data-theme="dark"] .schoolos-dash-panel,.dark .schoolos-dash-action,[data-theme="dark"] .schoolos-dash-action{background:#1a2420!important;border-color:#34453d!important;color:#e6efe9!important}
+.dark .schoolos-dash-panel-icon,[data-theme="dark"] .schoolos-dash-panel-icon,.dark .schoolos-dash-action-icon,[data-theme="dark"] .schoolos-dash-action-icon{background:#20372d!important;color:#8bd3ad!important}
