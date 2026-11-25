@@ -42,9 +42,13 @@ export function normalizeSchoolDashboardData(data: unknown) {
     absentStudents: Array.isArray(value.absentStudents) ? value.absentStudents : [],
     recentActivity: Array.isArray(value.recentActivity) ? value.recentActivity : [],
     upcomingEvents: Array.isArray(value.upcomingEvents) ? value.upcomingEvents : [],
-    setupReadiness: value.setupReadiness && typeof value.setupReadiness === 'object'
-      ? value.setupReadiness as DashboardRecord
-      : { checklist: [], canFinish: false },
+    setupReadiness: {
+      checklist: value.setupReadiness && typeof value.setupReadiness === 'object'
+        && Array.isArray((value.setupReadiness as DashboardRecord).checklist)
+        ? (value.setupReadiness as DashboardRecord).checklist
+        : [],
+      canFinish: Boolean((value.setupReadiness as DashboardRecord | undefined)?.canFinish)
+    },
     pendingAdmissions: number(value.pendingAdmissions)
   };
 }
