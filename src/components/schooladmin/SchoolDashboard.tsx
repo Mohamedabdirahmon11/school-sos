@@ -92,7 +92,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
   const { totalStudents, totalTeachers, totalClasses, attendanceRate, attendanceRecordedToday, todayAttendance, todayCollection, totalOutstanding } = result.stats;
   const currency = school?.currency || 'ETB';
   const today = new Intl.DateTimeFormat('so-ET', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
-  const greetingName = String(user?.fullName || user?.name || 'Maamulaha').trim().split(/\s+/)[0];
+  const greetingName = String(user?.fullName || 'Maamulaha').trim().split(/\s+/)[0];
   const maxTrend = Math.max(100, ...result.attendanceTrend.map((item: DashboardRecord) => Number(item.rate ?? item.attendanceRate ?? 0) || 0));
   const actions = [
     { label: 'Diiwaangeli arday', description: 'Ku dar arday cusub', icon: UserPlus, action: onOpenAddStudent, visible: canManageStudents, disabled: isReadOnly },
@@ -105,7 +105,7 @@ export const SchoolDashboard: React.FC<SchoolDashboardProps> = ({ onNavigate, on
   ].filter(item => item.visible);
 
   return (
-    <main className="schoolos-reference-dashboard" aria-label="School dashboard">
+    <div className="schoolos-reference-dashboard" aria-label="School dashboard">
       <header className="schoolos-dash-welcome">
         <div className="schoolos-dash-welcome-copy">
           <span className="schoolos-dash-kicker">SCHOOLOS · GUUDMAR</span>
