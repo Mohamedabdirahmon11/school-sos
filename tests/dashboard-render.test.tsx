@@ -10,8 +10,8 @@ import { AuthProvider } from '../src/context/AuthContext.tsx';
 
 test('School Dashboard handles an undefined response with zero metrics and empty lists', () => {
   const model = normalizeSchoolDashboardData(undefined);
-  assert.deepEqual(model.stats, { totalStudents: 0, totalTeachers: 0, totalClasses: 0, attendanceRate: 0, attendanceRecordedToday: 0, todayCollection: 0, totalOutstanding: 0 });
-  assert.deepEqual(model.recentPayments, []);
+  assert.deepEqual(model.stats, { totalStudents: 0, totalTeachers: 0, totalClasses: 0, attendanceRate: 0, attendanceRecordedToday: 0, todayAttendance: 0, todayCollection: 0, totalOutstanding: 0 });
+  assert.deepEqual(model.recentStudents, []);\n  assert.deepEqual(model.recentPayments, []);
   assert.deepEqual(model.notices, []);
 });
 
