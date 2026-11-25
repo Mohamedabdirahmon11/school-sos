@@ -95,3 +95,31 @@
 @media(max-width:360px) {
   .schoolos-operations-page .schoolos-operation-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
+
+
+/* School Settings hub: clear categories and a compact, consistent section picker. */
+.school-admin-settings-page>.schoolos-operation-header{background:#fff!important;border:1px solid #dce5e2!important;border-radius:14px!important;box-shadow:0 2px 8px rgb(24 55 39 / 3%)!important}
+.school-admin-settings-page>section:first-of-type>div:first-child{border-color:#dce5e2!important;border-radius:12px!important;box-shadow:none!important}
+.school-admin-settings-page>section:first-of-type>div:first-child h2{font-size:14px!important;letter-spacing:.04em!important;color:#243247!important}
+.school-admin-settings-page>section:first-of-type>.grid{align-items:stretch;gap:10px!important}
+.school-admin-settings-page>section:first-of-type>.grid>section{min-width:0;border:1px solid #dce5e2!important;border-radius:12px!important;background:#fff!important;box-shadow:0 1px 4px rgb(24 55 39 / 3%)!important;padding:12px!important}
+.school-admin-settings-page>section:first-of-type>.grid>section h3{color:#64748b!important;font-size:10px!important;letter-spacing:.08em!important}
+.school-admin-settings-page>section:first-of-type>.grid>section button{min-height:42px;max-width:100%;white-space:normal;line-height:1.35;overflow-wrap:anywhere}
+.school-admin-settings-page>section:first-of-type>.grid>section button[aria-current="page"]{background:#edf5f2!important;border-color:#b8d9cf!important;color:#176b60!important}
+.school-admin-settings-page>section:first-of-type>.grid>section button:not([aria-current="page"]){color:#334155!important}
+.school-admin-settings-page input,.school-admin-settings-page select,.school-admin-settings-page textarea{min-width:0;max-width:100%;min-height:40px;border-color:#dce5e2!important}
+.school-admin-settings-page [role="tabpanel"],.school-admin-settings-page>section:not(:first-of-type){min-width:0}
+@media(max-width:767px){
+.school-admin-settings-page{padding:10px!important;gap:12px!important}
+.school-admin-settings-page>.schoolos-operation-header{padding:14px!important}
+.school-admin-settings-page>section:first-of-type>.grid{grid-template-columns:minmax(0,1fr)!important}
+.school-admin-settings-page>section:first-of-type>.grid>section{padding:11px!important}
+.school-admin-settings-page>section:first-of-type>.grid>section button{font-size:12px!important}
+.school-admin-settings-page button{min-height:42px;white-space:normal;line-height:1.35}
+.school-admin-settings-page [role="dialog"]{width:calc(100vw - 20px)!important;max-width:calc(100vw - 20px)!important;max-height:90dvh;overflow:auto;padding:14px!important}
+}
+:root[data-theme="dark"] .school-admin-settings-page>.schoolos-operation-header,
+:root[data-theme="dark"] .school-admin-settings-page>section:first-of-type>.grid>section{background:#1a2420!important;border-color:#34453d!important}
+:root[data-theme="dark"] .school-admin-settings-page>section:first-of-type>div:first-child h2,
+:root[data-theme="dark"] .school-admin-settings-page>section:first-of-type>.grid>section h3{color:#e6efe9!important}
+:root[data-theme="dark"] .school-admin-settings-page>section:first-of-type>.grid>section button:not([aria-current="page"]){color:#d7e4dc!important}
