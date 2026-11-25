@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import './operations-reference.css';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useApi } from '../../hooks/useApi.ts';
 import { ApiClient } from '../../services/api.ts';
@@ -103,7 +104,7 @@ export const StudentInvoicesView: React.FC = () => {
 
   if (load.error) return <ErrorState error={load.error} onRetry={load.retry} />;
 
-  return <div className="mx-auto w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+  return <div className="schoolos-operations-page mx-auto w-full max-w-[1600px] space-y-6 p-5 md:p-8">
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900"><FileText className="h-6 w-6 text-teal-700" /> Student Invoices</h1>
