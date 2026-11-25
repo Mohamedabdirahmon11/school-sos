@@ -784,9 +784,7 @@
 .school-students-page label { line-height: 1.5; }
 .school-students-page .text-slate-400,
 .school-students-page .text-slate-500,
-.school-students-page .text-slate-600,
-.school-students-page .text-\\[\\#64748B\\],
-.school-students-page .text-\\[\\#71817d\\] { color: var(--students-muted) !important; }
+.school-students-page .text-slate-600 { color: var(--students-muted) !important; }
 .school-students-page .schoolos-people-header {
   display:flex; align-items:flex-start; justify-content:space-between; gap:20px;
   padding:20px 22px; background:var(--students-surface); border:1px solid var(--students-line);
