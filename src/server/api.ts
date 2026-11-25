@@ -5413,7 +5413,7 @@ apiRouter.get('/parents/contacts', requireAuth, requireSchoolContext, async (req
   const requestedClassId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
   const classId = requestedClassId;
   const search = typeof req.query.search === 'string'
-    ? req.query.search.trim().replace(/[^\\p{L}\\p{N}\\s+()._-]/gu, '').slice(0, 80)
+    ? req.query.search.trim().replace(/[^\\p{L}\\p{N}\s+()._-]/gu, '').slice(0, 80)
     : '';
   const cacheKey = [school.id, role, role === 'teacher' ? user.id : 'school', classId || '*', page, pageSize, search.toLowerCase()].join(':');
   const cachedResponse = parentContactsResponseCache.get(cacheKey);
@@ -12696,7 +12696,7 @@ apiRouter.get('/term-marks/terms', requireAuth, requireSchoolContext, async (req
     groups.set(key, [...(groups.get(key) || []), term]);
   }
   const canonicalTerms = [...groups.values()].map(group => {
-    const rank = (name: string) => /^semester\\s*[12]$/i.test(name) ? 0 : /^term\\s*[12]$/i.test(name) ? 1 : 2;
+    const rank = (name: string) => /^semester\s*[12]$/i.test(name) ? 0 : /^term\s*[12]$/i.test(name) ? 1 : 2;
     const sorted = [...group].sort((a: any,b: any) => rank(String(a.name || '')) - rank(String(b.name || '')) || String(a.name).localeCompare(String(b.name)));
     return { ...sorted[0], aliasTermIds: group.map((row: any) => row.id) };
   }).sort((a: any,b: any) => String(a.start_date).localeCompare(String(b.start_date)));
