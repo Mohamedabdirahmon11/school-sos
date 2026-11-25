@@ -4299,3 +4299,40 @@ main :is(.flex, .inline-flex) > * {
   outline:3px solid rgba(31,77,63,.25);
   outline-offset:2px;
 }
+
+
+/* Mobile readability: keep copy visible and confine wide content to its own scroller. */
+@media(max-width:767px) {
+  .school-admin-mobile-content :is(.school-dashboard-page,.school-students-page,.school-people-page) {
+    max-width:100%;
+    min-width:0;
+    overflow-wrap:anywhere;
+  }
+  .school-admin-mobile-content :is(.school-dashboard-page,.school-students-page,.school-people-page) :is(.grid,.flex) > * {
+    min-width:0;
+  }
+  .school-admin-mobile-content .school-dashboard-page :is(p,span,h1,h2,h3) {
+    overflow-wrap:anywhere;
+  }
+  .school-admin-mobile-content .school-dashboard-page .school-admin-metric .metric-label,
+  .school-admin-mobile-content .school-dashboard-page .school-admin-metric .metric-hint {
+    white-space:normal;
+    overflow-wrap:anywhere;
+  }
+  .school-admin-mobile-content .school-people-page .overflow-x-auto,
+  .school-admin-mobile-content .school-students-page .overflow-x-auto {
+    display:block;
+    width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .school-admin-mobile-content .school-people-page table,
+  .school-admin-mobile-content .school-students-page table {
+    width:max-content;
+    min-width:100%;
+  }
+  .school-admin-mobile-content .school-people-page :is(th,td),
+  .school-admin-mobile-content .school-students-page :is(th,td) {
+    overflow-wrap:normal;
+  }
+}
