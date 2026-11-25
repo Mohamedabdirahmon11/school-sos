@@ -211,3 +211,17 @@ test('school auth context invalidation clears cached sessions for that school', 
   assert.match(method, /invalidateAuthContextForUser\(userId\)/);
   assert.match(method, /entry\.schoolId === schoolId/);
 });
+
+
+test('session refresh reuses the session row already validated by authentication', () => {
+  const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
+  const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+  const start = storage.indexOf('public async touchSession(');
+  const end = storage.indexOf('public async revokeSession(', start);
+  const method = storage.slice(start, end);
+  assert.match(method, /validatedSession\?: UserSession/);
+  assert.match(method, /validatedSession\?\.id === id \? validatedSession : await this\.getSessionById\(id\)/);
+  assert.match(api, /\(req as any\)\.validatedSession = session \|\| undefined/);
+  assert.match(api, /refreshSessionCookie\(res, user, payload, \(req as any\)\.validatedSession\)/);
+  assert.match(api, /db\.touchSession\(previous\.sessionId, new Date\(expiresAt\)\.toISOString\(\), validatedSession\)/);
+});

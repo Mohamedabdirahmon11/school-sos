@@ -15,7 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabaseKey, supabaseUrl } from './supabase.ts';
 import { createPdf, PdfPageInput } from './pdf.ts';
 import { buildReportCardPdfPage, sanitizeReportCardDesign } from './report-card.ts';
-import { User, UserRole, School, SchoolClass, Student, FeePayment, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
+import { User, UserRole, UserSession, School, SchoolClass, Student, FeePayment, TimetableSlot, StaffPayrollRecord, SchoolExpense, PlanConfig, SuperAdminSettings } from '../types/index.ts';
 import {
   createSignedSessionToken,
   verifySignedSessionToken,
@@ -625,6 +625,8 @@ async function loadAuthenticatedUser(req: Request, token: string, allowBootstrap
     && payload.role === user.role;
   if (!session && !isBootstrap) return null;
   if (session && !isSessionExpiryValid(session.expiresAt)) return null;
+  // Carry the validated row into the refresh path so it never re-reads user_sessions.
+  (req as any).validatedSession = session || undefined;
   // Non-super-admin sessions must remain bound to the user's current tenant.
   // Super admins may have a selected school in the session while their account
   // itself is platform-wide and therefore has no permanent schoolId.
@@ -682,7 +684,7 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
     '/auth/change-password', '/auth/change-pin', '/auth/change-teacher-pin', '/auth/logout-all'
   ]);
   if (payload && !isBootstrap && !sessionMutationRoutes.has(req.path)) {
-    await refreshSessionCookie(res, user, payload);
+    await refreshSessionCookie(res, user, payload, (req as any).validatedSession);
   }
   (req as any).sessionPayload = payload;
   (req as any).user = user;
@@ -993,11 +995,11 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
 
 }
 
-async function refreshSessionCookie(res: Response, user: User, previous: ReturnType<typeof verifySignedSessionToken>): Promise<void> {
+async function refreshSessionCookie(res: Response, user: User, previous: ReturnType<typeof verifySignedSessionToken>, validatedSession?: UserSession): Promise<void> {
   if (!previous) return;
   const timeoutMinutes = ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : db.getSettings().sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
-  await db.touchSession(previous.sessionId, new Date(expiresAt).toISOString());
+  await db.touchSession(previous.sessionId, new Date(expiresAt).toISOString(), validatedSession);
   const token = createSignedSessionToken({ ...previous, role: user.role, schoolId: user.schoolId || previous.schoolId, expiresAt });
   res.cookie('schoolos_session', token, {
     httpOnly: true,
