@@ -45,7 +45,7 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
     if (academicYear) {
       const yearName = String(academicYear.name || '');
       const years = yearName.split('/').map(Number);
-      if (!/^\\d{4}\\/\\d{4}$/.test(yearName) || years[1] !== years[0] + 1 || !validIsoDate(academicYear.startDate) || !validIsoDate(academicYear.endDate)
+      if (!/^\d{4}\/\d{4}$/.test(yearName) || years[1] !== years[0] + 1 || !validIsoDate(academicYear.startDate) || !validIsoDate(academicYear.endDate)
         || Number(academicYear.startDate.slice(0, 4)) !== years[0] || Number(academicYear.endDate.slice(0, 4)) !== years[1]) {
         return 'Fix the academic year dates before saving semesters.';
       }
