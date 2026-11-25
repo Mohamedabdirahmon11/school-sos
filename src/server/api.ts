@@ -75,6 +75,7 @@ const PARENT_PORTAL_SUMMARY_TTL_MS = 5_000;
 const schoolReadinessCache = new SchoolReadinessCache<any>(30_000);
 const teacherAssignmentReadinessCache = new SchoolReadinessCache<any>(30_000);
 const schoolDashboardSummaryCache = new SchoolReadinessCache<any>(15_000);
+const schoolDashboardDetailsCache = new SchoolReadinessCache<any>(15_000);
 const schoolReportSummaryCache = new SchoolReadinessCache<any>(60_000);
 const classYearlyRankingsCache = new SchoolReadinessCache<any>(5 * 60_000);
 const classDetailsCache = new SchoolReadinessCache<any>(60_000);
@@ -113,6 +114,7 @@ apiRouter.use((req, res, next) => {
         schoolReadinessCache.invalidate(schoolId);
         teacherAssignmentReadinessCache.invalidate(schoolId);
         schoolDashboardSummaryCache.invalidate(schoolId);
+        schoolDashboardDetailsCache.invalidatePrefix(`${schoolId}:`);
         schoolReportSummaryCache.invalidatePrefix(`${schoolId}:`);
         classYearlyRankingsCache.invalidatePrefix(`${schoolId}:`);
         classDetailsCache.invalidatePrefix(`${schoolId}:`);
@@ -3220,17 +3222,21 @@ apiRouter.get('/school/dashboard', requireAuth, requireSchoolContext, requireSch
     const today = new Intl.DateTimeFormat('en-CA', {
       timeZone: school.timezone || 'Africa/Addis_Ababa'
     }).format(new Date());
-    const [readiness, eventsPage, activityPage, admissionsPage] = await Promise.all([
-      evaluateReadiness(school.id),
-      db.queryPage('school_events', { school_id: school.id }, 1, 5,
-        `end_date.gte.${today}`,
-        'id,title,start_date,end_date,type', 'start_date', true),
-      db.queryPage('audit_logs', { school_id: school.id }, 1, 5,
-        'or(category.eq.school,category.eq.academics)',
-        'id,timestamp,action,category,user_name,details,severity', 'timestamp', false),
-      db.queryPage('admission_applications', { school_id: school.id, status: 'pending' },
-        1, 1, undefined, 'id')
-    ]);
+    const details = await schoolDashboardDetailsCache.get(`${school.id}:${today}`, async () => {
+      const [readiness, eventsPage, activityPage, admissionsPage] = await Promise.all([
+        evaluateReadiness(school.id),
+        db.queryPage('school_events', { school_id: school.id }, 1, 5,
+          `end_date.gte.${today}`,
+          'id,title,start_date,end_date,type', 'start_date', true),
+        db.queryPage('audit_logs', { school_id: school.id }, 1, 5,
+          'or(category.eq.school,category.eq.academics)',
+          'id,timestamp,action,category,user_name,details,severity', 'timestamp', false),
+        db.queryPage('admission_applications', { school_id: school.id, status: 'pending' },
+          1, 1, undefined, 'id')
+      ]);
+      return { readiness, eventsPage, activityPage, admissionsPage };
+    });
+    const { readiness, eventsPage, activityPage, admissionsPage } = details;
     const dashboard = {
       ...summary,
       setupReadiness: {
