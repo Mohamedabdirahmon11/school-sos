@@ -28,7 +28,7 @@ const DEFAULT_DATA: SchoolSetupData = {
 const STEPS = [
   { title: 'School Information', description: 'Confirm the official details and contact information for this school.' },
   { title: 'Academic Year', description: 'Set the academic year and its official start and end dates.' },
-  { title: 'Terms / Semesters', description: 'Create one, two, or three terms for the academic year.' },
+  { title: 'Terms / Semesters', description: 'Create exactly two semesters for the academic year.' },
   { title: 'Academic Calendar', description: 'Choose working days, holidays, and the calendar display used by your school.' },
   { title: 'Working Hours', description: 'Set the daily schedule and the number of teaching periods.' }
 ];
