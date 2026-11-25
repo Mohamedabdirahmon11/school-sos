@@ -120,7 +120,7 @@ export const MessagesView: React.FC = () => {
   );
 
   return (
-    <div className={isTeacher ? "schoolos-operations-page mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-5 p-3 sm:p-5 lg:p-7" : "schoolos-operations-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto h-full min-h-0 flex flex-col"}>
+    <div className={isTeacher ? "mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col space-y-5 p-3 sm:p-5 lg:p-7" : "schoolos-operations-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto h-full min-h-0 flex flex-col"}>
       <div className="flex items-center justify-between">
         <div>
           <div><h1 className="text-xl font-bold tracking-tight text-[#132A29]">{isTeacher ? 'Teacher messages' : 'Direct Messages'}</h1><p className="mt-1 max-w-2xl text-xs leading-relaxed text-[#64748B]">Private one-to-one conversations with permitted school contacts. Use the Notice Board for announcements sent to groups.</p></div>
