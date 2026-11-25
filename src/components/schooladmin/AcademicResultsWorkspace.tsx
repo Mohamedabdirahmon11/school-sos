@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import './operations-reference.css';
 import {
   AlertCircle, BarChart3, BookOpen, ChevronLeft, ChevronRight, ClipboardList,
   Download, Filter, Search, TrendingUp, Users
@@ -208,8 +209,8 @@ export const AcademicResultsWorkspace: React.FC<AcademicResultsWorkspaceProps> =
       : 'Compare class and subject performance using approved marks only.';
 
   return (
-    <div className="schoolos-academic-results space-y-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <div className="schoolos-operations-page schoolos-academic-results space-y-5">
+      <div className="schoolos-operation-header flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#132A29]">{title}</h2>
           <p className="mt-1 text-xs text-[#64748B]">{subtitle}</p>
