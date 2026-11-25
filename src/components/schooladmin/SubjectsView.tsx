@@ -168,6 +168,12 @@ export const SubjectsView: React.FC<{ onNavigate: (view: string) => void }> = ({
         <AcademicSetupHeader active="sch_subjects" onNavigate={onNavigate} />
         <h2>Subjects</h2>
         <p className="lead">Template-ka Ethiopia Primary: maaddo kasta waxay ku jirtaa level kasta oo aad calaamadayso, waxayna si toos ah ugu darmaysaa fasallada level-kaas. Dugsi kasta wuu beddeli karaa.</p>
+        <section className="schoolos-academic-stats" aria-label="Subject setup summary">
+          <div className="schoolos-academic-stat"><span>Maaddooyinka</span><strong>{subjects.length}</strong></div>
+          <div className="schoolos-academic-stat"><span>Periods guud / usbuuc</span><strong>{BANDS.reduce((sum, band) => sum + (totals[band.key] || 0), 0)}</strong></div>
+          <div className="schoolos-academic-stat"><span>Heerarka waxbarashada</span><strong>{BANDS.length}</strong></div>
+          <div className="schoolos-academic-stat"><span>Heerarka isbeddelay</span><strong>{dirtyBands.length}</strong></div>
+        </section>
         {notice && <div role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite" className={`msg ${notice.kind === 'error' ? 'bad' : 'ok'}`}>{notice.text}</div>}
         <section className="card">
           {!isReadOnly && (
