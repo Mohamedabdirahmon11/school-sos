@@ -958,7 +958,7 @@ async function requireSchoolContextForSupportWrite(req: Request, res: Response, 
 }
 
 // Helper: Issue signed cookie session
-async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string, selectedStudentId?: string): Promise<void> {
+async function issueSessionCookie(res: Response, user: User, req: Request, schoolId?: string, selectedStudentId?: string): Promise<string> {
   const settings = db.getSettings();
   const timeoutMinutes = ['student', 'parent'].includes(user.role) ? 30 * 24 * 60 : settings.sessionTimeoutMinutes || 60;
   const expiresAt = Date.now() + timeoutMinutes * 60 * 1000;
@@ -995,6 +995,7 @@ async function issueSessionCookie(res: Response, user: User, req: Request, schoo
     maxAge: timeoutMinutes * 60 * 1000
   });
 
+  return sessionId;
 }
 
 async function refreshSessionCookie(res: Response, user: User, previous: ReturnType<typeof verifySignedSessionToken>, validatedSession?: UserSession): Promise<void> {
@@ -1700,35 +1701,46 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
     res.status(404).json({ error: 'Account not found; PIN was not changed.' });
     return;
   }
-  if (user.role === 'student' && user.studentId && user.schoolId) {
-    const studentRecord = (await db.getStudents(user.schoolId)).find(student => student.studentId === user.studentId);
-    if (!studentRecord) { res.status(403).json({ error: 'Student record is not linked to this account.' }); return; }
-    await db.updateStudent(studentRecord.id, { pinHash: hashPin(newPin) }, user.schoolId);
-  }
+  // The users.pin_hash value is the credential used by student/parent login.
+  // Do not perform a second, non-atomic write to students.pin_hash here: a
+  // failure in that legacy mirror must not leave the account PIN changed while
+  // the browser loses its session and reports a misleading 500.
   invalidateAuthenticatedSnapshot(user.id);
   await db.flush();
-  await db.revokeUserSessions(user.id);
   const currentSession = (req as any).sessionPayload;
   const retainedChildId = user.role === 'parent'
     && currentSession?.selectedStudentId
     && await hasParentStudentLink(user, String(currentSession.selectedStudentId), String(user.schoolId || ''))
       ? String(currentSession.selectedStudentId)
       : undefined;
-  db.logAudit({
-    action: 'PIN_CHANGED',
-    category: 'auth',
-    schoolId: user.schoolId,
-    userId: user.id,
-    userName: user.fullName,
-    userRole: user.role,
-    ipAddress: req.ip,
-    details: `${user.role} completed first-login PIN setup.`,
-    severity: 'info'
-  });
-  await db.flush();
-  // Issue exactly one replacement session after revoking the old sessions.
-  // Preserve the already-verified selected child for multi-child parents.
-  await issueSessionCookie(res, updated, req, user.schoolId, retainedChildId);
+
+  // Establish the replacement session BEFORE cleaning up old sessions. If
+  // cleanup encounters a transient database error, the new PIN and current
+  // browser session remain usable instead of producing a false "Unexpected
+  // error" after the credential has already changed.
+  const replacementSessionId = await issueSessionCookie(res, updated, req, user.schoolId, retainedChildId);
+  try {
+    await db.revokeUserSessionsExcept(user.id, replacementSessionId);
+  } catch (sessionCleanupError) {
+    console.warn('[auth] PIN changed; old-session cleanup will be retried:', sessionCleanupError instanceof Error ? sessionCleanupError.message : 'Unknown session cleanup error');
+  }
+
+  try {
+    db.logAudit({
+      action: 'PIN_CHANGED',
+      category: 'auth',
+      schoolId: user.schoolId,
+      userId: user.id,
+      userName: user.fullName,
+      userRole: user.role,
+      ipAddress: req.ip,
+      details: `${user.role} completed first-login PIN setup.`,
+      severity: 'info'
+    });
+    await db.flush();
+  } catch (auditError) {
+    console.warn('[auth] PIN changed but audit flush failed:', auditError instanceof Error ? auditError.message : 'Unknown audit error');
+  }
   res.json({ success: true, message: 'PIN set successfully.' });
 });
 
