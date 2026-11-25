@@ -43,9 +43,8 @@ const otherSubject=db.createSubject({schoolId:school.id,name:'Science',code:'SCI
 const student=db.createStudent({schoolId:school.id,studentId:'SP-ST-001',firstName:'Faadumo',middleName:'Axmed',lastName:'Cabdi',gender:'female',admissionDate:today,fatherPhone:'+251900000001',classId:klass.id,status:'active'} as any);
 const sameClassStudent=db.createStudent({schoolId:school.id,studentId:'SP-ST-002',firstName:'Other',middleName:'',lastName:'Student',gender:'male',admissionDate:today,fatherPhone:'',classId:klass.id,status:'active'} as any);
 const tenantStudent=db.createStudent({schoolId:otherSchool.id,studentId:'SP-OTHER-001',firstName:'Tenant',middleName:'',lastName:'Student',gender:'male',admissionDate:today,fatherPhone:'',classId:tenantClass.id,status:'active'} as any);
-const studentUser=await db.getUserById('usr-student-'+student.id,school.id);
-if(!studentUser) throw new Error('Student registration did not provision its portal account.');
-db.updateUser(studentUser.id,{mustChangePassword:false});
+db.deleteUser('usr-student-'+student.id); // The fixture supplies its own portal user below.
+const studentUser=makeUser(school.id,'student','Faadumo Axmed',{studentId:student.studentId});
 const sameClassStudentUser=makeUser(school.id,'student','Other Student',{studentId:sameClassStudent.studentId});
 const wrongTenantLink=makeUser(school.id,'student','Wrong Tenant Link',{studentId:tenantStudent.studentId});
 parentUser.linkedStudentIds=[student.id];
