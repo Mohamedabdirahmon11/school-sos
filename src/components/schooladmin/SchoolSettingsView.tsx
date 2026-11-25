@@ -1,5 +1,5 @@
 /**
- * Comprehensive School Configuration Hub
+ * Comprehensive School Settings Hub
  * Features:
  * 1. Institution Identity & Branding (Name, Logo, Brand Color, Currency, Super Admin locked academic dates)
  * 2. School Branches Manager (Multi-branch campus management)
@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './operations-reference.css';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { SchoolBranch, ReportCardDesign, ExamConfig, GradingBand, SchoolLanguage } from '../../types/index.ts';
@@ -551,7 +552,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
   };
 
   return (
-    <div className="school-admin-settings-page mx-auto min-w-0 w-full max-w-[1600px] space-y-5 p-3 md:p-6">
+    <div className="schoolos-operations-page school-admin-settings-page mx-auto min-w-0 w-full max-w-[1600px] space-y-5 p-3 md:p-6">
       {/* Header */}
       <div className="space-y-4">
         <div>
