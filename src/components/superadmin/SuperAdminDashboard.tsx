@@ -30,6 +30,7 @@ interface SuperAdminDashboardProps {
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavigate, onOpenAddSchool }) => {
   useEffect(() => {
+    // Keep role-specific responsive CSS out of the initial application bundle.
     void import('./super-admin-mobile.css');
   }, []);
 
