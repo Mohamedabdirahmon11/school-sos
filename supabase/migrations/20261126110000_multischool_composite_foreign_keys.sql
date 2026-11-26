@@ -13,6 +13,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS student_invoices_id_school_uidx
 CREATE UNIQUE INDEX IF NOT EXISTS school_branches_id_school_uidx
   ON public.school_branches (id, school_id);
 
+-- Parent keys and child-side indexes for finance reconciliation, documents and notices.
+CREATE UNIQUE INDEX IF NOT EXISTS bank_statement_entries_id_school_uidx ON public.bank_statement_entries (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS fee_payments_id_school_uidx ON public.fee_payments (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS school_expenses_id_school_uidx ON public.school_expenses (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS school_document_templates_id_school_uidx ON public.school_document_templates (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS school_documents_id_school_uidx ON public.school_documents (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS staff_roles_id_school_uidx ON public.staff_roles (id, school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS school_notices_id_school_uidx ON public.school_notices (id, school_id);
+CREATE INDEX IF NOT EXISTS idx_promotion_history_class_school_fk ON public.promotion_history (class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_promotion_history_student_school_fk ON public.promotion_history (student_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_promotions_class_from_school_fk ON public.promotions (class_from_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_promotions_class_to_school_fk ON public.promotions (class_to_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_school_documents_class_school_fk ON public.school_documents (class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_school_documents_student_school_fk ON public.school_documents (student_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_school_documents_template_school_fk ON public.school_documents (template_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_school_notices_class_school_fk ON public.school_notices (class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_users_branch_school_fk ON public.users (branch_id, school_id);
+
 -- Child-side indexes for academic, timetable, parent and school-branch links.
 CREATE INDEX IF NOT EXISTS idx_classes_branch_school_fk ON public.classes (branch_id, school_id);
 CREATE INDEX IF NOT EXISTS idx_class_sections_class_school_fk ON public.class_sections (class_id, school_id);
@@ -44,6 +62,110 @@ ALTER TABLE public.assignment_submissions
 
 DO $constraints$
 BEGIN
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.bank_statement_allocations'::regclass AND conname='bank_statement_allocations_entry_school_fk') THEN
+    ALTER TABLE public.bank_statement_allocations ADD CONSTRAINT bank_statement_allocations_entry_school_fk
+      FOREIGN KEY (statement_entry_id, school_id) REFERENCES public.bank_statement_entries(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.bank_statement_allocations'::regclass AND conname='bank_statement_allocations_payment_school_fk') THEN
+    ALTER TABLE public.bank_statement_allocations ADD CONSTRAINT bank_statement_allocations_payment_school_fk
+      FOREIGN KEY (payment_id, school_id) REFERENCES public.fee_payments(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.bank_statement_allocations'::regclass AND conname='bank_statement_allocations_expense_school_fk') THEN
+    ALTER TABLE public.bank_statement_allocations ADD CONSTRAINT bank_statement_allocations_expense_school_fk
+      FOREIGN KEY (expense_id, school_id) REFERENCES public.school_expenses(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.bank_statement_entries'::regclass AND conname='bank_statement_entries_payment_school_fk') THEN
+    ALTER TABLE public.bank_statement_entries ADD CONSTRAINT bank_statement_entries_payment_school_fk
+      FOREIGN KEY (matched_payment_id, school_id) REFERENCES public.fee_payments(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.bank_statement_entries'::regclass AND conname='bank_statement_entries_expense_school_fk') THEN
+    ALTER TABLE public.bank_statement_entries ADD CONSTRAINT bank_statement_entries_expense_school_fk
+      FOREIGN KEY (matched_expense_id, school_id) REFERENCES public.school_expenses(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.promotions'::regclass AND conname='promotions_class_from_school_fk') THEN
+    ALTER TABLE public.promotions ADD CONSTRAINT promotions_class_from_school_fk
+      FOREIGN KEY (class_from_id, school_id) REFERENCES public.classes(id, school_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.promotions'::regclass AND conname='promotions_class_to_school_fk') THEN
+    ALTER TABLE public.promotions ADD CONSTRAINT promotions_class_to_school_fk
+      FOREIGN KEY (class_to_id, school_id) REFERENCES public.classes(id, school_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.promotions'::regclass AND conname='promotions_student_school_fk') THEN
+    ALTER TABLE public.promotions ADD CONSTRAINT promotions_student_school_fk
+      FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.promotion_history'::regclass AND conname='promotion_history_class_school_fk') THEN
+    ALTER TABLE public.promotion_history ADD CONSTRAINT promotion_history_class_school_fk
+      FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.promotion_history'::regclass AND conname='promotion_history_student_school_fk') THEN
+    ALTER TABLE public.promotion_history ADD CONSTRAINT promotion_history_student_school_fk
+      FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_documents'::regclass AND conname='school_documents_class_school_fk') THEN
+    ALTER TABLE public.school_documents ADD CONSTRAINT school_documents_class_school_fk
+      FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE SET NULL (class_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_documents'::regclass AND conname='school_documents_student_school_fk') THEN
+    ALTER TABLE public.school_documents ADD CONSTRAINT school_documents_student_school_fk
+      FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE SET NULL (student_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_documents'::regclass AND conname='school_documents_template_school_fk') THEN
+    ALTER TABLE public.school_documents ADD CONSTRAINT school_documents_template_school_fk
+      FOREIGN KEY (template_id, school_id) REFERENCES public.school_document_templates(id, school_id) ON DELETE SET NULL (template_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_document_audit_events'::regclass AND conname='school_document_audit_events_document_school_fk') THEN
+    ALTER TABLE public.school_document_audit_events ADD CONSTRAINT school_document_audit_events_document_school_fk
+      FOREIGN KEY (document_id, school_id) REFERENCES public.school_documents(id, school_id) ON DELETE SET NULL (document_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_document_permissions'::regclass AND conname='school_document_permissions_document_school_fk') THEN
+    ALTER TABLE public.school_document_permissions ADD CONSTRAINT school_document_permissions_document_school_fk
+      FOREIGN KEY (document_id, school_id) REFERENCES public.school_documents(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_document_permissions'::regclass AND conname='school_document_permissions_user_school_fk') THEN
+    ALTER TABLE public.school_document_permissions ADD CONSTRAINT school_document_permissions_user_school_fk
+      FOREIGN KEY (user_id, school_id) REFERENCES public.users(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_document_versions'::regclass AND conname='school_document_versions_document_school_fk') THEN
+    ALTER TABLE public.school_document_versions ADD CONSTRAINT school_document_versions_document_school_fk
+      FOREIGN KEY (document_id, school_id) REFERENCES public.school_documents(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.student_document_attachments'::regclass AND conname='student_document_attachments_student_school_fk') THEN
+    ALTER TABLE public.student_document_attachments ADD CONSTRAINT student_document_attachments_student_school_fk
+      FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.staff_members'::regclass AND conname='staff_members_role_school_fk') THEN
+    ALTER TABLE public.staff_members ADD CONSTRAINT staff_members_role_school_fk
+      FOREIGN KEY (role_id, school_id) REFERENCES public.staff_roles(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.payroll_records'::regclass AND conname='payroll_records_user_school_fk') THEN
+    ALTER TABLE public.payroll_records ADD CONSTRAINT payroll_records_user_school_fk
+      FOREIGN KEY (user_id, school_id) REFERENCES public.users(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.school_notices'::regclass AND conname='school_notices_class_school_fk') THEN
+    ALTER TABLE public.school_notices ADD CONSTRAINT school_notices_class_school_fk
+      FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE SET NULL (class_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.notice_reads'::regclass AND conname='notice_reads_notice_school_fk') THEN
+    ALTER TABLE public.notice_reads ADD CONSTRAINT notice_reads_notice_school_fk
+      FOREIGN KEY (notice_id, school_id) REFERENCES public.school_notices(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.notice_reads'::regclass AND conname='notice_reads_user_school_fk') THEN
+    ALTER TABLE public.notice_reads ADD CONSTRAINT notice_reads_user_school_fk
+      FOREIGN KEY (user_id, school_id) REFERENCES public.users(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.notice_reads'::regclass AND conname='notice_reads_parent_school_fk') THEN
+    ALTER TABLE public.notice_reads ADD CONSTRAINT notice_reads_parent_school_fk
+      FOREIGN KEY (parent_id, school_id) REFERENCES public.users(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.users'::regclass AND conname='users_branch_school_fk') THEN
+    ALTER TABLE public.users ADD CONSTRAINT users_branch_school_fk
+      FOREIGN KEY (branch_id, school_id) REFERENCES public.school_branches(id, school_id) ON DELETE SET NULL (branch_id) NOT VALID;
+  END IF;
+
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.students'::regclass AND conname='students_class_school_fk') THEN
     ALTER TABLE public.students ADD CONSTRAINT students_class_school_fk
@@ -260,6 +382,33 @@ ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_class_school_
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_student_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_subject_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_submitter_school_fk;
+
+ALTER TABLE public.bank_statement_allocations VALIDATE CONSTRAINT bank_statement_allocations_entry_school_fk;
+ALTER TABLE public.bank_statement_allocations VALIDATE CONSTRAINT bank_statement_allocations_payment_school_fk;
+ALTER TABLE public.bank_statement_allocations VALIDATE CONSTRAINT bank_statement_allocations_expense_school_fk;
+ALTER TABLE public.bank_statement_entries VALIDATE CONSTRAINT bank_statement_entries_payment_school_fk;
+ALTER TABLE public.bank_statement_entries VALIDATE CONSTRAINT bank_statement_entries_expense_school_fk;
+ALTER TABLE public.promotions VALIDATE CONSTRAINT promotions_class_from_school_fk;
+ALTER TABLE public.promotions VALIDATE CONSTRAINT promotions_class_to_school_fk;
+ALTER TABLE public.promotions VALIDATE CONSTRAINT promotions_student_school_fk;
+ALTER TABLE public.promotion_history VALIDATE CONSTRAINT promotion_history_class_school_fk;
+ALTER TABLE public.promotion_history VALIDATE CONSTRAINT promotion_history_student_school_fk;
+ALTER TABLE public.school_documents VALIDATE CONSTRAINT school_documents_class_school_fk;
+ALTER TABLE public.school_documents VALIDATE CONSTRAINT school_documents_student_school_fk;
+ALTER TABLE public.school_documents VALIDATE CONSTRAINT school_documents_template_school_fk;
+ALTER TABLE public.school_document_audit_events VALIDATE CONSTRAINT school_document_audit_events_document_school_fk;
+ALTER TABLE public.school_document_permissions VALIDATE CONSTRAINT school_document_permissions_document_school_fk;
+ALTER TABLE public.school_document_permissions VALIDATE CONSTRAINT school_document_permissions_user_school_fk;
+ALTER TABLE public.school_document_versions VALIDATE CONSTRAINT school_document_versions_document_school_fk;
+ALTER TABLE public.student_document_attachments VALIDATE CONSTRAINT student_document_attachments_student_school_fk;
+ALTER TABLE public.staff_members VALIDATE CONSTRAINT staff_members_role_school_fk;
+ALTER TABLE public.payroll_records VALIDATE CONSTRAINT payroll_records_user_school_fk;
+ALTER TABLE public.school_notices VALIDATE CONSTRAINT school_notices_class_school_fk;
+ALTER TABLE public.notice_reads VALIDATE CONSTRAINT notice_reads_notice_school_fk;
+ALTER TABLE public.notice_reads VALIDATE CONSTRAINT notice_reads_user_school_fk;
+ALTER TABLE public.notice_reads VALIDATE CONSTRAINT notice_reads_parent_school_fk;
+ALTER TABLE public.users VALIDATE CONSTRAINT users_branch_school_fk;
+
 ALTER TABLE public.teacher_unavailability VALIDATE CONSTRAINT teacher_unavailability_teacher_school_fk;
 ALTER TABLE public.teachers VALIDATE CONSTRAINT teachers_user_school_fk;
 ALTER TABLE public.staff_members VALIDATE CONSTRAINT staff_members_user_school_fk;
