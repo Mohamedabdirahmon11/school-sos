@@ -5,6 +5,7 @@ import {
   applySchoolSetupProgressUpdate,
   buildSchoolSetupChecklist,
   canFinishSchoolSetup,
+  findCurrentAcademicYearRecord,
   normalizeSchoolSetupProgress,
   sanitizeSchoolSetupProgressUpdate
 } from '../src/server/school-setup.ts';
@@ -257,3 +258,16 @@ test('school setup requires the normalized academic year and both semester rows 
   assert.equal(checklist[1].ready, false);
   assert.match(checklist[1].reason, /Create\/select the current academic year/);
 });
+
+
+test('setup readiness matches slash-form academic-year rows to the school hyphen label', () => {
+  const records = [
+    { id: 'inactive-year', name: '2026/2027', isCurrent: false },
+    { id: 'current-year', name: '2026/2027', isCurrent: true },
+    { id: 'other-current-year', name: '2025/2026', isCurrent: true }
+  ];
+  assert.equal(findCurrentAcademicYearRecord(records, '2026-2027')?.id, 'current-year');
+  assert.equal(findCurrentAcademicYearRecord(records, '2026-2028'), undefined);
+  assert.equal(findCurrentAcademicYearRecord(records, ''), undefined);
+});
+
