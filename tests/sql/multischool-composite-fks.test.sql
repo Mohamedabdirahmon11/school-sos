@@ -21,7 +21,7 @@ CREATE TABLE public.staff_members (id varchar PRIMARY KEY, school_id varchar NOT
 CREATE TABLE public.teacher_subjects (id varchar PRIMARY KEY, school_id varchar NOT NULL, teacher_id varchar NOT NULL, subject_id varchar NOT NULL);
 
 INSERT INTO public.teacher_subjects VALUES ('ts-a','school-a','teacher-a','subject-a');
-INSERT INTO public.users VALUES ('admin-a','school-a'),('admin-b','school-b'),('teacher-a-user','school-a'),('teacher-b-user','school-b');
+INSERT INTO public.users VALUES ('admin-a','school-a'),('admin-b','school-b'),('teacher-a-user','school-a'),('teacher-b-user','school-b'),('super-admin',NULL);
 INSERT INTO public.classes VALUES ('class-a','school-a','teacher-a-user'),('class-b','school-b','teacher-b-user');
 INSERT INTO public.students VALUES ('student-a','school-a'),('student-b','school-b');
 INSERT INTO public.subjects VALUES ('subject-a','school-a'),('subject-b','school-b');
@@ -49,6 +49,8 @@ BEGIN
   BEGIN INSERT INTO public.admission_applications VALUES ('bad-admission','school-a','class-b',NULL); RAISE EXCEPTION 'cross-school admission class accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.student_invoice_items VALUES ('bad-item','school-a','invoice-b',NULL); RAISE EXCEPTION 'cross-school invoice item accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   INSERT INTO public.fee_payments VALUES ('pay-a','school-a','student-a','fee-a','invoice-a','admin-a',NULL);
+  INSERT INTO public.fee_payments VALUES ('super-admin-pay','school-a','student-a',NULL,'invoice-a','super-admin',NULL);
+  INSERT INTO public.student_marks VALUES ('super-admin-mark','school-a','class-a','student-a','subject-a',NULL,'super-admin');
   DELETE FROM public.fee_structures WHERE id='fee-a';
   IF (SELECT fee_structure_id FROM public.fee_payments WHERE id='pay-a') IS NOT NULL THEN RAISE EXCEPTION 'SET NULL behavior changed'; END IF;
 END
