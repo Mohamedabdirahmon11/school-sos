@@ -10,7 +10,7 @@ import {
   Settings, GraduationCap, UserCheck, PhoneCall, Layers, BookOpen, CalendarDays,
   CalendarCheck, FileSpreadsheet, FileCheck2, CreditCard, BellRing, MessageSquare,
   UserPlus, ShieldCheck, FileText, Sliders, Library, Bus, AlertTriangle,
-  HeartPulse, Award, Wallet, Boxes, ChevronLeft, ChevronRight, MessageCircle, UserCircle2, Search
+  HeartPulse, Award, Wallet, Boxes, ChevronLeft, ChevronRight, MessageCircle, UserCircle2, Search, LogOut
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,7 +24,7 @@ type NavItem = { id: string; label: string; icon: React.ComponentType<{ classNam
 type NavGroup = { title: string; items: NavItem[] };
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpenMobile, onCloseMobile }) => {
-  const { user, school, inspectedSchool, language } = useAuth();
+  const { user, school, inspectedSchool, language, logout } = useAuth();
   const role = user?.role || 'school_admin';
   const [menuSearch, setMenuSearch] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -365,6 +365,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         </div>
       </div>}
 
+      <button type="button" onClick={() => { onCloseMobile?.(); void logout(); }} className="school-admin-drawer-logout">
+        <LogOut size={18} aria-hidden="true" /><span>Log out</span>
+      </button>
     </aside>
   </>;
 };
