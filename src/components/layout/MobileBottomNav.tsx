@@ -1,6 +1,6 @@
 /**
  * Role-aware mobile shortcuts plus a dedicated full-menu entry.
- * School Admin uses four primary shortcuts; the drawer is the full navigation.
+ * School Admin uses five primary shortcuts; the drawer is the full navigation.
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
@@ -24,7 +24,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   const tabs = getMobileNavigation(role).filter(route =>
     !route.permission || role !== 'accountant' || hasStaffNavigationPermission(user?.permissions, route.permission)
   );
-  const schoolAdminTabs = tabs.filter(route => ['sch_dashboard', 'sch_students', 'sch_teachers', 'sch_attendance'].includes(route.id));
+  const schoolAdminTabs = tabs.filter(route => ['sch_dashboard', 'sch_students', 'sch_teachers', 'sch_attendance', 'sch_classes'].includes(route.id));
 
   if (role === 'super_admin') {
     const primaryTabs = tabs.filter(route => ['sa_dashboard', 'sa_schools', 'sa_users', 'sa_analytics'].includes(route.id));
@@ -51,7 +51,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   }
 
   if (isSchoolAdmin) {
-    const shortLabels: Record<string, string> = { sch_dashboard: 'Home', sch_students: 'Students', sch_teachers: 'Teachers', sch_attendance: 'Attendance' };
+    const shortLabels: Record<string, string> = { sch_dashboard: 'Home', sch_students: 'Students', sch_teachers: 'Teachers', sch_attendance: 'Attendance', sch_classes: 'Classes' };
     return (
       <nav
         aria-label="School Admin quick navigation"

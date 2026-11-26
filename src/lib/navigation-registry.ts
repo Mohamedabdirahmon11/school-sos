@@ -46,7 +46,7 @@ export const NAVIGATION_REGISTRY: readonly NavigationRoute[] = [
   { id: 'sch_parents', label: 'Parents & Contacts', labelKey: 'parents_contacts', icon: PhoneCall, roles: schoolAndFormTeacher, group: 'People', mobile: ['teacher'] },
   { id: 'sch_admissions', label: 'Admissions Pipeline', icon: UserPlus, roles: school, group: 'People' },
   { id: 'sch_staff', label: 'Staff Roles & Permissions', icon: ShieldCheck, roles: school, group: 'People' },
-  { id: 'sch_classes', label: 'Classes', labelKey: 'classes', icon: Layers, roles: school, group: 'Academic' },
+  { id: 'sch_classes', label: 'Classes', labelKey: 'classes', icon: Layers, roles: school, group: 'Academic', mobile: ['school_admin'] },
   { id: 'sch_subjects', label: 'Subjects', labelKey: 'subjects', icon: BookOpen, roles: school, group: 'Academic' },
   { id: 'sch_curriculum', label: 'Class Curriculum', icon: BookOpen, roles: school, group: 'Academic' },
   { id: 'sch_teacher_assignments', label: 'Teacher Assignments', icon: UserCheck, roles: school, group: 'Academic' },
