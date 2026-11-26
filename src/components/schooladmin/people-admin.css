@@ -45,11 +45,7 @@
     scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important;
   }
 }
-@media (prefers-color-scheme: dark) {
-  .school-people-page { --people-bg:#121a17; --people-card:#1a2420; --people-ink:#e6efe9; --people-muted:#9db0a7; --people-line:#2d3b35; --people-accent:#4cc58a; --people-soft:#1f2f28; }
-  .school-people-page thead th { background:#202d27; }
-  .school-people-page tbody tr:hover { background:#202d27; }
-}
+
 
 
 /* HTML reference parity: warm ivory canvas, compact cards and six-stage pipeline. */
@@ -229,51 +225,7 @@
 
 
 /* Preserve the reference's dark palette instead of forcing light-only white cards. */
-@media (prefers-color-scheme: dark) {
-  .school-people-page {
-    --people-bg: #121a17;
-    --people-card: #1a2420;
-    --people-ink: #e6efe9;
-    --people-muted: #9db0a7;
-    --people-line: #2d3b35;
-    --people-accent: #4cc58a;
-    background: var(--people-bg);
-    color: var(--people-ink);
-  }
-  .school-people-page > header:first-child,
-  .school-people-page > div:first-child,
-  .school-people-teachers-page tbody tr,
-  .school-people-parents-page .bg-white.rounded-xl.border,
-  .school-people-staff-page section,
-  .school-people-staff-page > div.bg-white,
-  .school-people-staff-page .school-people-role-card,
-  .school-people-staff-page [data-role-card] {
-    background: var(--people-card) !important;
-    border-color: var(--people-line) !important;
-    color: var(--people-ink);
-    box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
-  }
-  .school-people-page h1,
-  .school-people-page h2,
-  .school-people-page h3,
-  .school-people-page p,
-  .school-people-page label,
-  .school-people-page td,
-  .school-people-page th,
-  .school-people-page input,
-  .school-people-page select,
-  .school-people-page textarea {
-    background: #121a17;
-    border-color: var(--people-line);
-    color: var(--people-ink);
-  }
-  .school-people-page thead th { background: #202d27; color: var(--people-muted); }
-  .school-people-page tbody tr:hover { background: #202d27; }
-  .school-people-teachers-page tbody td:first-child { background: #202d27; }
-  .school-people-admissions-page .people-admissions-board > section { background: #1f2f28 !important; }
-  .school-people-admissions-page .people-admissions-board article { background: var(--people-card) !important; }
-  .school-people-staff-page section > div.grid > div { background: #202d27; }
-}
+
 
 
 /* Final reference alignment: use the supplied HTML's exact palette and typography. */
@@ -383,7 +335,7 @@
 .school-people-teachers-page .teacher-directory-rows tbody td:last-child { border-top:0; min-width:250px; white-space:nowrap; }
 .school-people-teachers-page .teacher-directory-rows tbody tr:hover { background:var(--people-soft); }
 @media (max-width:767px) { .school-people-teachers-page .teacher-directory-cards tbody { grid-template-columns:1fr; padding:8px; } .school-people-teachers-page .teacher-directory-rows table { min-width:900px; } }
-@media (prefers-color-scheme:dark) { .school-people-teachers-page .teacher-directory-rows tbody tr { background:transparent; } .school-people-teachers-page .teacher-directory-rows tbody tr:hover { background:#202d27; } }
+
 
 /* Mobile-first School Admin directories: readable cards, no sideways scrolling. */
 @media (max-width: 767px) {
@@ -1029,7 +981,7 @@
 .school-people-parents-page tbody td:last-child{display:flex;flex-wrap:wrap}
 .school-people-staff-page table{min-width:760px}
 }
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .school-people-admissions-page .people-admissions-board>section{background:#202b26!important;border-color:#3b4a42!important}}
+
 :root[data-theme="dark"] .school-people-admissions-page .people-admissions-board>section{background:#202b26!important;border-color:#3b4a42!important}
 
 /* Mobile polish for School Admin Students, Teachers, and Parents & Contacts.
@@ -1093,4 +1045,17 @@
 @media (max-width: 767px) {
   .school-people-teachers-page .teacher-contact-link { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; font-size: 12px; }
   .school-students-page .student-mobile-open { min-height: 44px; }
+}
+
+
+/* Phones in system dark mode must not partially dark-theme these light-only admin pages. */
+@media (max-width: 767px) {
+  .school-students-page .students-header-actions,
+  .school-students-page .students-export-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; position: static; }
+  .school-students-page .students-export-actions button,
+  .school-students-page .students-header-actions button { min-width: 0; padding: 9px 6px; font-size: 11px; white-space: normal; justify-content: center; }
+  .school-people-parents-page tbody tr,
+  .school-people-parents-page tbody td { width: 100%; max-width: 100%; box-sizing: border-box; min-width: 0; white-space: normal !important; }
+  .school-people-parents-page tbody td:last-child { overflow: visible; }
+  .school-people-staff-page table { min-width: 0; }
 }
