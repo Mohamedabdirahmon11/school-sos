@@ -1,10 +1,9 @@
 /**
  * Role-aware mobile shortcuts plus a dedicated full-menu entry.
- * School Admin has four primary shortcuts plus a fifth Menu button that opens the full drawer.
+ * School Admin uses four primary shortcuts; the drawer is the full navigation.
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
-import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import { getMobileNavigation, type SchoolOSRole } from '../../lib/navigation-registry.ts';
@@ -24,6 +23,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   const tabs = getMobileNavigation(role).filter(route =>
     !route.permission || role !== 'accountant' || hasStaffNavigationPermission(user?.permissions, route.permission)
   );
+  const schoolAdminTabs = tabs.filter(route => ['sch_dashboard', 'sch_students', 'sch_teachers', 'sch_attendance'].includes(route.id));
 
   if (role === 'super_admin') {
     const primaryTabs = tabs.filter(route => ['sa_dashboard', 'sa_schools', 'sa_users', 'sa_analytics'].includes(route.id));
@@ -58,7 +58,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
         className="schoolos-mobile-bottom-nav schoolos-schooladmin-bottom-nav md:hidden fixed z-40"
       >
         <div className="schoolos-schooladmin-bottom-inner">
-          {tabs.map(route => {
+          {schoolAdminTabs.map(route => {
             const Icon = route.icon;
             const isActive = !isMenuOpen && currentView === route.id;
             const label = shortLabels[route.id] || (route.labelKey ? t(route.labelKey as any) : route.label);
@@ -76,17 +76,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
               </button>
             );
           })}
-          <button
-            type="button"
-            onClick={isMenuOpen ? onCloseMenu : onOpenMenu}
-            aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={isMenuOpen}
-            aria-haspopup="dialog"
-            className={`schoolos-schooladmin-tab schoolos-schooladmin-menu-tab ${isMenuOpen ? 'is-active' : ''}`}
-          >
-            {isMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-            <span>Menu</span>
-          </button>
         </div>
       </nav>
     );
