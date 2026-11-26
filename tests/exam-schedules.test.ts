@@ -17,7 +17,6 @@ const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const termUi = readFileSync(new URL('../src/components/schooladmin/TermExamSchedulingPanel.tsx', import.meta.url), 'utf8');
 const teacherUi = readFileSync(new URL('../src/components/teacher/TeacherPortalView.tsx', import.meta.url), 'utf8');
-const academicsWorkspace = readFileSync(new URL('../src/components/schooladmin/AcademicsWorkspace.tsx', import.meta.url), 'utf8');
 const sidebar = readFileSync(new URL('../src/components/layout/Sidebar.tsx', import.meta.url), 'utf8');
 
 test('exam schedule schema is tenant-scoped and protects room and seat allocations', () => {
