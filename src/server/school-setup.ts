@@ -75,6 +75,8 @@ export interface SchoolSetupEvidence {
   teacherAssignmentIssues?: string[];
   curriculumClassCoverageReady?: boolean;
   curriculumClassCoverageIssues?: string[];
+  academicRecordsReady?: boolean;
+  academicRecordsIssues?: string[];
 }
 
 export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgress {
@@ -127,6 +129,34 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     && terms.semester2Start <= terms.semester2End
     && terms.semester1End < terms.semester2Start;
   const yearReady = /^\d{4}-\d{4}$/.test(String(school.academicYear || ''));
+  // Validate the detailed setup record too: legacy school.academicYear only
+  // stores the label and can hide an end date that extends into the wrong year.
+  const setupData = (school as any).setupData;
+  const hasDetailedSetup = Boolean(setupData && typeof setupData === 'object'
+    && ('academicYear' in setupData || 'terms' in setupData));
+  const configuredYear = setupData?.academicYear;
+  const configuredTerms = setupData?.terms;
+  const configuredYearReady = !hasDetailedSetup || (() => {
+    if (!configuredYear) return false;
+    const name = String(configuredYear.name || '');
+    const match = /^(\d{4})\/(\d{4})$/.exec(name);
+    if (!match || Number(match[2]) !== Number(match[1]) + 1
+      || !validDate(configuredYear.startDate) || !validDate(configuredYear.endDate)
+      || configuredYear.startDate >= configuredYear.endDate
+      || Number(configuredYear.startDate.slice(0, 4)) !== Number(match[1])
+      || Number(configuredYear.endDate.slice(0, 4)) !== Number(match[2])
+      || String(school.academicYear || '') !== name.replace('/', '-')) return false;
+    if (!Array.isArray(configuredTerms) || configuredTerms.length !== 2 || configuredTerms.some((term: any) =>
+      !String(term.name || '').trim() || !validDate(term.startDate) || !validDate(term.endDate)
+      || term.startDate >= term.endDate || term.startDate < configuredYear.startDate
+      || term.endDate > configuredYear.endDate)) return false;
+    const ordered = [...configuredTerms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
+    return ordered[0].endDate < ordered[1].startDate
+      && ordered[0].startDate === terms.semester1Start
+      && ordered[0].endDate === terms.semester1End
+      && ordered[1].startDate === terms.semester2Start
+      && ordered[1].endDate === terms.semester2End;
+  })();
   const normalizedNames = evidence.classNames.map(name => name.trim()).filter(Boolean);
   const hasActiveClass = normalizedNames.length > 0;
   const profileReady = Boolean(
@@ -137,7 +167,8 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     && evidence.teachers.every(teacher => Boolean(teacher.staffId?.trim() && teacher.userId && teacher.hasLogin));
 
   return {
-    1: step(yearReady && datesReady, false, 'Set a valid academic year and complete start/end dates for both semesters.'),
+    1: step(yearReady && datesReady && configuredYearReady && evidence.academicRecordsReady !== false, false,
+      (evidence.academicRecordsIssues || []).join(' · ') || 'Save the academic year and both semester date ranges to the school academic calendar; keep their dates consistent and non-overlapping.'),
     2: step(profileReady, false, 'Complete the school name, address, city, email, and an international administration WhatsApp number.'),
     3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
     4: step(evidence.subjectCount > 0 && evidence.curriculumClassCoverageReady !== false, false, evidence.subjectCount === 0 ? 'Add at least one school subject.' : (evidence.curriculumClassCoverageIssues || []).join(' · ') || 'Add subjects to the active class curriculum; every class needs at least one subject.'),

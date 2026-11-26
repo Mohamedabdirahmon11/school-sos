@@ -203,3 +203,57 @@ test('curriculum setup requires at least one subject in every active class', () 
   assert.equal(checklist[4].ready, false);
   assert.match(checklist[4].reason, /ugu yaraan hal maaddo ma leh/);
 });
+
+
+test('school setup blocks completion when saved academic year dates disagree with its year label', () => {
+  const staleYear = {
+    ...school,
+    terms: {
+      semester1Start: '2026-09-11',
+      semester1End: '2027-02-22',
+      semester2Start: '2027-03-10',
+      semester2End: '2027-07-22'
+    },
+    setupData: {
+      academicYear: { name: '2026/2027', startDate: '2026-09-11', endDate: '2028-06-08', isCurrent: true },
+      terms: [
+        { name: 'Term 1', startDate: '2026-09-11', endDate: '2027-02-22' },
+        { name: 'Term 2', startDate: '2027-03-10', endDate: '2027-07-22' }
+      ]
+    }
+  } as any;
+  const checklist = buildSchoolSetupChecklist(staleYear, completeEvidence);
+  assert.equal(checklist[1].ready, false);
+});
+
+test('school setup accepts a consistent configured academic year and two non-overlapping terms', () => {
+  const validYear = {
+    ...school,
+    terms: {
+      semester1Start: '2026-09-11',
+      semester1End: '2027-02-22',
+      semester2Start: '2027-03-10',
+      semester2End: '2027-07-22'
+    },
+    setupData: {
+      academicYear: { name: '2026/2027', startDate: '2026-09-11', endDate: '2027-07-22', isCurrent: true },
+      terms: [
+        { name: 'Term 1', startDate: '2026-09-11', endDate: '2027-02-22' },
+        { name: 'Term 2', startDate: '2027-03-10', endDate: '2027-07-22' }
+      ]
+    }
+  } as any;
+  const checklist = buildSchoolSetupChecklist(validYear, completeEvidence);
+  assert.equal(checklist[1].ready, true);
+});
+
+
+test('school setup requires the normalized academic year and both semester rows to exist', () => {
+  const checklist = buildSchoolSetupChecklist(school, {
+    ...completeEvidence,
+    academicRecordsReady: false,
+    academicRecordsIssues: ['Create/select the current academic year in Academic Setup.', 'Save both semester date ranges under that academic year.']
+  });
+  assert.equal(checklist[1].ready, false);
+  assert.match(checklist[1].reason, /Create\/select the current academic year/);
+});

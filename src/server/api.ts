@@ -10877,7 +10877,9 @@ async function getSchoolSetupState(school: School) {
     guardianStudents,
     timetable,
     examConfigs,
-    feeStructures
+    feeStructures,
+    academicYears,
+    academicTerms
   ] = await Promise.all([
     queryAllRows('classes', { school_id: school.id }, 'id,name,section,class_teacher_id,is_archived'),
     db.queryPage('subjects', { school_id: school.id }, 1, 1, undefined, 'id'),
@@ -10888,7 +10890,9 @@ async function getSchoolSetupState(school: School) {
     db.queryPage('students', { school_id: school.id, status: 'active' }, 1, 1, 'father_phone.not.is.null,mother_phone.not.is.null', 'id'),
     db.queryPage('timetable_slots', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
     db.queryPage('exam_configs', { school_id: school.id }, 1, 1, undefined, 'id'),
-    db.queryPage('fee_structures', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id')
+    db.queryPage('fee_structures', { school_id: school.id, is_active: 'true' }, 1, 1, undefined, 'id'),
+    queryAllRows('academic_years', { school_id: school.id }, 'id,name,is_current,start_date,end_date'),
+    queryAllRows('terms', { school_id: school.id }, 'id,name,academic_year_id,start_date,end_date,is_current')
   ]);
   const teacherUserIds = teachers.map((teacher: any) => String(teacher.userId || '')).filter(Boolean);
   const teacherAccounts = teacherUserIds.length
@@ -10902,8 +10906,29 @@ async function getSchoolSetupState(school: School) {
     classSubjects.map((row: any) => ({ classId: String(row.classId), subjectId: String(row.subjectId), teacherId: row.teacherId ? String(row.teacherId) : null, periodsPerWeek: Number(row.periodsPerWeek || 0), isActive: row.isActive !== false })),
     allSubjects.map((subject: any) => ({ id: String(subject.id), name: subject.name }))
   );
+  const expectedYearName = String(school.academicYear || '');
+  const normalizedYear = academicYears.find((row: any) => String(row.name || '') === expectedYearName && row.isCurrent === true);
+  const expectedTermRanges = [
+    [school.terms?.semester1Start, school.terms?.semester1End],
+    [school.terms?.semester2Start, school.terms?.semester2End]
+  ].filter(([start, end]) => typeof start === 'string' && typeof end === 'string');
+  const actualTermRanges = new Set(academicTerms
+    .filter((row: any) => normalizedYear && row.academicYearId === normalizedYear.id
+      && typeof row.startDate === 'string' && typeof row.endDate === 'string')
+    .map((row: any) => `${row.startDate}|${row.endDate}`));
+  const academicRecordsIssues: string[] = [];
+  if (!normalizedYear) academicRecordsIssues.push('Create/select the current academic year in Academic Setup.');
+  if (expectedTermRanges.length !== 2 || expectedTermRanges.some(([start, end]) => !actualTermRanges.has(`${start}|${end}`))) {
+    academicRecordsIssues.push('Save both semester date ranges under that academic year.');
+  }
+  if (normalizedYear && expectedTermRanges.some(([start, end]) =>
+    String(start) < String(normalizedYear.startDate || '') || String(end) > String(normalizedYear.endDate || ''))) {
+    academicRecordsIssues.push('The semester dates must fall within the normalized academic year.');
+  }
   const checklist = buildSchoolSetupChecklist(school, {
-    classNames: classes.filter((item: any) => item.isArchived !== true).map((item: any) => String(item.name || '')),
+    academicRecordsReady: academicRecordsIssues.length === 0,
+    academicRecordsIssues,
+    classNames: classes.filter((item: any) => item.isArchived !== true).map((x: any) => String(x.name || '')),
     teacherAssignmentReady: assignmentReadiness.ready,
     teacherAssignmentIssues: assignmentReadiness.issues,
     curriculumClassCoverageReady: !assignmentReadiness.issues.some(issue => issue.includes('ugu yaraan hal maaddo ma leh')),
