@@ -1115,7 +1115,7 @@
     gap: 8px !important;
   }
 
-  /* Four actual destinations only; the drawer/menu remains in the top bar. */
+  /* Five actual destinations only; the drawer/menu remains in the top bar. */
   .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
     display: block !important;
     position: fixed !important;
@@ -1135,8 +1135,8 @@
     width: 100% !important;
     min-width: 0 !important;
     min-height: 62px !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    gap: 3px !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 2px !important;
   }
   .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action {
     display: none !important;
