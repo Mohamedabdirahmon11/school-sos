@@ -585,8 +585,20 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' | 't
   };
 
   useEffect(() => {
-    void loadExamSetup();
-  }, [school]);
+    if (activeTab !== 'term_marks') {
+      void loadExamSetup();
+      return;
+    }
+    if (!school) return;
+    let active = true;
+    setIsLoading(true);
+    setLoadError(null);
+    void ApiClient.getClasses()
+      .then(rows => { if (active) setClasses(Array.isArray(rows) ? rows : []); })
+      .catch((error: any) => { if (active) setLoadError(error?.message || 'Unable to load classes.'); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [school, activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'schedule' || !school) return;
