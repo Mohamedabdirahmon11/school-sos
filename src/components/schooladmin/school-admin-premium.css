@@ -480,3 +480,43 @@
     display: none !important;
   }
 }
+
+
+/* Desktop restoration: preserve the classic wide School Admin workspace;
+   the refreshed drawer and bottom bar remain phone-only. */
+@media (min-width: 768px) {
+  .school-admin-role aside.school-admin-sidebar {
+    width: var(--sidebar-width, 250px) !important; max-width:none !important;
+    border-radius:0 !important;
+    background:linear-gradient(180deg,#102f3b 0%,#123e43 48%,#0b292f 100%) !important;
+    border:0 !important;border-right:1px solid rgba(255,255,255,.1) !important;
+    box-shadow:12px 0 38px rgba(10,35,43,.12) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child {
+    background:transparent !important;border-bottom:1px solid rgba(255,255,255,.12) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:first-child {color:#fff !important}
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:nth-child(2) {color:#a9d7d0 !important}
+  .school-admin-role aside.school-admin-sidebar > div:first-child > button {color:#fff !important;background:rgba(255,255,255,.08) !important;border-color:rgba(255,255,255,.16) !important}
+  .school-admin-role aside.school-admin-sidebar > nav {padding:12px 10px 14px !important}
+  .school-admin-role aside.school-admin-sidebar > nav > label {background:rgba(3,21,29,.34) !important;border-color:rgba(210,242,235,.17) !important;color:#c6e2de !important}
+  .school-admin-role aside.school-admin-sidebar > nav > label input {color:#fff !important}
+  .school-admin-role aside.school-admin-sidebar > nav section h2 {color:#8fc8bf !important;border-bottom-color:rgba(211,242,234,.12) !important}
+  .school-admin-role aside.school-admin-sidebar > nav section button {color:#d3e2e5 !important;border-color:transparent !important;background:transparent !important;min-height:43px !important;border-radius:12px !important}
+  .school-admin-role aside.school-admin-sidebar > nav section button > span:first-of-type {background:rgba(255,255,255,.075) !important;color:#b8d9d5 !important}
+  .school-admin-role aside.school-admin-sidebar > nav section button:hover {background:rgba(255,255,255,.085) !important;color:#fff !important}
+  .school-admin-role aside.school-admin-sidebar > nav section button[aria-current=page],
+  .school-admin-role aside.school-admin-sidebar > nav section button.is-active,
+  .school-admin-role aside.school-admin-sidebar > nav section button.bg-teal-700 {
+    background:linear-gradient(100deg,rgba(34,171,151,.32),rgba(29,122,125,.22)) !important;
+    border-color:rgba(139,229,213,.24) !important;color:#fff !important;
+    box-shadow:inset 3px 0 #54d5bd,0 6px 18px rgba(0,0,0,.12) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t {background:rgba(3,20,27,.38) !important;border-top-color:rgba(220,245,240,.13) !important}
+  .school-admin-role aside.school-admin-sidebar > div.border-t > div {background:rgba(255,255,255,.055) !important;border-color:rgba(255,255,255,.1) !important}
+  .school-admin-role aside.school-admin-sidebar > div.border-t p:first-child {color:#fff !important}
+  .school-admin-role aside.school-admin-sidebar > div.border-t p:last-child {color:#9fc4c1 !important}
+  .school-admin-role aside.school-admin-sidebar > button.school-admin-drawer-logout {background:rgba(255,255,255,.07) !important;border-color:rgba(255,255,255,.14) !important;color:#f1f7f8 !important}
+  .school-admin-role nav.schoolos-schooladmin-bottom-nav,
+  .school-admin-role nav.schoolos-mobile-bottom-nav {display:none !important}
+}
