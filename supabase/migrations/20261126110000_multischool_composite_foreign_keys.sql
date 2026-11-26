@@ -32,6 +32,9 @@ CREATE INDEX IF NOT EXISTS idx_school_notices_class_school_fk ON public.school_n
 CREATE INDEX IF NOT EXISTS idx_users_branch_school_fk ON public.users (branch_id, school_id);
 
 -- Child-side indexes for academic, timetable, parent and school-branch links.
+CREATE INDEX IF NOT EXISTS idx_class_subjects_class_school_fk ON public.class_subjects (class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_class_subjects_subject_school_fk ON public.class_subjects (subject_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_transactions_item_school_fk ON public.inventory_transactions (item_id, school_id);
 CREATE INDEX IF NOT EXISTS idx_classes_branch_school_fk ON public.classes (branch_id, school_id);
 CREATE INDEX IF NOT EXISTS idx_class_sections_class_school_fk ON public.class_sections (class_id, school_id);
 CREATE INDEX IF NOT EXISTS idx_class_sections_legacy_class_school_fk ON public.class_sections (legacy_class_id, school_id);
@@ -261,6 +264,19 @@ BEGIN
       FOREIGN KEY (teacher_id, school_id) REFERENCES public.teachers(id, school_id) ON DELETE SET NULL (teacher_id) NOT VALID;
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.class_subjects'::regclass AND conname='class_subjects_class_school_fk') THEN
+    ALTER TABLE public.class_subjects ADD CONSTRAINT class_subjects_class_school_fk
+      FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.class_subjects'::regclass AND conname='class_subjects_subject_school_fk') THEN
+    ALTER TABLE public.class_subjects ADD CONSTRAINT class_subjects_subject_school_fk
+      FOREIGN KEY (subject_id, school_id) REFERENCES public.subjects(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.inventory_transactions'::regclass AND conname='inventory_transactions_item_school_fk') THEN
+    ALTER TABLE public.inventory_transactions ADD CONSTRAINT inventory_transactions_item_school_fk
+      FOREIGN KEY (item_id, school_id) REFERENCES public.inventory_items(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.classes'::regclass AND conname='classes_form_teacher_school_fk') THEN
     ALTER TABLE public.classes ADD CONSTRAINT classes_form_teacher_school_fk
       FOREIGN KEY (class_teacher_id, school_id) REFERENCES public.users(id, school_id) ON DELETE SET NULL (class_teacher_id) NOT VALID;
@@ -347,6 +363,9 @@ ALTER TABLE public.teacher_subjects VALIDATE CONSTRAINT teacher_subjects_school_
 
 ALTER TABLE public.students VALIDATE CONSTRAINT students_class_school_fk;
 ALTER TABLE public.students VALIDATE CONSTRAINT students_branch_school_fk;
+ALTER TABLE public.class_subjects VALIDATE CONSTRAINT class_subjects_class_school_fk;
+ALTER TABLE public.class_subjects VALIDATE CONSTRAINT class_subjects_subject_school_fk;
+ALTER TABLE public.inventory_transactions VALIDATE CONSTRAINT inventory_transactions_item_school_fk;
 ALTER TABLE public.classes VALIDATE CONSTRAINT classes_branch_school_fk;
 ALTER TABLE public.class_sections VALIDATE CONSTRAINT class_sections_class_group_school_fk;
 ALTER TABLE public.class_sections VALIDATE CONSTRAINT class_sections_legacy_class_school_fk;
