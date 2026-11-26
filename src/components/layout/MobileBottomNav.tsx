@@ -4,7 +4,7 @@
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import { getMobileNavigation, type SchoolOSRole } from '../../lib/navigation-registry.ts';
@@ -53,20 +53,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
             </button>
           );
         })}
-        {!isSchoolAdmin && (
         <button
           type="button"
-          onClick={onOpenMenu}
-          aria-label="Open full navigation menu"
+          onClick={isSchoolAdmin && isMenuOpen ? onCloseMenu : onOpenMenu}
+          aria-label={isSchoolAdmin && isMenuOpen ? 'Close full navigation menu' : 'Open full navigation menu'}
           aria-expanded={isMenuOpen}
           aria-haspopup="dialog"
           title="Menu"
           className={`schoolos-mobile-menu-action flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'w-full min-w-0 px-0.5' : 'min-w-[68px] shrink-0 px-2'}`}
         >
-          <Menu aria-hidden="true" className="h-5 w-5 shrink-0" />
+          {isSchoolAdmin && isMenuOpen ? <X aria-hidden="true" className="h-5 w-5 shrink-0" /> : <Menu aria-hidden="true" className="h-5 w-5 shrink-0" />}
           <span className="text-[10px] font-semibold leading-tight">Menu</span>
         </button>
-        )}
       </div>
     </nav>
   );
