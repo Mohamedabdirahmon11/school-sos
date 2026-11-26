@@ -139,7 +139,7 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(client.includes('updateExamRoom'));
   assert.ok(client.includes('/exams/schedules'));
   assert.ok(client.includes('updateExamSchedule'));
-  assert.ok(app.includes("activeView === 'sch_exams'") && app.includes('<ExamsResultsView initialTab="marks" />'), 'The combined Exam Marks & Approval route opens the marks workspace.');
+  assert.ok(app.includes("activeView === 'sch_exams'") && app.includes("activeView === 'sch_marks_approval' ? 'approval' : 'marks'"), 'The combined Exam Marks & Approval route opens the marks workspace while preserving the legacy approval deep link.');
   assert.ok(sidebar.includes("item('sch_exams', 'Exam Marks & Approval'") && !sidebar.includes("item('sch_marks',") && !sidebar.includes("item('sch_marks_approval',"), 'Only one combined exam marks navigation item is visible to School Admin.');
   assert.ok(ui.includes("initialTab === 'approval' ? 'Marks Approval' : 'Marks'"), 'The selected route displays its own page title.');
   assert.ok(!ui.includes("setActiveTab('marks')"), 'Marks is no longer switched inside the combined workspace.');
