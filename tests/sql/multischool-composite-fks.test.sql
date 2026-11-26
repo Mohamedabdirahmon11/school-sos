@@ -12,7 +12,8 @@ CREATE TABLE public.assignments (id varchar PRIMARY KEY, school_id varchar NOT N
 CREATE TABLE public.admission_applications (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, student_id varchar);
 CREATE TABLE public.assignment_submissions (id varchar PRIMARY KEY, school_id varchar, assignment_id varchar NOT NULL, student_id varchar NOT NULL);
 CREATE TABLE public.attendance_records (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, student_id varchar NOT NULL, recorded_by varchar NOT NULL);
-CREATE TABLE public.class_subjects (id varchar PRIMARY KEY, school_id varchar NOT NULL, teacher_id varchar);
+CREATE TABLE public.class_subjects (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, subject_id varchar NOT NULL, teacher_id varchar);
+CREATE UNIQUE INDEX class_subjects_school_id_class_id_subject_id_key ON public.class_subjects (school_id, class_id, subject_id);
 CREATE TABLE public.fee_structures (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar);
 CREATE TABLE public.student_invoices (id varchar PRIMARY KEY, school_id varchar NOT NULL, student_id varchar NOT NULL, created_by varchar);
 CREATE TABLE public.fee_payments (id varchar PRIMARY KEY, school_id varchar NOT NULL, student_id varchar NOT NULL, fee_structure_id varchar, invoice_id varchar, recorded_by varchar NOT NULL, voided_by varchar);
@@ -53,6 +54,7 @@ INSERT INTO public.classes VALUES ('class-a','school-a','teacher-a-user','branch
 INSERT INTO public.students VALUES ('student-a','school-a','class-a','branch-a'),('student-b','school-b','class-b','branch-b');
 INSERT INTO public.subjects VALUES ('subject-a','school-a'),('subject-b','school-b');
 INSERT INTO public.teachers VALUES ('teacher-a','school-a','teacher-a-user'),('teacher-b','school-b','teacher-b-user');
+INSERT INTO public.class_subjects VALUES ('cs-a','school-a','class-a','subject-a','teacher-a');
 INSERT INTO public.inventory_items VALUES ('item-a','school-a'),('item-b','school-b');
 INSERT INTO public.inventory_transactions VALUES ('invtx-a','school-a','item-a');
 INSERT INTO public.class_sections VALUES ('section-a','school-a','group-a','class-a'),('section-b','school-b','group-b','class-b');
@@ -140,6 +142,8 @@ BEGIN
   BEGIN INSERT INTO public.parent_students VALUES ('bad-parent-link','school-a','admin-b','student-a'); RAISE EXCEPTION 'cross-school parent link accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.communication_queue VALUES ('bad-queue','school-a','student-b'); RAISE EXCEPTION 'cross-school communication student accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.teacher_unavailability VALUES ('bad-unavailability','school-a','teacher-b'); RAISE EXCEPTION 'cross-school teacher availability accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.class_subjects VALUES ('bad-cs','school-a','class-b','subject-a','teacher-a'); RAISE EXCEPTION 'cross-school class-subject class accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.class_subjects VALUES ('bad-cs-subject','school-a','class-a','subject-b','teacher-a'); RAISE EXCEPTION 'cross-school class-subject subject accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.inventory_transactions VALUES ('bad-invtx','school-a','item-b'); RAISE EXCEPTION 'cross-school inventory transaction accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.bank_statement_allocations VALUES ('bad-allocation','school-a','statement-b',NULL,NULL); RAISE EXCEPTION 'cross-school statement allocation accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.promotions VALUES ('bad-promotion','school-a','class-b','class-a','student-a'); RAISE EXCEPTION 'cross-school promotion class accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
