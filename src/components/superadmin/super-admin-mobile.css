@@ -79,7 +79,7 @@
     grid-template-columns: minmax(0,1fr);
   }
   .super-admin-design main .sa-metrics-grid,
-  .super-admin-design main .grid.grid-cols-1.md\\:grid-cols-3 {
+  .super-admin-design main .grid.grid-cols-1.md\:grid-cols-3 {
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
   .super-admin-design main :is(.bg-white.rounded-xl,.bg-white.rounded-2xl,.sa-panel) {
@@ -280,7 +280,7 @@
 }
 @media (max-width: 420px) {
   .super-admin-design main .sa-metrics-grid,
-  .super-admin-design main .grid.grid-cols-1.md\\:grid-cols-3 {
+  .super-admin-design main .grid.grid-cols-1.md\:grid-cols-3 {
     grid-template-columns: minmax(0,1fr);
   }
   .super-admin-design main {
