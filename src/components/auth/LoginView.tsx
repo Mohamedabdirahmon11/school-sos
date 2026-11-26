@@ -126,9 +126,23 @@ export const LoginView: React.FC<{ authCheckPending?: boolean }> = ({ authCheckP
   };
 
   return (
-    <div className="schoolos-login-page min-h-screen bg-[#F3F6F6] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="schoolos-login-page min-h-screen">
+      <div className="schoolos-login-layout">
+        <section className="schoolos-login-welcome" aria-label="SchoolOS welcome">
+          <div className="schoolos-login-orb schoolos-login-orb-one" />
+          <div className="schoolos-login-orb schoolos-login-orb-two" />
+          <div className="schoolos-login-orb schoolos-login-orb-three" />
+          <div className="schoolos-login-welcome-copy">
+            <div className="schoolos-login-brand-mark">S</div>
+            <p className="schoolos-login-eyebrow">WELCOME TO</p>
+            <h1>SchoolOS</h1>
+            <p className="schoolos-login-welcome-subtitle">YOUR SCHOOL. YOUR FUTURE.</p>
+            <p className="schoolos-login-welcome-description">One connected place for learning, teaching and managing your school community.</p>
+          </div>
+        </section>
+        <div className="schoolos-login-content">
       {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+      <div className="schoolos-login-heading sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="w-12 h-12 rounded-xl bg-[#0B2B2A] text-white flex items-center justify-center font-bold text-2xl mx-auto shadow-md">
           S
         </div>
@@ -297,7 +311,7 @@ export const LoginView: React.FC<{ authCheckPending?: boolean }> = ({ authCheckP
 
         </div>
       </div>
-
+      </div>
       {/* Forgot Password Modal */}
     </div>
   );

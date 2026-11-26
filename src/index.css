@@ -5246,3 +5246,28 @@ main :is(.flex, .inline-flex) > * {
   /* dim the page behind */
   .school-admin-role button[aria-label="Close navigation"] { background: rgba(15,30,30,.45) !important; backdrop-filter: blur(3px); }
 }
+
+.schoolos-login-page{min-height:100dvh;display:grid;place-items:center;padding:clamp(12px,4vw,40px);background:linear-gradient(135deg,#1688d6,#0868b2 55%,#06467f)}
+.schoolos-login-layout{display:grid;grid-template-columns:1fr .92fr;width:min(100%,1080px);min-height:600px;overflow:hidden;border-radius:22px;background:#fff;box-shadow:0 24px 70px #02224844}
+.schoolos-login-welcome{position:relative;display:flex;align-items:center;overflow:hidden;padding:clamp(28px,5vw,64px);color:white;background:linear-gradient(145deg,#168bd8,#0868b4 55%,#064a87)}
+.schoolos-login-welcome:after{position:absolute;content:"";width:430px;height:680px;top:-34px;right:-330px;border-radius:50%;background:#fff}
+.schoolos-login-welcome-copy{z-index:1;max-width:390px}
+.schoolos-login-brand-mark{display:grid;place-items:center;width:46px;height:46px;margin-bottom:40px;border:1px solid #ffffff70;border-radius:13px;background:#ffffff25;font-size:24px;font-weight:800}
+.schoolos-login-eyebrow{margin:0 0 8px;color:#ffffffd0;font-size:11px;font-weight:800;letter-spacing:.2em}
+.schoolos-login-welcome h1{margin:0;color:white;font-size:clamp(36px,4.5vw,56px);line-height:1;font-weight:850;letter-spacing:-.05em}
+.schoolos-login-welcome-subtitle{margin:14px 0;color:white;font-size:11px;font-weight:800;letter-spacing:.16em}
+.schoolos-login-welcome-description{max-width:300px;margin:20px 0;color:#ffffffc9;font-size:13px;line-height:1.7}
+.schoolos-login-orb{position:absolute;border-radius:50%;background:linear-gradient(145deg,#4eb1f580,#01458530)}
+.schoolos-login-orb-one{width:180px;height:180px;right:0;bottom:35px}.schoolos-login-orb-two{width:135px;height:135px;left:-60px;bottom:-50px}.schoolos-login-orb-three{width:70px;height:70px;right:80px;top:35px}
+.schoolos-login-content{z-index:1;display:flex;flex-direction:column;justify-content:center;min-width:0;padding:clamp(24px,4vw,52px);background:white}
+.schoolos-login-heading{width:100%;max-width:390px!important;margin:0 auto 24px!important;text-align:left!important}
+.schoolos-login-heading>div{width:40px!important;height:40px!important;margin:0 0 16px!important;border-radius:12px!important;background:#0a5794!important}
+.schoolos-login-heading h2{margin:0!important;color:#17212d!important;font-size:26px!important;font-weight:800!important}
+.schoolos-login-heading p{color:#8994a3!important;font-size:10px!important}
+.schoolos-login-content>.mt-6{width:100%;max-width:390px;margin:0 auto!important}
+.schoolos-login-card{padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+.schoolos-login-card label{color:#475569!important;font-size:11px!important}
+.schoolos-login-card input{min-height:43px;border-color:#e0e6ee!important;border-radius:8px!important;background:#f8fafc;font-size:12px!important}
+.schoolos-login-card form>button[type=submit]{min-height:44px;margin-top:5px;border-radius:8px!important;background:#07558f!important;font-size:12px!important}
+@media(max-width:760px){.schoolos-login-page{display:block;padding:12px}.schoolos-login-layout{display:flex;flex-direction:column;width:min(100%,520px);min-height:calc(100dvh - 24px);margin:auto;border-radius:18px}.schoolos-login-welcome{min-height:210px;align-items:flex-start;padding:22px 24px}.schoolos-login-welcome:after{width:240px;height:360px;top:-70px;right:-190px}.schoolos-login-brand-mark{width:36px;height:36px;margin-bottom:14px;font-size:18px}.schoolos-login-eyebrow{font-size:9px}.schoolos-login-welcome h1{font-size:34px}.schoolos-login-welcome-subtitle{margin:7px 0;font-size:9px}.schoolos-login-welcome-description{max-width:260px;margin:8px 0;font-size:10px;line-height:1.45}.schoolos-login-orb-one{width:105px;height:105px;right:-12px;bottom:-32px}.schoolos-login-orb-two{width:72px;height:72px;left:auto;right:50px;bottom:-45px}.schoolos-login-orb-three{width:40px;height:40px;right:20px;top:15px}.schoolos-login-content{flex:1;padding:24px clamp(18px,7vw,32px) 30px;justify-content:flex-start}.schoolos-login-heading{margin-bottom:16px!important}.schoolos-login-heading>div{display:none!important}.schoolos-login-heading h2{font-size:23px!important}.schoolos-login-content>.mt-6{margin-top:0!important}}
+@media(max-width:380px){.schoolos-login-page{padding:8px}.schoolos-login-layout{min-height:calc(100dvh - 16px)}.schoolos-login-welcome{min-height:195px;padding:18px 20px}.schoolos-login-content{padding:20px 18px 24px}}
