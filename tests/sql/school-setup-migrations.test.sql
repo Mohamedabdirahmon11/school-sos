@@ -130,3 +130,127 @@ BEGIN
 END $$;
 RESET ROLE;
 SELECT 'SQL migration integration checks passed' AS result;
+
+
+-- Exercise the Supabase index/RLS performance migration on isolated fixture tables.
+CREATE SCHEMA IF NOT EXISTS private;
+CREATE OR REPLACE FUNCTION private.auth_user_role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT 'school_admin'::text $$;
+CREATE OR REPLACE FUNCTION private.auth_has_term_assignment(varchar,varchar,varchar,uuid,varchar) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
+CREATE OR REPLACE FUNCTION private.auth_can_access_student(varchar) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
+
+CREATE TABLE IF NOT EXISTS public.class_sections (id text NOT NULL, school_id varchar NOT NULL);
+CREATE TABLE IF NOT EXISTS public.students (id text NOT NULL, school_id varchar NOT NULL);
+CREATE TABLE IF NOT EXISTS public.subjects (id text NOT NULL, school_id varchar NOT NULL);
+CREATE TABLE IF NOT EXISTS public.mark_structures (id text NOT NULL, school_id varchar NOT NULL, class_id text, term_id uuid);
+CREATE TABLE IF NOT EXISTS public.mark_components (id text NOT NULL, school_id varchar NOT NULL, structure_id text NOT NULL);
+CREATE TABLE IF NOT EXISTS public.report_cards (
+  id text NOT NULL, school_id varchar NOT NULL, student_id text NOT NULL,
+  published_at timestamptz, is_stale boolean NOT NULL DEFAULT false
+);
+CREATE TABLE IF NOT EXISTS public.term_status (id text NOT NULL, school_id varchar NOT NULL, term_id uuid);
+
+ALTER TABLE public.mark_structures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mark_components ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.report_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.term_status ENABLE ROW LEVEL SECURITY;
+
+CREATE UNIQUE INDEX IF NOT EXISTS academic_years_id_school_uidx ON public.academic_years(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS class_sections_id_school_uidx ON public.class_sections(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS classes_id_school_id_uidx ON public.classes(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS classes_id_school_uidx ON public.classes(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS students_id_school_uidx ON public.students(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS subjects_id_school_id_uidx ON public.subjects(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS subjects_id_school_uidx ON public.subjects(id,school_id);
+CREATE UNIQUE INDEX IF NOT EXISTS terms_id_school_uidx ON public.terms(id,school_id);
+
+CREATE POLICY mark_components_read ON public.mark_components FOR SELECT TO authenticated
+USING (private.auth_user_role() IN ('school_admin','super_admin') OR EXISTS (
+  SELECT 1 FROM public.mark_structures ms
+  WHERE ms.id=mark_components.structure_id AND ms.school_id=mark_components.school_id
+    AND EXISTS (
+      SELECT 1 FROM public.teacher_class_subject_assignments a
+      WHERE a.school_id=ms.school_id
+        AND (ms.class_id IS NULL OR a.class_id=ms.class_id)
+        AND (a.term_id IS NULL OR a.term_id=ms.term_id)
+        AND private.auth_has_term_assignment(a.school_id,a.class_id,a.subject_id,ms.term_id,NULL)
+    )
+));
+CREATE POLICY mark_components_admin_write ON public.mark_components FOR ALL TO authenticated
+USING (private.auth_user_role() IN ('school_admin','super_admin'))
+WITH CHECK (private.auth_user_role() IN ('school_admin','super_admin'));
+CREATE POLICY mark_structures_read ON public.mark_structures FOR SELECT TO authenticated
+USING (
+  private.auth_user_role() IN ('school_admin','super_admin')
+  OR EXISTS (
+    SELECT 1 FROM public.teacher_class_subject_assignments a
+    WHERE a.school_id=mark_structures.school_id
+      AND (mark_structures.class_id IS NULL OR a.class_id=mark_structures.class_id)
+      AND (a.term_id IS NULL OR a.term_id=mark_structures.term_id)
+      AND private.auth_has_term_assignment(a.school_id,a.class_id,a.subject_id,mark_structures.term_id,NULL)
+  )
+);
+CREATE POLICY mark_structures_admin_write ON public.mark_structures FOR ALL TO authenticated
+USING (private.auth_user_role() IN ('school_admin','super_admin'))
+WITH CHECK (private.auth_user_role() IN ('school_admin','super_admin'));
+CREATE POLICY report_cards_admin_all ON public.report_cards FOR ALL TO authenticated
+USING (private.auth_user_role() IN ('school_admin','super_admin'))
+WITH CHECK (private.auth_user_role() IN ('school_admin','super_admin'));
+CREATE POLICY report_cards_parent_published_read ON public.report_cards FOR SELECT TO authenticated
+USING (
+  published_at IS NOT NULL AND is_stale=false
+  AND private.auth_user_role() IN ('parent','student')
+  AND private.auth_can_access_student(student_id)
+);
+CREATE POLICY term_status_read ON public.term_status FOR SELECT TO authenticated
+USING (private.auth_user_role() IN ('school_admin','super_admin','teacher'));
+CREATE POLICY term_status_admin_write ON public.term_status FOR ALL TO authenticated
+USING (private.auth_user_role() IN ('school_admin','super_admin'))
+WITH CHECK (private.auth_user_role() IN ('school_admin','super_admin'));
+
+\i supabase/migrations/20261122180000_supabase_duplicate_index_and_rls_policy_cleanup.sql
+\i supabase/migrations/20261122180000_supabase_duplicate_index_and_rls_policy_cleanup.sql
+
+DO $rls_perf$
+DECLARE
+  table_name text;
+  select_count integer;
+  write_count integer;
+  report_policy text;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['mark_components','mark_structures','report_cards','term_status'] LOOP
+    SELECT count(*) INTO select_count
+    FROM pg_policies
+    WHERE schemaname='public' AND tablename=table_name
+      AND cmd='SELECT' AND roles @> ARRAY['authenticated']::name[];
+    IF select_count <> 1 THEN
+      RAISE EXCEPTION '% should have exactly one authenticated SELECT policy; got %', table_name, select_count;
+    END IF;
+    SELECT count(*) INTO write_count
+    FROM pg_policies
+    WHERE schemaname='public' AND tablename=table_name
+      AND cmd IN ('INSERT','UPDATE','DELETE') AND roles @> ARRAY['authenticated']::name[];
+    IF write_count <> 3 THEN
+      RAISE EXCEPTION '% should have three explicit admin write policies; got %', table_name, write_count;
+    END IF;
+  END LOOP;
+
+  SELECT qual INTO report_policy FROM pg_policies
+  WHERE schemaname='public' AND tablename='report_cards' AND policyname='report_cards_read';
+  IF report_policy IS NULL OR report_policy NOT LIKE '%published_at IS NOT NULL%'
+     OR report_policy NOT LIKE '%is_stale%' OR report_policy NOT LIKE '%auth_can_access_student%' THEN
+    RAISE EXCEPTION 'combined report-card SELECT policy lost parent/student published-read restrictions';
+  END IF;
+
+  IF to_regclass('public.academic_years_id_school_uidx') IS NOT NULL
+     OR to_regclass('public.class_sections_id_school_uidx') IS NOT NULL
+     OR to_regclass('public.classes_id_school_id_uidx') IS NOT NULL
+     OR to_regclass('public.classes_id_school_uidx') IS NOT NULL
+     OR to_regclass('public.students_id_school_uidx') IS NOT NULL
+     OR to_regclass('public.subjects_id_school_id_uidx') IS NOT NULL
+     OR to_regclass('public.subjects_id_school_uidx') IS NOT NULL
+     OR to_regclass('public.terms_id_school_uidx') IS NOT NULL THEN
+    RAISE EXCEPTION 'duplicate index cleanup did not remove every intended duplicate';
+  END IF;
+END $rls_perf$;
+
+SELECT 'Supabase RLS/index performance migration checks passed' AS result;
