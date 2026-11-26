@@ -313,6 +313,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       aria-modal={isOpenMobile ? true : undefined}
       aria-label={isOpenMobile ? menuText('Main navigation') : undefined}
       data-mobile-open={isOpenMobile ? 'true' : 'false'}
+      data-mobile-role={role}
       className={`school-admin-sidebar ${isCompact ? 'school-admin-sidebar-collapsed' : ''} fixed inset-y-0 left-0 z-50 flex h-[100dvh] max-h-[100dvh] w-[var(--sidebar-width,250px)] ${isCollapsed ? 'md:w-[72px]' : 'md:w-[var(--sidebar-width,250px)]'} shrink-0 flex-col border-r border-white/10 text-white shadow-xl transition-[width,transform] duration-200 ease-out md:sticky md:top-0 md:z-30 md:translate-x-0 md:shadow-none ${isOpenMobile ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className={`relative flex h-[68px] shrink-0 flex-row items-center gap-3 border-b border-white/10 ${isCompact ? 'justify-center px-2' : 'justify-start px-5'}`}>
         {school?.sidebarTheme?.showLogo !== false && <div className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl ${school?.logoUrl ? 'bg-white p-1' : ''}`} style={!school?.logoUrl ? { backgroundColor: 'var(--sidebar-accent)', color: 'var(--sidebar-accent-foreground)' } : undefined}>
