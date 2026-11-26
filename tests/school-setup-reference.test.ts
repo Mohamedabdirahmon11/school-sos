@@ -158,7 +158,8 @@ test('six setup modules render inside the wizard and use existing database-backe
   assert.match(wizard, /current\.id === 'profile'[\s\S]*?saveReferenceProfile/);
   assert.match(wizard, /current\.id === 'year'[\s\S]*?saveReferenceYear/);
   assert.ok(wizard.includes('ApiClient.saveSchoolSetupStep(1, { schoolInformation: data.schoolInformation })'));
-  assert.ok(wizard.includes('ApiClient.saveSchoolSetupStep(2, { academicYear: data.academicYear })'));
+  assert.ok(wizard.includes('ApiClient.saveSchoolSetupStep(2, { academicYear: { ...data.academicYear, isCurrent: true } })'));
+  assert.doesNotMatch(wizard, /checked=\{data\.academicYear\.isCurrent\}/);
   assert.ok(wizard.includes('ApiClient.saveSchoolSetupStep(3, { terms: data.terms })'));
   assert.doesNotMatch(wizard, /onNavigate\('sch_settings'\)|onNavigate\('sch_setup_academics'\)/);
   for (const method of ['getClasses', 'createClass', 'deleteClass', 'getSubjects', 'createSubject', 'saveClassCurriculum', 'getTeachers', 'createTeacher', 'getStudents', 'createStudent', 'setTimetableSlot']) {
