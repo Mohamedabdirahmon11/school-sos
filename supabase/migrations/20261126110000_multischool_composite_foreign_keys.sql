@@ -30,8 +30,6 @@ CREATE INDEX IF NOT EXISTS idx_school_documents_student_school_fk ON public.scho
 CREATE INDEX IF NOT EXISTS idx_school_documents_template_school_fk ON public.school_documents (template_id, school_id);
 CREATE INDEX IF NOT EXISTS idx_school_notices_class_school_fk ON public.school_notices (class_id, school_id);
 CREATE INDEX IF NOT EXISTS idx_users_branch_school_fk ON public.users (branch_id, school_id);
-CREATE INDEX IF NOT EXISTS idx_class_subjects_subject_school_fk ON public.class_subjects (subject_id, school_id);
-CREATE INDEX IF NOT EXISTS idx_inventory_transactions_item_school_fk ON public.inventory_transactions (item_id, school_id);
 
 -- Child-side indexes for academic, timetable, parent and school-branch links.
 CREATE INDEX IF NOT EXISTS idx_inventory_transactions_item_school_fk ON public.inventory_transactions (item_id, school_id);
