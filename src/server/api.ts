@@ -128,7 +128,7 @@ apiRouter.use((req, res, next) => {
 
 const LIST_QUERY_COLUMNS: Record<string, string> = {
   school_branches: 'id,school_id,name,address,phone,email,is_main,created_at',
-  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,section,shift,normal_exam_shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
+  classes: 'id,school_id,branch_id,name,class_code,academic_year,grade_level,kindergarten_level,section,shift,normal_exam_shift,room_number,capacity,class_teacher_id,monthly_fee,is_archived,created_at',
   subjects: 'id,school_id,name,code,description,credit_units,department,assigned_teacher_ids,created_at',
   class_subjects: 'id,school_id,class_id,subject_id,teacher_id,periods_per_week,small_exam_enabled,big_exam_enabled,is_active,created_at',
   students: 'id,school_id,branch_id,student_id,roll_number,first_name,middle_name,last_name,gender,admission_date,date_of_birth,student_phone,father_phone,father_name,mother_phone,address,class_id,section,status',
@@ -3350,12 +3350,13 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const school = (req as any).school as School;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const gradeLevel = Number(req.body?.gradeLevel);
+  const kindergartenLevel = req.body?.kindergartenLevel == null || req.body.kindergartenLevel === '' ? null : Number(req.body.kindergartenLevel);
   const section = typeof req.body?.section === 'string' ? req.body.section.trim().toUpperCase() : '';
   const academicYear = String(req.body?.academicYear || school.academicYear).trim();
   const [yearStart, yearEnd] = academicYear.split('-').map(Number);
   const classCode = String(req.body?.classCode || `${gradeLevel === 0 ? 'KG' : `G${gradeLevel}`}-${section || 'MAIN'}-${academicYear.slice(0, 4)}`).trim().toUpperCase();
   const capacity = req.body?.capacity === undefined || req.body.capacity === '' ? school.defaultClassCapacity : Number(req.body.capacity);
-  if (!name || !Number.isInteger(gradeLevel) || gradeLevel < 0 || gradeLevel > 12 || !/^\d{4}-\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40 || !Number.isInteger(capacity) || capacity < 1 || capacity > 500 || (req.body?.section !== undefined && typeof req.body.section !== 'string')) {
+  if (!name || !Number.isInteger(gradeLevel) || gradeLevel < 0 || gradeLevel > 12 || (gradeLevel === 0 ? ![1, 2, 3].includes(Number(kindergartenLevel)) : kindergartenLevel !== null) || !/^\d{4}-\d{4}$/.test(academicYear) || yearEnd !== yearStart + 1 || !classCode || classCode.length > 40 || !Number.isInteger(capacity) || capacity < 1 || capacity > 500 || (req.body?.section !== undefined && typeof req.body.section !== 'string')) {
     res.status(400).json({ error: 'Enter a class name, unique class code, valid academic year, KG–12 level, and valid optional capacity/section.' }); return;
   }
   const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
@@ -3363,10 +3364,10 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const requestedShift = Number(req.body?.shift ?? 1);
   const timetableSettings = await db.getTimetableSettings(school.id);
   if (![1, 2].includes(requestedShift) || (requestedShift === 2 && timetableSettings.shiftCount !== 2)) { res.status(400).json({ error: 'The requested shift is not enabled in School Settings.' }); return; }
-  const gradeMismatch = classGradeMismatchError(name, gradeLevel);
+  const gradeMismatch = classGradeMismatchError(name, gradeLevel, kindergartenLevel);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   const existingClasses = await db.getClasses(school.id);
-  if (hasActiveClassIdentityConflict(existingClasses, { academicYear, gradeLevel, section })) {
+  if (hasActiveClassIdentityConflict(existingClasses, { academicYear, gradeLevel, kindergartenLevel, section })) {
     res.status(409).json({ code: 'CLASS_SECTION_EXISTS', error: `Grade ${gradeLevel} · Section ${section || '—'} already exists for academic year ${academicYear}.` }); return;
   }
   if (existingClasses.some(item => String(item.academicYear || school.academicYear) === academicYear && String(item.classCode || '').toLowerCase() === classCode.toLowerCase())) {
@@ -3381,7 +3382,7 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
     }
   }
   const newClass = db.createClass({
-    schoolId: school.id, branchId: req.body?.branchId || undefined, name, classCode, academicYear, gradeLevel, section,
+    schoolId: school.id, branchId: req.body?.branchId || undefined, name, classCode, academicYear, gradeLevel, kindergartenLevel, section,
     roomNumber: String(req.body?.roomNumber || '').trim(), capacity,
     classTeacherId: req.body?.classTeacherId || null,
     monthlyFee: Number(req.body?.monthlyFee || 0), shift: requestedShift as 1 | 2
@@ -3412,6 +3413,7 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   if (hasActiveClassIdentityConflict(allClasses, {
     academicYear,
     gradeLevel: Number(req.body?.gradeLevel ?? existing.gradeLevel),
+    kindergartenLevel: req.body?.kindergartenLevel === undefined ? existing.kindergartenLevel : (req.body.kindergartenLevel == null || req.body.kindergartenLevel === '' ? null : Number(req.body.kindergartenLevel)),
     section: String(req.body?.section ?? existing.section ?? '')
   }, existing.id)) {
     res.status(409).json({ code: 'CLASS_SECTION_EXISTS', error: 'Another active class already uses this school/year/grade/section.' }); return;
@@ -3436,6 +3438,12 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
     const allowedLevels: number[] = [0, ...((school.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0))];
     if (!Number.isInteger(gradeLevel) || !allowedLevels.includes(gradeLevel)) { res.status(400).json({ error: `Grade level must be one of this school's offered levels (${allowedLevels.join(', ')}).` }); return; }
     updates.gradeLevel = gradeLevel;
+  }
+  if (req.body?.kindergartenLevel !== undefined) {
+    const level = req.body.kindergartenLevel == null || req.body.kindergartenLevel === '' ? null : Number(req.body.kindergartenLevel);
+    const targetGrade = Number(req.body?.gradeLevel ?? existing.gradeLevel);
+    if (targetGrade === 0 ? ![1, 2, 3].includes(Number(level)) : level !== null) { res.status(400).json({ error: 'Choose KG1, KG2, or KG3 only for Kindergarten classes.' }); return; }
+    updates.kindergartenLevel = level;
   }
   if (req.body?.section !== undefined) {
     if (typeof req.body.section !== 'string') { res.status(400).json({ error: 'Section must be text or blank.' }); return; }
@@ -3479,7 +3487,7 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   }
   const gradeLevel = Number(updates.gradeLevel ?? existing.gradeLevel);
   const name = String(updates.name ?? existing.name);
-  const gradeMismatch = classGradeMismatchError(name, gradeLevel);
+  const gradeMismatch = classGradeMismatchError(name, gradeLevel, (updates.kindergartenLevel ?? existing.kindergartenLevel) as number | null | undefined);
   if (gradeMismatch) { res.status(400).json({ error: gradeMismatch }); return; }
   const updated = await db.updateClass(existing.id, updates, school.id);
   res.json(updated);
