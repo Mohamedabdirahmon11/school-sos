@@ -21,8 +21,8 @@ INSERT INTO public.admission_applications(id,school_id,class_id,status) VALUES
  ('app-pending','school-a','class-a','pending'),
  ('app-approved','school-a','class-a','approved'),
  ('app-rejected','school-a','class-a','rejected');
-\i supabase/migrations/013_people_admin_pipeline_roles.sql
-\i supabase/migrations/013_people_admin_pipeline_roles.sql
+\i supabase/migrations/20261124132309_people_admin_pipeline_roles.sql
+\i supabase/migrations/20261124132309_people_admin_pipeline_roles.sql
 DO $$
 BEGIN
   IF (SELECT pipeline_stage FROM public.admission_applications WHERE id='app-pending') <> 'applied' THEN RAISE EXCEPTION 'pending legacy application did not map to applied'; END IF;
