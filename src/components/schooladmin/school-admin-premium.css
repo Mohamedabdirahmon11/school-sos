@@ -922,3 +922,71 @@
     border-color: color-mix(in srgb, #ff9e96 34%, transparent) !important;
   }
 }
+
+/* Mobile drawer also follows the same school-scoped appearance preferences. */
+@media (max-width: 767px) {
+  .school-admin-role aside.school-admin-sidebar {
+    background: var(--sidebar-background, #102c2a) !important;
+    color: var(--sidebar-text, #fff) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child {
+    background: color-mix(in srgb, var(--sidebar-text, #fff) 6%, transparent) !important;
+    border-bottom-color: color-mix(in srgb, var(--sidebar-text, #fff) 14%, transparent) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:first-child,
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:nth-child(2) {
+    color: var(--sidebar-text, #fff) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav > label {
+    background: color-mix(in srgb, var(--sidebar-text, #fff) 6%, transparent) !important;
+    border-color: color-mix(in srgb, var(--sidebar-text, #fff) 16%, transparent) !important;
+    color: var(--sidebar-text, #fff) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav > label input {
+    color: var(--sidebar-text, #fff) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section h2 {
+    color: var(--sidebar-text, #fff) !important;
+    opacity: .7 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button,
+  .school-admin-role aside.school-admin-sidebar > nav section button[aria-current="page"] {
+    min-height: var(--sidebar-item-height, 41px) !important;
+    border-radius: var(--sidebar-radius, 14px) !important;
+    color: var(--sidebar-text, #fff) !important;
+    font-size: var(--sidebar-font-size, 13px) !important;
+    background: transparent !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button > span:first-of-type {
+    color: var(--sidebar-text, #fff) !important;
+    background: color-mix(in srgb, var(--sidebar-text, #fff) 9%, transparent) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button:not([aria-current="page"]):hover {
+    background: color-mix(in srgb, var(--sidebar-text, #fff) 9%, transparent) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button[aria-current="page"] {
+    background: var(--sidebar-active-background, var(--sidebar-accent, #0f766e)) !important;
+    color: var(--sidebar-active-foreground, #fff) !important;
+    border: var(--sidebar-active-border, 1px solid transparent) !important;
+    border-radius: var(--sidebar-active-radius, var(--sidebar-radius, 14px)) !important;
+    box-shadow: inset 3px 0 var(--sidebar-accent, #67e0c4), 0 5px 14px rgba(0,0,0,.12) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t {
+    background: color-mix(in srgb, var(--sidebar-text, #fff) 5%, transparent) !important;
+    border-top-color: color-mix(in srgb, var(--sidebar-text, #fff) 14%, transparent) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t > div {
+    background: color-mix(in srgb, var(--sidebar-text, #fff) 7%, transparent) !important;
+    border-color: color-mix(in srgb, var(--sidebar-text, #fff) 14%, transparent) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t p,
+  .school-admin-role aside.school-admin-sidebar > div.border-t > div > span {
+    color: var(--sidebar-text, #fff) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > button.school-admin-drawer-logout {
+    color: var(--sidebar-text, #fff) !important;
+    background: color-mix(in srgb, var(--sidebar-text, #fff) 7%, transparent) !important;
+    border-color: color-mix(in srgb, var(--sidebar-text, #fff) 16%, transparent) !important;
+    font-size: var(--sidebar-font-size, 13px) !important;
+  }
+}
