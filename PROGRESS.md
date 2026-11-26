@@ -1,3 +1,9 @@
+## School Admin phone layout fixes (2026-11-26)
+
+- PARTIAL: phone-only CSS (below 768px) for School Admin dialogs, crowded grids and setup wizard steps.
+- Checked: dialog sizing on a minimal mock page at 390px and 1280px in Chromium.
+- NOT DONE: `npm run lint`, `npm run build` and visual checks in the real app (dependencies not installed in this session).
+
 ## Global page refresh control — merged into performance branch (2026-11-23)
 
 - Preserved the shared 32px refresh control from latest `main` in the performance branch; it reloads the current authenticated page without changing routes or API behavior.

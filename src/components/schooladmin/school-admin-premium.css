@@ -1208,3 +1208,34 @@
     text-overflow: clip !important;
   }
 }
+
+/* School Admin phone-only fixes. Screen widths below 768px; desktop and print are unchanged. */
+@media screen and (max-width: 767px) {
+  /* Dialogs: open as a bottom sheet that fits the screen, scrolls, and sits above the bottom nav. */
+  .school-admin-role main div.fixed.inset-0[class*="bg-"]:not(.exam-seat-print) {
+    z-index: 110 !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 8px 8px max(8px, env(safe-area-inset-bottom)) !important;
+  }
+  .school-admin-role main div.fixed.inset-0[class*="bg-"]:not(.exam-seat-print) > * {
+    width: 100%;
+    min-width: 0;
+    max-height: calc(100dvh - 24px) !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+  }
+
+  /* Crowded fixed-column grids. */
+  .school-admin-role main .grid.grid-cols-6 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .school-admin-role main .grid.grid-cols-4.gap-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .school-admin-role main .grid.grid-cols-3.gap-4:not(.text-center) { grid-template-columns: minmax(0, 1fr); }
+
+  /* Setup wizard steps: swipe sideways instead of squeezing five into one row. */
+  .school-admin-role main .grid.grid-cols-5.mt-5 {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(104px, 1fr);
+    overflow-x: auto;
+  }
+}
