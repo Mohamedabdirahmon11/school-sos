@@ -235,3 +235,14 @@ test('school setup accepts a consistent configured academic year and two non-ove
   const checklist = buildSchoolSetupChecklist(validYear, completeEvidence);
   assert.equal(checklist[1].ready, true);
 });
+
+
+test('school setup requires the normalized academic year and both semester rows to exist', () => {
+  const checklist = buildSchoolSetupChecklist(school, {
+    ...completeEvidence,
+    academicRecordsReady: false,
+    academicRecordsIssues: ['Create/select the current academic year in Academic Setup.', 'Save both semester date ranges under that academic year.']
+  });
+  assert.equal(checklist[1].ready, false);
+  assert.match(checklist[1].reason, /Create\/select the current academic year/);
+});
