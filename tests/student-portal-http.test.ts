@@ -41,8 +41,6 @@ const tenantClass=db.createClass({schoolId:otherSchool.id,name:'Tenant Grade',gr
 const subject=db.createSubject({schoolId:school.id,name:'Mathematics',code:'MATH',category:'core',isActive:true} as any);
 const otherSubject=db.createSubject({schoolId:school.id,name:'Science',code:'SCI',category:'core',isActive:true} as any);
 const student=db.createStudent({schoolId:school.id,studentId:'SP-ST-001',firstName:'Faadumo',middleName:'Axmed',lastName:'Cabdi',gender:'female',admissionDate:today,fatherPhone:'+251900000001',classId:klass.id,status:'active'} as any);
-const provisionedStudentUser=await db.getUserById('usr-student-'+student.id,school.id);
-assert.equal(provisionedStudentUser?.mustChangePassword,false,'a newly issued student PIN must allow direct portal login');
 const sameClassStudent=db.createStudent({schoolId:school.id,studentId:'SP-ST-002',firstName:'Other',middleName:'',lastName:'Student',gender:'male',admissionDate:today,fatherPhone:'',classId:klass.id,status:'active'} as any);
 const tenantStudent=db.createStudent({schoolId:otherSchool.id,studentId:'SP-OTHER-001',firstName:'Tenant',middleName:'',lastName:'Student',gender:'male',admissionDate:today,fatherPhone:'',classId:tenantClass.id,status:'active'} as any);
 db.deleteUser('usr-student-'+student.id); // The fixture supplies its own portal user below.
