@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
+const assignmentView = readFileSync(new URL('../src/components/schooladmin/TeacherAssignmentsView.tsx', import.meta.url), 'utf8');
 const migration = readFileSync(new URL('../supabase/migrations/20261118183000_step6_teacher_class_subject_assignments.sql', import.meta.url), 'utf8');
 const uniqueMigration = readFileSync(new URL('../supabase/migrations/20261122090000_teacher_assignment_unique_class_subject.sql', import.meta.url), 'utf8');
 
@@ -16,6 +17,16 @@ test('Teacher assignments canonicalize same-date Term/Semester aliases and block
   assert.match(upsert, /\.in\('term_id', payload\.term_alias_ids\)/);
   assert.match(upsert, /logicalRows\s*\|\|\s*\[\]\.length > 1|\(logicalRows\s*\|\|\s*\[\]\)\.length > 1/);
   assert.match(upsert, /error\.status = 409/);
+});
+
+test('Teacher assignment screen surfaces same-date Term/Semester conflicts without hiding rows', () => {
+  const route = api.slice(api.indexOf("apiRouter.get('/teacher-assignments'"), api.indexOf("apiRouter.post('/teacher-assignments'"));
+  assert.match(route, /start_date,end_date/);
+  assert.match(route, /termAliasConflicts/);
+  assert.match(route, /effectiveTermRows/);
+  assert.match(route, /termRows\.sort/);
+  assert.match(assignmentView, /Qoondeynno Term\/Semester is dul saaran/);
+  assert.match(assignmentView, /data\.termAliasConflicts\.map/);
 });
 
 test('Teacher assignment requires an active teacher and an active class-subject curriculum row', () => {
