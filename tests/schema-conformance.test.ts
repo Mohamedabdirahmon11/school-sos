@@ -332,3 +332,14 @@ test('student registration migrations add address, guardian identity, and atomic
   assert.match(bulk, /father_name/);
   assert.match(bulk, /address/);
 });
+
+
+test('teacher assignment reconciliation RPC uses a hardened search_path and service-role-only execution', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261126072127_reconcile_teacher_assignment_rpc.sql', import.meta.url), 'utf8');
+  assert.ok(migration.includes("SECURITY DEFINER\nSET search_path = ''"));
+  assert.ok(!migration.includes('SET search_path = public, pg_temp'));
+  assert.ok(migration.includes('REVOKE ALL ON FUNCTION public.upsert_teacher_assignment_atomic('));
+  assert.ok(migration.includes('FROM PUBLIC, anon, authenticated;'));
+  assert.ok(migration.includes('GRANT EXECUTE ON FUNCTION public.upsert_teacher_assignment_atomic('));
+  assert.ok(migration.includes('TO service_role;'));
+});
