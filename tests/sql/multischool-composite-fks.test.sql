@@ -24,6 +24,7 @@ CREATE TABLE public.class_sections (id varchar PRIMARY KEY, school_id varchar NO
 CREATE TABLE public.timetable_slots (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, subject_id varchar NOT NULL, teacher_id varchar);
 CREATE TABLE public.parent_students (id varchar PRIMARY KEY, school_id varchar NOT NULL, parent_id varchar NOT NULL, student_id varchar NOT NULL);
 CREATE TABLE public.communication_queue (id varchar PRIMARY KEY, school_id varchar NOT NULL, student_id varchar);
+CREATE TABLE public.teacher_unavailability (id varchar PRIMARY KEY, school_id varchar NOT NULL, teacher_id varchar NOT NULL);
 CREATE TABLE public.teacher_subjects (id varchar PRIMARY KEY, school_id varchar NOT NULL, teacher_id varchar NOT NULL, subject_id varchar NOT NULL);
 
 INSERT INTO public.teacher_subjects VALUES ('ts-a','school-a','teacher-a','subject-a');
@@ -81,6 +82,7 @@ BEGIN
   BEGIN INSERT INTO public.timetable_slots VALUES ('bad-slot','school-a','class-a','subject-a','teacher-b'); RAISE EXCEPTION 'cross-school timetable teacher accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.parent_students VALUES ('bad-parent-link','school-a','admin-b','student-a'); RAISE EXCEPTION 'cross-school parent link accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.communication_queue VALUES ('bad-queue','school-a','student-b'); RAISE EXCEPTION 'cross-school communication student accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.teacher_unavailability VALUES ('bad-unavailability','school-a','teacher-b'); RAISE EXCEPTION 'cross-school teacher availability accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.attendance_records VALUES ('bad-att','school-a','class-a','student-b','admin-a'); RAISE EXCEPTION 'cross-school attendance accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.fee_payments VALUES ('bad-pay','school-a','student-a','fee-a','invoice-b','admin-a',NULL); RAISE EXCEPTION 'cross-school payment accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.student_marks VALUES ('bad-mark','school-a','class-a','student-a','subject-b','admin-a',NULL); RAISE EXCEPTION 'cross-school mark accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
