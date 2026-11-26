@@ -4,7 +4,7 @@
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
-import { Menu, X, UserCircle2 } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import { getMobileNavigation, type SchoolOSRole } from '../../lib/navigation-registry.ts';
@@ -34,7 +34,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
         className="schoolos-mobile-bottom-nav md:hidden fixed z-40"
         style={{ left: 14, right: 14, bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))', background: '#fff', borderRadius: 26, boxShadow: '0 12px 34px rgba(15,45,40,.22), 0 2px 6px rgba(15,45,40,.08)', padding: '6px 4px' }}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', alignItems: 'center', minHeight: 58 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', alignItems: 'center', minHeight: 58 }}>
           {tabs.map(route => {
             const Icon = route.icon;
             const isActive = !isMenuOpen && currentView === route.id;
@@ -53,16 +53,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
               </button>
             );
           })}
-          <button
-            type="button"
-            onClick={() => { onCloseMenu?.(); window.dispatchEvent(new Event('schoolos:open-profile')); }}
-            aria-label="Profile"
-            title="Profile"
-            style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 0', background: 'transparent', border: 0, color: '#a3adb5' }}
-          >
-            <UserCircle2 aria-hidden="true" style={{ width: 23, height: 23, color: '#a3adb5' }} strokeWidth={1.7} />
-            <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.1 }}>Profile</span>
-          </button>
         </div>
       </nav>
     );
