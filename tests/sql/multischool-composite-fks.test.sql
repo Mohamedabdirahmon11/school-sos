@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 CREATE TABLE public.schools (id varchar PRIMARY KEY);
 INSERT INTO public.schools VALUES ('school-a'),('school-b');
-CREATE TABLE public.users (id varchar PRIMARY KEY, school_id varchar, UNIQUE(id,school_id));
+CREATE TABLE public.users (id varchar PRIMARY KEY, school_id varchar, branch_id varchar, UNIQUE(id,school_id));
 CREATE TABLE public.school_branches (id varchar PRIMARY KEY, school_id varchar NOT NULL, UNIQUE(id,school_id));
 CREATE TABLE public.class_groups (id varchar PRIMARY KEY, school_id varchar NOT NULL, UNIQUE(id,school_id));
 CREATE TABLE public.classes (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_teacher_id varchar, branch_id varchar, UNIQUE(id,school_id));
@@ -19,16 +19,32 @@ CREATE TABLE public.fee_payments (id varchar PRIMARY KEY, school_id varchar NOT 
 CREATE TABLE public.form_teacher_comments (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, student_id varchar NOT NULL, teacher_user_id varchar NOT NULL);
 CREATE TABLE public.student_invoice_items (id varchar PRIMARY KEY, school_id varchar NOT NULL, invoice_id varchar NOT NULL, fee_structure_id varchar);
 CREATE TABLE public.student_marks (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, student_id varchar NOT NULL, subject_id varchar NOT NULL, submitted_by varchar, approved_by varchar);
-CREATE TABLE public.staff_members (id varchar PRIMARY KEY, school_id varchar NOT NULL, user_id varchar);
+CREATE TABLE public.staff_members (id varchar PRIMARY KEY, school_id varchar NOT NULL, user_id varchar, role_id varchar);
 CREATE TABLE public.class_sections (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, legacy_class_id varchar);
 CREATE TABLE public.timetable_slots (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, subject_id varchar NOT NULL, teacher_id varchar);
 CREATE TABLE public.parent_students (id varchar PRIMARY KEY, school_id varchar NOT NULL, parent_id varchar NOT NULL, student_id varchar NOT NULL);
 CREATE TABLE public.communication_queue (id varchar PRIMARY KEY, school_id varchar NOT NULL, student_id varchar);
 CREATE TABLE public.teacher_unavailability (id varchar PRIMARY KEY, school_id varchar NOT NULL, teacher_id varchar NOT NULL);
+CREATE TABLE public.school_expenses (id varchar PRIMARY KEY, school_id varchar NOT NULL);
+CREATE TABLE public.bank_statement_entries (id varchar PRIMARY KEY, school_id varchar NOT NULL, matched_payment_id varchar, matched_expense_id varchar);
+CREATE TABLE public.bank_statement_allocations (id varchar PRIMARY KEY, school_id varchar NOT NULL, statement_entry_id varchar NOT NULL, payment_id varchar, expense_id varchar);
+CREATE TABLE public.promotions (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_from_id varchar NOT NULL, class_to_id varchar NOT NULL, student_id varchar NOT NULL);
+CREATE TABLE public.promotion_history (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, student_id varchar NOT NULL);
+CREATE TABLE public.school_document_templates (id varchar PRIMARY KEY, school_id varchar NOT NULL);
+CREATE TABLE public.school_documents (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar, student_id varchar, template_id varchar);
+CREATE TABLE public.school_document_audit_events (id varchar PRIMARY KEY, school_id varchar NOT NULL, document_id varchar);
+CREATE TABLE public.school_document_permissions (id varchar PRIMARY KEY, school_id varchar NOT NULL, document_id varchar NOT NULL, user_id varchar NOT NULL);
+CREATE TABLE public.school_document_versions (id varchar PRIMARY KEY, school_id varchar NOT NULL, document_id varchar NOT NULL);
+CREATE TABLE public.student_document_attachments (id varchar PRIMARY KEY, school_id varchar NOT NULL, student_id varchar NOT NULL);
+CREATE TABLE public.staff_roles (id varchar PRIMARY KEY, school_id varchar NOT NULL);
+CREATE TABLE public.payroll_records (id varchar PRIMARY KEY, school_id varchar NOT NULL, user_id varchar NOT NULL);
+CREATE TABLE public.school_notices (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar);
+CREATE TABLE public.notice_reads (id varchar PRIMARY KEY, school_id varchar NOT NULL, notice_id varchar NOT NULL, user_id varchar NOT NULL, parent_id varchar);
 CREATE TABLE public.teacher_subjects (id varchar PRIMARY KEY, school_id varchar NOT NULL, teacher_id varchar NOT NULL, subject_id varchar NOT NULL);
 
 INSERT INTO public.teacher_subjects VALUES ('ts-a','school-a','teacher-a','subject-a');
-INSERT INTO public.users VALUES ('admin-a','school-a'),('admin-b','school-b'),('teacher-a-user','school-a'),('teacher-b-user','school-b'),('super-admin',NULL);
+INSERT INTO public.users(id,school_id) VALUES ('admin-a','school-a'),('admin-b','school-b'),('teacher-a-user','school-a'),('teacher-b-user','school-b'),('super-admin',NULL);
+INSERT INTO public.users(id,school_id,branch_id) VALUES ('branch-user','school-a','branch-a');
 INSERT INTO public.school_branches VALUES ('branch-a','school-a'),('branch-b','school-b');
 INSERT INTO public.class_groups VALUES ('group-a','school-a'),('group-b','school-b');
 INSERT INTO public.classes VALUES ('class-a','school-a','teacher-a-user','branch-a'),('class-b','school-b','teacher-b-user','branch-b');
@@ -38,6 +54,22 @@ INSERT INTO public.teachers VALUES ('teacher-a','school-a','teacher-a-user'),('t
 INSERT INTO public.class_sections VALUES ('section-a','school-a','group-a','class-a'),('section-b','school-b','group-b','class-b');
 INSERT INTO public.assignments VALUES ('assignment-a','school-a','class-a','subject-a','teacher-a-user');
 INSERT INTO public.fee_structures VALUES ('fee-a','school-a','class-a'),('fee-b','school-b','class-b');
+INSERT INTO public.school_expenses VALUES ('expense-a','school-a'),('expense-b','school-b');
+INSERT INTO public.bank_statement_entries VALUES ('statement-a','school-a',NULL,'expense-a'),('statement-b','school-b',NULL,'expense-b');
+INSERT INTO public.promotions VALUES ('promotion-a','school-a','class-a','class-a','student-a');
+INSERT INTO public.promotion_history VALUES ('history-a','school-a','class-a','student-a');
+INSERT INTO public.school_document_templates VALUES ('template-a','school-a'),('template-b','school-b');
+INSERT INTO public.school_documents VALUES ('document-a','school-a','class-a','student-a','template-a'),('document-b','school-b','class-b','student-b','template-b');
+INSERT INTO public.school_document_audit_events VALUES ('audit-a','school-a','document-a');
+INSERT INTO public.school_document_permissions VALUES ('permission-a','school-a','document-a','admin-a');
+INSERT INTO public.school_document_versions VALUES ('version-a','school-a','document-a');
+INSERT INTO public.student_document_attachments VALUES ('attachment-a','school-a','student-a');
+INSERT INTO public.staff_roles VALUES ('role-a','school-a'),('role-b','school-b');
+INSERT INTO public.staff_members(id,school_id,user_id,role_id) VALUES ('staff-a','school-a','teacher-a-user','role-a');
+INSERT INTO public.payroll_records VALUES ('payroll-a','school-a','teacher-a-user');
+INSERT INTO public.school_notices VALUES ('notice-a','school-a','class-a'),('notice-b','school-b','class-b');
+INSERT INTO public.notice_reads VALUES ('notice-read-a','school-a','notice-a','teacher-a-user','admin-a');
+INSERT INTO public.bank_statement_allocations VALUES ('allocation-a','school-a','statement-a',NULL,'expense-a');
 INSERT INTO public.student_invoices VALUES ('invoice-a','school-a','student-a','admin-a'),('invoice-b','school-b','student-b','admin-b');
 
 \i supabase/migrations/20261126110000_multischool_composite_foreign_keys.sql
@@ -83,6 +115,17 @@ BEGIN
   BEGIN INSERT INTO public.parent_students VALUES ('bad-parent-link','school-a','admin-b','student-a'); RAISE EXCEPTION 'cross-school parent link accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.communication_queue VALUES ('bad-queue','school-a','student-b'); RAISE EXCEPTION 'cross-school communication student accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.teacher_unavailability VALUES ('bad-unavailability','school-a','teacher-b'); RAISE EXCEPTION 'cross-school teacher availability accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.bank_statement_allocations VALUES ('bad-allocation','school-a','statement-b',NULL,NULL); RAISE EXCEPTION 'cross-school statement allocation accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.promotions VALUES ('bad-promotion','school-a','class-b','class-a','student-a'); RAISE EXCEPTION 'cross-school promotion class accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.promotion_history VALUES ('bad-history','school-a','class-a','student-b'); RAISE EXCEPTION 'cross-school promotion history student accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.school_documents VALUES ('bad-document','school-a',NULL,NULL,'template-b'); RAISE EXCEPTION 'cross-school document template accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.school_document_permissions VALUES ('bad-permission','school-a','document-a','admin-b'); RAISE EXCEPTION 'cross-school document permission user accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.student_document_attachments VALUES ('bad-attachment','school-a','student-b'); RAISE EXCEPTION 'cross-school student attachment accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.staff_members(id,school_id,user_id,role_id) VALUES ('bad-staff','school-a','teacher-a-user','role-b'); RAISE EXCEPTION 'cross-school staff role accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.payroll_records VALUES ('bad-payroll','school-a','teacher-b-user'); RAISE EXCEPTION 'cross-school payroll user accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.school_notices VALUES ('bad-notice','school-a','class-b'); RAISE EXCEPTION 'cross-school notice class accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.notice_reads VALUES ('bad-notice-read','school-a','notice-a','teacher-a-user','admin-b'); RAISE EXCEPTION 'cross-school notice parent accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.users(id,school_id,branch_id) VALUES ('bad-branch-user','school-a','branch-b'); RAISE EXCEPTION 'cross-school user branch accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.attendance_records VALUES ('bad-att','school-a','class-a','student-b','admin-a'); RAISE EXCEPTION 'cross-school attendance accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.fee_payments VALUES ('bad-pay','school-a','student-a','fee-a','invoice-b','admin-a',NULL); RAISE EXCEPTION 'cross-school payment accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.student_marks VALUES ('bad-mark','school-a','class-a','student-a','subject-b','admin-a',NULL); RAISE EXCEPTION 'cross-school mark accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
