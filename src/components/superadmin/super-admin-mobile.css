@@ -493,3 +493,160 @@
 @media(prefers-reduced-motion:reduce){
   .super-admin-design *,.super-admin-design *::before,.super-admin-design *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
 }
+
+
+/* Super Admin navigation + command dashboard visual system (desktop and mobile). */
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] {
+  --sa-nav-bg:#102f2c;
+  --sa-nav-ink:#e8f4f1;
+  --sa-nav-muted:#a5c1ba;
+  --sa-nav-accent:#20b69e;
+  background:linear-gradient(165deg,#102f2c 0%,#123f3a 56%,#0b2926 100%) !important;
+  border-right:1px solid rgba(255,255,255,.1);
+  box-shadow:8px 0 32px rgba(7,25,23,.12);
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child {
+  min-height:82px;height:82px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.12);
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child::after {
+  content:"PLATFORM CONTROL";display:block;align-self:flex-end;margin:0 0 2px auto;
+  color:#8ed3c4;font-size:9px;font-weight:800;letter-spacing:.15em;white-space:nowrap;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav {
+  padding:18px 13px 24px;gap:22px;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav label {
+  min-height:46px;border:1px solid rgba(203,235,226,.16);border-radius:14px;
+  background:rgba(255,255,255,.075);color:#e9f6f2;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav label:focus-within {
+  border-color:#4ccab1;box-shadow:0 0 0 3px rgba(32,182,158,.16);
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav label input {
+  color:#fff!important;font-size:13px;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section h2 {
+  margin:0 0 9px;padding:0 10px;color:#91bdb3!important;
+  font-size:10px!important;letter-spacing:.16em;line-height:1.4;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section > div { gap:5px; }
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button {
+  min-height:47px;align-items:center;padding:10px 12px;border:1px solid transparent;
+  border-radius:13px!important;color:#e3f0ed!important;font-size:13px!important;
+  font-weight:600;line-height:1.25;transition:background .16s ease,border-color .16s ease,transform .16s ease;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button:hover {
+  background:rgba(255,255,255,.09)!important;border-color:rgba(255,255,255,.09);
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button[aria-current="page"] {
+  background:linear-gradient(105deg,#1ca88f,#147c70)!important;color:#fff!important;
+  border-color:rgba(181,255,238,.18);box-shadow:0 8px 20px rgba(2,22,18,.24);
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button[aria-current="page"] > span:first-child {
+  color:#fff!important;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] .school-admin-drawer-logout {
+  display:flex;align-items:center;justify-content:center;gap:10px;min-height:49px;
+  margin:0 14px 14px;padding:0 14px;border:1px solid rgba(255,255,255,.14);
+  border-radius:14px;background:rgba(255,255,255,.075);color:#f1f8f6;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] .school-admin-drawer-logout:hover {
+  background:rgba(255,255,255,.13);
+}
+.super-admin-design .schoolos-topbar:has(.schoolos-topbar-menu) {
+  min-height:68px;background:rgba(255,255,255,.96);border-bottom:1px solid #e2ece9;
+}
+.super-admin-design .schoolos-topbar-menu {
+  width:43px;height:43px;border-radius:14px!important;background:#0e766b!important;
+  box-shadow:0 6px 16px rgba(15,118,110,.22)!important;
+}
+.super-admin-design .sa-dashboard { padding-top:26px;padding-bottom:36px; }
+.super-admin-design .sa-dashboard .sa-hero {
+  min-height:132px;padding:24px 26px;border:1px solid #d9e9e4;border-radius:22px;
+  background:radial-gradient(circle at 88% 8%,rgba(37,184,155,.13),transparent 30%),linear-gradient(125deg,#fff 0%,#f0faf6 100%);
+  box-shadow:0 8px 28px rgba(15,70,60,.055);
+}
+.super-admin-design .sa-dashboard .sa-page-title {
+  color:#123b35;font-size:25px;line-height:1.2;letter-spacing:-.04em;
+}
+.super-admin-design .sa-dashboard .sa-hero p { margin-top:8px;color:#607670;font-size:13px; }
+.super-admin-design .sa-dashboard .sa-hero button {
+  min-height:46px;padding:0 18px;border-radius:13px;background:linear-gradient(110deg,#0f8a78,#0d6d64);
+  box-shadow:0 7px 17px rgba(15,118,110,.2);font-size:13px;
+}
+.super-admin-design .sa-dashboard .sa-metric-card {
+  position:relative;overflow:hidden;min-height:132px;padding:19px;border:1px solid #e0ebe7;
+  border-radius:18px;background:linear-gradient(155deg,#fff 0%,#fbfefd 100%);
+  box-shadow:0 5px 18px rgba(15,45,40,.045);transition:transform .18s ease,box-shadow .18s ease;
+}
+.super-admin-design .sa-dashboard .sa-metric-card::after {
+  content:"";position:absolute;right:-22px;top:-28px;width:92px;height:92px;border-radius:50%;
+  background:rgba(24,165,143,.055);pointer-events:none;
+}
+.super-admin-design .sa-dashboard .sa-metric-card:hover {
+  transform:translateY(-2px);box-shadow:0 10px 25px rgba(15,65,55,.08);
+}
+.super-admin-design .sa-dashboard .sa-metric-card > div:first-child { position:relative;z-index:1;gap:10px; }
+.super-admin-design .sa-dashboard .sa-metric-card > div:first-child > span {
+  font-size:10px;letter-spacing:.1em;line-height:1.45;
+}
+.super-admin-design .sa-dashboard .sa-metric-card .text-2xl {
+  font-size:27px;letter-spacing:-.04em;color:#153b36;
+}
+.super-admin-design .sa-dashboard .sa-panels-grid { gap:20px; }
+.super-admin-design .sa-dashboard .sa-panel {
+  padding:22px;border:1px solid #e0ebe7;border-radius:19px;background:#fff;
+  box-shadow:0 5px 20px rgba(15,45,40,.04);
+}
+.super-admin-design .sa-dashboard .sa-panel h2 { font-size:14px;letter-spacing:-.01em; }
+.super-admin-design .sa-dashboard .sa-revenue-chart { min-height:190px;border-color:#e7efec; }
+.super-admin-design .sa-dashboard .sa-attention-panel { padding:0; }
+.super-admin-design .sa-dashboard .sa-attention-panel > div:first-child {
+  padding:19px 22px;background:linear-gradient(100deg,#fff,#f6fbf9);
+}
+.super-admin-design .sa-dashboard .sa-attention-panel table th {font-size:10px;letter-spacing:.07em;text-transform:uppercase;}
+@media (min-width:768px) {
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] {
+    width:264px;min-width:264px;
+  }
+}
+@media (max-width:767px) {
+  .super-admin-design .schoolos-topbar:has(.schoolos-topbar-menu) { min-height:64px;height:64px;padding:8px 12px; }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"][data-mobile-open="true"] {
+    position:fixed;z-index:100;inset:0 auto 0 0;width:min(88vw,370px);max-width:370px;
+    height:100dvh;max-height:100dvh;border-radius:0 22px 22px 0;
+    padding-bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(0);
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"][data-mobile-open="false"] {
+    transform:translateX(-105%);
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"][data-mobile-open="true"] > div:first-child {
+    min-height:82px;height:82px;padding:14px 18px;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav {
+    padding:18px 14px 22px;gap:21px;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button {
+    min-height:50px;padding:11px 13px;font-size:14px!important;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] .school-admin-drawer-logout {
+    margin-bottom:calc(12px + env(safe-area-inset-bottom));
+  }
+  .super-admin-design .sa-dashboard { padding:15px 12px 34px!important;gap:14px; }
+  .super-admin-design .sa-dashboard .sa-hero { padding:18px 16px;min-height:0;border-radius:18px; }
+  .super-admin-design .sa-dashboard .sa-page-title { font-size:21px!important; }
+  .super-admin-design .sa-dashboard .sa-metrics-grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+  .super-admin-design .sa-dashboard .sa-metric-card { min-height:118px;padding:14px; }
+  .super-admin-design .sa-dashboard .sa-metric-card .text-2xl { font-size:22px; }
+  .super-admin-design .sa-dashboard .sa-panels-grid { grid-template-columns:minmax(0,1fr);gap:13px; }
+  .super-admin-design .sa-dashboard .sa-panel { padding:16px; }
+  .super-admin-design .sa-dashboard .sa-attention-panel { padding:0; }
+  .super-admin-design .sa-dashboard .sa-attention-panel > div:first-child { padding:15px; }
+}
+@media (max-width:420px) {
+  .super-admin-design .sa-dashboard .sa-metrics-grid { grid-template-columns:minmax(0,1fr); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button,
+  .super-admin-design .sa-dashboard .sa-metric-card { transition:none; }
+}
