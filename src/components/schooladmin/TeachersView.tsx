@@ -314,7 +314,7 @@ export const TeachersView: React.FC = () => {
                     return klass ? `${klass.name}${klass.section ? ` · ${klass.section}` : ''}` : id;
                   }).join(', ') || 'Not assigned'}</td>
                   <td className="px-4 py-3 text-[#334155]">{formTeacherClass ? `${formTeacherClass.name}${formTeacherClass.section ? ` · ${formTeacherClass.section}` : ''}` : 'Not assigned'}</td>
-                  <td className="px-4 py-3 font-mono text-[#334155]">{t.phone || 'Phone not provided'}</td>
+                  <td className="px-4 py-3 font-mono text-[#334155]">{t.phone ? (<div className="flex flex-wrap items-center gap-2"><span>{t.phone}</span><a href={`tel:${t.phone.trim()}`} aria-label={`Call ${t.fullName}`} className="teacher-contact-link rounded border border-slate-200 px-2 py-1 font-sans text-[10px] font-semibold text-slate-700 hover:bg-slate-50">Call</a>{t.phone.replace(/\D/g, '') && <a href={`https://wa.me/${t.phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" aria-label={`WhatsApp ${t.fullName}`} className="teacher-contact-link rounded border border-emerald-200 bg-emerald-50 px-2 py-1 font-sans text-[10px] font-semibold text-emerald-800 hover:bg-emerald-100">WhatsApp</a>}</div>) : 'Phone not provided'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${String(t.status).toLowerCase() === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>{t.status}</span>
                   </td>

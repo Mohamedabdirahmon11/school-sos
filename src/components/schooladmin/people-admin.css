@@ -1089,3 +1089,8 @@
   .school-people-parents-page tbody td:last-child button,
   .school-people-parents-page tbody td:last-child a { min-height: 44px; font-size: 12px; flex: 1 1 calc(50% - 7px); }
 }
+
+@media (max-width: 767px) {
+  .school-people-teachers-page .teacher-contact-link { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; font-size: 12px; }
+  .school-students-page .student-mobile-open { min-height: 44px; }
+}
