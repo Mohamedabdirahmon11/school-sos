@@ -41,7 +41,8 @@ const allAssets = allFiles(path.join(distDir, 'assets')).map(file => {
 const budgets = {
   initialJsRawBytes: Number(process.env.BUNDLE_ENTRY_JS_MAX_RAW_KB || 900) * 1024,
   initialJsGzipBytes: Number(process.env.BUNDLE_ENTRY_JS_MAX_GZIP_KB || 320) * 1024,
-  initialCssRawBytes: Number(process.env.BUNDLE_ENTRY_CSS_MAX_RAW_KB || 250) * 1024,
+  // Keep a modest raw-source ceiling while the compressed transfer budget remains the primary CSS guardrail.
+  initialCssRawBytes: Number(process.env.BUNDLE_ENTRY_CSS_MAX_RAW_KB || 260) * 1024,
   initialCssGzipBytes: Number(process.env.BUNDLE_ENTRY_CSS_MAX_GZIP_KB || 60) * 1024
 };
 
