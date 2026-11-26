@@ -556,3 +556,137 @@
 .dark .school-admin-role .schoolos-schooladmin-tab{color:#afc0c6!important}
 :root[data-theme=dark] .school-admin-role .schoolos-schooladmin-tab.is-active,
 .dark .school-admin-role .schoolos-schooladmin-tab.is-active{background:#1c4542!important;color:#c3f5e8!important}
+
+
+/* School Admin navigation v2: light editorial drawer with a clear hierarchy. */
+.school-admin-role aside.school-admin-sidebar{
+  background:#f7faf9!important;
+  color:#183b38!important;
+  border-right:1px solid #dce9e5!important;
+  border-radius:0 22px 22px 0!important;
+  box-shadow:22px 0 65px rgba(12,43,40,.22)!important;
+}
+.school-admin-role aside.school-admin-sidebar>div:first-child{
+  min-height:94px!important;padding:18px 17px!important;
+  background:linear-gradient(135deg,#e2f3ed 0%,#f5faf8 70%,#fff 100%)!important;
+  border-bottom:1px solid #dbe9e4!important;
+}
+.school-admin-role aside.school-admin-sidebar>div:first-child>div:first-child{
+  width:50px!important;height:50px!important;border-radius:16px!important;
+  background:#fff!important;border:1px solid #d7e7e1!important;
+  box-shadow:0 6px 18px rgba(16,75,64,.10)!important;
+}
+.school-admin-role aside.school-admin-sidebar>div:first-child>div:nth-child(2)>div:first-child{
+  color:#173e39!important;font-size:14px!important;font-weight:850!important;
+}
+.school-admin-role aside.school-admin-sidebar>div:first-child>div:nth-child(2)>div:nth-child(2){
+  color:#62827b!important;letter-spacing:.14em!important;
+}
+.school-admin-role aside.school-admin-sidebar>div:first-child>button{
+  color:#315e56!important;background:#fff!important;border:1px solid #dce9e5!important;
+  border-radius:11px!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav{
+  gap:16px!important;padding:17px 13px 22px!important;
+  scrollbar-color:#c7dcd4 transparent!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav>label{
+  min-height:46px!important;background:#fff!important;color:#6a827c!important;
+  border:1px solid #dce9e5!important;border-radius:13px!important;
+  box-shadow:0 2px 8px rgba(20,65,55,.035)!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav>label input{
+  color:#173e39!important;font-size:12px!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav>label input::placeholder{color:#91a6a0!important}
+.school-admin-role aside.school-admin-sidebar>nav section h2{
+  color:#78938b!important;border-bottom:1px solid #e2ece8!important;
+  font-size:9px!important;letter-spacing:.16em!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav section button{
+  min-height:45px!important;color:#49635e!important;
+  border:1px solid transparent!important;border-radius:13px!important;
+  font-size:12px!important;font-weight:650!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav section button>span:first-of-type{
+  width:32px!important;height:32px!important;border-radius:10px!important;
+  background:#edf4f1!important;color:#52756c!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav section button:hover{
+  background:#edf5f1!important;border-color:#e0ece7!important;
+  color:#174d43!important;transform:translateX(2px)!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav section button[aria-current=page]{
+  background:linear-gradient(100deg,#dff3eb,#edf8f3)!important;
+  border:1px solid #c4e7d9!important;color:#075b4d!important;
+  box-shadow:inset 3px 0 #13866d,0 4px 12px rgba(15,95,72,.06)!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav section button[aria-current=page]>span:first-of-type{
+  background:#167e69!important;color:#fff!important;box-shadow:none!important;
+}
+.school-admin-role aside.school-admin-sidebar>nav section button[aria-current=page]>span:last-child{
+  color:#075b4d!important;font-weight:800!important;
+}
+.school-admin-role aside.school-admin-sidebar>div.border-t{
+  background:#f0f6f3!important;border-top:1px solid #dce9e5!important;
+}
+.school-admin-role aside.school-admin-sidebar>div.border-t>div{
+  background:#fff!important;border:1px solid #dce9e5!important;
+}
+.school-admin-role aside.school-admin-sidebar>div.border-t>div>span{
+  background:#e1f2eb!important;color:#176b59!important;
+}
+.school-admin-role aside.school-admin-sidebar>div.border-t p:first-child{color:#1d403a!important}
+.school-admin-role aside.school-admin-sidebar>div.border-t p:last-child{color:#77918a!important}
+.school-admin-role aside.school-admin-sidebar>button.school-admin-drawer-logout{
+  margin:7px 14px 14px!important;background:#fff5f4!important;
+  border:1px solid #f1d9d6!important;color:#a9443e!important;border-radius:13px!important;
+}
+.school-admin-role aside.school-admin-sidebar>button.school-admin-drawer-logout:hover{
+  background:#ffecea!important;border-color:#eabfba!important;
+}
+.school-admin-role aside.school-admin-sidebar :is(button,input):focus-visible{
+  outline:2px solid #159879!important;outline-offset:2px!important;
+}
+.school-admin-role nav.schoolos-schooladmin-bottom-nav{
+  background:rgba(255,255,255,.97)!important;border:1px solid #dce9e5!important;
+  box-shadow:0 14px 38px rgba(18,55,49,.16)!important;
+}
+.school-admin-role .schoolos-schooladmin-tab{color:#718780!important}
+.school-admin-role .schoolos-schooladmin-tab.is-active{
+  background:#e5f4ed!important;color:#08644f!important;
+  box-shadow:inset 0 0 0 1px #d0eadd!important;
+}
+.school-admin-role .schoolos-schooladmin-tab.is-active:before{background:#14836b!important}
+.school-admin-role .schoolos-schooladmin-menu-tab{color:#08745e!important}
+@media(max-width:767px){
+  .school-admin-role aside.school-admin-sidebar{
+    width:min(88vw,360px)!important;max-width:360px!important;
+    border-radius:0 22px 22px 0!important;
+  }
+  .school-admin-role aside.school-admin-sidebar>nav{padding:15px 13px 22px!important}
+}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar,
+.dark .school-admin-role aside.school-admin-sidebar{
+  background:#142a2a!important;color:#e5f2ee!important;border-color:#294744!important;
+}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>div:first-child,
+.dark .school-admin-role aside.school-admin-sidebar>div:first-child{
+  background:linear-gradient(135deg,#1c4540,#173531)!important;border-color:#31554e!important;
+}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>div:first-child>div:nth-child(2)>div:first-child,
+.dark .school-admin-role aside.school-admin-sidebar>div:first-child>div:nth-child(2)>div:first-child{color:#f0faf6!important}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>nav section h2,
+.dark .school-admin-role aside.school-admin-sidebar>nav section h2{color:#9bbab0!important;border-color:#294843!important}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>nav section button,
+.dark .school-admin-role aside.school-admin-sidebar>nav section button{color:#c0d5ce!important}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>nav section button>span:first-of-type,
+.dark .school-admin-role aside.school-admin-sidebar>nav section button>span:first-of-type{background:#203e39!important;color:#a9d3c5!important}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>nav section button[aria-current=page],
+.dark .school-admin-role aside.school-admin-sidebar>nav section button[aria-current=page]{background:#1c5145!important;color:#eafff6!important;border-color:#327b65!important}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>div.border-t,
+.dark .school-admin-role aside.school-admin-sidebar>div.border-t{background:#102321!important;border-color:#294843!important}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>div.border-t>div,
+.dark .school-admin-role aside.school-admin-sidebar>div.border-t>div{background:#1a3530!important;border-color:#31554e!important}
+:root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>div.border-t p:first-child,
+.dark .school-admin-role aside.school-admin-sidebar>div.border-t p:first-child{color:#e6f4ef!important}
