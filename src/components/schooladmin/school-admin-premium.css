@@ -260,3 +260,123 @@
 :root[data-theme=dark] .school-admin-role .schoolos-dash-stat,.dark .school-admin-role .schoolos-dash-stat{background:var(--sa-surface)!important}
 :root[data-theme=dark] .school-admin-role .schoolos-dash-chart-track,.dark .school-admin-role .schoolos-dash-chart-track{background:#243a41}
 :root[data-theme=dark] .school-admin-role .schoolos-dash-chart-foot,.dark .school-admin-role .schoolos-dash-chart-foot{border-color:var(--sa-line)}
+
+
+/* Mobile-first finishing pass for the remaining School Admin workspaces.
+   Keep existing workflows intact; improve touch layout, wrapping and scroll containment. */
+@media (max-width:767px){
+  .school-admin-role main .school-people-page,
+  .school-admin-role main .schoolos-operations-page,
+  .school-admin-role main .school-admin-attendance-page,
+  .school-admin-role main .schoolos-timetable-page,
+  .school-admin-role main .academic-setup{
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    padding:12px!important;gap:14px!important;
+  }
+  .school-admin-role main .schoolos-operation-header,
+  .school-admin-role main .schoolos-people-header{
+    display:flex!important;flex-direction:column!important;align-items:stretch!important;
+    gap:12px!important;padding:17px!important;
+  }
+  .school-admin-role main .schoolos-operation-header h1,
+  .school-admin-role main .schoolos-people-header h1{
+    font-size:clamp(1.35rem,6vw,1.75rem)!important;line-height:1.15!important;
+  }
+  .school-admin-role main :is(.students-header-actions,.students-export-actions,.students-primary-actions,
+    .schoolos-people-header-actions,.people-header-actions){
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    width:100%!important;gap:8px!important;
+  }
+  .school-admin-role main :is(.students-header-actions,.students-export-actions,.students-primary-actions,
+    .schoolos-people-header-actions,.people-header-actions)>*{
+    min-width:0!important;width:100%!important;justify-content:center!important;
+  }
+  .school-admin-role main .schoolos-people-stats,
+  .school-admin-role main .schoolos-operation-stats{
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important;
+  }
+  .school-admin-role main .schoolos-people-stat{min-width:0!important;padding:12px!important}
+  .school-admin-role main :is(.schoolos-people-filter,.schoolos-operation-filter){
+    padding:12px!important;border-radius:16px!important;
+  }
+  .school-admin-role main :is(.schoolos-people-filter,.schoolos-operation-filter) :is(input,select,textarea){
+    width:100%!important;max-width:100%!important;min-width:0!important;
+  }
+  .school-admin-role main :is(.schoolos-people-filter,.schoolos-operation-filter) .flex{
+    flex-wrap:wrap!important;
+  }
+  .school-admin-role main :is(.schoolos-people-filter,.schoolos-operation-filter) .flex>*{
+    min-width:0!important;max-width:100%;
+  }
+  .school-admin-role main .schoolos-people-filter select,
+  .school-admin-role main .schoolos-operation-filter select{
+    flex:1 1 135px!important;
+  }
+  .school-admin-role main :is(.schoolos-people-page,.schoolos-operations-page,.school-admin-attendance-page) .overflow-x-auto{
+    max-width:100%!important;overscroll-behavior-x:contain!important;
+    -webkit-overflow-scrolling:touch!important;border-radius:14px!important;
+  }
+  .school-admin-role main table{max-width:none!important}
+  .school-admin-role main :is(.school-people-page,.schoolos-operations-page) .grid{
+    min-width:0!important;
+  }
+  .school-admin-role main :is(.school-people-page,.schoolos-operations-page) .grid>*{
+    min-width:0!important;
+  }
+  .school-admin-role main :is(.schoolos-operation-header,.schoolos-people-header) :is(button,a){
+    min-height:42px!important;white-space:normal!important;text-align:center;
+  }
+  .school-admin-role main :is(.school-people-page,.schoolos-operations-page) .rounded-2xl,
+  .school-admin-role main :is(.school-people-page,.schoolos-operations-page) .rounded-xl{
+    min-width:0;
+  }
+  .school-admin-role main :is(.school-admin-settings-page,.school-admin-fees-page) .grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .school-admin-role main .school-admin-settings-page :is(input,select,textarea){
+    width:100%!important;min-width:0!important;
+  }
+  .school-admin-role main .school-admin-settings-page form{
+    min-width:0!important;width:100%!important;
+  }
+  .school-admin-role main .school-admin-attendance-page>div:first-child{
+    align-items:stretch!important;
+  }
+  .school-admin-role main .school-admin-attendance-page>div:first-child>div:last-child{
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;width:100%!important;
+  }
+  .school-admin-role main .school-admin-attendance-page>div:first-child>div:last-child>*{
+    min-width:0!important;width:100%!important;
+  }
+  .school-admin-role main .schoolos-operations-page :is(.flex.items-center,.flex.justify-between){
+    min-width:0;
+  }
+  .school-admin-role main :is([role=dialog],.modal,.fixed.inset-0) [class*=max-w-]{
+    max-width:calc(100vw - 24px)!important;
+  }
+  .school-admin-role main :is([role=dialog],.modal) :is(input,select,textarea){
+    width:100%;min-width:0;max-width:100%;
+  }
+  .school-admin-role main :is([role=dialog],.modal) .grid{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .school-admin-role main :is(.school-people-page,.schoolos-operations-page) :is(.text-3xl,.text-2xl){
+    font-size:clamp(1.35rem,5.8vw,1.75rem)!important;line-height:1.2!important;
+  }
+  .school-admin-role main .people-admissions-board{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+}
+@media (max-width:420px){
+  .school-admin-role main :is(.students-header-actions,.students-export-actions,.students-primary-actions,
+    .schoolos-people-header-actions,.people-header-actions){
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .school-admin-role main .schoolos-people-stats,
+  .school-admin-role main .schoolos-operation-stats{
+    gap:7px!important;
+  }
+  .school-admin-role main .schoolos-people-stat{padding:10px!important}
+  .school-admin-role main :is(.schoolos-operation-header,.schoolos-people-header){padding:14px!important}
+}
