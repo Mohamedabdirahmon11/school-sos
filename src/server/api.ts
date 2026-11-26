@@ -51,7 +51,7 @@ import { isShiftWithinSchoolClosingTime, sanitizeBranchInput, sanitizeExamConfig
 import { forwardAsyncErrors } from './async-errors.ts';
 import { staffHasPermission, type StaffPermission } from '../lib/staff-permissions.ts';
 import { getRecurringInvoiceAmount, isOpenSubscriptionInvoice } from '../lib/subscription-billing.ts';
-import { buildSchoolSetupChecklist, canFinishSchoolSetup, evaluateTeacherAssignmentReadiness, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
+import { buildSchoolSetupChecklist, canFinishSchoolSetup, evaluateTeacherAssignmentReadiness, findCurrentAcademicYearRecord, normalizeSchoolSetupProgress, sanitizeSchoolSetupProgressUpdate, applySchoolSetupProgressUpdate } from './school-setup.ts';
 import { SCHOOL_SETUP_DEFAULTS, buildSchoolSetupSchoolUpdates, validateSchoolSetupStep } from './school-setup-data.ts';
 import { detectSchoolLogoImage, SCHOOL_LOGO_BUCKET } from './school-logo.ts';
 import { isSchoolSetupProgressComplete, isSchoolSetupProgressCompleteWithTeacherAssignment, isSchoolSetupWizardEligible } from '../lib/school-setup-navigation.ts';
@@ -10909,7 +10909,7 @@ async function getSchoolSetupState(school: School) {
     allSubjects.map((subject: any) => ({ id: String(subject.id), name: subject.name }))
   );
   const expectedYearName = String(school.academicYear || '');
-  const normalizedYear = academicYears.find((row: any) => String(row.name || '') === expectedYearName && row.isCurrent === true);
+  const normalizedYear = findCurrentAcademicYearRecord(academicYears, expectedYearName);
   const expectedTermRanges = [
     [school.terms?.semester1Start, school.terms?.semester1End],
     [school.terms?.semester2Start, school.terms?.semester2End]
