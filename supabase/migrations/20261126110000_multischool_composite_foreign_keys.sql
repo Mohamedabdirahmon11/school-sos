@@ -16,6 +16,10 @@ ALTER TABLE public.assignment_submissions
 
 DO $constraints$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.teacher_subjects'::regclass AND conname='teacher_subjects_school_id_fkey') THEN
+    ALTER TABLE public.teacher_subjects ADD CONSTRAINT teacher_subjects_school_id_fkey
+      FOREIGN KEY (school_id) REFERENCES public.schools(id) ON DELETE CASCADE NOT VALID;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.admission_applications'::regclass AND conname='admission_applications_class_school_fk') THEN
     ALTER TABLE public.admission_applications ADD CONSTRAINT admission_applications_class_school_fk
       FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE RESTRICT NOT VALID;
@@ -159,6 +163,7 @@ BEGIN
 END
 $constraints$;
 
+ALTER TABLE public.teacher_subjects VALIDATE CONSTRAINT teacher_subjects_school_id_fkey;
 ALTER TABLE public.admission_applications VALIDATE CONSTRAINT admission_applications_class_school_fk;
 ALTER TABLE public.admission_applications VALIDATE CONSTRAINT admission_applications_student_school_fk;
 ALTER TABLE public.assignment_submissions VALIDATE CONSTRAINT assignment_submissions_assignment_school_fk;
