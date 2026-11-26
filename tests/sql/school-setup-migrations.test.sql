@@ -265,40 +265,6 @@ BEGIN
     RAISE EXCEPTION 'combined report-card SELECT policy lost parent/student published-read restrictions';
   END IF;
 
-  SET ROLE authenticated;
-  SET app.school_id = 'school-a';
-  SET app.user_role = 'school_admin';
-  DO $tenant_rls$
-  DECLARE n integer;
-  BEGIN
-    SELECT count(*) INTO n FROM public.report_cards WHERE school_id='school-b';
-    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school report card'; END IF;
-    SELECT count(*) INTO n FROM public.mark_structures WHERE school_id='school-b';
-    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school mark structure'; END IF;
-    SELECT count(*) INTO n FROM public.mark_components WHERE school_id='school-b';
-    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school mark component'; END IF;
-    SELECT count(*) INTO n FROM public.term_status WHERE school_id='school-b';
-    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school term status'; END IF;
-    BEGIN
-      INSERT INTO public.report_cards(id,school_id,student_id) VALUES ('rc-cross-write','school-b','student-b');
-      RAISE EXCEPTION 'school admin inserted a report card into another school';
-    EXCEPTION WHEN insufficient_privilege THEN NULL;
-    END;
-  END
-  $tenant_rls$;
-  RESET ROLE;
-  SET ROLE authenticated;
-  SET app.school_id = 'school-a';
-  SET app.user_role = 'super_admin';
-  DO $super_admin_rls$
-  DECLARE n integer;
-  BEGIN
-    SELECT count(*) INTO n FROM public.report_cards WHERE school_id='school-b';
-    IF n <> 1 THEN RAISE EXCEPTION 'Super Admin lost global report-card visibility'; END IF;
-  END
-  $super_admin_rls$;
-  RESET ROLE;
-
   IF to_regclass('public.idx_attendance_student') IS NOT NULL
      OR to_regclass('public.academic_years_id_school_uidx') IS NOT NULL
      OR to_regclass('public.class_sections_id_school_uidx') IS NOT NULL
@@ -311,5 +277,40 @@ BEGIN
     RAISE EXCEPTION 'duplicate index cleanup did not remove every intended duplicate';
   END IF;
 END $rls_perf$;
+
+SET ROLE authenticated;
+SET app.school_id = 'school-a';
+SET app.user_role = 'school_admin';
+DO $tenant_rls$
+DECLARE n integer;
+BEGIN
+  SELECT count(*) INTO n FROM public.report_cards WHERE school_id='school-b';
+  IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school report card'; END IF;
+  SELECT count(*) INTO n FROM public.mark_structures WHERE school_id='school-b';
+  IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school mark structure'; END IF;
+  SELECT count(*) INTO n FROM public.mark_components WHERE school_id='school-b';
+  IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school mark component'; END IF;
+  SELECT count(*) INTO n FROM public.term_status WHERE school_id='school-b';
+  IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school term status'; END IF;
+  BEGIN
+    INSERT INTO public.report_cards(id,school_id,student_id) VALUES ('rc-cross-write','school-b','student-b');
+    RAISE EXCEPTION 'school admin inserted a report card into another school';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END
+$tenant_rls$;
+RESET ROLE;
+SET ROLE authenticated;
+SET app.school_id = 'school-a';
+SET app.user_role = 'super_admin';
+DO $super_admin_rls$
+DECLARE n integer;
+BEGIN
+  SELECT count(*) INTO n FROM public.report_cards WHERE school_id='school-b';
+  IF n <> 1 THEN RAISE EXCEPTION 'Super Admin lost global report-card visibility'; END IF;
+END
+$super_admin_rls$;
+RESET ROLE;
+
 
 SELECT 'Supabase RLS/index performance migration checks passed' AS result;
