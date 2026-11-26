@@ -756,3 +756,34 @@
     font-size: 13px !important;
   }
 }
+
+
+/* Super Admin mobile: the slide-in drawer replaces the bottom shortcut bar. */
+@media (max-width: 767px) {
+  .super-admin-design main {
+    padding-bottom: 24px !important;
+  }
+  .super-admin-design .schoolos-topbar {
+    align-items: flex-start;
+  }
+  .super-admin-design .schoolos-topbar > :first-child {
+    align-items: flex-start;
+    padding-top: 2px;
+  }
+  .super-admin-design .schoolos-topbar > :first-child > span {
+    align-self: flex-start;
+    margin-top: 1px;
+    line-height: 1.25;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child > div {
+    align-self: flex-start;
+    margin-top: 5px;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child::after {
+    bottom: 7px;
+  }
+  .super-admin-design .schoolos-superadmin-bottom-nav,
+  .super-admin-design .schoolos-mobile-bottom-nav[data-mobile-role="super_admin"] {
+    display: none !important;
+  }
+}
