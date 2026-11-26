@@ -324,7 +324,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
           <div className="mt-4"><button className="sw-btn" type="button" disabled={saving} onClick={() => void saveReferenceProfile()}>{saving ? 'Kaydinaya…' : 'Kaydi School Profile'}</button></div>
         </section>}
         {current.id === 'year' && <section className="sw-card">
-          <p className="sw-sub">Deji sannad-dugsiyeedka iyo semester-yada adigoo ku jira wizard-ka.</p>
+          <p className="sw-sub">Deji sannad-dugsiyeedka hadda socda iyo laba semester oo taariikhdoodu aan is-dul-saarayn.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Sannad-dugsiyeedka (YYYY/YYYY)', data.academicYear.name, value => patch('academicYear', { ...data.academicYear, name: value }), 'text', '2026/2027')}
             {field('Taariikhda bilowga', data.academicYear.startDate, value => patch('academicYear', { ...data.academicYear, startDate: value }), 'date')}
