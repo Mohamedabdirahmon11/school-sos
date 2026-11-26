@@ -1059,3 +1059,25 @@
   .school-people-parents-page tbody td:last-child { overflow: visible; }
   .school-people-staff-page table { min-width: 0; }
 }
+
+/* Mobile: page headers (Students, Teachers) must grow with their buttons and never overlap the cards below. */
+@media (max-width: 767px) {
+  .school-people-students-page > header,
+  .school-people-teachers-page > header {
+    display: block !important;
+    position: relative !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    contain: none !important;
+    margin-bottom: 14px !important;
+  }
+  .school-people-students-page > header *,
+  .school-people-teachers-page > header > div:not(.pointer-events-none),
+  .school-people-teachers-page > header .flex { position: static !important; transform: none !important; }
+  .school-people-students-page > header .students-header-actions { display: grid !important; gap: 10px !important; margin-top: 14px; }
+  .school-people-students-page > header .students-primary-actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .school-people-students-page > header .students-admit-button { grid-column: 1 / -1; }
+  .school-people-teachers-page > header .flex.flex-wrap { margin-top: 14px; }
+}
