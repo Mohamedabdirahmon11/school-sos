@@ -10,6 +10,7 @@ import {
   sanitizeSchoolSetupProgressUpdate
 } from '../src/server/school-setup.ts';
 import { isSchoolSetupProgressComplete } from '../src/lib/school-setup-navigation.ts';
+import { validateSchoolSetupStep } from '../src/server/school-setup-data.ts';
 
 const school: School = {
   id: 'school-1',
@@ -271,3 +272,47 @@ test('setup readiness matches slash-form academic-year rows to the school hyphen
   assert.equal(findCurrentAcademicYearRecord(records, ''), undefined);
 });
 
+
+
+test('first-time school setup requires the configured academic year to be current', () => {
+  const academicYear = {
+    name: '2026/2027',
+    startDate: '2026-09-01',
+    endDate: '2027-06-30',
+    isCurrent: false
+  };
+  assert.match(
+    validateSchoolSetupStep(2, { academicYear }) || '',
+    /must be marked as the current academic year/
+  );
+  assert.equal(
+    validateSchoolSetupStep(2, { academicYear: { ...academicYear, isCurrent: true } }),
+    null
+  );
+});
+
+test('first-time school setup rejects semesters entered in reverse chronological order', () => {
+  const academicYear = {
+    name: '2026/2027',
+    startDate: '2026-09-01',
+    endDate: '2027-06-30',
+    isCurrent: true
+  };
+  const reversedTerms = [
+    { name: 'Semester 2', startDate: '2027-02-01', endDate: '2027-06-20' },
+    { name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-20' }
+  ];
+  assert.match(
+    validateSchoolSetupStep(3, { terms: reversedTerms }, { academicYear }) || '',
+    /Semester 1 must be earlier than Semester 2/
+  );
+  assert.equal(
+    validateSchoolSetupStep(3, {
+      terms: [
+        { name: 'Semester 1', startDate: '2026-09-01', endDate: '2027-01-20' },
+        { name: 'Semester 2', startDate: '2027-02-01', endDate: '2027-06-20' }
+      ]
+    }, { academicYear }),
+    null
+  );
+});
