@@ -282,8 +282,11 @@ const AppContent: React.FC = () => {
             {activeView === 'sch_teacher_assignments' && (
               <TeacherAssignmentsView onNavigate={handleNavigate} />
             )}
-            {['sch_timetable', 'sch_marks', 'sch_exams'].includes(activeView) && (
+            {['sch_timetable', 'sch_marks'].includes(activeView) && (
               <AcademicsWorkspace activeView={activeView} onNavigate={handleNavigate} />
+            )}
+            {(activeView === 'sch_exams' || activeView === 'sch_marks_approval') && (
+              <ExamsResultsView initialTab={activeView === 'sch_marks_approval' ? 'approval' : 'marks'} />
             )}
             {activeView === 'sch_attendance' && (
               <AttendanceView />
