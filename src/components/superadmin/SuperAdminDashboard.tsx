@@ -3,6 +3,7 @@
  * Metrics, 6-month SaaS revenue chart, subscription distribution, and Needs Attention triage
  */
 
+import './super-admin-mobile.css';
 import React, { useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { formatMoney } from '../../lib/money.ts';
