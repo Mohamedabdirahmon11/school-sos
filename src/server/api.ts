@@ -12562,6 +12562,7 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     const termRows = (assignments.data || []).filter((x: any) =>
       x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && termId && aliasTermIds.has(x.term_id)
     );
+    termRows.sort((a: any, b: any) => Number(b.term_id === termId) - Number(a.term_id === termId));
     const rowsByClassSubject = new Map<string, any[]>();
     for (const row of termRows) {
       const key = `${row.class_id}:${row.subject_id}`;
