@@ -5248,7 +5248,7 @@ main :is(.flex, .inline-flex) > * {
     color: #e5584d; font-size: 15px; font-weight: 650;
   }
   /* dim the page behind */
-  .school-admin-role button[aria-label="Close navigation"] { background: rgba(15,30,30,.45) !important; backdrop-filter: blur(3px); }
+  .school-admin-role button[aria-label="Close navigation"] { background: rgba(15,30,30,.18) !important; backdrop-filter: blur(1px); }
 }
 
 .schoolos-login-page{min-height:100dvh;display:grid;place-items:center;padding:clamp(12px,4vw,40px);background:linear-gradient(135deg,#1688d6,#0868b2 55%,#06467f)}
@@ -5442,8 +5442,8 @@ main :is(.flex, .inline-flex) > * {
     position:fixed;
     z-index:100;
     inset:0 auto 0 0;
-    width:min(88vw,370px) !important;
-    max-width:370px;
+    width:min(72vw,300px) !important;
+    max-width:300px;
     height:100dvh;
     max-height:100dvh;
     flex-basis:auto;
