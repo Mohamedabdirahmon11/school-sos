@@ -1,3 +1,8 @@
+## School Admin uniform phone design (2026-11-26)
+
+- PARTIAL: shared phone-only CSS for page spacing, titles, cards, buttons, headers and tables.
+- NOT DONE: page-by-page visual check in the real app.
+
 ## School Admin phone layout fixes (2026-11-26)
 
 - PARTIAL: phone-only CSS (below 768px) for School Admin dialogs, crowded grids and setup wizard steps.
