@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     root.style.setProperty('--sidebar-background', background);
     root.style.setProperty('--sidebar-text', theme?.textColor || preset?.text || '#ffffff');
     root.style.setProperty('--sidebar-accent', accent);
-    root.style.setProperty('--sidebar-accent-foreground', luminance > 0.42 ? '#111827' : '#ffffff');
+    root.style.setProperty('--sidebar-accent-foreground', luminance > 0.179 ? '#111827' : '#ffffff');
     root.style.setProperty('--sidebar-width', (theme?.width || 250) + 'px');
     root.style.setProperty('--school-ui-zoom', String((theme?.zoom ?? 96) / 100));
     root.style.setProperty('--sidebar-radius', theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px');
