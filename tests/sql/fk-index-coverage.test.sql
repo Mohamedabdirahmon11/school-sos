@@ -3,6 +3,9 @@ CREATE TABLE public.schools (id text PRIMARY KEY);
 INSERT INTO public.schools VALUES ('school-a'),('school-b');
 CREATE TABLE public.classes (id text NOT NULL, school_id text NOT NULL, UNIQUE (id, school_id));
 CREATE TABLE public.students (id text NOT NULL PRIMARY KEY, school_id text NOT NULL);
+CREATE TABLE public.users (id text NOT NULL, school_id text NOT NULL, UNIQUE (id, school_id));
+CREATE TABLE public.class_groups (id text NOT NULL, school_id text NOT NULL, UNIQUE (id, school_id));
+CREATE TABLE public.subjects (id text NOT NULL, school_id text NOT NULL, UNIQUE (id, school_id));
 CREATE UNIQUE INDEX idx_students_id_school_unique ON public.students (id, school_id);
 CREATE UNIQUE INDEX students_id_school_id_parent_link_uidx ON public.students (id, school_id);
 INSERT INTO public.classes VALUES ('class-a','school-a'),('class-b','school-b');
@@ -14,10 +17,37 @@ CREATE TABLE public.child_records (
 );
 CREATE INDEX child_records_school_class_wrong_idx ON public.child_records (school_id, class_id);
 CREATE INDEX child_records_student_only_idx ON public.child_records (student_id);
+
+CREATE TABLE public.class_sections (id text PRIMARY KEY, school_id text NOT NULL, class_id text NOT NULL);
+ALTER TABLE public.class_sections ADD CONSTRAINT class_sections_class_group_school_fk
+  FOREIGN KEY (class_id, school_id) REFERENCES public.class_groups(id, school_id) ON DELETE CASCADE;
+ALTER TABLE public.class_sections ADD CONSTRAINT class_sections_class_school_fkey
+  FOREIGN KEY (class_id, school_id) REFERENCES public.class_groups(id, school_id) ON DELETE CASCADE;
+
+CREATE TABLE public.class_subjects (id text PRIMARY KEY, school_id text NOT NULL, class_id text NOT NULL, subject_id text NOT NULL);
+ALTER TABLE public.class_subjects ADD CONSTRAINT class_subjects_class_school_fk
+  FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE CASCADE;
+ALTER TABLE public.class_subjects ADD CONSTRAINT class_subjects_class_school_fkey
+  FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE CASCADE;
+ALTER TABLE public.class_subjects ADD CONSTRAINT class_subjects_subject_school_fk
+  FOREIGN KEY (subject_id, school_id) REFERENCES public.subjects(id, school_id) ON DELETE CASCADE;
+ALTER TABLE public.class_subjects ADD CONSTRAINT class_subjects_subject_school_fkey
+  FOREIGN KEY (subject_id, school_id) REFERENCES public.subjects(id, school_id) ON DELETE CASCADE;
+
+CREATE TABLE public.parent_students (id text PRIMARY KEY, school_id text NOT NULL, parent_id text NOT NULL, student_id text NOT NULL);
+ALTER TABLE public.parent_students ADD CONSTRAINT parent_students_parent_school_fk
+  FOREIGN KEY (parent_id, school_id) REFERENCES public.users(id, school_id) ON DELETE CASCADE;
+ALTER TABLE public.parent_students ADD CONSTRAINT parent_students_school_parent_fk
+  FOREIGN KEY (parent_id, school_id) REFERENCES public.users(id, school_id) ON DELETE CASCADE;
+ALTER TABLE public.parent_students ADD CONSTRAINT parent_students_student_school_fk
+  FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE CASCADE;
+ALTER TABLE public.parent_students ADD CONSTRAINT parent_students_school_student_fk
+  FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE CASCADE;
 CREATE TABLE public.inventory_items (id text NOT NULL, school_id text NOT NULL, UNIQUE (id, school_id));
 CREATE TABLE public.inventory_transactions (
   id text PRIMARY KEY, school_id text NOT NULL, item_id text NOT NULL,
-  CONSTRAINT inventory_transactions_item_school_fk FOREIGN KEY (item_id, school_id) REFERENCES public.inventory_items(id, school_id)
+  CONSTRAINT inventory_transactions_item_school_fk FOREIGN KEY (item_id, school_id) REFERENCES public.inventory_items(id, school_id),
+  CONSTRAINT inventory_transaction_item_school_fk FOREIGN KEY (item_id, school_id) REFERENCES public.inventory_items(id, school_id)
 );
 CREATE INDEX inventory_transactions_item_school_idx ON public.inventory_transactions (item_id, school_id);
 CREATE INDEX idx_inventory_transactions_item_school_fk ON public.inventory_transactions (item_id, school_id);
@@ -32,6 +62,18 @@ BEGIN
   IF to_regclass('public.idx_students_id_school_unique') IS NULL THEN RAISE EXCEPTION 'constraint-supporting students unique index was removed'; END IF;
   IF to_regclass('public.idx_inventory_transactions_item_school_fk') IS NOT NULL THEN RAISE EXCEPTION 'redundant inventory transaction index was not removed'; END IF;
   IF to_regclass('public.inventory_transactions_item_school_idx') IS NULL THEN RAISE EXCEPTION 'existing inventory FK index was removed'; END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname IN (
+    'class_sections_class_group_school_fk','class_subjects_class_school_fk','class_subjects_subject_school_fk',
+    'inventory_transactions_item_school_fk','parent_students_parent_school_fk','parent_students_student_school_fk'
+  )) THEN RAISE EXCEPTION 'duplicate tenant FK constraint was not removed'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='class_sections_class_school_fkey')
+     OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='class_subjects_class_school_fkey')
+     OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='class_subjects_subject_school_fkey')
+     OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='inventory_transaction_item_school_fk')
+     OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='parent_students_school_parent_fk')
+     OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='parent_students_school_student_fk') THEN
+    RAISE EXCEPTION 'canonical tenant FK constraint was removed';
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid='public.child_records'::regclass AND i.indisvalid AND i.indisready AND i.indnkeyatts>=2 AND left(i.indkey::text,3)='3 2') THEN RAISE EXCEPTION 'correct class_id, school_id index missing'; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid='public.child_records'::regclass AND i.indisvalid AND i.indisready AND i.indnkeyatts>=2 AND left(i.indkey::text,3)='4 2') THEN RAISE EXCEPTION 'correct student_id, school_id index missing'; END IF;
   IF EXISTS (
