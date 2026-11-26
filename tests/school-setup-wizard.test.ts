@@ -224,6 +224,12 @@ test('school setup blocks completion when saved academic year dates disagree wit
 test('school setup accepts a consistent configured academic year and two non-overlapping terms', () => {
   const validYear = {
     ...school,
+    terms: {
+      semester1Start: '2026-09-11',
+      semester1End: '2027-02-22',
+      semester2Start: '2027-03-10',
+      semester2End: '2027-07-22'
+    },
     setupData: {
       academicYear: { name: '2026/2027', startDate: '2026-09-11', endDate: '2027-07-22', isCurrent: true },
       terms: [
