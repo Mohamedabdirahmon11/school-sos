@@ -38,6 +38,19 @@ BEGIN
   IF (SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='assignment_submissions' AND column_name='school_id') <> 'NO' THEN
     RAISE EXCEPTION 'assignment_submissions.school_id must be NOT NULL';
   END IF;
+  IF to_regclass('public.idx_admission_applications_student_school_fk') IS NULL
+     OR to_regclass('public.idx_assignment_submissions_assignment_school_fk') IS NULL
+     OR to_regclass('public.idx_assignments_subject_school_fk') IS NULL
+     OR to_regclass('public.idx_assignments_teacher_school_fk') IS NULL
+     OR to_regclass('public.idx_fee_payments_structure_school_fk') IS NULL
+     OR to_regclass('public.idx_form_teacher_comments_teacher_school_fk') IS NULL
+     OR to_regclass('public.idx_staff_members_user_school_fk') IS NULL
+     OR to_regclass('public.idx_student_invoice_items_structure_school_fk') IS NULL
+     OR to_regclass('public.idx_student_marks_subject_school_fk') IS NULL
+     OR to_regclass('public.idx_student_marks_submitter_school_fk') IS NULL
+     OR to_regclass('public.idx_teachers_user_school_fk') IS NULL THEN
+    RAISE EXCEPTION 'a composite foreign-key child index is missing';
+  END IF;
   BEGIN INSERT INTO public.assignments VALUES ('bad-a','school-a','class-b','subject-a','teacher-a-user'); RAISE EXCEPTION 'cross-school assignment accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.attendance_records VALUES ('bad-att','school-a','class-a','student-b','admin-a'); RAISE EXCEPTION 'cross-school attendance accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.fee_payments VALUES ('bad-pay','school-a','student-a','fee-a','invoice-b','admin-a',NULL); RAISE EXCEPTION 'cross-school payment accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
