@@ -75,6 +75,8 @@ export interface SchoolSetupEvidence {
   teacherAssignmentIssues?: string[];
   curriculumClassCoverageReady?: boolean;
   curriculumClassCoverageIssues?: string[];
+  academicRecordsReady?: boolean;
+  academicRecordsIssues?: string[];
 }
 
 export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgress {
@@ -165,7 +167,8 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
     && evidence.teachers.every(teacher => Boolean(teacher.staffId?.trim() && teacher.userId && teacher.hasLogin));
 
   return {
-    1: step(yearReady && datesReady && configuredYearReady, false, 'Set a valid academic year, keep its dates within the two consecutive calendar years in its name, and keep both semesters inside that year without overlap.'),
+    1: step(yearReady && datesReady && configuredYearReady && evidence.academicRecordsReady !== false, false,
+      (evidence.academicRecordsIssues || []).join(' · ') || 'Save the academic year and both semester date ranges to the school academic calendar; keep their dates consistent and non-overlapping.'),
     2: step(profileReady, false, 'Complete the school name, address, city, email, and an international administration WhatsApp number.'),
     3: step(hasActiveClass, false, 'Create at least one active class or section. KG classes are available when your school offers kindergarten.'),
     4: step(evidence.subjectCount > 0 && evidence.curriculumClassCoverageReady !== false, false, evidence.subjectCount === 0 ? 'Add at least one school subject.' : (evidence.curriculumClassCoverageIssues || []).join(' · ') || 'Add subjects to the active class curriculum; every class needs at least one subject.'),
