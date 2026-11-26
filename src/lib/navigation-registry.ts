@@ -33,7 +33,7 @@ export const NAVIGATION_REGISTRY: readonly NavigationRoute[] = [
   { id: 'sa_schools', label: 'Schools', labelKey: 'schools', icon: Building2, roles: platform, group: 'Platform Management', mobile: platform },
   { id: 'sa_plans', label: 'Plans & Billing', labelKey: 'plans_billing', icon: Receipt, roles: platform, group: 'Platform Management' },
   { id: 'sa_users', label: 'Users', labelKey: 'users', icon: Users, roles: platform, group: 'Platform Management', mobile: platform },
-  { id: 'sa_analytics', label: 'Analytics', labelKey: 'analytics', icon: BarChart3, roles: platform, group: 'Platform Management' },
+  { id: 'sa_analytics', label: 'Analytics', labelKey: 'analytics', icon: BarChart3, roles: platform, group: 'Platform Management', mobile: platform },
   { id: 'sa_broadcasts', label: 'Broadcasts', labelKey: 'broadcasts', icon: Radio, roles: platform, group: 'Platform Management' },
   { id: 'sa_support', label: 'Support & Audit', labelKey: 'support_audit', icon: LifeBuoy, roles: platform, group: 'Platform Management' },
   { id: 'sa_settings', label: 'Platform Settings', labelKey: 'platform_settings', icon: Settings, roles: platform, group: 'Platform Management', mobile: platform },
