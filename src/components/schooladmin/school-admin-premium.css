@@ -650,3 +650,110 @@
     flex-basis: 268px !important;
   }
 }
+
+
+/* Compact School Admin desktop sidebar: show more navigation without crowding. */
+@media (min-width: 768px) {
+  .school-admin-role aside.school-admin-sidebar {
+    width: 252px !important;
+    flex: 0 0 252px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar.school-admin-sidebar-collapsed {
+    width: 72px !important;
+    flex-basis: 72px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child {
+    min-height: 70px !important;
+    padding: 10px 14px !important;
+    gap: 10px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:first-child {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 12px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:first-child {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:nth-child(2) {
+    margin-top: 3px !important;
+    font-size: 9px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav {
+    padding: 11px 10px 13px !important;
+    gap: 12px !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav > label {
+    min-height: 38px !important;
+    margin-bottom: 2px !important;
+    padding: 0 10px !important;
+    border-radius: 11px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav > label input {
+    min-height: 36px !important;
+    font-size: 12px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section h2 {
+    margin-bottom: 6px !important;
+    padding: 0 10px 5px !important;
+    font-size: 9px !important;
+    letter-spacing: .13em !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section > div {
+    gap: 2px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button,
+  .school-admin-role aside.school-admin-sidebar > nav section button[aria-current="page"] {
+    min-height: 39px !important;
+    padding: 6px 9px !important;
+    gap: 9px !important;
+    border-radius: 11px !important;
+    font-size: 12.5px !important;
+    line-height: 1.2 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button > span:nth-of-type(1) {
+    width: 21px !important;
+    height: 21px !important;
+    border-radius: 7px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t {
+    padding: 8px 10px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t > div {
+    min-height: 44px !important;
+    padding: 5px 8px !important;
+    border-radius: 11px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t > div > span {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 9px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t p:first-child {
+    font-size: 11px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t p:last-child {
+    font-size: 9px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > button.school-admin-drawer-logout {
+    min-height: 39px !important;
+    margin: 0 10px 10px !important;
+    padding: 0 11px !important;
+    border-radius: 11px !important;
+    font-size: 12px !important;
+  }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .school-admin-role aside.school-admin-sidebar:not(.school-admin-sidebar-collapsed) {
+    width: 232px !important;
+    flex-basis: 232px !important;
+  }
+}
