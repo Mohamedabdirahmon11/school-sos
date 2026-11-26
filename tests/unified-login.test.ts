@@ -59,3 +59,20 @@ test('School Admin profile and forced credential screens use PINs instead of pas
   assert.ok(forcedSource.includes('New School Admin PIN'));
   assert.ok(forcedSource.includes('ApiClient.changePin(pin)'));
 });
+
+
+test('first-login bootstrap challenge does not call /auth/me before PIN or password setup', () => {
+  const authContext = read('../src/context/AuthContext.tsx');
+  const loginStart = authContext.indexOf('const login = async (credentials: any) =>');
+  const loginEnd = authContext.indexOf('\n  const logout =', loginStart);
+  const login = authContext.slice(loginStart, loginEnd);
+
+  assert.ok(login.includes('res.challengeToken && (res.requirePinChange || res.requirePasswordChange)'));
+  assert.ok(login.includes('return res;'));
+  assert.ok(login.indexOf('res.challengeToken &&') < login.indexOf('await refreshUser();'));
+  assert.ok(login.includes('await refreshUser();'));
+  assert.ok(authContext.includes('await ApiClient.getMe()'));
+  assert.ok(authContext.includes('await ApiClient.changePin(newAdminPin, bootstrapToken)') === false);
+  assert.ok(loginView.includes('ApiClient.changePin(newAdminPin, bootstrapToken)'));
+  assert.ok(loginView.includes('ApiClient.changePassword(newAdminPassword, bootstrapToken)'));
+});
