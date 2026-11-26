@@ -130,23 +130,30 @@ export function buildSchoolSetupChecklist(school: School, evidence: SchoolSetupE
   // Validate the detailed setup record too: legacy school.academicYear only
   // stores the label and can hide an end date that extends into the wrong year.
   const setupData = (school as any).setupData;
+  const hasDetailedSetup = Boolean(setupData && typeof setupData === 'object'
+    && ('academicYear' in setupData || 'terms' in setupData));
   const configuredYear = setupData?.academicYear;
   const configuredTerms = setupData?.terms;
-  const configuredYearReady = !configuredYear || (() => {
+  const configuredYearReady = !hasDetailedSetup || (() => {
+    if (!configuredYear) return false;
     const name = String(configuredYear.name || '');
     const match = /^(\d{4})\/(\d{4})$/.exec(name);
     if (!match || Number(match[2]) !== Number(match[1]) + 1
       || !validDate(configuredYear.startDate) || !validDate(configuredYear.endDate)
       || configuredYear.startDate >= configuredYear.endDate
       || Number(configuredYear.startDate.slice(0, 4)) !== Number(match[1])
-      || Number(configuredYear.endDate.slice(0, 4)) !== Number(match[2])) return false;
-    if (!Array.isArray(configuredTerms)) return false;
-    if (configuredTerms.length !== 2 || configuredTerms.some((term: any) =>
+      || Number(configuredYear.endDate.slice(0, 4)) !== Number(match[2])
+      || String(school.academicYear || '') !== name.replace('/', '-')) return false;
+    if (!Array.isArray(configuredTerms) || configuredTerms.length !== 2 || configuredTerms.some((term: any) =>
       !String(term.name || '').trim() || !validDate(term.startDate) || !validDate(term.endDate)
       || term.startDate >= term.endDate || term.startDate < configuredYear.startDate
       || term.endDate > configuredYear.endDate)) return false;
     const ordered = [...configuredTerms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
-    return ordered[0].endDate < ordered[1].startDate;
+    return ordered[0].endDate < ordered[1].startDate
+      && ordered[0].startDate === terms.semester1Start
+      && ordered[0].endDate === terms.semester1End
+      && ordered[1].startDate === terms.semester2Start
+      && ordered[1].endDate === terms.semester2End;
   })();
   const normalizedNames = evidence.classNames.map(name => name.trim()).filter(Boolean);
   const hasActiveClass = normalizedNames.length > 0;
