@@ -70,6 +70,12 @@ const AppContent: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedIDCardStudent, setSelectedIDCardStudent] = useState<any | null>(null);
 
+  // Load the Super Admin mobile design for every Super Admin route, not only the dashboard.
+  React.useEffect(() => {
+    if (user?.role !== 'super_admin' || inspectedSchool) return;
+    void import('./components/superadmin/super-admin-mobile.css');
+  }, [user?.role, inspectedSchool?.id]);
+
   React.useEffect(() => {
     const onApiError = (event: Event) => {
       const detail = (event as CustomEvent<{ status: number; message: string; code?: string }>).detail;
