@@ -176,7 +176,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     setSaving(true); setError(null);
     try {
       const section: Partial<SchoolSetupData> = step === 1 ? { schoolInformation: data.schoolInformation }
-        : step === 2 ? { academicYear: data.academicYear }
+        : step === 2 ? { academicYear: { ...data.academicYear, isCurrent: true } }
         : step === 3 ? { terms: data.terms }
         : step === 4 ? { calendar: data.calendar }
         : { workingHours: data.workingHours };
@@ -222,7 +222,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   const saveReferenceYear = async () => {
     setSaving(true); setError(null);
     try {
-      const yearResult = await ApiClient.saveSchoolSetupStep(2, { academicYear: data.academicYear });
+      const yearResult = await ApiClient.saveSchoolSetupStep(2, { academicYear: { ...data.academicYear, isCurrent: true } });
       const termsResult = await ApiClient.saveSchoolSetupStep(3, { terms: data.terms });
       setData(termsResult.data || yearResult.data);
       setSaved(termsResult.data.completedSteps || yearResult.data.completedSteps || []);
@@ -329,7 +329,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
             {field('Sannad-dugsiyeedka (YYYY/YYYY)', data.academicYear.name, value => patch('academicYear', { ...data.academicYear, name: value }), 'text', '2026/2027')}
             {field('Taariikhda bilowga', data.academicYear.startDate, value => patch('academicYear', { ...data.academicYear, startDate: value }), 'date')}
             {field('Taariikhda dhammaadka', data.academicYear.endDate, value => patch('academicYear', { ...data.academicYear, endDate: value }), 'date')}
-            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={data.academicYear.isCurrent} onChange={event => patch('academicYear', { ...data.academicYear, isCurrent: event.target.checked })} /> Sannad-dugsiyeedka hadda socda</label>
+            <p className="text-sm font-medium text-slate-600">Sannad-dugsiyeedkan waxaa loo kaydinayaa sannadka hadda socda.</p>
           </div>
           <h3 className="mt-5 mb-2 font-semibold">Semesters / Terms</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
