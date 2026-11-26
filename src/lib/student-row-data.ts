@@ -3,19 +3,41 @@ export type StudentRowLike = {
   classId?: string | null;
   class_id?: string | null;
   className?: string | null;
+  class_name?: string | null;
   section?: string | null;
   gender?: string | null;
   status?: string | null;
+  student_status?: string | null;
   fatherPhone?: string | null;
   father_phone?: string | null;
   motherPhone?: string | null;
   mother_phone?: string | null;
+  enrollment?: { classId?: string | null; class_id?: string | null; className?: string | null } | null;
 };
 
 export type StudentClassLike = {
   id: string;
   name: string;
   section?: string | null;
+  gradeLevel?: number;
+  grade_level?: number;
+};
+
+type FeeStructureLike = {
+  id?: string;
+  name?: string;
+  feeType?: string;
+  fee_type?: string;
+  isActive?: boolean;
+  is_active?: boolean;
+  classId?: string | null;
+  class_id?: string | null;
+  minGrade?: number;
+  min_grade?: number;
+  maxGrade?: number;
+  max_grade?: number;
+  academicYear?: string;
+  academic_year?: string;
 };
 
 export function normalizeStudentPhone(value: unknown): string {
@@ -61,16 +83,48 @@ export function resolveStudentStatus(value: unknown): 'active' | 'inactive' | 't
   return 'active';
 }
 
+const normalizedLabel = (value: unknown) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 export function resolveStudentClassName(
   student: StudentRowLike,
   classes: StudentClassLike[]
 ): string {
-  const supplied = String(student.className ?? '').trim();
+  const supplied = String(student.className ?? student.class_name ?? '').trim();
   if (supplied && supplied.toLowerCase() !== 'not assigned') return supplied;
-  const classId = String(student.classId || student.class_id || '').trim();
-  const klass = classes.find(item => item.id === classId);
+  const classId = String(student.classId || student.class_id || student.enrollment?.classId || student.enrollment?.class_id || '').trim();
+  const klass = classes.find(item => String(item.id) === classId)
+    || classes.find(item => normalizedLabel([item.name, item.section].filter(Boolean).join(' · ')) === normalizedLabel(supplied));
   if (!klass) return 'Not assigned';
   return [klass.name, klass.section || student.section].filter(Boolean).join(' · ');
+}
+
+export function resolveStudentFeeStructure(
+  student: StudentRowLike,
+  classes: StudentClassLike[],
+  structures: FeeStructureLike[],
+  academicYear?: string
+): FeeStructureLike | undefined {
+  const classId = String(student.classId || student.class_id || student.enrollment?.classId || student.enrollment?.class_id || '').trim();
+  const suppliedClassName = String(student.className ?? student.class_name ?? student.enrollment?.className ?? '').trim();
+  const klass = classes.find(item => String(item.id) === classId)
+    || classes.find(item => normalizedLabel([item.name, item.section].filter(Boolean).join(' · ')) === normalizedLabel(suppliedClassName));
+  const resolvedClassId = classId || String(klass?.id || '');
+  const grade = Number(klass?.gradeLevel ?? klass?.grade_level ?? (suppliedClassName.match(/(?:grade|g)\s*(\d+)/i)?.[1] || NaN));
+  const year = String(academicYear || '').trim();
+  return structures
+    .filter(item => {
+      const feeType = String(item.feeType ?? item.fee_type ?? '').toLowerCase();
+      const active = item.isActive ?? item.is_active;
+      const feeYear = String(item.academicYear ?? item.academic_year ?? '').trim();
+      if (feeType !== 'monthly_tuition' || active === false) return false;
+      if (feeYear && year && feeYear !== year) return false;
+      const feeClassId = String(item.classId || item.class_id || '').trim();
+      if (feeClassId) return Boolean(resolvedClassId) && feeClassId === resolvedClassId;
+      const minGrade = Number(item.minGrade ?? item.min_grade);
+      const maxGrade = Number(item.maxGrade ?? item.max_grade);
+      return Number.isFinite(grade) && Number.isFinite(minGrade) && Number.isFinite(maxGrade) && grade >= minGrade && grade <= maxGrade;
+    })
+    .sort((a, b) => Number(Boolean(b.classId || b.class_id)) - Number(Boolean(a.classId || a.class_id)))[0];
 }
 
 export function resolvePrimaryGuardianPhone(rows: unknown): string {

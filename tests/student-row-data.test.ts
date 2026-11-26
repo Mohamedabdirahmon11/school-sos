@@ -7,6 +7,7 @@ import {
   resolveStudentClassName,
   resolveStudentGender,
   resolveStudentParentPhone,
+  resolveStudentFeeStructure,
   resolveStudentStatus
 } from '../src/lib/student-row-data.ts';
 
@@ -57,4 +58,29 @@ test('student reconciliation migration is additive, tenant-scoped, and never ove
   assert.match(migration, /e\.school_id = s\.school_id/);
   assert.match(migration, /ON CONFLICT DO NOTHING/);
   assert.doesNotMatch(migration, /\bDELETE\s+FROM\s+public\.(students|enrollments|fee_payments|student_invoices)\b/i);
+});
+
+
+test('student directory mapping accepts API camelCase and database snake_case fields', () => {
+  const student = {
+    class_id: 'class-1', class_name: 'Grade 1 · A',
+    gender: 'male', student_status: 'active',
+    father_phone: '+251923711591'
+  };
+  assert.equal(resolveStudentClassName(student, [{ id: 'class-1', name: 'Grade 1', section: 'A' }]), 'Grade 1 · A');
+  assert.equal(resolveStudentGender(student.gender), 'Male');
+  assert.equal(resolveStudentStatus(student.student_status), 'active');
+  assert.equal(resolveStudentParentPhone(student), '+251923711591');
+});
+
+test('fee structure lookup matches by class ID or class label and grade range', () => {
+  const classes = [{ id: 'class-1', name: 'Grade 1', section: 'A', gradeLevel: 1 }];
+  const structures = [
+    { id: 'grade-fee', fee_type: 'monthly_tuition', is_active: true, min_grade: 1, max_grade: 4, name: 'Primary tuition' },
+    { id: 'other-fee', feeType: 'monthly_tuition', isActive: true, classId: 'class-2', name: 'Other class' }
+  ];
+  assert.equal(resolveStudentFeeStructure({ class_id: 'class-1' }, classes, structures)?.id, 'grade-fee');
+  assert.equal(resolveStudentFeeStructure({ className: 'Grade 1 · A' }, classes, structures)?.id, 'grade-fee');
+  assert.equal(resolveStudentFeeStructure({ classId: 'class-2' }, classes, structures)?.id, 'other-fee');
+  assert.equal(resolveStudentFeeStructure({ className: 'Grade 9 · A' }, [], structures), undefined);
 });
