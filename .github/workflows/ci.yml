@@ -596,6 +596,35 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  fk-index-coverage-sql:
+    name: Foreign-key index coverage and duplicate cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schoolos_fk_index_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d schoolos_fk_index_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run FK index coverage migration integration checks
+        env:
+          PGPASSWORD: postgres
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql "postgresql://postgres:postgres@localhost:5432/schoolos_fk_index_test" -v ON_ERROR_STOP=1 -f tests/sql/fk-index-coverage.test.sql
+
   multischool-composite-fk-sql:
     name: Multi-school composite foreign-key isolation
     runs-on: ubuntu-latest
