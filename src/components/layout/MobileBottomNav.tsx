@@ -51,7 +51,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   }
 
   if (isSchoolAdmin) {
-    const shortLabels: Record<string, string> = { sch_dashboard: 'Home', sch_students: 'Students', sch_teachers: 'Teachers', sch_attendance: 'Attendance', sch_classes: 'Classes' };
+    const shortLabels: Record<string, string> = { sch_dashboard: 'Home', sch_students: 'Students', sch_teachers: 'Teachers', sch_attendance: 'Attend', sch_classes: 'Classes' };
     return (
       <nav
         aria-label="School Admin quick navigation"
