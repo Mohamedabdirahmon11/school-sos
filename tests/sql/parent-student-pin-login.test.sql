@@ -87,6 +87,14 @@ BEGIN
   VALUES ('new-parent','pin-school-a','parent','New Parent',ARRAY['new-child-1'],'scrypt:hash');
   SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-parent';
   IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'New parent account must require first-login PIN rotation.'; END IF;
+  -- Once the parent has selected a permanent PIN, a later UPSERT must not
+  -- force first-login rotation again.
+  UPDATE public.users SET must_change_password=false WHERE id='new-parent';
+  INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,pin_hash,must_change_password)
+  VALUES ('new-parent','pin-school-a','parent','New Parent Updated',ARRAY['new-child-1'],'scrypt:hash',false)
+  ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name, must_change_password=EXCLUDED.must_change_password;
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-parent';
+  IF v_rotation IS DISTINCT FROM false THEN RAISE EXCEPTION 'Parent UPSERT must not re-enable first-login PIN rotation.'; END IF;
   UPDATE public.users SET linked_student_ids=ARRAY['new-child-1','new-child-2'] WHERE id='new-parent';
   INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,pin_hash)
   VALUES ('second-parent','pin-school-a','parent','Second Parent',ARRAY['new-child-1'],'scrypt:hash');
