@@ -65,6 +65,7 @@ VALUES ('legacy-parent','pin-school-a','parent','Legacy Parent',ARRAY['legacy-ch
 -- Re-running both migrations must be safe and must not duplicate relationship rows.
 \i supabase/migrations/20261123083200_parent_student_accounts.sql
 \i supabase/migrations/20261123090000_bulk_pin_reset_rotation.sql
+\i supabase/migrations/20261126141321_20261126150000_fix_student_portal_pin_login.sql
 
 DO $$
 DECLARE
@@ -86,6 +87,14 @@ BEGIN
   VALUES ('new-parent','pin-school-a','parent','New Parent',ARRAY['new-child-1'],'scrypt:hash');
   SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-parent';
   IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'New parent account must require first-login PIN rotation.'; END IF;
+  -- Once the parent has selected a permanent PIN, a later UPSERT must not
+  -- force first-login rotation again.
+  UPDATE public.users SET must_change_password=false WHERE id='new-parent';
+  INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,pin_hash,must_change_password)
+  VALUES ('new-parent','pin-school-a','parent','New Parent Updated',ARRAY['new-child-1'],'scrypt:hash',false)
+  ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name, must_change_password=EXCLUDED.must_change_password;
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-parent';
+  IF v_rotation IS DISTINCT FROM false THEN RAISE EXCEPTION 'Parent UPSERT must not re-enable first-login PIN rotation.'; END IF;
   UPDATE public.users SET linked_student_ids=ARRAY['new-child-1','new-child-2'] WHERE id='new-parent';
   INSERT INTO public.users(id,school_id,role,full_name,linked_student_ids,pin_hash)
   VALUES ('second-parent','pin-school-a','parent','Second Parent',ARRAY['new-child-1'],'scrypt:hash');
@@ -114,7 +123,14 @@ BEGIN
   INSERT INTO public.users(id,school_id,role,full_name,student_id,pin_hash)
   VALUES ('new-student-user','pin-school-a','student','New Student','ST-0002','scrypt:hash');
   SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-student-user';
-  IF v_rotation IS DISTINCT FROM true THEN RAISE EXCEPTION 'New student account must require first-login PIN rotation.'; END IF;
+  IF v_rotation IS DISTINCT FROM false THEN RAISE EXCEPTION 'A school-issued student PIN must allow direct portal login.'; END IF;
+  -- The storage layer persists rows through INSERT .. ON CONFLICT DO UPDATE.
+  -- An upsert on an existing account must not re-trigger first-login PIN rotation.
+  INSERT INTO public.users(id,school_id,role,full_name,student_id,pin_hash,must_change_password)
+  VALUES ('new-student-user','pin-school-a','student','New Student Updated','ST-0002','scrypt:hash',false)
+  ON CONFLICT (id) DO UPDATE SET full_name=EXCLUDED.full_name, must_change_password=EXCLUDED.must_change_password;
+  SELECT must_change_password INTO v_rotation FROM public.users WHERE id='new-student-user';
+  IF v_rotation IS DISTINCT FROM false THEN RAISE EXCEPTION 'Student UPSERT must not re-enable first-login PIN rotation.'; END IF;
 
   SELECT c.relrowsecurity INTO v_rls
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace

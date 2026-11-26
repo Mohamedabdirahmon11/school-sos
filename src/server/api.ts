@@ -1288,7 +1288,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     // Success -> Clear failed attempts
-    db.handleSuccessfulLogin(targetUser.id);
+    await db.handleSuccessfulLogin(targetUser.id);
     db.clearLoginFailures(lockKey);
     db.clearLoginFailures(ipKey);
     await db.flush();
@@ -1721,10 +1721,18 @@ apiRouter.post('/auth/change-pin', requireAuth, async (req, res) => {
   // browser session remain usable instead of producing a false "Unexpected
   // error" after the credential has already changed.
   const replacementSessionId = await issueSessionCookie(res, updated, req, user.schoolId, retainedChildId);
-  try {
-    await db.revokeUserSessionsExcept(user.id, replacementSessionId);
-  } catch (sessionCleanupError) {
-    console.warn('[auth] PIN changed; old-session cleanup will be retried:', sessionCleanupError instanceof Error ? sessionCleanupError.message : 'Unknown session cleanup error');
+  // Bootstrap challenges are not persisted sessions. Admin PIN-reset flows
+  // already revoke prior portal sessions before issuing the temporary PIN, so
+  // there is nothing to clean up here. Skipping this query also guarantees the
+  // freshly-created replacement session cannot be removed by stale session
+  // snapshots during first-login setup.
+  const isBootstrapSession = String(currentSession?.sessionId || '').startsWith('bootstrap-');
+  if (!isBootstrapSession) {
+    try {
+      await db.revokeUserSessionsExcept(user.id, replacementSessionId);
+    } catch (sessionCleanupError) {
+      console.warn('[auth] PIN changed; old-session cleanup will be retried:', sessionCleanupError instanceof Error ? sessionCleanupError.message : 'Unknown session cleanup error');
+    }
   }
 
   try {
