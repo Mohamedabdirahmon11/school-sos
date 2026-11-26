@@ -5197,52 +5197,56 @@ main :is(.flex, .inline-flex) > * {
   .school-admin-mobile-content { padding-bottom: 110px; }
 }
 
-/* ===== Mobile menu drawer: white slide-in panel, profile on top, simple list, Log out at the bottom ===== */
+/* ===== Mobile menu drawer: slide-in panel that FOLLOWS the school's Appearance colors (white by default) ===== */
 .school-admin-drawer-logout { display: none; }
 @media (max-width: 767px) {
   aside.school-admin-sidebar[data-mobile-open="true"] {
-    background: #fff !important; color: #1f2d3a !important;
-    width: min(80vw, 300px) !important; flex: 0 0 min(80vw, 300px) !important;
+    background: var(--sidebar-background, #fff) !important;
+    color: var(--sidebar-text, #1f2d3a) !important;
+    width: min(82vw, 310px) !important; flex: 0 0 min(82vw, 310px) !important;
     border-radius: 0 28px 28px 0; border: 0 !important;
-    box-shadow: 10px 0 40px rgba(15,45,40,.22) !important;
+    box-shadow: 12px 0 44px rgba(10,25,25,.28) !important;
     padding-top: env(safe-area-inset-top, 0px);
   }
-  aside.school-admin-sidebar[data-mobile-open="true"] * { color: #1f2d3a !important; border-color: #eef2f1 !important; }
-  /* profile block on top (the user card), school header becomes a slim line below it */
+  /* profile card on top */
   aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) {
-    order: -2; background: transparent !important; border: 0 !important; padding: 26px 22px 12px !important;
+    order: -2; background: transparent !important; border: 0 !important; padding: 28px 22px 10px !important;
   }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) > div { flex-direction: column; align-items: flex-start; gap: 10px; padding: 0 !important; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) > div { flex-direction: column; align-items: flex-start; gap: 12px; padding: 0 !important; }
   aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) span.grid {
-    width: 64px !important; height: 64px !important; border-radius: 50% !important;
-    background: linear-gradient(135deg, #6fd0a0, #6aa6cb) !important;
+    width: 68px !important; height: 68px !important; border-radius: 50% !important;
+    background: linear-gradient(135deg, var(--sidebar-accent, #6fd0a0), #6aa6cb) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.18);
   }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) span.grid svg { width: 34px; height: 34px; color: #fff !important; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) p:first-child { font-size: 18px !important; font-weight: 700; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) p:last-child { font-size: 12px !important; color: #19a58f !important; opacity: 1 !important; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child { order: -1; height: auto !important; min-height: 0 !important; padding: 0 22px 8px !important; border: 0 !important; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child > div:not(:has(img)):not(.grid) { display: none; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child .grid { display: none; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child button { top: 14px; right: 14px; }
-  /* simple list */
-  aside.school-admin-sidebar[data-mobile-open="true"] > nav { padding: 6px 12px !important; gap: 4px !important; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > nav > button,
-  aside.school-admin-sidebar[data-mobile-open="true"] > nav > label,
-  aside.school-admin-sidebar[data-mobile-open="true"] > nav section h2 { display: none !important; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) span.grid svg { width: 36px; height: 36px; color: #fff !important; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) p:first-child { font-size: 19px !important; font-weight: 750; letter-spacing: -.01em; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > div:nth-of-type(2) p:last-child { font-size: 12px !important; font-weight: 600; opacity: .7 !important; }
+  /* school logo + name: slim row under the profile */
+  aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child {
+    order: -1; height: auto !important; min-height: 0 !important; margin: 4px 14px 6px; padding: 10px 12px !important;
+    border: 0 !important; border-radius: 16px; background: color-mix(in srgb, currentColor 7%, transparent);
+  }
+  aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child > div:first-of-type { width: 34px; height: 34px; border-radius: 10px; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child button { top: -2px; right: -2px; opacity: .8; }
+  /* search + list */
+  aside.school-admin-sidebar[data-mobile-open="true"] > nav { padding: 6px 12px 10px !important; gap: 6px !important; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > nav > button { display: none !important; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > nav > label { border-radius: 14px !important; min-height: 44px; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > nav section h2 { display: block !important; margin: 12px 12px 4px !important; font-size: 10px !important; letter-spacing: .14em !important; opacity: .55; }
   aside.school-admin-sidebar[data-mobile-open="true"] > nav section button {
     min-height: 46px !important; padding: 8px 14px !important; border: 0 !important; border-radius: 14px !important;
     font-size: 15px !important; font-weight: 500; align-items: center !important; background: transparent !important;
   }
-  aside.school-admin-sidebar[data-mobile-open="true"] > nav section button[aria-current="page"] { background: #e8f6f2 !important; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > nav section button[aria-current="page"] * { color: #0f8f7c !important; font-weight: 700; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > nav section button[aria-current="page"] {
+    background: color-mix(in srgb, var(--sidebar-accent, #19a58f) 18%, transparent) !important; font-weight: 700;
+  }
   aside.school-admin-sidebar[data-mobile-open="true"] > nav section button svg { width: 20px !important; height: 20px !important; }
-  aside.school-admin-sidebar[data-mobile-open="true"] > nav section button > span:last-child:not(:first-child):empty { display: none; }
   /* log out at the bottom */
   aside.school-admin-sidebar[data-mobile-open="true"] .school-admin-drawer-logout {
-    display: flex; align-items: center; gap: 12px; margin: 6px 12px calc(16px + env(safe-area-inset-bottom, 0px)); padding: 12px 14px;
-    border: 0; border-radius: 14px; background: transparent; font-size: 15px; font-weight: 600; flex-shrink: 0;
+    display: flex; align-items: center; gap: 12px; margin: 4px 14px calc(16px + env(safe-area-inset-bottom, 0px)); padding: 13px 14px; flex-shrink: 0;
+    border: 0; border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); border-radius: 0 0 14px 14px; background: transparent;
+    color: #e5584d; font-size: 15px; font-weight: 650;
   }
-  aside.school-admin-sidebar[data-mobile-open="true"] .school-admin-drawer-logout * { color: #d0453a !important; }
   /* dim the page behind */
   .school-admin-role button[aria-label="Close navigation"] { background: rgba(15,30,30,.45) !important; backdrop-filter: blur(3px); }
 }
