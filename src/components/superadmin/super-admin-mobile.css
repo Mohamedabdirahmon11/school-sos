@@ -40,7 +40,7 @@
     font-size: 14px;
     line-height: 1.45;
   }
-  .super-admin-design main > div {
+  .super-admin-design main > div[class*="max-w-"] {
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -246,6 +246,12 @@
     align-items: flex-start;
     flex-wrap: wrap;
     gap: 8px;
+  }
+  .super-admin-design .schoolos-topbar :is(span,p),
+  .super-admin-design aside :is(span,h2) {
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
   }
   .super-admin-design .schoolos-topbar {
     min-height: 58px;
