@@ -498,7 +498,7 @@ export const ClassesSubjectsView: React.FC = () => {
                     onChange={e => setGradeLevel(parseInt(e.target.value, 10))}
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   >
-                    {[0, ...(school?.classLevels?.length ? school.classLevels : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]).filter(level => level !== 0)].map(level => (
+                    {[0, ...Array.from({ length: 12 }, (_, index) => index + 1)].map(level => (
                       <option key={level} value={level}>{level === 0 ? 'KG' : `Grade ${level}`}</option>
                     ))}
                   </select>
