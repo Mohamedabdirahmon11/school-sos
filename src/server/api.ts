@@ -3350,7 +3350,7 @@ apiRouter.post('/classes', requireAuth, requireSchoolAdminOrSuperAdmin, requireS
   const school = (req as any).school as School;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   const gradeLevel = Number(req.body?.gradeLevel);
-  const kindergartenLevel = req.body?.kindergartenLevel == null || req.body.kindergartenLevel === '' ? null : Number(req.body.kindergartenLevel);
+  const kindergartenLevel = (req.body?.kindergartenLevel == null || req.body.kindergartenLevel === '' ? null : Number(req.body.kindergartenLevel)) as 1 | 2 | 3 | null;
   const section = typeof req.body?.section === 'string' ? req.body.section.trim().toUpperCase() : '';
   const academicYear = String(req.body?.academicYear || school.academicYear).trim();
   const [yearStart, yearEnd] = academicYear.split('-').map(Number);
