@@ -5288,37 +5288,17 @@ main :is(.flex, .inline-flex) > * {
 }
 
 
-/* School Admin premium responsive system */
-.school-admin-role{--sa-bg:#f4f7fb;--sa-ink:#17243a;--sa-line:#e5ebf3;background:var(--sa-bg)!important;color:var(--sa-ink)}
-.school-admin-role main{background:var(--sa-bg)!important;color:var(--sa-ink);overflow-x:clip}
-.school-admin-role main h1{font-size:clamp(1.4rem,3vw,2rem)!important;font-weight:800;letter-spacing:-.04em;line-height:1.15}
-.school-admin-role main :is(h2,h3){color:var(--sa-ink);font-weight:750}
-.school-admin-role main :is(p,label,td){overflow-wrap:anywhere}
-.school-admin-role main :is(input,select,textarea){max-width:100%;min-width:0;min-height:44px;border:1px solid #d8e1eb!important;border-radius:11px!important}
+/* School Admin mobile polish */
+.school-admin-role{--sa-bg:#f4f7fb;--sa-ink:#17243a;background:var(--sa-bg)!important;color:var(--sa-ink)}
+.school-admin-role main{background:var(--sa-bg)!important;overflow-x:clip}
+.school-admin-role main h1{font-size:clamp(1.4rem,5vw,2rem)!important;font-weight:800;letter-spacing:-.04em}
+.school-admin-role main :is(input,select,textarea){max-width:100%;min-width:0;min-height:44px;border-radius:11px!important}
 .school-admin-role main :is(button,a,input,select,textarea):focus-visible{outline:3px solid #176b6040;outline-offset:2px}
 .school-admin-role main .overflow-x-auto{max-width:100%;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
-.school-admin-role main table{border-collapse:separate;border-spacing:0}
-.school-admin-role main thead th{background:#f5f8fc;color:#526176;font-size:11px;font-weight:800;white-space:nowrap}
-.school-admin-role main :is([role=dialog],[aria-modal=true]){border-radius:18px;box-shadow:0 20px 60px #0c1d302e}
-.school-admin-role .schoolos-topbar{background:#fffffff0!important;border-color:var(--sa-line)!important;backdrop-filter:blur(14px)}
-.school-admin-role .schoolos-topbar-menu,.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] .schoolos-mobile-menu-action{background:linear-gradient(145deg,#176b60,#278b79)!important}
-.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin]{background:#fffffff2!important;border:1px solid #dce6ef!important;box-shadow:0 12px 34px #12263b26!important;backdrop-filter:blur(18px)}
+.school-admin-role main :is([role=dialog],[aria-modal=true]){border-radius:18px}
+.school-admin-role .schoolos-topbar{background:#fffffff0!important;backdrop-filter:blur(14px)}
+.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin]{background:#fffffff2!important;border:1px solid #dce6ef!important;box-shadow:0 12px 34px #12263b26!important}
 .school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] .schoolos-mobile-quick-action[aria-current=page]{color:#176b60!important;background:#eaf5f1!important}
-@media(max-width:767px){
-.school-admin-role main{padding-bottom:calc(108px + env(safe-area-inset-bottom,0px))!important}
-.school-admin-role main>div:not(.pointer-events-none){padding:14px 12px 22px!important}
-.school-admin-role main :is(input,select,textarea){width:100%;min-height:46px;font-size:16px}
-.school-admin-role main button{min-height:42px;max-width:100%;white-space:normal}
-.school-admin-role main table{min-width:640px}
-.school-admin-role main :is([role=dialog],[aria-modal=true]){width:calc(100vw - 20px)!important;max-height:88dvh;overflow:auto}
-.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin]{left:9px!important;right:9px!important;bottom:calc(7px + env(safe-area-inset-bottom,0px))!important;border-radius:20px!important}
-.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] .schoolos-mobile-quick-action{min-height:50px!important;gap:4px!important}
-.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] .schoolos-mobile-quick-action span{font-size:9px!important;line-height:1.1}
-aside.school-admin-sidebar[data-mobile-open=true]{width:min(86vw,350px)!important;flex-basis:min(86vw,350px)!important}
-}
-@media(max-width:390px){.school-admin-role main>div:not(.pointer-events-none){padding-inline:10px!important}.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin]{left:7px!important;right:7px!important}}
-:root[data-theme=dark] .school-admin-role,.dark .school-admin-role{--sa-bg:#101a19;--sa-ink:#edf5f1;--sa-line:#2d403b;color:var(--sa-ink)}
-:root[data-theme=dark] .school-admin-role main .bg-white,.dark .school-admin-role main .bg-white{background:#172321!important;color:var(--sa-ink)!important;border-color:var(--sa-line)!important}
-:root[data-theme=dark] .school-admin-role main :is(input,select,textarea),.dark .school-admin-role main :is(input,select,textarea){background:#101a19!important;color:#edf5f1!important}
-:root[data-theme=dark] .school-admin-role .schoolos-topbar,.dark .school-admin-role .schoolos-topbar{background:#13201df0!important}
-@media(prefers-reduced-motion:reduce){.school-admin-role *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
+@media(max-width:767px){.school-admin-role main{padding-bottom:calc(108px + env(safe-area-inset-bottom,0px))!important}.school-admin-role main>div:not(.pointer-events-none){padding:14px 12px 22px!important}.school-admin-role main :is(input,select,textarea){width:100%;min-height:46px;font-size:16px}.school-admin-role main table{min-width:640px}.school-admin-role main :is([role=dialog],[aria-modal=true]){width:calc(100vw - 20px)!important;max-height:88dvh;overflow:auto}.school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin]{left:9px!important;right:9px!important;bottom:calc(7px + env(safe-area-inset-bottom,0px))!important;border-radius:20px!important}aside.school-admin-sidebar[data-mobile-open=true]{width:min(86vw,350px)!important;flex-basis:min(86vw,350px)!important}}
+:root[data-theme=dark] .school-admin-role,.dark .school-admin-role{--sa-bg:#101a19;--sa-ink:#edf5f1;color:var(--sa-ink)}
+:root[data-theme=dark] .school-admin-role main .bg-white,.dark .school-admin-role main .bg-white{background:#172321!important;color:var(--sa-ink)!important}
