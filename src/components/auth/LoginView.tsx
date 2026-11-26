@@ -312,6 +312,7 @@ export const LoginView: React.FC<{ authCheckPending?: boolean }> = ({ authCheckP
         </div>
       </div>
       </div>
+      </div>
       {/* Forgot Password Modal */}
     </div>
   );
