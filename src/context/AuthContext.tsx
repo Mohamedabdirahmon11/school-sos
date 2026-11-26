@@ -146,6 +146,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSchool(res.school);
       setSelectedStudentId(res.selectedStudentId || null);
       setSessionTimeoutMinutes(res.sessionTimeoutMinutes || 60);
+    } else if (res.challengeToken && (res.requirePinChange || res.requirePasswordChange)) {
+      // First-login credential setup uses a short-lived bearer challenge and
+      // intentionally has no session cookie yet. Do not call /auth/me until
+      // the new PIN/password has been saved and the server issues a session.
+      return res;
     } else {
       await refreshUser();
     }
