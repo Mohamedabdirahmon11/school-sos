@@ -26,8 +26,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   );
 
   if (role === 'super_admin') {
-    const primaryTabs = tabs.filter(route => ['sa_dashboard', 'sa_schools', 'sa_users'].includes(route.id));
-    const labels: Record<string, string> = { sa_dashboard: 'Home', sa_schools: 'Schools', sa_users: 'Users' };
+    const primaryTabs = tabs.filter(route => ['sa_dashboard', 'sa_schools', 'sa_users', 'sa_analytics'].includes(route.id));
+    const labels: Record<string, string> = { sa_dashboard: 'Home', sa_schools: 'Schools', sa_users: 'Users', sa_analytics: 'Analytics' };
     return (
       <nav aria-label="Super Admin quick navigation" data-mobile-role="super_admin" className="schoolos-mobile-bottom-nav schoolos-superadmin-bottom-nav md:hidden fixed z-40">
         <div className="schoolos-superadmin-bottom-inner">
@@ -43,11 +43,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
               </button>
             );
           })}
-          <button type="button" onClick={isMenuOpen ? onCloseMenu : onOpenMenu} aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={isMenuOpen} aria-haspopup="dialog" className={`schoolos-superadmin-tab schoolos-superadmin-menu-tab ${isMenuOpen ? 'is-active' : ''}`}>
-            {isMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-            <span>Menu</span>
-          </button>
+
         </div>
       </nav>
     );
