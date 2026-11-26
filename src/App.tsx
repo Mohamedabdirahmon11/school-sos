@@ -161,7 +161,7 @@ const AppContent: React.FC = () => {
   const requestedView = setupRequired && currentView === 'default' ? 'sch_setup' : getEffectiveView();
   const activeView = setupRequired
     ? (SCHOOL_SETUP_ALLOWED_VIEWS.has(requestedView) ? requestedView : 'sch_setup')
-    : user.role === 'school_admin' && ['sch_fees', 'sch_payroll'].includes(requestedView) ? 'sch_dashboard'
+    : user.role === 'school_admin' && requestedView === 'sch_payroll' ? 'sch_dashboard'
       : user.role === 'accountant' && (
         (requestedView === 'sch_fees' || requestedView === 'sch_student_invoices') && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
         || requestedView === 'acc_expenses' && !hasStaffNavigationPermission(user.permissions, 'fees_manage')
