@@ -20,7 +20,7 @@ CREATE OR REPLACE FUNCTION public.upsert_teacher_assignment_atomic(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = ''
 AS $function$
 DECLARE
   old_row public.teacher_class_subject_assignments%ROWTYPE;
