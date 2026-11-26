@@ -1094,7 +1094,8 @@
   .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
     display: block !important;
     position: fixed !important;
-    z-index: 1000 !important;
+    /* Keep the mobile drawer/backdrop above the bottom navigation. */
+    z-index: 30 !important;
     left: 10px !important;
     right: 10px !important;
     bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
