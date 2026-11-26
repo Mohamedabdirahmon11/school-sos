@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
-const migration = readFileSync(new URL('../supabase/migrations/060_accountant_expenses_ledger.sql', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../supabase/migrations/20261110072445_accountant_expenses_ledger.sql', import.meta.url), 'utf8');
 const view = readFileSync(new URL('../src/components/accountant/AccountantExpensesView.tsx', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 

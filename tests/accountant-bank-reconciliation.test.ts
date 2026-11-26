@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
-const migration = readFileSync(new URL('../supabase/migrations/061_accountant_payment_channels_bank_reconciliation.sql', import.meta.url), 'utf8');
+const migration = readFileSync(new URL('../supabase/migrations/20261110072459_accountant_payment_channels_bank_reconciliation.sql', import.meta.url), 'utf8');
 const screen = readFileSync(new URL('../src/components/accountant/AccountantBankReconciliationView.tsx', import.meta.url), 'utf8');
 
 test('fee collection accepts only the three supported channels and persists the selected channel', () => {
