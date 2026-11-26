@@ -34,6 +34,6 @@ test('student registration never writes the generated student_code column or del
   assert.doesNotMatch(functionBody, /student_code/);
   assert.doesNotMatch(migration, /\bDELETE\s+FROM\b|\bTRUNCATE\b/i);
   assert.match(functionBody, /SET search_path = ''/);
-  assert.match(functionBody, /REVOKE ALL ON FUNCTION public\.schoolos_create_student/);
-  assert.match(functionBody, /GRANT EXECUTE ON FUNCTION public\.schoolos_create_student\(JSONB\) TO service_role/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.schoolos_create_student/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION public\.schoolos_create_student\(JSONB\) TO service_role/);
 });
