@@ -137,3 +137,14 @@
 :root[data-theme=dark] .school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin],.dark .school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin]{background:rgba(20,35,43,.96)!important;border-color:#2a414b!important}
 :root[data-theme=dark] .school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] button,.dark .school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] button{color:#a9bbc2!important}
 :root[data-theme=dark] .school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] button[aria-current=page],.dark .school-admin-role .schoolos-mobile-bottom-nav[data-mobile-role=school_admin] button[aria-current=page]{background:#1b4140!important;color:#b9f2e6!important}
+
+/* Branded School Admin top bar and drawer identity. */
+.school-admin-role .schoolos-topbar{position:relative;min-height:68px!important;padding:10px clamp(12px,2vw,26px)!important;background:rgba(255,255,255,.92)!important;border-bottom:1px solid #e1eaee!important;box-shadow:0 4px 18px rgba(20,49,61,.035);backdrop-filter:blur(18px)}
+.school-admin-role .schoolos-topbar-menu{width:42px!important;height:42px!important;border-radius:14px!important;background:linear-gradient(145deg,#0b716c,#0e9586)!important;box-shadow:0 6px 16px rgba(8,127,120,.2)}
+.school-admin-role .schoolos-topbar-menu svg{width:21px!important;height:21px!important}
+.school-admin-role aside.school-admin-sidebar>div:first-child{padding:17px 16px!important;border-bottom:1px solid rgba(255,255,255,.1)!important}
+.school-admin-role aside.school-admin-sidebar>div:first-child :is(img,svg){filter:drop-shadow(0 3px 8px rgba(0,0,0,.12))}
+.school-admin-role aside.school-admin-sidebar>div:first-child :is(h1,h2,strong,span){color:#f5fbfc}
+@media(max-width:767px){.school-admin-role .schoolos-topbar{min-height:60px!important;padding:8px 12px!important}.school-admin-role .schoolos-topbar-menu{width:40px!important;height:40px!important}}
+:root[data-theme=dark] .school-admin-role .schoolos-topbar,.dark .school-admin-role .schoolos-topbar{background:rgba(20,35,43,.94)!important;border-color:#2a414b!important}
+:root[data-theme=dark] .school-admin-role .schoolos-topbar :is(span,p),.dark .school-admin-role .schoolos-topbar :is(span,p){color:#e8f2f4}
