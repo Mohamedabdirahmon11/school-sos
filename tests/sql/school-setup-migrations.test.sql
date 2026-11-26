@@ -224,6 +224,7 @@ WITH CHECK (private.auth_user_role()='super_admin' OR school_id=private.auth_sch
 GRANT USAGE ON SCHEMA private TO authenticated;
 GRANT EXECUTE ON FUNCTION private.auth_user_role(), private.auth_school_id(), private.auth_has_term_assignment(varchar,varchar,varchar,uuid,varchar), private.auth_can_access_student(varchar) TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.mark_components, public.mark_structures, public.report_cards, public.term_status TO authenticated;
+GRANT SELECT ON public.teacher_class_subject_assignments TO authenticated;
 
 INSERT INTO public.students(id,school_id) VALUES ('student-a','school-a'),('student-b','school-b');
 INSERT INTO public.mark_structures(id,school_id) VALUES ('ms-a','school-a'),('ms-b','school-b');
