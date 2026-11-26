@@ -47,6 +47,6 @@ test('Parents & Contacts navigation is available to Form Teachers as well as sch
 
 test('School Admin mobile navigation presents exactly five quick actions; the header Menu remains separate', () => {
   assert.deepEqual(getMobileNavigation('school_admin').map(route => route.id), [
-    'sch_dashboard', 'sch_students', 'sch_teachers', 'sch_attendance', 'sch_classes'
+    'sch_dashboard', 'sch_students', 'sch_teachers', 'sch_classes', 'sch_attendance'
   ]);
 });
