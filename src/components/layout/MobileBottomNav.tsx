@@ -102,3 +102,4 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
     </nav>
   );
 };
+
