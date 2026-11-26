@@ -28,13 +28,13 @@ const DEFAULT_DATA: SchoolSetupData = {
 const STEPS = [
   { title: 'School Information', description: 'Confirm the official details and contact information for this school.' },
   { title: 'Academic Year', description: 'Set the academic year and its official start and end dates.' },
-  { title: 'Terms / Semesters', description: 'Create one, two, or three terms for the academic year.' },
+  { title: 'Terms / Semesters', description: 'Create exactly two semesters for the academic year.' },
   { title: 'Academic Calendar', description: 'Choose working days, holidays, and the calendar display used by your school.' },
   { title: 'Working Hours', description: 'Set the daily schedule and the number of teaching periods.' }
 ];
 
 const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; coreSteps?: number[]; optional?: boolean; views?: Array<{ label: string; view: string }> }> = [
-  { id: 1, title: 'Academic Year & Semesters', description: 'Confirm the current academic year and semester dates.', coreSteps: [2, 3] },
+  { id: 1, title: 'Academic Year & Semesters', description: 'Set one current academic year and exactly two non-overlapping semesters.', coreSteps: [2, 3] },
   { id: 2, title: 'School Information & WhatsApp', description: 'Confirm the school profile and administration WhatsApp number.', coreSteps: [1] },
   { id: 3, title: 'Classes & Grades', description: 'Create the school classes and sections. KG 1 and KG 2 are supported.', views: [{ label: 'Open Classes', view: 'sch_classes' }] },
   { id: 4, title: 'Subjects', description: 'Add school subjects and edit Ethiopian primary templates for Grades 1–4, 5–6 and 7–8. New Grade 1–8 classes receive their matching template automatically.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Primary Templates & Curriculum', view: 'sch_curriculum' }] },
@@ -176,7 +176,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
     setSaving(true); setError(null);
     try {
       const section: Partial<SchoolSetupData> = step === 1 ? { schoolInformation: data.schoolInformation }
-        : step === 2 ? { academicYear: data.academicYear }
+        : step === 2 ? { academicYear: { ...data.academicYear, isCurrent: true } }
         : step === 3 ? { terms: data.terms }
         : step === 4 ? { calendar: data.calendar }
         : { workingHours: data.workingHours };
@@ -222,7 +222,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
   const saveReferenceYear = async () => {
     setSaving(true); setError(null);
     try {
-      const yearResult = await ApiClient.saveSchoolSetupStep(2, { academicYear: data.academicYear });
+      const yearResult = await ApiClient.saveSchoolSetupStep(2, { academicYear: { ...data.academicYear, isCurrent: true } });
       const termsResult = await ApiClient.saveSchoolSetupStep(3, { terms: data.terms });
       setData(termsResult.data || yearResult.data);
       setSaved(termsResult.data.completedSteps || yearResult.data.completedSteps || []);
@@ -324,12 +324,12 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
           <div className="mt-4"><button className="sw-btn" type="button" disabled={saving} onClick={() => void saveReferenceProfile()}>{saving ? 'Kaydinaya…' : 'Kaydi School Profile'}</button></div>
         </section>}
         {current.id === 'year' && <section className="sw-card">
-          <p className="sw-sub">Deji sannad-dugsiyeedka iyo semester-yada adigoo ku jira wizard-ka.</p>
+          <p className="sw-sub">Deji sannad-dugsiyeedka hadda socda iyo laba semester oo taariikhdoodu aan is-dul-saarayn.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {field('Sannad-dugsiyeedka (YYYY/YYYY)', data.academicYear.name, value => patch('academicYear', { ...data.academicYear, name: value }), 'text', '2026/2027')}
             {field('Taariikhda bilowga', data.academicYear.startDate, value => patch('academicYear', { ...data.academicYear, startDate: value }), 'date')}
             {field('Taariikhda dhammaadka', data.academicYear.endDate, value => patch('academicYear', { ...data.academicYear, endDate: value }), 'date')}
-            <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={data.academicYear.isCurrent} onChange={event => patch('academicYear', { ...data.academicYear, isCurrent: event.target.checked })} /> Sannad-dugsiyeedka hadda socda</label>
+            <p className="text-sm font-medium text-slate-600">Sannad-dugsiyeedkan waxaa loo kaydinayaa sannadka hadda socda.</p>
           </div>
           <h3 className="mt-5 mb-2 font-semibold">Semesters / Terms</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -460,7 +460,7 @@ export const SchoolSetupWizard: React.FC<Props> = ({ onNavigate, onComplete }) =
         {field('Academic year (e.g. 2026/2027)', data.academicYear.name, v => patch('academicYear', { ...data.academicYear, name: v }), 'text', '2026/2027')}
         {field('Start date', data.academicYear.startDate, v => patch('academicYear', { ...data.academicYear, startDate: v }), 'date')}
         {field('End date', data.academicYear.endDate, v => patch('academicYear', { ...data.academicYear, endDate: v }), 'date')}
-        <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-medium text-slate-700"><input type="checkbox" checked={data.academicYear.isCurrent} onChange={e => patch('academicYear', { ...data.academicYear, isCurrent: e.target.checked })} className="h-4 w-4 accent-teal-700" /> Set as the current academic year</label>
+        <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-600">This onboarding year is saved as the current academic year.</p>
       </div>}
 
       {step === 3 && <div className="space-y-4">

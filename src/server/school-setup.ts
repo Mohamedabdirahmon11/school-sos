@@ -109,6 +109,22 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
   return { currentStep, completedSteps, skippedSteps, completedAt, ...(startedAt ? { startedAt } : {}) };
 }
 
+function academicYearKey(value: unknown): string {
+  const match = /^(\d{4})[/-](\d{4})$/.exec(String(value ?? '').trim());
+  if (!match || Number(match[2]) !== Number(match[1]) + 1) return '';
+  return `${match[1]}${match[2]}`;
+}
+
+/** Match school.academicYear (YYYY-YYYY) to academic_years.name (YYYY/YYYY). */
+export function findCurrentAcademicYearRecord<T extends { name?: unknown; isCurrent?: unknown }>(
+  records: readonly T[],
+  schoolAcademicYear: unknown
+): T | undefined {
+  const expectedKey = academicYearKey(schoolAcademicYear);
+  if (!expectedKey) return undefined;
+  return records.find(record => record.isCurrent === true && academicYearKey(record.name) === expectedKey);
+}
+
 function validDate(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(value + 'T00:00:00.000Z');

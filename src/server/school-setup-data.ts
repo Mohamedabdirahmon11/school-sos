@@ -27,7 +27,8 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   }
   if (step === 2) {
     const y = data.academicYear;
-    if (!y || typeof y.isCurrent !== 'boolean' || !/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
+    if (!y || y.isCurrent !== true) return 'The onboarding academic year must be marked as the current academic year.';
+    if (!/^\d{4}\/\d{4}$/.test(String(y.name || '')) || !validIsoDate(y.startDate) || !validIsoDate(y.endDate) || y.startDate >= y.endDate) return 'Enter a valid academic year and an ordered start/end date.';
     const years = String(y.name).split('/').map(Number);
     if (years[1] !== years[0] + 1) return 'Academic year must contain consecutive years, such as 2026/2027.';
     if (Number(y.startDate.slice(0, 4)) !== years[0] || Number(y.endDate.slice(0, 4)) !== years[1]) {
@@ -39,6 +40,7 @@ export function validateSchoolSetupStep(step: number, data: any, existingData?: 
   if (step === 3) {
     const terms = data.terms;
     if (!Array.isArray(terms) || terms.length !== 2 || terms.some((t: any) => !String(t.name || '').trim() || !validIsoDate(t.startDate) || !validIsoDate(t.endDate) || t.startDate >= t.endDate)) return 'Ku dar laba semester oo keliya, mid kastaana ha lahaado magac iyo taariikho sax ah.';
+    if (terms[0].startDate >= terms[1].startDate) return 'Semester 1 must be earlier than Semester 2.';
     const sorted = [...terms].sort((a: any, b: any) => a.startDate.localeCompare(b.startDate));
     if (sorted.some((t: any, i: number) => i > 0 && sorted[i - 1].endDate >= t.startDate)) return 'Term dates must not overlap.';
     const academicYear = existingData?.academicYear;
