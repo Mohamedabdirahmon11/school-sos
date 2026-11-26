@@ -690,3 +690,95 @@
 .dark .school-admin-role aside.school-admin-sidebar>div.border-t>div{background:#1a3530!important;border-color:#31554e!important}
 :root[data-theme=dark] .school-admin-role aside.school-admin-sidebar>div.border-t p:first-child,
 .dark .school-admin-role aside.school-admin-sidebar>div.border-t p:first-child{color:#e6f4ef!important}
+
+
+/* School Admin mobile-wide polish: consistent page rhythm and no horizontal clipping. */
+@media (max-width: 767px) {
+  .school-admin-role aside.school-admin-sidebar {
+    width: min(78vw, 310px) !important;
+    max-width: 310px !important;
+  }
+  .school-admin-role main {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-x: clip !important;
+  }
+  .school-admin-role main > * { min-width: 0; max-width: 100%; }
+  .school-admin-role main :is(h1) {
+    font-size: clamp(1.25rem, 5vw, 1.65rem) !important;
+    line-height: 1.2 !important;
+    letter-spacing: -.025em !important;
+  }
+  .school-admin-role main :is(h2) {
+    font-size: clamp(1rem, 4vw, 1.2rem) !important;
+    line-height: 1.25 !important;
+  }
+  .school-admin-role main :is(p, label, input, select, textarea, button) {
+    overflow-wrap: anywhere;
+  }
+  .school-admin-role main :is(input, select, textarea) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    font-size: 14px !important;
+  }
+  .school-admin-role main :is(button) {
+    max-width: 100%;
+    touch-action: manipulation;
+  }
+  .school-admin-role main :is(table) {
+    min-width: 620px;
+    font-size: 12px !important;
+  }
+  .school-admin-role main :is(.overflow-x-auto, [class*="overflow-x-scroll"]) {
+    max-width: 100% !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 14px;
+  }
+  .school-admin-role main :is(.grid) {
+    min-width: 0;
+  }
+  .school-admin-role main :is(.grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6, .grid-cols-7) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .school-admin-role main :is(.rounded-xl, .rounded-2xl, .rounded-3xl) {
+    min-width: 0;
+  }
+  .school-admin-role main :is(.p-6, .px-6, .py-6) { padding: 14px !important; }
+  .school-admin-role main :is(.p-8, .px-8, .py-8) { padding: 16px !important; }
+  .school-admin-role main :is(.gap-6, .gap-8) { gap: 12px !important; }
+  .school-admin-role main :is(.space-y-6 > :not([hidden]) ~ :not([hidden])) { margin-top: 14px !important; }
+  .school-admin-role nav.schoolos-schooladmin-bottom-nav {
+    left: 10px !important; right: 10px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    z-index: 60 !important;
+    padding: 6px !important;
+    border-radius: 20px !important;
+  }
+  .school-admin-role .schoolos-schooladmin-bottom-inner {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    min-height: 60px !important;
+    gap: 4px !important;
+  }
+  .school-admin-role .schoolos-schooladmin-tab {
+    min-height: 52px !important;
+    gap: 4px !important;
+    border-radius: 13px !important;
+  }
+  .school-admin-role .schoolos-schooladmin-tab svg {
+    width: 19px !important; height: 19px !important;
+  }
+  .school-admin-role .schoolos-schooladmin-tab span {
+    font-size: 9px !important;
+    letter-spacing: -.01em;
+  }
+}
+@media (max-width: 380px) {
+  .school-admin-role main :is(.grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6, .grid-cols-7) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .school-admin-role main :is(.p-5, .px-5, .py-5) { padding: 12px !important; }
+  .school-admin-role .schoolos-schooladmin-tab span { font-size: 8px !important; }
+}
