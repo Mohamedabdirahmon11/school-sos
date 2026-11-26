@@ -206,6 +206,10 @@ BEGIN
       FOREIGN KEY (submitted_by, school_id) REFERENCES public.users(id, school_id) NOT VALID;
   END IF;
 
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.teacher_unavailability'::regclass AND conname='teacher_unavailability_teacher_school_fk') THEN
+    ALTER TABLE public.teacher_unavailability ADD CONSTRAINT teacher_unavailability_teacher_school_fk
+      FOREIGN KEY (teacher_id, school_id) REFERENCES public.teachers(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.teachers'::regclass AND conname='teachers_user_school_fk') THEN
     ALTER TABLE public.teachers ADD CONSTRAINT teachers_user_school_fk
       FOREIGN KEY (user_id, school_id) REFERENCES public.users(id, school_id) ON DELETE CASCADE NOT VALID;
@@ -256,6 +260,7 @@ ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_class_school_
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_student_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_subject_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_submitter_school_fk;
+ALTER TABLE public.teacher_unavailability VALIDATE CONSTRAINT teacher_unavailability_teacher_school_fk;
 ALTER TABLE public.teachers VALIDATE CONSTRAINT teachers_user_school_fk;
 ALTER TABLE public.staff_members VALIDATE CONSTRAINT staff_members_user_school_fk;
 
