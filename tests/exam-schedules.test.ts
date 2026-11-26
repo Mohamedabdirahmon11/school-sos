@@ -14,6 +14,8 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const storage = readFileSync(new URL('../src/server/storage.ts', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../src/services/api.ts', import.meta.url), 'utf8');
 const ui = readFileSync(new URL('../src/components/schooladmin/ExamsResultsView.tsx', import.meta.url), 'utf8');
+const termMarksUi = readFileSync(new URL('../src/components/schooladmin/TermMarksWorkspace.tsx', import.meta.url), 'utf8');
+const academicsWorkspace = readFileSync(new URL('../src/components/schooladmin/AcademicsWorkspace.tsx', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const termUi = readFileSync(new URL('../src/components/schooladmin/TermExamSchedulingPanel.tsx', import.meta.url), 'utf8');
 const teacherUi = readFileSync(new URL('../src/components/teacher/TeacherPortalView.tsx', import.meta.url), 'utf8');
@@ -139,11 +141,13 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(client.includes('updateExamRoom'));
   assert.ok(client.includes('/exams/schedules'));
   assert.ok(client.includes('updateExamSchedule'));
-  assert.ok(app.includes("activeView === 'sch_exams'") && app.includes("activeView === 'sch_marks_approval' ? 'approval' : 'marks'"), 'The combined Exam Marks & Approval route opens the marks workspace while preserving the legacy approval deep link.');
+  assert.ok(app.includes("['sch_exams', 'sch_marks', 'sch_marks_approval'].includes(activeView)") && app.includes("activeView === 'sch_marks_approval' ? 'approval' : activeView === 'sch_marks' ? 'marks' : 'term_marks'"), 'All marks routes open the combined workspace with Term Marks as the primary tab and preserve the approval deep link.');
   assert.ok(sidebar.includes("item('sch_exams', 'Exam Marks & Approval'") && !sidebar.includes("item('sch_marks',") && !sidebar.includes("item('sch_marks_approval',"), 'Only one combined exam marks navigation item is visible to School Admin.');
-  assert.ok(ui.includes("activeTab === 'approval' ? 'Marks Approval' : 'Marks Entry'"), 'The combined page title follows the selected workflow tab.');
+  assert.ok(ui.includes("activeTab === 'approval' ? 'Marks Approval' : activeTab === 'term_marks' ? 'Term Marks & Report Cards' : 'Marks Register'"), 'The combined page title follows the selected workflow tab.');
   assert.ok(ui.includes('aria-label="Exam marks workflow"'), 'The combined page exposes one accessible workflow switcher.');
-  assert.ok(ui.includes("onClick={() => setActiveTab('marks')}") && ui.includes("onClick={() => setActiveTab('approval')}"), 'School Admin can switch between Marks Entry and Marks Approval without another sidebar item.');
+  assert.ok(ui.includes("onClick={() => setActiveTab('term_marks')}") && ui.includes("onClick={() => setActiveTab('marks')}") && ui.includes("onClick={() => setActiveTab('approval')}"), 'School Admin can switch between Term Marks, the legacy register and approval without another sidebar item.');
+  assert.ok(ui.includes('<TermMarksWorkspace classes={classes} />') && termMarksUi.includes('report_cards'), 'The combined page embeds the component-based Term Marks and Report Cards workflow.');
+  assert.ok(academicsWorkspace.includes('<TimetableView />') && !academicsWorkspace.includes('TermMarksWorkspace') && !academicsWorkspace.includes('Marks Entry'), 'The timetable workspace no longer duplicates marks and report-card navigation.');
   assert.ok(!ui.includes("setActiveTab('schedule')"), 'Exam schedule is intentionally hidden from the simplified Marks workspace until it is redesigned separately.');
   assert.ok(ui.includes('Save schedule draft'));
   assert.ok(ui.includes('Publish & assign seats'));
