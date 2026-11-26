@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 const migration = readFileSync(new URL('../supabase/migrations/058_exam_schedules_and_seating.sql', import.meta.url), 'utf8');
 const rlsMigration = readFileSync(new URL('../supabase/migrations/059_exam_schedule_service_role_policies.sql', import.meta.url), 'utf8');
-const shiftMigration = readFileSync(new URL('../supabase/migrations/060_exam_schedule_shifts.sql', import.meta.url), 'utf8');
+const shiftMigration = readFileSync(new URL('../supabase/migrations/20261115073340_exam_schedule_shifts.sql', import.meta.url), 'utf8');
 const cohortMigration = readFileSync(new URL('../supabase/migrations/061_exam_schedule_mixed_class_groups.sql', import.meta.url), 'utf8');
 const randomizedSeatMigration = readFileSync(new URL('../supabase/migrations/062_exam_schedule_randomized_seating.sql', import.meta.url), 'utf8');
 const roomRegistryMigration = readFileSync(new URL('../supabase/migrations/063_exam_room_registry.sql', import.meta.url), 'utf8');
