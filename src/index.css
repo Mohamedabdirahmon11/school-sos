@@ -5538,3 +5538,12 @@ main :is(.flex, .inline-flex) > * {
     flex-wrap: wrap;
   }
 }
+
+@media (max-width: 767px) {
+  .super-admin-design main :is(input[type="checkbox"],input[type="radio"]) {
+    width: auto;
+    min-width: 16px;
+    min-height: 16px;
+    flex: 0 0 auto;
+  }
+}
