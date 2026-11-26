@@ -585,10 +585,11 @@ async function getNoticeClassIds(schoolId: string, user: User): Promise<string[]
 }
 
 async function getAuthenticatedUser(req: Request, allowBootstrap = false): Promise<User | null> {
-  let token = req.cookies?.schoolos_session;
-  if (!token && req.headers.authorization) {
-    token = req.headers.authorization.replace(/^Bearer\s+/, '').trim();
-  }
+  // An explicit Authorization header (notably the short-lived first-login
+  // PIN challenge) must win over a stale HttpOnly cookie left by an older
+  // session. Otherwise the browser can never complete PIN setup after expiry.
+  const bearerToken = req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
+  const token = bearerToken || req.cookies?.schoolos_session;
   if (!token) return null;
   const cached = authenticatedRequestCache.get(req);
   const bootstrapToken = Boolean(verifySignedSessionToken(token)?.sessionId.startsWith('bootstrap-'));
@@ -656,7 +657,8 @@ async function requireAuth(req: Request, res: Response, next: () => void) {
     res.status(401).json({ error: 'Authentication required. Please sign in.' });
     return;
   }
-  const token = req.cookies?.schoolos_session || req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
+  const bearerToken = req.headers.authorization?.replace(/^Bearer\s+/, '').trim();
+  const token = bearerToken || req.cookies?.schoolos_session;
   const payload = token ? verifySignedSessionToken(token) : null;
   const isBootstrap = Boolean(payload?.sessionId.startsWith('bootstrap-'));
   const superAdminCredentialRoutes = ['/auth/me', '/auth/change-password', '/auth/logout', '/auth/logout-all'];

@@ -8,6 +8,17 @@ const client = read('../src/services/api.ts');
 const portal = read('../src/components/student/StudentPortalView.tsx');
 const styles = read('../src/components/student/student-portal-design.css');
 
+test('first-login PIN challenge bearer token takes precedence over a stale session cookie', () => {
+  const auth = api.slice(api.indexOf('async function getAuthenticatedUser'), api.indexOf('async function loadAuthenticatedUser'));
+  assert.match(auth, /const bearerToken = req\.headers\.authorization\?\.replace/);
+  assert.match(auth, /const token = bearerToken \|\| req\.cookies\?\.schoolos_session/);
+  const middlewareStart = api.indexOf('async function requireAuth');
+  const middlewareEnd = api.indexOf('function ', middlewareStart + 20);
+  const middleware = api.slice(middlewareStart, middlewareEnd > middlewareStart ? middlewareEnd : middlewareStart + 5000);
+  assert.match(middleware, /const bearerToken = req\.headers\.authorization\?\.replace/);
+  assert.match(middleware, /const token = bearerToken \|\| req\.cookies\?\.schoolos_session/);
+});
+
 test('student profile resolves exactly the authenticated school student link', () => {
   const start = api.indexOf("apiRouter.get('/student/me'");
   const end = api.indexOf("apiRouter.get('/students'", start);
