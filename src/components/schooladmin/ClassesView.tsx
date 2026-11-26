@@ -9,7 +9,7 @@ type ShiftSettings = { shiftCount: 1 | 2 };
 type Notice = { kind: 'ok' | 'error'; text: string };
 
 const gradeBand = (grade: number) => grade === 0 ? 'KG' : grade <= 4 ? 'Grade 1–4' : grade <= 6 ? 'Grade 5–6' : grade <= 8 ? 'Grade 7–8' : grade <= 10 ? 'Grade 9–10' : 'Grade 11–12';
-const classLabel = (row: SchoolClass) => `${row.gradeLevel === 0 ? 'KG' : `Grade ${row.gradeLevel}`} · ${row.section || '—'}`;
+const classLabel = (row: SchoolClass) => `${row.gradeLevel === 0 ? `KG${row.kindergartenLevel ?? ''}` : `Grade ${row.gradeLevel}`} · ${row.section || '—'}`;
 const activeClass = (row: SchoolClass) => row.isArchived !== true;
 
 async function fetchAllPages<T>(path: string): Promise<T[]> {
@@ -30,6 +30,7 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   const [capacityDrafts, setCapacityDrafts] = useState<Record<string, string>>({});
   const [shiftSettings, setShiftSettings] = useState<ShiftSettings>({ shiftCount: 1 });
   const [grade, setGrade] = useState(1);
+  const [kindergartenLevel, setKindergartenLevel] = useState<1 | 2 | 3>(1);
   const [section, setSection] = useState('B');
   const [capacity, setCapacity] = useState(String(school?.defaultClassCapacity || 40));
   const [shift, setShift] = useState<1 | 2>(1);
@@ -80,8 +81,9 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   const createClass = async (gradeLevel: number, sectionName: string, classCapacity: number, classShift: 1 | 2) => {
     if (!school?.academicYear) throw new Error('School academic year is not configured.');
     return ApiClient.createClass({
-      name: gradeLevel === 0 ? 'KG' : `Grade ${gradeLevel}`,
+      name: gradeLevel === 0 ? `KG${kindergartenLevel}` : `Grade ${gradeLevel}`,
       gradeLevel,
+      kindergartenLevel: gradeLevel === 0 ? kindergartenLevel : null,
       section: sectionName,
       academicYear: school.academicYear,
       capacity: classCapacity,
@@ -98,7 +100,7 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     if (!cleanSection || cleanSection.length > 2) { setNotice({ kind: 'error', text: 'Section must be 1–2 characters.' }); return; }
     if (!Number.isInteger(classCapacity) || classCapacity < 1 || classCapacity > 200) { setNotice({ kind: 'error', text: 'Capacity must be between 1 and 200.' }); return; }
     if (!school?.academicYear) { setNotice({ kind: 'error', text: 'School academic year is not configured.' }); return; }
-    if (rows.some(row => row.gradeLevel === grade && row.section.trim().toUpperCase() === cleanSection && (row.academicYear || school.academicYear) === school.academicYear)) {
+    if (rows.some(row => row.gradeLevel === grade && Number(row.kindergartenLevel ?? 0) === (grade === 0 ? kindergartenLevel : 0) && row.section.trim().toUpperCase() === cleanSection && (row.academicYear || school.academicYear) === school.academicYear)) {
       setNotice({ kind: 'error', text: `Grade ${grade} · ${cleanSection} already exists.` }); return;
     }
     setBusy(true); setNotice(null);
@@ -198,8 +200,9 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <div className="f">
                 <label htmlFor="ng">Grade</label>
                 <select id="ng" value={grade} onChange={event => setGrade(Number(event.target.value))}>
-                  {[0, ...Array.from({ length: 12 }, (_, index) => index + 1)].map(level => <option key={level} value={level}>{level === 0 ? 'KG' : `Grade ${level}`}</option>)}
+                  {[0, ...Array.from({ length: 12 }, (_, index) => index + 1)].map(level => <option key={level} value={level}>{level === 0 ? 'Kindergarten' : `Grade ${level}`}</option>)}
                 </select>
+                {grade === 0 && <select aria-label="Kindergarten level" value={kindergartenLevel} onChange={event => setKindergartenLevel(Number(event.target.value) as 1 | 2 | 3)}><option value={1}>KG1</option><option value={2}>KG2</option><option value={3}>KG3</option></select>}
               </div>
               <div className="f">
                 <label htmlFor="ns">Section</label>
