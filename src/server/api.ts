@@ -1288,7 +1288,7 @@ apiRouter.post('/auth/login', async (req, res) => {
     }
 
     // Success -> Clear failed attempts
-    db.handleSuccessfulLogin(targetUser.id);
+    await db.handleSuccessfulLogin(targetUser.id);
     db.clearLoginFailures(lockKey);
     db.clearLoginFailures(ipKey);
     await db.flush();
