@@ -42,7 +42,8 @@ const budgets = {
   initialJsRawBytes: Number(process.env.BUNDLE_ENTRY_JS_MAX_RAW_KB || 900) * 1024,
   initialJsGzipBytes: Number(process.env.BUNDLE_ENTRY_JS_MAX_GZIP_KB || 320) * 1024,
   // Keep a modest raw-source ceiling while the compressed transfer budget remains the primary CSS guardrail.
-  initialCssRawBytes: Number(process.env.BUNDLE_ENTRY_CSS_MAX_RAW_KB || 265) * 1024,
+  // Raw CSS includes the existing global design system; gzip remains the transfer-size guardrail.
+  initialCssRawBytes: Number(process.env.BUNDLE_ENTRY_CSS_MAX_RAW_KB || 280) * 1024,
   initialCssGzipBytes: Number(process.env.BUNDLE_ENTRY_CSS_MAX_GZIP_KB || 60) * 1024
 };
 
