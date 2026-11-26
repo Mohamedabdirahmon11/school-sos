@@ -110,7 +110,7 @@ export function normalizeSchoolSetupProgress(value: unknown): SchoolSetupProgres
 }
 
 function academicYearKey(value: unknown): string {
-  const match = /^(\\d{4})[/-](\\d{4})$/.exec(String(value ?? '').trim());
+  const match = /^(\d{4})[/-](\d{4})$/.exec(String(value ?? '').trim());
   if (!match || Number(match[2]) !== Number(match[1]) + 1) return '';
   return `${match[1]}${match[2]}`;
 }
