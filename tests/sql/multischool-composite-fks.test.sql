@@ -80,6 +80,24 @@ BEGIN
   IF (SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='assignment_submissions' AND column_name='school_id') <> 'NO' THEN
     RAISE EXCEPTION 'assignment_submissions.school_id must be NOT NULL';
   END IF;
+  IF to_regclass('public.bank_statement_entries_id_school_uidx') IS NULL
+     OR to_regclass('public.fee_payments_id_school_uidx') IS NULL
+     OR to_regclass('public.school_expenses_id_school_uidx') IS NULL
+     OR to_regclass('public.school_document_templates_id_school_uidx') IS NULL
+     OR to_regclass('public.school_documents_id_school_uidx') IS NULL
+     OR to_regclass('public.staff_roles_id_school_uidx') IS NULL
+     OR to_regclass('public.school_notices_id_school_uidx') IS NULL
+     OR to_regclass('public.idx_promotion_history_class_school_fk') IS NULL
+     OR to_regclass('public.idx_promotion_history_student_school_fk') IS NULL
+     OR to_regclass('public.idx_promotions_class_from_school_fk') IS NULL
+     OR to_regclass('public.idx_promotions_class_to_school_fk') IS NULL
+     OR to_regclass('public.idx_school_documents_class_school_fk') IS NULL
+     OR to_regclass('public.idx_school_documents_student_school_fk') IS NULL
+     OR to_regclass('public.idx_school_documents_template_school_fk') IS NULL
+     OR to_regclass('public.idx_school_notices_class_school_fk') IS NULL
+     OR to_regclass('public.idx_users_branch_school_fk') IS NULL THEN
+    RAISE EXCEPTION 'finance/document/notice tenant indexes are missing';
+  END IF;
   IF to_regclass('public.school_branches_id_school_uidx') IS NULL
      OR to_regclass('public.idx_classes_branch_school_fk') IS NULL
      OR to_regclass('public.idx_class_sections_class_school_fk') IS NULL
