@@ -1,4 +1,6 @@
 \set ON_ERROR_STOP on
+CREATE TABLE public.schools (id varchar PRIMARY KEY);
+INSERT INTO public.schools VALUES ('school-a'),('school-b');
 CREATE TABLE public.users (id varchar PRIMARY KEY, school_id varchar, UNIQUE(id,school_id));
 CREATE TABLE public.classes (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_teacher_id varchar, UNIQUE(id,school_id));
 CREATE TABLE public.students (id varchar PRIMARY KEY, school_id varchar NOT NULL, UNIQUE(id,school_id));
@@ -16,7 +18,9 @@ CREATE TABLE public.form_teacher_comments (id varchar PRIMARY KEY, school_id var
 CREATE TABLE public.student_invoice_items (id varchar PRIMARY KEY, school_id varchar NOT NULL, invoice_id varchar NOT NULL, fee_structure_id varchar);
 CREATE TABLE public.student_marks (id varchar PRIMARY KEY, school_id varchar NOT NULL, class_id varchar NOT NULL, student_id varchar NOT NULL, subject_id varchar NOT NULL, submitted_by varchar, approved_by varchar);
 CREATE TABLE public.staff_members (id varchar PRIMARY KEY, school_id varchar NOT NULL, user_id varchar);
+CREATE TABLE public.teacher_subjects (id varchar PRIMARY KEY, school_id varchar NOT NULL, teacher_id varchar NOT NULL, subject_id varchar NOT NULL);
 
+INSERT INTO public.teacher_subjects VALUES ('ts-a','school-a','teacher-a','subject-a');
 INSERT INTO public.users VALUES ('admin-a','school-a'),('admin-b','school-b'),('teacher-a-user','school-a'),('teacher-b-user','school-b');
 INSERT INTO public.classes VALUES ('class-a','school-a','teacher-a-user'),('class-b','school-b','teacher-b-user');
 INSERT INTO public.students VALUES ('student-a','school-a'),('student-b','school-b');
@@ -40,6 +44,7 @@ BEGIN
   BEGIN INSERT INTO public.student_marks VALUES ('bad-mark','school-a','class-a','student-a','subject-b','admin-a',NULL); RAISE EXCEPTION 'cross-school mark accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.form_teacher_comments VALUES ('bad-comment','school-a','class-a','student-a','teacher-b-user'); RAISE EXCEPTION 'cross-school teacher comment accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.teachers VALUES ('bad-teacher','school-a','teacher-b-user'); RAISE EXCEPTION 'cross-school teacher login accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
+  BEGIN INSERT INTO public.teacher_subjects VALUES ('bad-ts','school-c','teacher-a','subject-a'); RAISE EXCEPTION 'orphan teacher subject school accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.assignment_submissions VALUES ('bad-sub','school-a','assignment-a','student-b'); RAISE EXCEPTION 'cross-school submission accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.admission_applications VALUES ('bad-admission','school-a','class-b',NULL); RAISE EXCEPTION 'cross-school admission class accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
   BEGIN INSERT INTO public.student_invoice_items VALUES ('bad-item','school-a','invoice-b',NULL); RAISE EXCEPTION 'cross-school invoice item accepted'; EXCEPTION WHEN foreign_key_violation THEN NULL; END;
