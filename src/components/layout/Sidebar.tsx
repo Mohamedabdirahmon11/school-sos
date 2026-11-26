@@ -263,9 +263,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
         item('sch_teacher_assignments', 'Teacher Assignments', UserCheck),
         item('sch_timetable', menuT('timetable'), CalendarDays),
         item('sch_attendance', menuT('attendance'), CalendarCheck),
-        item('sch_exams', menuT('exams_results'), FileSpreadsheet),
-        item('sch_marks', 'Marks Entry', FileSpreadsheet),
-        item('sch_marks_approval', 'Marks Approval', ShieldCheck),
+        item('sch_exams', 'Exam Marks & Approval', FileSpreadsheet),
         item('sch_report_cards', menuT('report_cards'), FileText),
         item('sch_promotion', 'Student Progression & Alumni', Award)
       ] },
