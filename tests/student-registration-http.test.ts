@@ -195,11 +195,12 @@ test('student ID and normalized parent phone logins are school-scoped and requir
   assert.equal(weakPin.status, 400);
   const unchangedPin = await changePin(studentResult.challengeToken, temporaryPin);
   assert.equal(unchangedPin.status, 400);
+  const studentPinMirrorBeforeChange = student.pin_hash;
   const studentPinChanged = await changePin(studentResult.challengeToken, '765432');
   assert.equal(studentPinChanged.status, 200);
   assert.equal(studentUser.must_change_password, false);
   assert.equal(verifyPin('765432', studentUser.pin_hash), true);
-  assert.equal(verifyPin('765432', student.pin_hash), true);
+  assert.equal(student.pin_hash, studentPinMirrorBeforeChange); // users.pin_hash is the authoritative login credential.
 
   const parentPinChanged = await changePin(parentResult.challengeToken, '876543');
   assert.equal(parentPinChanged.status, 200);
