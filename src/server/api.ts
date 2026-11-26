@@ -12535,7 +12535,7 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
   try {
     const [years, terms, classes, sections, subjects, teachers, curriculum, assignments, quals] = await Promise.all([
       client.from('academic_years').select('id,name,is_current').eq('school_id', school.id).order('start_date', { ascending: false }),
-      client.from('terms').select('id,name,academic_year_id,is_current').eq('school_id', school.id).order('start_date'),
+      client.from('terms').select('id,name,academic_year_id,is_current,start_date,end_date').eq('school_id', school.id).order('start_date'),
       client.from('classes').select('id,name,section,grade_level,academic_year').eq('school_id', school.id).eq('is_archived', false).order('grade_level').order('name'),
       client.from('class_sections').select('id,class_id,name,legacy_class_id').eq('school_id', school.id).order('sort_order'),
       client.from('subjects').select('id,name,code').eq('school_id', school.id).order('name'),
@@ -12554,13 +12554,40 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
     const visibleClassIds = new Set(visibleClasses.map((x: any) => x.id));
     const visibleSections = (sections.data || []).filter((x: any) => !x.legacy_class_id || visibleClassIds.has(x.legacy_class_id));
     const yearRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && !x.term_id);
-    const termRows = (assignments.data || []).filter((x: any) => x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && termId && x.term_id === termId);
+    const selectedTerm = (terms.data || []).find((x: any) => x.id === termId);
+    const aliasTermIds = new Set((terms.data || [])
+      .filter((x: any) => selectedTerm && x.academic_year_id === yearId
+        && x.start_date === selectedTerm.start_date && x.end_date === selectedTerm.end_date)
+      .map((x: any) => x.id));
+    const termRows = (assignments.data || []).filter((x: any) =>
+      x.academic_year_id === yearId && visibleClassIds.has(x.class_id) && termId && aliasTermIds.has(x.term_id)
+    );
+    termRows.sort((a: any, b: any) => Number(b.term_id === termId) - Number(a.term_id === termId));
+    const rowsByClassSubject = new Map<string, any[]>();
+    for (const row of termRows) {
+      const key = `${row.class_id}:${row.subject_id}`;
+      rowsByClassSubject.set(key, [...(rowsByClassSubject.get(key) || []), row]);
+    }
+    const termAliasConflicts = [...rowsByClassSubject.values()].filter((rows: any[]) => rows.length > 1).map((rows: any[]) => ({
+      classId: rows[0].class_id,
+      subjectId: rows[0].subject_id,
+      assignments: rows.map((row: any) => ({
+        id: row.id, termId: row.term_id,
+        termName: (terms.data || []).find((term: any) => term.id === row.term_id)?.name || 'Term',
+        teacherId: row.teacher_id,
+        teacherName: (teachers.data || []).find((teacher: any) => teacher.id === row.teacher_id)?.full_name || '—'
+      }))
+    }));
+    const effectiveTermRows = [...rowsByClassSubject.values()].map((rows: any[]) =>
+      rows.find((row: any) => row.term_id === termId) || rows[0]
+    );
     const current = [...termRows, ...yearRows.filter((base: any) => !termRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id))];
+    const effectiveCurrent = [...effectiveTermRows, ...yearRows.filter((base: any) => !effectiveTermRows.some((specific: any) => specific.class_id === base.class_id && specific.subject_id === base.subject_id))];
     const cur = (curriculum.data || []).filter((x: any) => visibleClassIds.has(x.class_id));
     const unassigned = cur.filter((x: any) => !current.some((a: any) => a.class_id === x.class_id && a.subject_id === x.subject_id))
       .map((x: any) => ({ classId: x.class_id, subjectId: x.subject_id, periodsPerWeek: Number(x.periods_per_week || 0) }));
     const workload = (teachers.data || []).map((t: any) => {
-      const periods = current.filter((a: any) => a.teacher_id === t.id).reduce((sum: number, a: any) => {
+      const periods = effectiveCurrent.filter((a: any) => a.teacher_id === t.id).reduce((sum: number, a: any) => {
         const row: any = cur.find((c: any) => c.class_id === a.class_id && c.subject_id === a.subject_id);
         return sum + Number(row?.periods_per_week || 0);
       }, 0);
@@ -12572,9 +12599,10 @@ apiRouter.get('/teacher-assignments', requireAuth, requireSchoolContext, async (
       academicYears: years.data || [], terms: terms.data || [], classes: visibleClasses, sections: visibleSections,
       subjects: subjects.data || [], teachers: teachers.data || [], curriculum: cur, assignments: current,
       qualifiedTeacherIdsBySubject: (quals.data || []).reduce((out: any, row: any) => { (out[row.subject_id] ||= []).push(row.teacher_id); return out; }, {}),
-      workload, unassigned, selectedAcademicYearId: yearId, selectedTermId: termId,
+      workload, unassigned, termAliasConflicts, selectedAcademicYearId: yearId, selectedTermId: termId,
       totalClassSubjects: cur.length, assignedCount: cur.length - unassigned.length, unassignedCount: unassigned.length,
-      overloadedCount: workload.filter((x: any) => x.overloaded).length
+      overloadedCount: workload.filter((x: any) => x.overloaded).length,
+      termAliasConflictCount: termAliasConflicts.length
     });
   } catch (error: any) { res.status(503).json({ error: error?.message || 'Qoondeynta lama soo qaadi karin.' }); }
 });
