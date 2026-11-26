@@ -34,7 +34,7 @@ const STEPS = [
 ];
 
 const CHECKLIST_STEPS: Array<{ id: number; title: string; description: string; coreSteps?: number[]; optional?: boolean; views?: Array<{ label: string; view: string }> }> = [
-  { id: 1, title: 'Academic Year & Semesters', description: 'Confirm the current academic year and semester dates.', coreSteps: [2, 3] },
+  { id: 1, title: 'Academic Year & Semesters', description: 'Set one current academic year and exactly two non-overlapping semesters.', coreSteps: [2, 3] },
   { id: 2, title: 'School Information & WhatsApp', description: 'Confirm the school profile and administration WhatsApp number.', coreSteps: [1] },
   { id: 3, title: 'Classes & Grades', description: 'Create the school classes and sections. KG 1 and KG 2 are supported.', views: [{ label: 'Open Classes', view: 'sch_classes' }] },
   { id: 4, title: 'Subjects', description: 'Add school subjects and edit Ethiopian primary templates for Grades 1–4, 5–6 and 7–8. New Grade 1–8 classes receive their matching template automatically.', views: [{ label: 'Open Subjects', view: 'sch_subjects' }, { label: 'Primary Templates & Curriculum', view: 'sch_curriculum' }] },
