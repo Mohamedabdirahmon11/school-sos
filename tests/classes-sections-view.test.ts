@@ -13,7 +13,7 @@ test('Classes & Sections uses live school classes and real active teachers', () 
   assert.doesNotMatch(view, /const TEACH\s*=|localStorage|demo data/i);
 });
 
-test('Grade 1–8 standard creates only missing Section A classes for the configured school year', () => {
+test('Grade 1–12 standard creates only missing Section A classes for the configured school year', () => {
   assert.match(view, /for \(let level = 1; level <= 8; level \+= 1\)/);
   assert.match(view, /createClass\(level, 'A'/);
   assert.match(view, /row\.section\.trim\(\)\.toUpperCase\(\) === 'A'/);
@@ -46,4 +46,12 @@ test('Class table capacity edits persist on blur instead of remaining local-only
   assert.match(view, /capacityDrafts\[row\.id\]/);
   assert.match(view, /onBlur=\{\(\) => void saveCapacity\(row\)\}/);
   assert.match(view, /ApiClient\.updateClass\(row\.id, updates\)/);
+});
+
+
+test('Class creation offers KG and Grades 1–12 with A–D section dropdown', () => {
+  assert.match(view, /Array\.from\(\{ length: 12 \}/);
+  assert.match(view, /level === 0 \? 'KG'/);
+  assert.match(view, /<select id="ns"/);
+  for (const section of ['A', 'B', 'C', 'D']) assert.ok(view.includes(`<option value="${section}">${section}</option>`));
 });
