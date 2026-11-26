@@ -8,7 +8,7 @@ import './academic-setup.css';
 type ShiftSettings = { shiftCount: 1 | 2 };
 type Notice = { kind: 'ok' | 'error'; text: string };
 
-const gradeBand = (grade: number) => grade <= 4 ? 'Grade 1–4' : grade <= 6 ? 'Grade 5–6' : 'Grade 7–8';
+const gradeBand = (grade: number) => grade === 0 ? 'KG' : grade <= 4 ? 'Grade 1–4' : grade <= 6 ? 'Grade 5–6' : grade <= 8 ? 'Grade 7–8' : grade <= 10 ? 'Grade 9–10' : 'Grade 11–12';
 const classLabel = (row: SchoolClass) => `${row.gradeLevel === 0 ? 'KG' : `Grade ${row.gradeLevel}`} · ${row.section || '—'}`;
 const activeClass = (row: SchoolClass) => row.isArchived !== true;
 
