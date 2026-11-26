@@ -51,7 +51,9 @@ test('Class table capacity edits persist on blur instead of remaining local-only
 
 test('Class creation offers KG and Grades 1–12 with A–D section dropdown', () => {
   assert.match(view, /Array\.from\(\{ length: 12 \}/);
-  assert.match(view, /level === 0 \? 'KG'/);
+  assert.match(view, /level === 0 \? 'Kindergarten'/);
+  assert.match(view, /aria-label="Kindergarten level"/);
+  for (const level of ['KG1', 'KG2', 'KG3']) assert.ok(view.includes(level));
   assert.match(view, /<select id="ns"/);
   for (const section of ['A', 'B', 'C', 'D']) assert.ok(view.includes(`<option value="${section}">${section}</option>`));
 });

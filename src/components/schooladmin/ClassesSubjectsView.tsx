@@ -46,6 +46,7 @@ export const ClassesSubjectsView: React.FC = () => {
   const [classCode, setClassCode] = useState('');
   const [classAcademicYear, setClassAcademicYear] = useState(school?.academicYear || '2026-2027');
   const [gradeLevel, setGradeLevel] = useState(0);
+  const [kindergartenLevel, setKindergartenLevel] = useState<1 | 2 | 3>(1);
   const [classShift, setClassShift] = useState<1 | 2>(1);
   const [availableShiftCount, setAvailableShiftCount] = useState<1 | 2>(1);
   const [section, setSection] = useState('');
@@ -136,6 +137,7 @@ export const ClassesSubjectsView: React.FC = () => {
         classCode: classCode.trim().toUpperCase(),
         academicYear: classAcademicYear,
         gradeLevel,
+        kindergartenLevel: gradeLevel === 0 ? kindergartenLevel : null,
         shift: classShift,
         section: section.trim(),
         roomNumber,
@@ -266,7 +268,7 @@ export const ClassesSubjectsView: React.FC = () => {
                 className="inline-flex items-center gap-2 rounded-xl border border-[#CBD5E1] px-3 py-2 text-xs font-semibold text-[#334155] hover:bg-slate-50 disabled:opacity-50">
                 <Upload className="h-4 w-4 text-[#0F766E]" /> {t('bulk_import')}
               </button>
-              <button type="button" onClick={() => { setEditingClass(null); setClassName(''); setClassCode(''); setClassAcademicYear(school?.academicYear || '2026-2027'); setGradeLevel(0); setClassShift(1); setSection(''); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
+              <button type="button" onClick={() => { setEditingClass(null); setClassName(''); setClassCode(''); setClassAcademicYear(school?.academicYear || '2026-2027'); setGradeLevel(0); setKindergartenLevel(1); setClassShift(1); setSection(''); setCapacity(school?.defaultClassCapacity || 40); setFormTeacherId(''); setShowClassModal(true); }}
                 disabled={isReadOnly} className="inline-flex items-center gap-2 rounded-xl bg-[#0F766E] px-3 py-2 text-xs font-semibold text-white hover:bg-[#0D655E] disabled:opacity-50">
                 <Plus className="h-4 w-4" /> Create class
               </button>
@@ -318,7 +320,7 @@ export const ClassesSubjectsView: React.FC = () => {
                               <p className="mt-2 text-[11px] text-slate-600">Form Teacher: <span className="font-semibold text-slate-800">{formTeacher?.fullName || 'Not assigned'}</span></p>
                             </button>
                             <button type="button" disabled={isReadOnly} aria-label={`Edit ${klass.name}`}
-                              onClick={() => { setEditingClass(klass); setClassName(klass.name); setClassCode(klass.classCode || ''); setClassAcademicYear(klass.academicYear || school?.academicYear || '2026-2027'); setGradeLevel(klass.gradeLevel); setClassShift(klass.shift === 2 ? 2 : 1); setSection(klass.section || ''); setRoomNumber(klass.roomNumber || ''); setCapacity(klass.capacity); setMonthlyFee(klass.monthlyFee); setBranchId(klass.branchId || ''); setFormTeacherId(klass.classTeacherId || ''); setShowClassModal(true); }}
+                              onClick={() => { setEditingClass(klass); setClassName(klass.name); setClassCode(klass.classCode || ''); setClassAcademicYear(klass.academicYear || school?.academicYear || '2026-2027'); setGradeLevel(klass.gradeLevel); setKindergartenLevel((klass.kindergartenLevel || 1) as 1 | 2 | 3); setClassShift(klass.shift === 2 ? 2 : 1); setSection(klass.section || ''); setRoomNumber(klass.roomNumber || ''); setCapacity(klass.capacity); setMonthlyFee(klass.monthlyFee); setBranchId(klass.branchId || ''); setFormTeacherId(klass.classTeacherId || ''); setShowClassModal(true); }}
                               className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-white hover:text-[#0F766E] disabled:opacity-50"><Pencil className="h-4 w-4" /></button>
                           </div>
                         </article>
@@ -499,9 +501,10 @@ export const ClassesSubjectsView: React.FC = () => {
                     className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg font-mono"
                   >
                     {[0, ...Array.from({ length: 12 }, (_, index) => index + 1)].map(level => (
-                      <option key={level} value={level}>{level === 0 ? 'KG' : `Grade ${level}`}</option>
+                      <option key={level} value={level}>{level === 0 ? 'Kindergarten' : `Grade ${level}`}</option>
                     ))}
                   </select>
+                  {gradeLevel === 0 && <select aria-label="Kindergarten level" value={kindergartenLevel} onChange={e => setKindergartenLevel(Number(e.target.value) as 1 | 2 | 3)} className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg"><option value={1}>KG1</option><option value={2}>KG2</option><option value={3}>KG3</option></select>}
                 </div>
                 <div>
                   <label className="block font-medium">Shift</label>

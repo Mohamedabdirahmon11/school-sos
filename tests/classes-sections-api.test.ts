@@ -5,7 +5,7 @@ import test from 'node:test';
 const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8');
 
 test('Class create and update enforce school/year/grade/section uniqueness with HTTP 409', () => {
-  assert.match(api, /hasActiveClassIdentityConflict\(existingClasses, \{ academicYear, gradeLevel, section \}\)/);
+  assert.match(api, /hasActiveClassIdentityConflict\(existingClasses, \{ academicYear, gradeLevel, kindergartenLevel, section \}\)/);
   assert.match(api, /hasActiveClassIdentityConflict\(allClasses,[\s\S]*existing\.id\)/);
   assert.ok(api.includes("Grade ${gradeLevel} · Section ${section || '—'}"));
   assert.match(api, /Another active class already uses this school\/year\/grade\/section/);

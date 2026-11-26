@@ -19,6 +19,17 @@ test('class identity uniqueness is case-insensitive and scoped to school/year/gr
   assert.equal(hasActiveClassIdentityConflict(existing, { academicYear: '2026-2027', gradeLevel: 1, section: 'C' }), false);
 });
 
+test('KG1, KG2 and KG3 are separate class identities for the same school year and section', () => {
+  const kgRows = [
+    { id: 'kg1', academicYear: '2026-2027', gradeLevel: 0, kindergartenLevel: 1, section: 'A' },
+    { id: 'kg2', academicYear: '2026-2027', gradeLevel: 0, kindergartenLevel: 2, section: 'A' },
+    { id: 'kg3', academicYear: '2026-2027', gradeLevel: 0, kindergartenLevel: 3, section: 'A' }
+  ];
+  assert.equal(hasActiveClassIdentityConflict(kgRows, { academicYear: '2026-2027', gradeLevel: 0, kindergartenLevel: 1, section: 'A' }), true);
+  assert.equal(hasActiveClassIdentityConflict(kgRows, { academicYear: '2026-2027', gradeLevel: 0, kindergartenLevel: 2, section: 'B' }), false);
+  assert.equal(hasActiveClassIdentityConflict(kgRows, { academicYear: '2026-2027', gradeLevel: 0, kindergartenLevel: 3, section: 'A' }), true);
+});
+
 test('class identity updates exclude their own row', () => {
   assert.equal(hasActiveClassIdentityConflict(existing, { academicYear: '2026-2027', gradeLevel: 1, section: 'A' }, 'c1'), false);
 });

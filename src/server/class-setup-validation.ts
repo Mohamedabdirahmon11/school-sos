@@ -2,6 +2,7 @@ export type ClassIdentityRecord = {
   id: string;
   academicYear?: string;
   gradeLevel: number;
+  kindergartenLevel?: number | null;
   section?: string | null;
   classTeacherId?: string | null;
   isArchived?: boolean;
@@ -10,6 +11,7 @@ export type ClassIdentityRecord = {
 export type ClassIdentityCandidate = {
   academicYear: string;
   gradeLevel: number;
+  kindergartenLevel?: number | null;
   section?: string | null;
 };
 
@@ -27,6 +29,7 @@ export function hasActiveClassIdentityConflict(
     klass.isArchived !== true &&
     String(klass.academicYear ?? '').trim() === year &&
     Number(klass.gradeLevel) === Number(candidate.gradeLevel) &&
+    Number(klass.kindergartenLevel ?? 0) === Number(candidate.kindergartenLevel ?? 0) &&
     normalizeSection(klass.section) === section
   );
 }

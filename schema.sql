@@ -248,6 +248,7 @@ CREATE TABLE IF NOT EXISTS classes (
   class_code VARCHAR(40) NOT NULL,
   academic_year VARCHAR(9) NOT NULL,
   grade_level INTEGER NOT NULL CHECK (grade_level BETWEEN 0 AND 12),
+  kindergarten_level SMALLINT CHECK (kindergarten_level IS NULL OR (grade_level = 0 AND kindergarten_level BETWEEN 1 AND 3)),
   section VARCHAR(20) NOT NULL DEFAULT '',
   room_number VARCHAR(50),
   capacity INTEGER NOT NULL DEFAULT 40,
@@ -264,6 +265,7 @@ ALTER TABLE classes ADD COLUMN IF NOT EXISTS shift SMALLINT NOT NULL DEFAULT 1;
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS normal_exam_shift TEXT NOT NULL DEFAULT 'morning';
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS class_code VARCHAR(40);
 ALTER TABLE classes ADD COLUMN IF NOT EXISTS academic_year VARCHAR(9);
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS kindergarten_level SMALLINT;
 ALTER TABLE classes ALTER COLUMN section SET DEFAULT '';
 UPDATE classes c SET academic_year = s.academic_year FROM schools s WHERE c.school_id = s.id AND c.academic_year IS NULL;
 UPDATE classes SET academic_year = '2026-2027' WHERE academic_year IS NULL;
