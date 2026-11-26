@@ -4,7 +4,7 @@
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, UserCircle2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import { getMobileNavigation, type SchoolOSRole } from '../../lib/navigation-registry.ts';
@@ -55,14 +55,13 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
           })}
           <button
             type="button"
-            onClick={isMenuOpen ? onCloseMenu : onOpenMenu}
-            aria-label={isMenuOpen ? 'Close full navigation menu' : 'Open full navigation menu'}
-            aria-expanded={isMenuOpen}
-            aria-haspopup="dialog"
-            title="Menu"
-            style={{ width: 48, height: 48, margin: '0 auto', display: 'grid', placeItems: 'center', border: 0, borderRadius: '50%', color: '#fff', background: 'linear-gradient(135deg, #6fd0a0 0%, #6aa6cb 100%)', boxShadow: '0 6px 16px rgba(60,150,150,.38)' }}
+            onClick={() => { onCloseMenu?.(); window.dispatchEvent(new Event('schoolos:open-profile')); }}
+            aria-label="Profile"
+            title="Profile"
+            style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 0', background: 'transparent', border: 0, color: '#a3adb5' }}
           >
-            {isMenuOpen ? <X aria-hidden="true" style={{ width: 22, height: 22 }} /> : <Menu aria-hidden="true" style={{ width: 22, height: 22 }} />}
+            <UserCircle2 aria-hidden="true" style={{ width: 23, height: 23, color: '#a3adb5' }} strokeWidth={1.7} />
+            <span style={{ fontSize: 10, fontWeight: 600, lineHeight: 1.1 }}>Profile</span>
           </button>
         </div>
       </nav>

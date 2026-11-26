@@ -23,6 +23,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  useEffect(() => {
+    const openProfile = () => setShowProfileModal(true);
+    window.addEventListener('schoolos:open-profile', openProfile);
+    return () => window.removeEventListener('schoolos:open-profile', openProfile);
+  }, []);
   const subscriptionStatus = school?.subscription?.status;
   const noticesState = useApi(() => ApiClient.getNotices({ pageSize: 8 }), [school?.id, user?.id], Boolean(school && user));
   const unreadNoticesState = useApi(() => ApiClient.getNoticeUnreadCount(), [school?.id, user?.id], Boolean(school && user));
@@ -112,8 +117,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {onOpenMenu && user?.role === 'school_admin' && (
           <button type="button" onClick={onOpenMenu} aria-label="Open full navigation menu" title="Menu"
-            className="schoolos-topbar-menu grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0F766E] text-white shadow-sm active:scale-95 md:hidden">
-            <MenuIcon aria-hidden="true" className="h-5 w-5" />
+            className="schoolos-topbar-menu grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white active:scale-90 md:hidden"
+            style={{ background: 'linear-gradient(135deg, #6fd0a0 0%, #3fa8b8 60%, #6aa6cb 100%)', boxShadow: '0 6px 16px rgba(60,150,160,.40)', transition: 'transform .15s ease' }}>
+            <MenuIcon aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />
           </button>
         )}
         {school && <div title={school.name} className={`grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg md:hidden ${school.logoUrl ? "border border-slate-200 bg-white p-0.5" : ""}`} style={!school.logoUrl ? { backgroundColor: "var(--brand-color)", color: "var(--brand-foreground)" } : undefined}>
