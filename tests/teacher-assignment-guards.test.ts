@@ -10,7 +10,7 @@ test('Teacher assignments canonicalize same-date Term/Semester aliases and block
   const check = api.slice(api.indexOf('async function checkTeacherAssignment'), api.indexOf('async function upsertTeacherAssignment'));
   const upsert = api.slice(api.indexOf('async function upsertTeacherAssignment'), api.indexOf("apiRouter.get('/teacher-assignments'"));
   assert.match(check, /samePeriodTerms/);
-  assert.match(check, /semester\\\\s\*\[12\]/i);
+  assert.match(check, /semester\\s\*\[12\]/i);
   assert.match(check, /termAliasIds\.includes\(String\(row\.term_id\)\)/);
   assert.match(check, /term_alias_ids: termAliasIds/);
   assert.match(upsert, /\.in\('term_id', payload\.term_alias_ids\)/);
