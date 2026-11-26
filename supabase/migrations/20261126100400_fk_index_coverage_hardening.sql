@@ -6,6 +6,14 @@ BEGIN;
 DROP INDEX IF EXISTS public.idx_inventory_transactions_item_school_fk;
 DROP INDEX IF EXISTS public.students_id_school_id_parent_link_uidx;
 
+-- Keep the pre-existing equivalent tenant constraints; remove duplicate copies.
+ALTER TABLE public.class_sections DROP CONSTRAINT IF EXISTS class_sections_class_group_school_fk;
+ALTER TABLE public.class_subjects DROP CONSTRAINT IF EXISTS class_subjects_class_school_fk;
+ALTER TABLE public.class_subjects DROP CONSTRAINT IF EXISTS class_subjects_subject_school_fk;
+ALTER TABLE public.inventory_transactions DROP CONSTRAINT IF EXISTS inventory_transactions_item_school_fk;
+ALTER TABLE public.parent_students DROP CONSTRAINT IF EXISTS parent_students_parent_school_fk;
+ALTER TABLE public.parent_students DROP CONSTRAINT IF EXISTS parent_students_student_school_fk;
+
 DO $fk_indexes$
 DECLARE
   r record;
