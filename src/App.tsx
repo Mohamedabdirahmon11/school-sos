@@ -390,7 +390,7 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Super Admin uses the header-triggered navigation drawer instead of a bottom menu. */}
-      {!setupRequired && !['student', 'parent', 'super_admin'].includes(user.role) && (
+      {!setupRequired && !['student', 'parent'].includes(user.role) && (
         <MobileBottomNav
           currentView={activeView}
           onNavigate={handleNavigate}
