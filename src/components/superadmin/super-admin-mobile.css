@@ -302,3 +302,94 @@
     max-width: 100%;
   }
 }
+
+
+/* Super Admin mobile shell: platform header, navigation drawer and command dashboard. */
+@media (max-width: 767px) {
+  .super-admin-design .schoolos-topbar {
+    min-height:64px;height:64px;padding:8px 12px;gap:8px;background:rgba(255,255,255,.97);
+    border-bottom:1px solid #e5eeec;box-shadow:0 2px 12px rgba(15,45,40,.045);
+  }
+  .super-admin-design .schoolos-topbar > :first-child { gap:9px; }
+  .super-admin-design .schoolos-topbar-menu {
+    width:42px;height:42px;border-radius:13px;background:#0f766e!important;
+    box-shadow:0 5px 14px rgba(15,118,110,.22)!important;
+  }
+  .super-admin-design .schoolos-topbar > :first-child > span {
+    display:block;min-width:0;font-size:13px;line-height:1.3;font-weight:700;color:#183b38;
+    overflow-wrap:normal;word-break:normal;
+  }
+  .super-admin-design .schoolos-topbar > :last-child { gap:3px; }
+  .super-admin-design .schoolos-topbar > :last-child > .relative > button {
+    min-width:38px;min-height:40px;padding:7px;border-radius:11px;
+  }
+  .super-admin-design .schoolos-topbar > :last-child > .relative:first-child > button span { display:none; }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] {
+    width:min(88vw,360px);max-width:360px;padding-bottom:max(8px,env(safe-area-inset-bottom));
+    background:linear-gradient(165deg,#102f2c 0%,#123f3a 54%,#0c2927 100%)!important;
+    border-right:1px solid rgba(255,255,255,.12);box-shadow:18px 0 48px rgba(7,25,23,.28);
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child {
+    height:76px;padding:0 18px;border-bottom-color:rgba(255,255,255,.13);
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] > div:first-child::after {
+    content:"SUPER ADMIN WORKSPACE";display:block;margin-left:auto;color:#a9d9cf;
+    font-size:9px;font-weight:800;letter-spacing:.11em;white-space:nowrap;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] nav { padding:18px 13px 22px;gap:20px; }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] nav label {
+    min-height:46px;border:1px solid rgba(255,255,255,.17);border-radius:13px;background:rgba(255,255,255,.08);
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] nav section h2 {
+    margin:0 0 8px;padding:0 10px;color:#9ccbc2!important;font-size:10px!important;letter-spacing:.14em;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] nav section button {
+    min-height:48px;align-items:center;padding:10px 12px;border-radius:13px!important;
+    font-size:14px!important;line-height:1.3;color:#e7f4f1!important;overflow-wrap:normal;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] nav section button[aria-current="page"] {
+    background:linear-gradient(100deg,#20a58f,#168574)!important;color:white!important;
+    box-shadow:0 7px 18px rgba(5,20,18,.2);
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] nav section button > span:last-of-type {
+    overflow-wrap:normal;word-break:normal;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-open="true"] .school-admin-drawer-logout {
+    min-height:50px;margin:0 14px 8px;padding:0 14px;border:1px solid rgba(255,255,255,.14);
+    border-radius:13px;background:rgba(255,255,255,.08);color:#fff;
+  }
+  .super-admin-design .schoolos-superadmin-bottom-nav {
+    left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));padding:6px;
+    border:1px solid #dce9e6;border-radius:19px;background:rgba(255,255,255,.97);
+    box-shadow:0 9px 30px rgba(12,47,42,.17),0 2px 6px rgba(12,47,42,.06);backdrop-filter:blur(18px);
+  }
+  .super-admin-design .schoolos-superadmin-bottom-inner {
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));min-height:58px;align-items:stretch;gap:3px;
+  }
+  .super-admin-design .schoolos-superadmin-tab {
+    position:relative;display:flex;min-width:0;min-height:56px;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px;padding:5px 2px;border:0;border-radius:13px;background:transparent;
+    color:#758581;font-size:11px;font-weight:700;line-height:1.15;
+  }
+  .super-admin-design .schoolos-superadmin-tab svg { width:21px;height:21px;stroke-width:1.9; }
+  .super-admin-design .schoolos-superadmin-tab span { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .super-admin-design .schoolos-superadmin-tab.is-active { background:#e8f5f2;color:#08796c; }
+  .super-admin-design .schoolos-superadmin-tab.is-active::before {
+    content:"";position:absolute;top:0;width:22px;height:3px;border-radius:0 0 4px 4px;background:#0f9b87;
+  }
+  .super-admin-design main .sa-page { gap:16px; }
+  .super-admin-design main .sa-hero {
+    padding:17px;border:1px solid #dcebe7;border-radius:18px;
+    background:linear-gradient(135deg,#fff 0%,#f0faf7 100%);box-shadow:0 5px 18px rgba(15,75,65,.055);
+  }
+  .super-admin-design main .sa-hero .sa-page-title { font-size:21px!important;line-height:1.2;letter-spacing:-.035em; }
+  .super-admin-design main .sa-hero p { margin-top:6px;font-size:12px!important;line-height:1.45;color:#60736f; }
+  .super-admin-design main .sa-hero button { min-height:44px;border-radius:12px;box-shadow:0 5px 12px rgba(15,118,110,.16); }
+  .super-admin-design main .sa-metric-card { border-color:#e2ece9;border-radius:15px;box-shadow:0 3px 12px rgba(15,45,40,.035); }
+  .super-admin-design main .sa-panel { border-color:#e2ece9;border-radius:16px;box-shadow:0 3px 14px rgba(15,45,40,.035); }
+}
+@media (max-width:380px) {
+  .super-admin-design .schoolos-topbar { padding-left:9px;padding-right:9px; }
+  .super-admin-design .schoolos-topbar > :first-child > span { font-size:12px; }
+  .super-admin-design .schoolos-superadmin-bottom-nav { left:8px;right:8px; }
+}
