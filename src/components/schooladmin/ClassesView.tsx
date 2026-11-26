@@ -9,7 +9,7 @@ type ShiftSettings = { shiftCount: 1 | 2 };
 type Notice = { kind: 'ok' | 'error'; text: string };
 
 const gradeBand = (grade: number) => grade <= 4 ? 'Grade 1–4' : grade <= 6 ? 'Grade 5–6' : 'Grade 7–8';
-const classLabel = (row: SchoolClass) => `Grade ${row.gradeLevel} · ${row.section || '—'}`;
+const classLabel = (row: SchoolClass) => `${row.gradeLevel === 0 ? 'KG' : `Grade ${row.gradeLevel}`} · ${row.section || '—'}`;
 const activeClass = (row: SchoolClass) => row.isArchived !== true;
 
 async function fetchAllPages<T>(path: string): Promise<T[]> {
@@ -80,7 +80,7 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
   const createClass = async (gradeLevel: number, sectionName: string, classCapacity: number, classShift: 1 | 2) => {
     if (!school?.academicYear) throw new Error('School academic year is not configured.');
     return ApiClient.createClass({
-      name: `Grade ${gradeLevel}`,
+      name: gradeLevel === 0 ? 'KG' : `Grade ${gradeLevel}`,
       gradeLevel,
       section: sectionName,
       academicYear: school.academicYear,
@@ -119,7 +119,7 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
     let created = 0;
     let skipped = 0;
     try {
-      for (let level = 1; level <= 8; level += 1) {
+      for (let level = 1; level <= 12; level += 1) {
         const exists = rows.some(row => row.gradeLevel === level && row.section.trim().toUpperCase() === 'A' && (row.academicYear || school.academicYear) === school.academicYear);
         if (exists) { skipped += 1; continue; }
         try {
@@ -131,7 +131,7 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
         }
       }
       await load();
-      setNotice({ kind: 'ok', text: created ? `${created} fasal ayaa lagu daray; ${skipped} hore ayay u jireen.` : 'Grade 1–8 Section A oo dhan way jiraan.' });
+      setNotice({ kind: 'ok', text: created ? `${created} fasal ayaa lagu daray; ${skipped} hore ayay u jireen.` : 'Grade 1–12 Section A oo dhan way jiraan.' });
     } catch (error) {
       await load();
       setNotice({ kind: 'error', text: error instanceof Error ? error.message : 'Standard classes could not be created.' });
@@ -198,12 +198,12 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               <div className="f">
                 <label htmlFor="ng">Grade</label>
                 <select id="ng" value={grade} onChange={event => setGrade(Number(event.target.value))}>
-                  {[1,2,3,4,5,6,7,8].map(level => <option key={level} value={level}>Grade {level}</option>)}
+                  {[0, ...Array.from({ length: 12 }, (_, index) => index + 1)].map(level => <option key={level} value={level}>{level === 0 ? 'KG' : `Grade ${level}`}</option>)}
                 </select>
               </div>
               <div className="f">
                 <label htmlFor="ns">Section</label>
-                <input id="ns" type="text" maxLength={2} value={section} onChange={event => setSection(event.target.value)} style={{ width: 80 }} />
+                <select id="ns" value={section} onChange={event => setSection(event.target.value)}><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
               </div>
               <div className="f">
                 <label htmlFor="nc">Capacity</label>
@@ -218,7 +218,7 @@ export const ClassesView: React.FC<{ onNavigate: (view: string) => void }> = ({ 
               </div>
               <button className="primary" type="submit" disabled={busy || loading}>Add class</button>
               <span className="spacer" />
-              <button type="button" onClick={() => void addStandard()} disabled={busy || loading}>Standard: Grade 1–8</button>
+              <button type="button" onClick={() => void addStandard()} disabled={busy || loading}>Standard: Grade 1–12</button>
             </form>
           )}
           {notice && <div role={notice.kind === 'error' ? 'alert' : 'status'} aria-live="polite" className={`msg ${notice.kind === 'error' ? 'bad' : 'ok'}`}>{notice.text}</div>}
