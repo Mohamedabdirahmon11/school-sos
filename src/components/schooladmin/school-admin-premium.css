@@ -1153,3 +1153,57 @@
     font-size: 8px !important;
   }
 }
+
+
+/* School Admin bottom navigation: identical hit areas and non-overlapping labels. */
+@media (max-width: 767px) {
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
+    box-sizing: border-box !important;
+    height: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] > div {
+    box-sizing: border-box !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    align-items: stretch !important;
+    gap: 3px !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action {
+    box-sizing: border-box !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    padding: 7px 1px 5px !important;
+    margin: 0 !important;
+    gap: 5px !important;
+    overflow: hidden !important;
+    line-height: 1 !important;
+    transform: none !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action svg {
+    width: 19px !important;
+    height: 19px !important;
+    min-width: 19px !important;
+    min-height: 19px !important;
+    flex: 0 0 19px !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action span {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: clamp(8px, 2.35vw, 10px) !important;
+    line-height: 1.15 !important;
+    letter-spacing: -.02em !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: clip !important;
+  }
+}
