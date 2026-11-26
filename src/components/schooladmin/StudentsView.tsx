@@ -18,7 +18,7 @@ import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { LoadingState } from '../common/AsyncState.tsx';
 import { formatMoney } from '../../lib/money.ts';
-import { resolvePrimaryGuardianPhone, resolveStudentClassName, resolveStudentGender, resolveStudentParentPhone, resolveStudentStatus } from '../../lib/student-row-data.ts';
+import { resolvePrimaryGuardianPhone, resolveStudentClassName, resolveStudentFeeStructure, resolveStudentGender, resolveStudentParentPhone, resolveStudentStatus } from '../../lib/student-row-data.ts';
 import { 
   GraduationCap, 
   Search, 
@@ -104,7 +104,8 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
     ApiClient.getClasses(), ApiClient.getBranches(), ApiClient.getFeeStructures().catch(() => [] as FeeStructureItem[])
   ]), [school?.id, debouncedSearch, classFilter, branchFilter, feeFilter, genderFilter, studentStatusFilter, page, showAllClass], Boolean(school));
   const [studentRows, classRows, branchRows, feeStructureRows] = studentLoad.data || [[], [], [], []];
-  const students: any[] = Array.isArray(studentRows) ? studentRows : [];
+  const asRows = (value: any): any[] => Array.isArray(value) ? value : Array.isArray(value?.items) ? value.items : Array.isArray(value?.data) ? value.data : [];
+  const students: any[] = asRows(studentRows);
   const compareRollNumber = (a: any, b: any) => {
     const left = String(a.rollNumber ?? a.roll_number ?? '').trim();
     const right = String(b.rollNumber ?? b.roll_number ?? '').trim();
@@ -114,22 +115,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
       || String(a.studentId || '').localeCompare(String(b.studentId || ''), undefined, { numeric: true, sensitivity: 'base' });
   };
   const visibleStudents = [...students].sort(compareRollNumber);
-  const classes: SchoolClass[] = Array.isArray(classRows) ? classRows : [];
-  const branches: SchoolBranch[] = Array.isArray(branchRows) ? branchRows : [];
-  const feeStructures: FeeStructureItem[] = Array.isArray(feeStructureRows) ? feeStructureRows : [];
-  const feeStructureForStudent = (student: any): FeeStructureItem | undefined => {
-    const studentClass = classes.find(item => item.id === (student.classId || student.class_id));
-    if (!studentClass) return undefined;
-    const currentAcademicYear = String(school?.academicYear || '').trim();
-    return feeStructures
-      .filter(item => item.isActive && item.feeType === 'monthly_tuition'
-        && (!(item as any).academicYear || !currentAcademicYear || String((item as any).academicYear).trim() === currentAcademicYear) && (
-        item.classId ? item.classId === studentClass.id : item.minGrade !== undefined && item.maxGrade !== undefined && studentClass.gradeLevel >= item.minGrade && studentClass.gradeLevel <= item.maxGrade
-      ))
-      .sort((a, b) => Number(Boolean(b.classId)) - Number(Boolean(a.classId)))[0];
-  };
+  const classes: SchoolClass[] = asRows(classRows);
+  const branches: SchoolBranch[] = asRows(branchRows);
+  const feeStructures: FeeStructureItem[] = asRows(feeStructureRows);
+  const feeStructureForStudent = (student: any): FeeStructureItem | undefined =>
+    resolveStudentFeeStructure(student, classes as any, feeStructures as any, school?.academicYear) as FeeStructureItem | undefined;
   const feeStatusPresentation = (student: any) => {
-    const status = String(student?.feeStatus || '').toLowerCase();
+    const status = String(student?.feeStatus ?? student?.fee_status ?? '').toLowerCase();
     if (status === 'paid') return { label: 'PAID', className: 'bg-emerald-100 text-emerald-800' };
     if (status === 'partial') return { label: 'PARTIAL', className: 'bg-amber-100 text-amber-800' };
     if (status === 'unpaid') return { label: 'UNPAID', className: 'bg-rose-100 text-rose-800' };
@@ -553,7 +545,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                   <div className="flex items-start justify-between gap-2"><button type="button" onClick={() => void loadStudentDetails(student)} className="text-left font-semibold text-[#132A29]">{[student.firstName,student.middleName,student.lastName].filter(Boolean).join(' ')}</button><span className="font-mono text-[11px] text-[#0F766E]">{student.studentId}</span></div>
                   <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs text-slate-500"><span className="student-mobile-class">{resolveStudentClassName(student, classes)}</span><span className="student-mobile-roll">Roll No. {student.rollNumber || '—'}</span><span>{guardianPhoneLookupErrors[student.id] && !(student.fatherPhone || student.father_phone || student.motherPhone || student.mother_phone) ? <button type="button" onClick={event => { event.stopPropagation(); void loadGuardianPhone(student.id); }} className="text-rose-700 underline">Phone unavailable · Try again</button> : resolveStudentParentPhone(student, guardianPhoneByStudent[student.id])}</span></div>
                   {resolveStudentClassName(student, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(student); }} className="mt-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-slate-500">{resolveStudentGender(student.gender)}</span><div className="flex flex-wrap items-center gap-1.5"><span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{resolveStudentStatus(student.status).toUpperCase()}</span><span className={`rounded-full px-2 py-0.5 font-semibold ${feeStatusPresentation(student).className}`}>Fee: {feeStatusPresentation(student).label}</span></div></div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs"><span className="text-slate-500">{resolveStudentGender(student.gender ?? student.gender_name)}</span><div className="flex flex-wrap items-center gap-1.5"><span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">{resolveStudentStatus(student.status ?? student.student_status).toUpperCase()}</span><span className={`rounded-full px-2 py-0.5 font-semibold ${feeStatusPresentation(student).className}`}>Fee: {feeStatusPresentation(student).label}</span></div></div>
                   <button type="button" onClick={() => void loadStudentDetails(student)} className="student-mobile-open mt-3 w-full rounded-xl border border-[#0e8078] bg-[#e8f4f1] px-3 py-2.5 text-sm font-semibold text-[#0e8078] active:bg-[#d6ece7]">View profile</button>
                   <div className="mt-2 text-xs"><span className="font-semibold text-slate-500">Fee structure: </span>{feeStructureForStudent(student) ? <><span className="font-medium text-[#0F766E]">{feeStructureForStudent(student)!.name}</span><span className="ml-1 text-slate-500">· {formatMoney(feeStructureForStudent(student)!.amount, school?.currency)} / {feeStructureForStudent(student)!.cadence}</span></> : <><span className="font-medium text-slate-400">Not configured</span><button type="button" onClick={event => { event.stopPropagation(); openFeesSetup(); }} className="ml-2 font-semibold text-[#0F766E] underline">Set up fees</button></>}</div>
                 </div>
@@ -601,13 +593,13 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                         <td className="px-5 py-4 text-[#334155]">{resolveStudentClassName(s, classes)}{resolveStudentClassName(s, classes) === 'Not assigned' && <button type="button" onClick={event => { event.stopPropagation(); openAssignClass(s); }} className="ml-2 text-xs font-semibold text-[#0F766E] underline">Assign class</button>}</td>
                         <td className="px-5 py-4"><div className="font-medium text-[#18312d]">{feeStructureForStudent(s)?.name || <span className="text-slate-400">Not configured</span>}</div>{feeStructureForStudent(s) ? <div className="mt-1 text-xs text-slate-500">{formatMoney(feeStructureForStudent(s)!.amount, school?.currency)} / {feeStructureForStudent(s)!.cadence}</div> : <button type="button" onClick={event => { event.stopPropagation(); openFeesSetup(); }} className="mt-1 text-xs font-semibold text-[#0F766E] underline">Set up fees</button>}</td>
                         <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${feeStatusPresentation(s).className}`}>{feeStatusPresentation(s).label}</span></td>
-                        <td className="px-5 py-4 capitalize text-[#334155]">{resolveStudentGender(s.gender)}</td>
+                        <td className="px-5 py-4 capitalize text-[#334155]">{resolveStudentGender(s.gender ?? s.gender_name)}</td>
                         <td className="px-5 py-4 font-mono text-xs text-[#334155]">{guardianPhoneLookupErrors[s.id] && !(s.fatherPhone || s.father_phone || s.motherPhone || s.mother_phone) ? <button type="button" onClick={event => { event.stopPropagation(); void loadGuardianPhone(s.id); }} className="text-rose-700 underline">Phone unavailable · Try again</button> : resolveStudentParentPhone(s, guardianPhoneByStudent[s.id])}</td>
                         <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                          resolveStudentStatus(s.status) === 'active' ? 'bg-emerald-100 text-emerald-800' :
-                          resolveStudentStatus(s.status) === 'inactive' ? 'bg-slate-100 text-slate-600' :
+                          resolveStudentStatus(s.status ?? s.student_status) === 'active' ? 'bg-emerald-100 text-emerald-800' :
+                          resolveStudentStatus(s.status ?? s.student_status) === 'inactive' ? 'bg-slate-100 text-slate-600' :
                           'bg-amber-100 text-amber-800'
-                        }`}>{resolveStudentStatus(s.status).toUpperCase()}</span></td>
+                        }`}>{resolveStudentStatus(s.status ?? s.student_status).toUpperCase()}</span></td>
                         <td className="px-5 py-4">
                           <button type="button" disabled={isReadOnly} onClick={event => {
                             event.stopPropagation();
