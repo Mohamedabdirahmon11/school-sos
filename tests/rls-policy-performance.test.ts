@@ -15,6 +15,7 @@ test('RLS performance migration keeps one SELECT policy per protected table and 
   assert.match(migration, /DROP POLICY IF EXISTS report_cards_parent_published_read ON public\.report_cards/);
   assert.doesNotMatch(migration, /CREATE POLICY report_cards_admin_read/);
   assert.doesNotMatch(migration, /CREATE POLICY report_cards_parent_published_read/);
+  assert.match(migration, /DROP INDEX IF EXISTS public\\.idx_attendance_student/);
 
   const policyCases: Array<{ name: string; table: string; roles: string[] }> = [
     { name: 'mark_components_read', table: 'mark_components', roles: ['school_admin', 'super_admin'] },
