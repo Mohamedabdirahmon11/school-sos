@@ -4,6 +4,7 @@
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { hasStaffNavigationPermission } from '../../lib/staff-permissions.ts';
 import { getMobileNavigation, type SchoolOSRole } from '../../lib/navigation-registry.ts';
