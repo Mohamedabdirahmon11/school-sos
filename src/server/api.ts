@@ -12353,7 +12353,9 @@ async function syncTeacherAssignmentLegacy(client: any, schoolId: string, yearId
   if (updateError) throw new Error('Qoondeynta waa la beddelay, balse macallinka manhajka lama waafajin karin.');
 }
 async function checkTeacherAssignment(client: any, school: School, body: any, excludeAssignmentId?: string) {
-  const yearId = String(body?.academicYearId || ''), termId = body?.termId ? String(body.termId) : null;
+  const yearId = String(body?.academicYearId || '');
+  let termId = body?.termId ? String(body.termId) : null;
+  let termAliasIds: string[] = termId ? [termId] : [];
   const classId = String(body?.classId || ''), sectionId = body?.sectionId ? String(body.sectionId) : null;
   const subjectId = String(body?.subjectId || ''), teacherId = String(body?.teacherId || '');
   if (!yearId || !classId || !subjectId || !teacherId) { const error = new Error('Dooro sannad-dugsiyeed, fasal, maaddo iyo macallin.') as Error & { status: number }; error.status = 422; throw error; }
@@ -12366,8 +12368,24 @@ async function checkTeacherAssignment(client: any, school: School, body: any, ex
   ]);
   if (year.error || !year.data) { const error = new Error('Sannadka waxbarasho lagama helin dugsigan.') as Error & { status: number }; error.status = 422; throw error; }
   if (termId) {
-    const { data: term } = await client.from('terms').select('id,academic_year_id').eq('school_id', school.id).eq('id', termId).maybeSingle();
+    const { data: term, error: termError } = await client.from('terms')
+      .select('id,academic_year_id,name,start_date,end_date')
+      .eq('school_id', school.id).eq('id', termId).maybeSingle();
+    if (termError) throw new Error('Term-ka la doortay lama xaqiijin karin.');
     if (!term || term.academic_year_id !== yearId) { const error = new Error('Term-ka la doortay kuma jiro sannad-dugsiyeedkan.') as Error & { status: number }; error.status = 422; throw error; }
+    const { data: samePeriodTerms, error: aliasError } = await client.from('terms')
+      .select('id,name,start_date,end_date')
+      .eq('school_id', school.id).eq('academic_year_id', yearId)
+      .eq('start_date', term.start_date).eq('end_date', term.end_date);
+    if (aliasError) throw new Error('Magacyada kale ee term-kan lama xaqiijin karin.');
+    const aliases = samePeriodTerms?.length ? samePeriodTerms : [term];
+    const aliasRank = (name: unknown) => /^semester\s*[12]$/i.test(String(name || '').trim()) ? 0
+      : /^term\s*[12]$/i.test(String(name || '').trim()) ? 1 : 2;
+    const canonical = [...aliases].sort((a: any, b: any) =>
+      aliasRank(a.name) - aliasRank(b.name) || String(a.id).localeCompare(String(b.id))
+    )[0];
+    termId = String(canonical.id);
+    termAliasIds = aliases.map((item: any) => String(item.id));
   }
   if (klass.error || !klass.data) { const error = new Error('Fasalkan lagama helin dugsigan.') as Error & { status: number }; error.status = 403; throw error; }
   if (klass.data.is_archived) { const error = new Error('Fasalkan waa la archive-gareeyey.') as Error & { status: number }; error.status = 422; throw error; }
@@ -12395,7 +12413,7 @@ async function checkTeacherAssignment(client: any, school: School, body: any, ex
   ]);
   if (assignmentRows.error || curriculumRows.error) throw new Error('Culayska macallinka lama xaqiijin karin.');
   const relevant = (assignmentRows.data || []).filter((row: any) =>
-    row.id !== excludeAssignmentId && (termId ? (!row.term_id || row.term_id === termId) : !row.term_id)
+    row.id !== excludeAssignmentId && (termId ? (!row.term_id || termAliasIds.includes(String(row.term_id))) : !row.term_id)
   );
   const byClassSubject = new Map<string, any>();
   for (const row of relevant) {
@@ -12416,7 +12434,7 @@ async function checkTeacherAssignment(client: any, school: School, body: any, ex
     throw error;
   }
   return {
-    school_id: school.id, academic_year_id: yearId, term_id: termId, class_id: classId,
+    school_id: school.id, academic_year_id: yearId, term_id: termId, term_alias_ids: termAliasIds, class_id: classId,
     section_id: sectionId, subject_id: subjectId, teacher_id: teacherId,
     qualification_override: !qualified
   };
@@ -12428,10 +12446,39 @@ async function upsertTeacherAssignment(client: any, school: School, user: User, 
   query = payload.term_id ? query.eq('term_id', payload.term_id) : query.is('term_id', null);
   // Class rows already represent Grade + Section. Assignment uniqueness is class + subject;
   // legacy section_id is retained as metadata but must not create parallel assignments.
-  const found = id
-    ? await client.from('teacher_class_subject_assignments').select('*').eq('school_id', school.id).eq('id', id).maybeSingle()
-    : await query.maybeSingle();
-  if (found.error || (id && !found.data)) throw new Error('Qoondeyntan lagama helin dugsigan.');
+  let found: any;
+  if (id) {
+    found = await client.from('teacher_class_subject_assignments').select('*')
+      .eq('school_id', school.id).eq('id', id).maybeSingle();
+    if (found.error || !found.data) throw new Error('Qoondeyntan lagama helin dugsigan.');
+    if (payload.term_id && payload.term_alias_ids?.length) {
+      const { data: logicalRows, error: logicalError } = await client.from('teacher_class_subject_assignments')
+        .select('id').eq('school_id', school.id).eq('academic_year_id', payload.academic_year_id)
+        .eq('class_id', payload.class_id).eq('subject_id', payload.subject_id)
+        .in('term_id', payload.term_alias_ids);
+      if (logicalError) throw new Error('Qoondeynaha term-kan lama xaqiijin karin.');
+      if ((logicalRows || []).some((row: any) => row.id !== found.data.id)) {
+        const error = new Error('Fasalkan iyo maaddadan waxay leeyihiin qoondeynno is dul saaran oo Term/Semester isku taariikh ah. Marka hore hagaaji qoondeynaha hore.') as Error & { status: number };
+        error.status = 409;
+        throw error;
+      }
+    }
+  } else if (payload.term_id && payload.term_alias_ids?.length) {
+    const { data: logicalRows, error: logicalError } = await client.from('teacher_class_subject_assignments')
+      .select('*').eq('school_id', school.id).eq('academic_year_id', payload.academic_year_id)
+      .eq('class_id', payload.class_id).eq('subject_id', payload.subject_id)
+      .in('term_id', payload.term_alias_ids);
+    if (logicalError) throw new Error('Qoondeynaha term-kan lama xaqiijin karin.');
+    if ((logicalRows || []).length > 1) {
+      const error = new Error('Fasalkan iyo maaddadan waxay leeyihiin qoondeynno is dul saaran oo Term/Semester isku taariikh ah. Marka hore hagaaji qoondeynaha hore.') as Error & { status: number };
+      error.status = 409;
+      throw error;
+    }
+    found = { data: logicalRows?.[0] || null, error: null };
+  } else {
+    found = await query.maybeSingle();
+    if (found.error) throw new Error('Qoondeyntan lama xaqiijin karin.');
+  }
   const old = found.data;
   const clearDependentSlots = Boolean(old && (old.teacher_id !== payload.teacher_id || old.class_id !== payload.class_id || old.subject_id !== payload.subject_id || old.section_id !== payload.section_id) && body?.clearDependentEntries === true);
   if (old && (old.teacher_id !== payload.teacher_id || old.class_id !== payload.class_id || old.subject_id !== payload.subject_id || old.section_id !== payload.section_id)) {
