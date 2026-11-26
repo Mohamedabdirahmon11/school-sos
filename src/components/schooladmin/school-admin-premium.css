@@ -1015,3 +1015,166 @@
     flex-basis: 244px !important;
   }
 }
+
+
+/* Mobile-only all-pages refinement. Desktop layout intentionally untouched. */
+@media (max-width: 767px) {
+  .school-admin-role { overflow-x: clip !important; }
+  .school-admin-role main {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 10px 0 calc(112px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow-x: clip !important;
+  }
+  .school-admin-role main > div:not(.pointer-events-none) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    padding-inline: 12px !important;
+  }
+  .school-admin-role main :is(h1, .text-3xl, .text-4xl) {
+    font-size: clamp(1.25rem, 5.2vw, 1.65rem) !important;
+    line-height: 1.2 !important;
+    letter-spacing: -.035em !important;
+    overflow-wrap: anywhere !important;
+  }
+  .school-admin-role main :is(h2, .text-2xl) {
+    font-size: clamp(1rem, 4.2vw, 1.2rem) !important;
+    line-height: 1.3 !important;
+  }
+  .school-admin-role main :is(.school-people-page, .schoolos-operations-page,
+    .school-admin-attendance-page, .schoolos-timetable-page, .academic-setup,
+    .schoolos-reference-dashboard, .school-admin-settings-page,
+    .exam-management-redesign) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: auto !important;
+    padding: 10px !important;
+    border-radius: 16px !important;
+  }
+  .school-admin-role main :is(.schoolos-operation-header, .schoolos-people-header,
+    .schoolos-dash-welcome) {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 17px 15px !important;
+    border-radius: 17px !important;
+    gap: 10px !important;
+  }
+  .school-admin-role main :is(.schoolos-dash-stats, .schoolos-academic-stats) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 9px !important;
+  }
+  .school-admin-role main :is(.schoolos-dash-stat, .schoolos-academic-stat) {
+    min-width: 0 !important;
+    padding: 12px !important;
+    border-radius: 15px !important;
+    overflow-wrap: anywhere !important;
+  }
+  .school-admin-role main :is(.schoolos-dash-panel, .people-panel,
+    .school-people-page .bg-white, .schoolos-operations-page .bg-white,
+    .academic-setup .wrap, .academic-setup .lead) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border-radius: 15px !important;
+    padding: 13px !important;
+  }
+  .school-admin-role main :is(.grid, .flex, .inline-flex) { min-width: 0 !important; }
+  .school-admin-role main :is(input, select, textarea) {
+    width: 100%;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    font-size: 16px !important;
+  }
+  .school-admin-role main :is(button, a) { min-width: 0; }
+  .school-admin-role main .overflow-x-auto {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .school-admin-role main table { min-width: 640px !important; }
+  .school-admin-role main .schoolos-timetable-page table { min-width: 760px !important; }
+  .school-admin-role main .school-people-admissions-page .people-admissions-board {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+  .school-admin-role main .school-people-admissions-page .people-admissions-board > section {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .school-admin-role main .schoolos-dash-grid,
+  .school-admin-role main .schoolos-dash-grid-main,
+  .school-admin-role main .schoolos-dash-grid-lower {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 11px !important;
+  }
+  .school-admin-role main .schoolos-dash-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  /* Four actual destinations only; the drawer/menu remains in the top bar. */
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
+    display: block !important;
+    position: fixed !important;
+    z-index: 1000 !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    width: auto !important;
+    max-width: 560px !important;
+    margin-inline: auto !important;
+    padding: 5px !important;
+    border-radius: 19px !important;
+    overflow: visible !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] > div {
+    display: grid !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 62px !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action {
+    display: none !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 54px !important;
+    flex: 1 1 0 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    padding: 5px 2px !important;
+    border: 0 !important;
+    border-radius: 13px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+    flex: 0 0 20px !important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action span {
+    display: block !important;
+    max-width: 100% !important;
+    font-size: 9px !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
+@media (max-width: 360px) {
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action span {
+    font-size: 8px !important;
+  }
+}
