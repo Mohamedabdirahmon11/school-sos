@@ -650,3 +650,109 @@
   .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button,
   .super-admin-design .sa-dashboard .sa-metric-card { transition:none; }
 }
+
+
+/* Fix Super Admin mobile typography: wrap at word boundaries, never per character. */
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] :is(h1,h2,h3,p,span,label,button) {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  text-wrap: pretty;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 11px;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button > span:nth-of-type(2) {
+  display: block;
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.35;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child {
+  position: relative;
+  min-width: 0;
+  gap: 12px;
+  padding-bottom: 25px;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child > div > div {
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  line-height: 1.25;
+}
+.super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child::after {
+  position: absolute;
+  right: 17px;
+  bottom: 8px;
+  margin: 0;
+  font-size: 8px;
+  letter-spacing: .12em;
+}
+.super-admin-design .sa-dashboard :is(h1,h2,h3,h4,p,span,label,th,td,button,a,strong) {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  hyphens: none !important;
+  text-wrap: pretty;
+}
+.super-admin-design .sa-dashboard .sa-panel h2,
+.super-admin-design .sa-dashboard .sa-page-title,
+.super-admin-design .sa-dashboard .sa-hero :is(h1,h2,p) {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  max-width: 100%;
+}
+.super-admin-design .sa-dashboard :is(.sa-panel,.sa-hero,.sa-metric-card,.sa-panels-grid) {
+  min-width: 0;
+}
+.super-admin-design .sa-dashboard .sa-panel :is(.flex,.grid) > * {
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] > div:first-child {
+    min-height: 82px;
+    height: 82px;
+    padding: 12px 16px 25px;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section h2 {
+    white-space: normal;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    line-height: 1.35;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button {
+    min-height: 48px;
+    padding: 10px 12px;
+  }
+  .super-admin-design .sa-dashboard .sa-panel h2 {
+    font-size: 14px !important;
+    line-height: 1.35 !important;
+    letter-spacing: 0 !important;
+  }
+  .super-admin-design .sa-dashboard .sa-metric-card > div:first-child > span {
+    white-space: normal;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    letter-spacing: .035em;
+  }
+}
+@media (max-width: 380px) {
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button {
+    gap: 9px;
+    padding-inline: 10px;
+  }
+  .super-admin-design aside.school-admin-sidebar[data-mobile-role="super_admin"] nav section button > span:nth-of-type(2) {
+    font-size: 13px !important;
+  }
+}
