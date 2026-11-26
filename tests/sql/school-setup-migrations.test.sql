@@ -133,8 +133,8 @@ SELECT 'SQL migration integration checks passed' AS result;
 
 -- Exercise the Supabase index/RLS performance migration on isolated fixture tables.
 CREATE SCHEMA IF NOT EXISTS private;
-CREATE OR REPLACE FUNCTION private.auth_user_role() RETURNS text LANGUAGE sql STABLE AS $ SELECT COALESCE(NULLIF(current_setting('app.user_role', true),''),'school_admin')::text $;
-CREATE OR REPLACE FUNCTION private.auth_school_id() RETURNS text LANGUAGE sql STABLE AS $ SELECT current_setting('app.school_id', true)::text $;
+CREATE OR REPLACE FUNCTION private.auth_user_role() RETURNS text LANGUAGE sql STABLE AS $fn$ SELECT COALESCE(NULLIF(current_setting('app.user_role', true),''),'school_admin')::text $fn$;
+CREATE OR REPLACE FUNCTION private.auth_school_id() RETURNS text LANGUAGE sql STABLE AS $fn$ SELECT current_setting('app.school_id', true)::text $fn$;
 CREATE OR REPLACE FUNCTION private.auth_has_term_assignment(varchar,varchar,varchar,uuid,varchar) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 CREATE OR REPLACE FUNCTION private.auth_can_access_student(varchar) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 
