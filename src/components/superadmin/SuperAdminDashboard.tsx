@@ -3,7 +3,7 @@
  * Metrics, 6-month SaaS revenue chart, subscription distribution, and Needs Attention triage
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ApiClient } from '../../services/api.ts';
 import { formatMoney } from '../../lib/money.ts';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -29,11 +29,6 @@ interface SuperAdminDashboardProps {
 }
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavigate, onOpenAddSchool }) => {
-  useEffect(() => {
-    // Keep role-specific responsive CSS out of the initial application bundle.
-    void import('./super-admin-mobile.css');
-  }, []);
-
   const { t, viewAsSchool } = useAuth();
   const dashboard = useApi(() => ApiClient.getSuperAdminDashboard(), []);
   const data = dashboard.data;
