@@ -93,6 +93,13 @@ const AppContent: React.FC = () => {
 
   React.useEffect(() => { if (user) setApiFailure(null); }, [user]);
 
+  // A view belongs to the account that selected it. Never carry a previous
+  // account's screen into a new login (for example, school Attendance -> Student Portal).
+  React.useEffect(() => {
+    setCurrentView('default');
+    setMobileMenuOpen(false);
+  }, [user?.id]);
+
   React.useEffect(() => {
     if (!user || !['sch_notices', 't_notices', 'p_notices', 'st_notices'].includes(currentView)) return;
     let active = true;
@@ -131,7 +138,14 @@ const AppContent: React.FC = () => {
 
   // Determine active default view based on role
   const getEffectiveView = () => {
-    if (currentView !== 'default') return currentView;
+    if (currentView !== 'default') {
+      const selectedRoute = getNavigationRoute(currentView);
+      // Student accounts may only resume routes registered for the Student Portal.
+      // In particular, never mount the school-admin Attendance screen for a student.
+      if (user.role !== 'student' || (currentView.startsWith('st_') && selectedRoute?.roles.includes('student'))) {
+        return currentView;
+      }
+    }
     if (user.role === 'super_admin' && !inspectedSchool) return 'sa_dashboard';
     if (user.role === 'teacher') return 't_dashboard';
     if (user.role === 'parent') return 'p_overview';
@@ -387,8 +401,8 @@ const AppContent: React.FC = () => {
             {activeView.startsWith('p_') && <ParentPortalView initialView={activeView} />}
 
             {/* STUDENT ROUTING */}
-            {activeView.startsWith('st_') && (
-              <StudentPortalView />
+            {activeView.startsWith('st_') && user.role === 'student' && (
+              <StudentPortalView key={user.id} />
             )}
             </React.Suspense>
           </main>
