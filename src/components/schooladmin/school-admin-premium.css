@@ -480,3 +480,173 @@
     display: none !important;
   }
 }
+
+
+/* School Admin sidebar: spacious, premium navigation with stronger hierarchy. */
+@media (min-width: 768px) {
+  .school-admin-role aside.school-admin-sidebar {
+    width: 286px !important;
+    flex: 0 0 286px !important;
+    border-right: 1px solid rgba(255,255,255,.12) !important;
+    box-shadow: 12px 0 34px rgba(7,28,31,.13) !important;
+    isolation: isolate;
+  }
+  .school-admin-role aside.school-admin-sidebar.school-admin-sidebar-collapsed {
+    width: 78px !important;
+    flex-basis: 78px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child {
+    min-height: 86px !important;
+    height: auto !important;
+    padding: 16px 18px !important;
+    gap: 13px !important;
+    border-bottom: 1px solid rgba(255,255,255,.14) !important;
+    background: linear-gradient(115deg, rgba(255,255,255,.105), rgba(255,255,255,.025)) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:first-child {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 15px !important;
+    box-shadow: 0 5px 16px rgba(0,0,0,.16) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:first-child {
+    font-size: 15px !important;
+    font-weight: 850 !important;
+    line-height: 1.25 !important;
+    letter-spacing: -.025em !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div:first-child > div:nth-child(2) > div:nth-child(2) {
+    margin-top: 5px !important;
+    font-size: 10px !important;
+    letter-spacing: .16em !important;
+    opacity: .72 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav {
+    padding: 19px 14px 22px !important;
+    gap: 19px !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(255,255,255,.24) transparent !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav > label {
+    min-height: 46px !important;
+    margin: 0 0 4px !important;
+    padding: 0 13px !important;
+    border: 1px solid rgba(255,255,255,.16) !important;
+    border-radius: 14px !important;
+    background: rgba(0,0,0,.16) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav > label svg {
+    width: 17px !important;
+    height: 17px !important;
+    opacity: .8;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav > label input {
+    min-height: 42px !important;
+    font-size: 13px !important;
+    font-weight: 550 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section h2 {
+    margin: 0 0 9px !important;
+    padding: 0 12px 8px !important;
+    border-bottom: 1px solid rgba(255,255,255,.13) !important;
+    font-size: 10px !important;
+    font-weight: 850 !important;
+    letter-spacing: .17em !important;
+    opacity: .68 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section > div {
+    display: grid !important;
+    gap: 5px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button {
+    min-height: 47px !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 9px 12px !important;
+    border: 1px solid transparent !important;
+    border-radius: 14px !important;
+    font-size: 13.5px !important;
+    font-weight: 650 !important;
+    letter-spacing: -.012em !important;
+    line-height: 1.3 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button > span:nth-of-type(1) {
+    width: 23px !important;
+    height: 23px !important;
+    border-radius: 8px !important;
+    display: grid !important;
+    place-items: center !important;
+    opacity: .9 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button:not([aria-current="page"]):hover {
+    background: rgba(255,255,255,.095) !important;
+    border-color: rgba(255,255,255,.09) !important;
+    transform: translateX(2px);
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button[aria-current="page"] {
+    min-height: 49px !important;
+    border-color: rgba(255,255,255,.18) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 3px 0 0 var(--sidebar-accent, #55c6a5) !important;
+    font-weight: 800 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > nav section button[aria-current="page"] > span:nth-of-type(1) {
+    opacity: 1 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t {
+    padding: 13px 14px !important;
+    border-top: 1px solid rgba(255,255,255,.15) !important;
+    background: rgba(0,0,0,.14) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t > div {
+    min-height: 54px !important;
+    padding: 8px 10px !important;
+    border: 1px solid rgba(255,255,255,.12) !important;
+    border-radius: 14px !important;
+    background: rgba(255,255,255,.07) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t > div > span {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 11px !important;
+    background: rgba(255,255,255,.12) !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t p:first-child {
+    font-size: 12px !important;
+    font-weight: 800 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > div.border-t p:last-child {
+    margin-top: 3px !important;
+    font-size: 10px !important;
+    opacity: .7 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > button.school-admin-drawer-logout {
+    min-height: 48px !important;
+    margin: 0 14px 14px !important;
+    padding: 0 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 11px !important;
+    border: 1px solid rgba(255,255,255,.15) !important;
+    border-radius: 14px !important;
+    background: rgba(255,255,255,.075) !important;
+    color: var(--sidebar-text, #fff) !important;
+    font-size: 13px !important;
+    font-weight: 750 !important;
+  }
+  .school-admin-role aside.school-admin-sidebar > button.school-admin-drawer-logout:hover {
+    background: rgba(220,75,75,.2) !important;
+    border-color: rgba(255,160,150,.35) !important;
+  }
+}
+@media (min-width: 768px) and (max-width: 1100px) {
+  .school-admin-role aside.school-admin-sidebar:not(.school-admin-sidebar-collapsed) {
+    width: 268px !important;
+    flex-basis: 268px !important;
+  }
+}
