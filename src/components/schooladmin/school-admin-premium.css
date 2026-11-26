@@ -471,3 +471,12 @@
   .school-admin-role main :is(.p-5, .px-5, .py-5) { padding: 12px !important; }
   .school-admin-role .schoolos-schooladmin-tab span { font-size: 8px !important; }
 }
+
+
+/* Desktop School Admin uses the full sidebar; bottom quick-nav is mobile-only. */
+@media (min-width: 768px) {
+  .school-admin-role nav.schoolos-schooladmin-bottom-nav,
+  .school-admin-role nav.schoolos-mobile-bottom-nav {
+    display: none !important;
+  }
+}
