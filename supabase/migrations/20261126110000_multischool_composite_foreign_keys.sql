@@ -10,6 +10,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS fee_structures_id_school_uidx
 CREATE UNIQUE INDEX IF NOT EXISTS student_invoices_id_school_uidx
   ON public.student_invoices (id, school_id);
 
+CREATE UNIQUE INDEX IF NOT EXISTS school_branches_id_school_uidx
+  ON public.school_branches (id, school_id);
+
+-- Child-side indexes for academic, timetable, parent and school-branch links.
+CREATE INDEX IF NOT EXISTS idx_classes_branch_school_fk ON public.classes (branch_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_class_sections_class_school_fk ON public.class_sections (class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_class_sections_legacy_class_school_fk ON public.class_sections (legacy_class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_students_branch_school_fk ON public.students (branch_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_timetable_slots_class_school_fk ON public.timetable_slots (class_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_timetable_slots_subject_school_fk ON public.timetable_slots (subject_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_timetable_slots_teacher_school_fk ON public.timetable_slots (teacher_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_parent_students_student_school_fk ON public.parent_students (student_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_parent_students_parent_school_fk ON public.parent_students (parent_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_communication_queue_student_school_fk ON public.communication_queue (student_id, school_id);
+
 -- Cover the child-side columns of the new composite foreign keys.
 CREATE INDEX IF NOT EXISTS idx_admission_applications_student_school_fk ON public.admission_applications (student_id, school_id);
 CREATE INDEX IF NOT EXISTS idx_assignment_submissions_assignment_school_fk ON public.assignment_submissions (assignment_id, school_id);
@@ -29,6 +44,52 @@ ALTER TABLE public.assignment_submissions
 
 DO $constraints$
 BEGIN
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.students'::regclass AND conname='students_class_school_fk') THEN
+    ALTER TABLE public.students ADD CONSTRAINT students_class_school_fk
+      FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE RESTRICT NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.students'::regclass AND conname='students_branch_school_fk') THEN
+    ALTER TABLE public.students ADD CONSTRAINT students_branch_school_fk
+      FOREIGN KEY (branch_id, school_id) REFERENCES public.school_branches(id, school_id) ON DELETE SET NULL (branch_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.classes'::regclass AND conname='classes_branch_school_fk') THEN
+    ALTER TABLE public.classes ADD CONSTRAINT classes_branch_school_fk
+      FOREIGN KEY (branch_id, school_id) REFERENCES public.school_branches(id, school_id) ON DELETE SET NULL (branch_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.class_sections'::regclass AND conname='class_sections_class_group_school_fk') THEN
+    ALTER TABLE public.class_sections ADD CONSTRAINT class_sections_class_group_school_fk
+      FOREIGN KEY (class_id, school_id) REFERENCES public.class_groups(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.class_sections'::regclass AND conname='class_sections_legacy_class_school_fk') THEN
+    ALTER TABLE public.class_sections ADD CONSTRAINT class_sections_legacy_class_school_fk
+      FOREIGN KEY (legacy_class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE SET NULL (legacy_class_id) NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.timetable_slots'::regclass AND conname='timetable_slots_class_school_fk') THEN
+    ALTER TABLE public.timetable_slots ADD CONSTRAINT timetable_slots_class_school_fk
+      FOREIGN KEY (class_id, school_id) REFERENCES public.classes(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.timetable_slots'::regclass AND conname='timetable_slots_subject_school_fk') THEN
+    ALTER TABLE public.timetable_slots ADD CONSTRAINT timetable_slots_subject_school_fk
+      FOREIGN KEY (subject_id, school_id) REFERENCES public.subjects(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.timetable_slots'::regclass AND conname='timetable_slots_teacher_school_fk') THEN
+    ALTER TABLE public.timetable_slots ADD CONSTRAINT timetable_slots_teacher_school_fk
+      FOREIGN KEY (teacher_id, school_id) REFERENCES public.teachers(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.parent_students'::regclass AND conname='parent_students_student_school_fk') THEN
+    ALTER TABLE public.parent_students ADD CONSTRAINT parent_students_student_school_fk
+      FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.parent_students'::regclass AND conname='parent_students_parent_school_fk') THEN
+    ALTER TABLE public.parent_students ADD CONSTRAINT parent_students_parent_school_fk
+      FOREIGN KEY (parent_id, school_id) REFERENCES public.users(id, school_id) ON DELETE CASCADE NOT VALID;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.communication_queue'::regclass AND conname='communication_queue_student_school_fk') THEN
+    ALTER TABLE public.communication_queue ADD CONSTRAINT communication_queue_student_school_fk
+      FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE SET NULL (student_id) NOT VALID;
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.teacher_subjects'::regclass AND conname='teacher_subjects_school_id_fkey') THEN
     ALTER TABLE public.teacher_subjects ADD CONSTRAINT teacher_subjects_school_id_fkey
       FOREIGN KEY (school_id) REFERENCES public.schools(id) ON DELETE CASCADE NOT VALID;
@@ -157,6 +218,19 @@ END
 $constraints$;
 
 ALTER TABLE public.teacher_subjects VALIDATE CONSTRAINT teacher_subjects_school_id_fkey;
+
+ALTER TABLE public.students VALIDATE CONSTRAINT students_class_school_fk;
+ALTER TABLE public.students VALIDATE CONSTRAINT students_branch_school_fk;
+ALTER TABLE public.classes VALIDATE CONSTRAINT classes_branch_school_fk;
+ALTER TABLE public.class_sections VALIDATE CONSTRAINT class_sections_class_group_school_fk;
+ALTER TABLE public.class_sections VALIDATE CONSTRAINT class_sections_legacy_class_school_fk;
+ALTER TABLE public.timetable_slots VALIDATE CONSTRAINT timetable_slots_class_school_fk;
+ALTER TABLE public.timetable_slots VALIDATE CONSTRAINT timetable_slots_subject_school_fk;
+ALTER TABLE public.timetable_slots VALIDATE CONSTRAINT timetable_slots_teacher_school_fk;
+ALTER TABLE public.parent_students VALIDATE CONSTRAINT parent_students_student_school_fk;
+ALTER TABLE public.parent_students VALIDATE CONSTRAINT parent_students_parent_school_fk;
+ALTER TABLE public.communication_queue VALIDATE CONSTRAINT communication_queue_student_school_fk;
+
 ALTER TABLE public.admission_applications VALIDATE CONSTRAINT admission_applications_class_school_fk;
 ALTER TABLE public.admission_applications VALIDATE CONSTRAINT admission_applications_student_school_fk;
 ALTER TABLE public.assignment_submissions VALIDATE CONSTRAINT assignment_submissions_assignment_school_fk;
