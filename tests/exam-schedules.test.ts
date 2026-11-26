@@ -141,9 +141,9 @@ test('exam schedule storage, client, and UI expose draft, publish, and print sea
   assert.ok(client.includes('updateExamSchedule'));
   assert.ok(app.includes("activeView === 'sch_exams'") && app.includes("activeView === 'sch_marks_approval' ? 'approval' : 'marks'"), 'The combined Exam Marks & Approval route opens the marks workspace while preserving the legacy approval deep link.');
   assert.ok(sidebar.includes("item('sch_exams', 'Exam Marks & Approval'") && !sidebar.includes("item('sch_marks',") && !sidebar.includes("item('sch_marks_approval',"), 'Only one combined exam marks navigation item is visible to School Admin.');
-  assert.ok(ui.includes("initialTab === 'approval' ? 'Marks Approval' : 'Marks'"), 'The selected route displays its own page title.');
-  assert.ok(!ui.includes("setActiveTab('marks')"), 'Marks is no longer switched inside the combined workspace.');
-  assert.ok(!ui.includes("setActiveTab('approval')"), 'Marks Approval is no longer switched inside the combined workspace.');
+  assert.ok(ui.includes("activeTab === 'approval' ? 'Marks Approval' : 'Marks Entry'"), 'The combined page title follows the selected workflow tab.');
+  assert.ok(ui.includes('aria-label="Exam marks workflow"'), 'The combined page exposes one accessible workflow switcher.');
+  assert.ok(ui.includes("onClick={() => setActiveTab('marks')}") && ui.includes("onClick={() => setActiveTab('approval')}"), 'School Admin can switch between Marks Entry and Marks Approval without another sidebar item.');
   assert.ok(!ui.includes("setActiveTab('schedule')"), 'Exam schedule is intentionally hidden from the simplified Marks workspace until it is redesigned separately.');
   assert.ok(ui.includes('Save schedule draft'));
   assert.ok(ui.includes('Publish & assign seats'));
