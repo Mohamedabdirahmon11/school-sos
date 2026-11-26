@@ -5176,3 +5176,23 @@ main :is(.flex, .inline-flex) > * {
   .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action span { display: none; }
   .school-admin-mobile-content { padding-bottom: 104px; }
 }
+
+/* Bottom bar fit: five equal cells side by side, lifted above the phone's rounded bottom edge. */
+@media (max-width: 767px) {
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
+    left: 14px !important; right: 14px !important;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 6px 4px !important; border-radius: 26px;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] > div {
+    display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 0 !important; padding: 0 !important; min-height: 58px !important; align-items: center; overflow: visible !important;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action { min-width: 0 !important; width: 100%; padding: 4px 0 !important; }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action svg { width: 22px; height: 22px; }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action {
+    width: 48px !important; height: 48px !important; min-height: 48px !important; min-width: 0 !important; margin: 0 auto !important; padding: 0 !important;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action svg { width: 22px; height: 22px; }
+  .school-admin-mobile-content { padding-bottom: 110px; }
+}
