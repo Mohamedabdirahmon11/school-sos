@@ -5203,8 +5203,8 @@ main :is(.flex, .inline-flex) > * {
   aside.school-admin-sidebar[data-mobile-open="true"] {
     background: var(--sidebar-background, #fff) !important;
     color: var(--sidebar-text, #1f2d3a) !important;
-    width: min(82vw, 310px) !important; flex: 0 0 min(82vw, 310px) !important;
-    border-radius: 0 28px 28px 0; border: 0 !important;
+    width: min(70vw, 270px) !important; flex: 0 0 min(70vw, 270px) !important;
+    border-radius: 0 28px 28px 0; animation: schoolos-drawer-in .26s cubic-bezier(.22,.9,.3,1) both; border: 0 !important;
     box-shadow: 12px 0 44px rgba(10,25,25,.28) !important;
     padding-top: env(safe-area-inset-top, 0px);
   }
@@ -5275,3 +5275,14 @@ main :is(.flex, .inline-flex) > * {
 .schoolos-login-card form>button[type=submit]{min-height:44px;margin-top:5px;border-radius:8px!important;background:#07558f!important;font-size:12px!important}
 @media(max-width:760px){.schoolos-login-page{display:block;padding:12px}.schoolos-login-layout{display:flex;flex-direction:column;width:min(100%,520px);min-height:calc(100dvh - 24px);margin:auto;border-radius:18px}.schoolos-login-welcome{min-height:210px;align-items:flex-start;padding:22px 24px}.schoolos-login-welcome:after{width:240px;height:360px;top:-70px;right:-190px}.schoolos-login-brand-mark{width:36px;height:36px;margin-bottom:14px;font-size:18px}.schoolos-login-eyebrow{font-size:9px}.schoolos-login-welcome h1{font-size:34px}.schoolos-login-welcome-subtitle{margin:7px 0;font-size:9px}.schoolos-login-welcome-description{max-width:260px;margin:8px 0;font-size:10px;line-height:1.45}.schoolos-login-orb-one{width:105px;height:105px;right:-12px;bottom:-32px}.schoolos-login-orb-two{width:72px;height:72px;left:auto;right:50px;bottom:-45px}.schoolos-login-orb-three{width:40px;height:40px;right:20px;top:15px}.schoolos-login-content{flex:1;padding:24px clamp(18px,7vw,32px) 30px;justify-content:flex-start}.schoolos-login-heading{margin-bottom:16px!important}.schoolos-login-heading>div{display:none!important}.schoolos-login-heading h2{font-size:23px!important}.schoolos-login-content>.mt-6{margin-top:0!important}}
 @media(max-width:380px){.schoolos-login-page{padding:8px}.schoolos-login-layout{min-height:calc(100dvh - 16px)}.schoolos-login-welcome{min-height:195px;padding:18px 20px}.schoolos-login-content{padding:20px 18px 24px}}
+
+@keyframes schoolos-drawer-in { from { transform: translateX(-100%); opacity: .6; } to { transform: translateX(0); opacity: 1; } }
+@keyframes schoolos-drawer-dim { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 767px) {
+  .school-admin-role button[aria-label="Close navigation"] { animation: schoolos-drawer-dim .22s ease both; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > nav section button { transition: background-color .15s ease, transform .15s ease; }
+  aside.school-admin-sidebar[data-mobile-open="true"] > nav section button:active { transform: scale(.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  aside.school-admin-sidebar[data-mobile-open="true"], .school-admin-role button[aria-label="Close navigation"] { animation: none !important; }
+}
