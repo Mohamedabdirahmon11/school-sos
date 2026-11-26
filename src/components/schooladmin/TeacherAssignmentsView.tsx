@@ -13,6 +13,8 @@ type Data = {
   curriculum: Row[]; assignments: Assignment[]; qualifiedTeacherIdsBySubject: Record<string, string[]>;
   workload: Array<{ teacherId: string; periodsPerWeek: number; maxPeriodsPerWeek: number | null; overloaded: boolean }>;
   unassigned: Array<{ classId: string; subjectId: string; periodsPerWeek: number }>;
+  termAliasConflicts: Array<{ classId: string; subjectId: string; assignments: Array<{ id: string; termId: string; termName: string; teacherId: string; teacherName: string }> }>;
+  termAliasConflictCount: number;
   selectedAcademicYearId: string; selectedTermId: string; totalClassSubjects: number; assignedCount: number; unassignedCount: number; overloadedCount: number;
 };
 const errorText = (e: unknown) => e instanceof Error ? e.message : 'Qoondeynta lama kaydin karin.';
@@ -261,6 +263,23 @@ export const TeacherAssignmentsView: React.FC<{ onNavigate: (view: string) => vo
     {notice && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"><CheckCircle2 className="mr-2 inline h-4 w-4" />{notice}</div>}
     {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200">{error}</div>}
     <div className="inline-flex min-h-9 items-center rounded-full border border-[var(--schoolos-line)] bg-[var(--schoolos-surface)] px-3 text-xs font-bold text-[var(--schoolos-accent)]">{data.unassignedCount > 0 ? data.unassignedCount + " maaddo macallin la’aan" : "Dhammaan waa la qoondeeyay"}</div>
+    {!!data.termAliasConflicts?.length && <Card role="alert" className="border-amber-300 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+        <div className="min-w-0">
+          <h3 className="font-semibold text-amber-950 dark:text-amber-100">Qoondeynno Term/Semester is dul saaran</h3>
+          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+            {data.termAliasConflictCount} fasal/maaddo ayaa leh qoondeynno kala duwan oo ku jira Term iyo Semester leh taariikho isku mid ah. Xogta lama beddelin; hubi macallinka saxda ah ka hor intaadan wax ka beddelin.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {data.termAliasConflicts.map(conflict => <div key={conflict.classId + ':' + conflict.subjectId} className="rounded-lg border border-amber-200 bg-white/80 p-3 text-sm dark:border-amber-800 dark:bg-slate-950/40">
+          <p className="font-semibold text-slate-900 dark:text-white">{className(conflict.classId)} · {subjectName(conflict.subjectId)}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-700 dark:text-slate-300">{conflict.assignments.map(item => item.teacherName + ' (' + item.termName + ')').join(' · ')}</p>
+        </div>)}
+      </div>
+    </Card>}
     {view !== 'class' && <>
     <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {[['Maaddooyinka fasallada', data.totalClassSubjects], ['La qoondeeyey', data.assignedCount], ['Maaddo macallin la’aan', data.unassignedCount], ['Macallimiin culayskoodu badan yahay', data.overloadedCount]].map(([label, value]) =>
