@@ -1239,3 +1239,72 @@
     overflow-x: auto;
   }
 }
+
+
+/* Phone viewport fit: prevent the School Admin app drifting wider than the screen. */
+@media screen and (max-width: 767px) {
+  .school-admin-role,
+  .school-admin-role #root,
+  .school-admin-role main,
+  .school-admin-role main > div,
+  .school-admin-role main > div > * {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .school-admin-role {
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: clip !important;
+  }
+
+  .school-admin-role main {
+    width: 100% !important;
+    max-width: 100vw !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    overflow-x: clip !important;
+  }
+
+  .school-admin-role main > div:not(.pointer-events-none) {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .school-admin-role main :is(section, article, header, footer, .card, [class*="rounded-"]) {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .school-admin-role main :is(.flex, [class*="flex-"]) > *,
+  .school-admin-role main :is(.grid, [class*="grid-cols-"]) > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .school-admin-role main :is(img, video, canvas, svg) {
+    max-width: 100%;
+  }
+
+  .school-admin-role main :is(input, select, textarea) {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+  }
+
+  /* Wide data tables remain scrollable inside their own panel, never across the page. */
+  .school-admin-role main .overflow-x-auto {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+  }
+
+  .school-admin-role main :is(.schoolos-operation-header, .schoolos-people-header,
+    .schoolos-dash-welcome, .schoolos-dash-panel, .schoolos-dash-stat) {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
