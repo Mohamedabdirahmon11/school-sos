@@ -133,7 +133,8 @@ SELECT 'SQL migration integration checks passed' AS result;
 
 -- Exercise the Supabase index/RLS performance migration on isolated fixture tables.
 CREATE SCHEMA IF NOT EXISTS private;
-CREATE OR REPLACE FUNCTION private.auth_user_role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT 'school_admin'::text $$;
+CREATE OR REPLACE FUNCTION private.auth_user_role() RETURNS text LANGUAGE sql STABLE AS $ SELECT COALESCE(NULLIF(current_setting('app.user_role', true),''),'school_admin')::text $;
+CREATE OR REPLACE FUNCTION private.auth_school_id() RETURNS text LANGUAGE sql STABLE AS $ SELECT current_setting('app.school_id', true)::text $;
 CREATE OR REPLACE FUNCTION private.auth_has_term_assignment(varchar,varchar,varchar,uuid,varchar) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 CREATE OR REPLACE FUNCTION private.auth_can_access_student(varchar) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 
@@ -208,6 +209,27 @@ USING (private.auth_user_role() IN ('school_admin','super_admin','teacher'));
 CREATE POLICY term_status_admin_write ON public.term_status FOR ALL TO authenticated
 USING (private.auth_user_role() IN ('school_admin','super_admin'))
 WITH CHECK (private.auth_user_role() IN ('school_admin','super_admin'));
+CREATE POLICY mark_components_tenant_guard ON public.mark_components FOR ALL TO authenticated
+USING (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id())
+WITH CHECK (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id());
+CREATE POLICY mark_structures_tenant_guard ON public.mark_structures FOR ALL TO authenticated
+USING (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id())
+WITH CHECK (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id());
+CREATE POLICY report_cards_tenant_guard ON public.report_cards FOR ALL TO authenticated
+USING (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id())
+WITH CHECK (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id());
+CREATE POLICY term_status_tenant_guard ON public.term_status FOR ALL TO authenticated
+USING (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id())
+WITH CHECK (private.auth_user_role()='super_admin' OR school_id=private.auth_school_id());
+GRANT USAGE ON SCHEMA private TO authenticated;
+GRANT EXECUTE ON FUNCTION private.auth_user_role(), private.auth_school_id(), private.auth_has_term_assignment(varchar,varchar,varchar,uuid,varchar), private.auth_can_access_student(varchar) TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.mark_components, public.mark_structures, public.report_cards, public.term_status TO authenticated;
+
+INSERT INTO public.students(id,school_id) VALUES ('student-a','school-a'),('student-b','school-b');
+INSERT INTO public.mark_structures(id,school_id) VALUES ('ms-a','school-a'),('ms-b','school-b');
+INSERT INTO public.mark_components(id,school_id,structure_id) VALUES ('mc-a','school-a','ms-a'),('mc-b','school-b','ms-b');
+INSERT INTO public.report_cards(id,school_id,student_id) VALUES ('rc-a','school-a','student-a'),('rc-b','school-b','student-b');
+INSERT INTO public.term_status(id,school_id) VALUES ('term-a','school-a'),('term-b','school-b');
 
 \i supabase/migrations/20261126100000_supabase_duplicate_index_and_rls_policy_cleanup.sql
 \i supabase/migrations/20261126100000_supabase_duplicate_index_and_rls_policy_cleanup.sql
@@ -242,6 +264,40 @@ BEGIN
      OR report_policy NOT LIKE '%is_stale%' OR report_policy NOT LIKE '%auth_can_access_student%' THEN
     RAISE EXCEPTION 'combined report-card SELECT policy lost parent/student published-read restrictions';
   END IF;
+
+  SET ROLE authenticated;
+  SET app.school_id = 'school-a';
+  SET app.user_role = 'school_admin';
+  DO $tenant_rls$
+  DECLARE n integer;
+  BEGIN
+    SELECT count(*) INTO n FROM public.report_cards WHERE school_id='school-b';
+    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school report card'; END IF;
+    SELECT count(*) INTO n FROM public.mark_structures WHERE school_id='school-b';
+    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school mark structure'; END IF;
+    SELECT count(*) INTO n FROM public.mark_components WHERE school_id='school-b';
+    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school mark component'; END IF;
+    SELECT count(*) INTO n FROM public.term_status WHERE school_id='school-b';
+    IF n <> 0 THEN RAISE EXCEPTION 'school admin read another school term status'; END IF;
+    BEGIN
+      INSERT INTO public.report_cards(id,school_id,student_id) VALUES ('rc-cross-write','school-b','student-b');
+      RAISE EXCEPTION 'school admin inserted a report card into another school';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+  END
+  $tenant_rls$;
+  RESET ROLE;
+  SET ROLE authenticated;
+  SET app.school_id = 'school-a';
+  SET app.user_role = 'super_admin';
+  DO $super_admin_rls$
+  DECLARE n integer;
+  BEGIN
+    SELECT count(*) INTO n FROM public.report_cards WHERE school_id='school-b';
+    IF n <> 1 THEN RAISE EXCEPTION 'Super Admin lost global report-card visibility'; END IF;
+  END
+  $super_admin_rls$;
+  RESET ROLE;
 
   IF to_regclass('public.idx_attendance_student') IS NOT NULL
      OR to_regclass('public.academic_years_id_school_uidx') IS NOT NULL
