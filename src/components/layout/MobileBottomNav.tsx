@@ -1,6 +1,6 @@
 /**
  * Role-aware mobile shortcuts plus a dedicated full-menu entry.
- * School Admin has five shortcuts; its full menu opens from the header (top-left).
+ * School Admin has four primary shortcuts plus a fifth Menu button that opens the full drawer.
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
@@ -50,15 +50,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
   }
 
   if (isSchoolAdmin) {
-    const shortLabels: Record<string, string> = { sch_dashboard: 'Dashboard', sch_students: 'Students', sch_teachers: 'Teachers', sch_attendance: 'Attendance' };
+    const shortLabels: Record<string, string> = { sch_dashboard: 'Home', sch_students: 'Students', sch_teachers: 'Teachers', sch_attendance: 'Attendance' };
     return (
       <nav
-        aria-label="Quick navigation"
+        aria-label="School Admin quick navigation"
         data-mobile-role={role}
-        className="schoolos-mobile-bottom-nav md:hidden fixed z-40"
-        style={{ left: 14, right: 14, bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))', background: '#fff', borderRadius: 26, boxShadow: '0 12px 34px rgba(15,45,40,.22), 0 2px 6px rgba(15,45,40,.08)', padding: '6px 4px' }}
+        className="schoolos-mobile-bottom-nav schoolos-schooladmin-bottom-nav md:hidden fixed z-40"
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', alignItems: 'center', minHeight: 58 }}>
+        <div className="schoolos-schooladmin-bottom-inner">
           {tabs.map(route => {
             const Icon = route.icon;
             const isActive = !isMenuOpen && currentView === route.id;
@@ -70,13 +69,24 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
                 onClick={() => { onCloseMenu?.(); onNavigate(route.id); }}
                 aria-label={label}
                 aria-current={isActive ? 'page' : undefined}
-                style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 0', background: 'transparent', border: 0, color: isActive ? '#132a29' : '#a3adb5' }}
+                className={`schoolos-schooladmin-tab ${isActive ? 'is-active' : ''}`}
               >
-                <Icon aria-hidden="true" style={{ width: 23, height: 23, color: isActive ? '#19a58f' : '#a3adb5' }} strokeWidth={1.7} />
-                <span style={{ maxWidth: '100%', fontSize: 10, fontWeight: 600, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                <Icon aria-hidden="true" />
+                <span>{label}</span>
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={isMenuOpen ? onCloseMenu : onOpenMenu}
+            aria-label={isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMenuOpen}
+            aria-haspopup="dialog"
+            className={`schoolos-schooladmin-tab schoolos-schooladmin-menu-tab ${isMenuOpen ? 'is-active' : ''}`}
+          >
+            {isMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            <span>Menu</span>
+          </button>
         </div>
       </nav>
     );
