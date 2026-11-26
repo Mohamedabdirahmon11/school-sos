@@ -25,6 +25,50 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
     !route.permission || role !== 'accountant' || hasStaffNavigationPermission(user?.permissions, route.permission)
   );
 
+  if (isSchoolAdmin) {
+    const shortLabels: Record<string, string> = { sch_dashboard: 'Dashboard', sch_students: 'Students', sch_teachers: 'Teachers', sch_attendance: 'Attendance' };
+    return (
+      <nav
+        aria-label="Quick navigation"
+        data-mobile-role={role}
+        className="schoolos-mobile-bottom-nav md:hidden fixed z-40"
+        style={{ left: 14, right: 14, bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))', background: '#fff', borderRadius: 26, boxShadow: '0 12px 34px rgba(15,45,40,.22), 0 2px 6px rgba(15,45,40,.08)', padding: '6px 4px' }}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', alignItems: 'center', minHeight: 58 }}>
+          {tabs.map(route => {
+            const Icon = route.icon;
+            const isActive = !isMenuOpen && currentView === route.id;
+            const label = shortLabels[route.id] || (route.labelKey ? t(route.labelKey as any) : route.label);
+            return (
+              <button
+                key={route.id}
+                type="button"
+                onClick={() => { onCloseMenu?.(); onNavigate(route.id); }}
+                aria-label={label}
+                aria-current={isActive ? 'page' : undefined}
+                style={{ minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '6px 0', background: 'transparent', border: 0, color: isActive ? '#132a29' : '#a3adb5' }}
+              >
+                <Icon aria-hidden="true" style={{ width: 23, height: 23, color: isActive ? '#19a58f' : '#a3adb5' }} strokeWidth={1.7} />
+                <span style={{ maxWidth: '100%', fontSize: 10, fontWeight: 600, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={isMenuOpen ? onCloseMenu : onOpenMenu}
+            aria-label={isMenuOpen ? 'Close full navigation menu' : 'Open full navigation menu'}
+            aria-expanded={isMenuOpen}
+            aria-haspopup="dialog"
+            title="Menu"
+            style={{ width: 48, height: 48, margin: '0 auto', display: 'grid', placeItems: 'center', border: 0, borderRadius: '50%', color: '#fff', background: 'linear-gradient(135deg, #6fd0a0 0%, #6aa6cb 100%)', boxShadow: '0 6px 16px rgba(60,150,150,.38)' }}
+          >
+            {isMenuOpen ? <X aria-hidden="true" style={{ width: 22, height: 22 }} /> : <Menu aria-hidden="true" style={{ width: 22, height: 22 }} />}
+          </button>
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <nav
       aria-label="Quick navigation"
