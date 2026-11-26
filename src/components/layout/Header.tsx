@@ -115,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
     <header className="schoolos-topbar min-h-14 h-auto bg-white border-b border-[#E2E8F0] px-4 py-2 md:px-6 flex items-center justify-between gap-3 shrink-0 z-20">
       {/* Zone 1: Contextual Breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        {onOpenMenu && user?.role === 'school_admin' && (
+        {onOpenMenu && (user?.role === 'school_admin' || (user?.role === 'super_admin' && !inspectedSchool)) && (
           <button type="button" onClick={onOpenMenu} aria-label="Open full navigation menu" title="Menu"
             className="schoolos-topbar-menu grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white active:scale-90 md:hidden"
             style={{ background: 'linear-gradient(135deg, #6fd0a0 0%, #3fa8b8 60%, #6aa6cb 100%)', boxShadow: '0 6px 16px rgba(60,150,160,.40)', transition: 'transform .15s ease' }}>
