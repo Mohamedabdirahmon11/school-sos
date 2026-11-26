@@ -798,6 +798,9 @@
 }
 
 
+/* Workspace scale is controlled by the saved School Settings zoom slider. */
+.school-admin-role main { zoom: var(--school-ui-zoom, .96); }
+
 /* Premium desktop sidebar — all configurable values come from School Settings. */
 @media (min-width: 768px) {
   .school-admin-role aside.school-admin-sidebar {
