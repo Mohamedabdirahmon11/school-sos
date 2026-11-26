@@ -138,6 +138,7 @@ CREATE OR REPLACE FUNCTION private.auth_has_term_assignment(varchar,varchar,varc
 CREATE OR REPLACE FUNCTION private.auth_can_access_student(varchar) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT true $$;
 
 CREATE TABLE IF NOT EXISTS public.class_sections (id text NOT NULL, school_id varchar NOT NULL);
+CREATE TABLE IF NOT EXISTS public.attendance_records (id text NOT NULL, school_id varchar NOT NULL, student_id text NOT NULL, date date NOT NULL);
 CREATE TABLE IF NOT EXISTS public.students (id text NOT NULL, school_id varchar NOT NULL);
 CREATE TABLE IF NOT EXISTS public.subjects (id text NOT NULL, school_id varchar NOT NULL);
 CREATE TABLE IF NOT EXISTS public.mark_structures (id text NOT NULL, school_id varchar NOT NULL, class_id text, term_id uuid);
@@ -154,6 +155,8 @@ ALTER TABLE public.report_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.term_status ENABLE ROW LEVEL SECURITY;
 
 CREATE UNIQUE INDEX IF NOT EXISTS academic_years_id_school_uidx ON public.academic_years(id,school_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_school_student_date ON public.attendance_records(school_id,student_id,date);
+CREATE INDEX IF NOT EXISTS idx_attendance_student ON public.attendance_records(school_id,student_id,date);
 CREATE UNIQUE INDEX IF NOT EXISTS class_sections_id_school_uidx ON public.class_sections(id,school_id);
 CREATE UNIQUE INDEX IF NOT EXISTS classes_id_school_id_uidx ON public.classes(id,school_id);
 CREATE UNIQUE INDEX IF NOT EXISTS classes_id_school_uidx ON public.classes(id,school_id);
@@ -240,7 +243,8 @@ BEGIN
     RAISE EXCEPTION 'combined report-card SELECT policy lost parent/student published-read restrictions';
   END IF;
 
-  IF to_regclass('public.academic_years_id_school_uidx') IS NOT NULL
+  IF to_regclass('public.idx_attendance_student') IS NOT NULL
+     OR to_regclass('public.academic_years_id_school_uidx') IS NOT NULL
      OR to_regclass('public.class_sections_id_school_uidx') IS NOT NULL
      OR to_regclass('public.classes_id_school_id_uidx') IS NOT NULL
      OR to_regclass('public.classes_id_school_uidx') IS NOT NULL
