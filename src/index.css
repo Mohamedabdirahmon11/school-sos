@@ -5488,3 +5488,166 @@ main :is(.flex, .inline-flex) > * {
     transition:none;
   }
 }
+
+
+/* Desktop-only School Admin sidebar refinement. Mobile drawer styles remain untouched. */
+@media (min-width: 768px) {
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] {
+    width: var(--sidebar-width, 264px) !important;
+    flex-basis: var(--sidebar-width, 264px) !important;
+    border: 0 !important;
+    border-right: 1px solid rgba(255,255,255,.10) !important;
+    box-shadow: 10px 0 34px rgba(15, 35, 68, .10) !important;
+    transition: width .22s ease, flex-basis .22s ease, background .2s ease;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed {
+    width: 76px !important;
+    flex-basis: 76px !important;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] > div:first-child {
+    min-height: 84px;
+    height: 84px;
+    padding: 15px 17px;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.035);
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] > div:first-child > div:first-child {
+    width: 43px;
+    height: 43px;
+    border-radius: 13px;
+    box-shadow: 0 5px 14px rgba(0,0,0,.16);
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav {
+    padding: 17px 12px 20px;
+    gap: 18px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(210,230,255,.24) transparent;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav > button {
+    min-height: 34px;
+    margin: 0 2px 5px;
+    padding: 7px 10px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    color: rgba(238,245,255,.78);
+    justify-content: flex-start;
+    font-size: 11px;
+    letter-spacing: .01em;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav > button:hover {
+    background: rgba(255,255,255,.075);
+    color: #fff;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav > label {
+    min-height: 39px;
+    margin: 0 2px 9px;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 11px;
+    background: rgba(4,16,37,.20);
+    color: rgba(240,247,255,.82);
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav > label:focus-within {
+    border-color: var(--sidebar-accent, #36b8a5);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sidebar-accent, #36b8a5) 18%, transparent);
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section h2 {
+    margin: 7px 9px 8px;
+    color: rgba(205,222,248,.55) !important;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .15em;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section > div {
+    display: grid;
+    gap: 3px;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section button {
+    position: relative;
+    min-height: 41px;
+    align-items: center;
+    gap: 11px;
+    padding: 8px 11px;
+    border: 1px solid transparent;
+    border-radius: 10px !important;
+    color: rgba(235,243,255,.78) !important;
+    font-size: 12px !important;
+    font-weight: 550;
+    line-height: 1.25;
+    box-shadow: none;
+    transition: background .16s ease, color .16s ease, border-color .16s ease, transform .16s ease;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section button:hover {
+    background: rgba(255,255,255,.075) !important;
+    border-color: rgba(255,255,255,.055);
+    color: #fff !important;
+    transform: translateX(2px);
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section button > span:first-child {
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    border-radius: 9px;
+    background: rgba(255,255,255,.055);
+    color: rgba(218,233,255,.78) !important;
+    transition: background .16s ease, color .16s ease;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section button > span:first-child svg {
+    width: 16px;
+    height: 16px;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section button[aria-current="page"] {
+    min-height: 43px;
+    background: linear-gradient(105deg, color-mix(in srgb, var(--sidebar-accent, #20a58e) 95%, white), var(--sidebar-accent, #168575)) !important;
+    border-color: rgba(220,255,246,.20) !important;
+    color: var(--sidebar-accent-foreground, #fff) !important;
+    box-shadow: 0 6px 16px rgba(2,18,30,.20), inset 0 1px 0 rgba(255,255,255,.15) !important;
+    font-weight: 700;
+    transform: none;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] nav section button[aria-current="page"] > span:first-child {
+    background: rgba(255,255,255,.17);
+    color: inherit !important;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] > div:last-of-type {
+    margin: 8px 10px 0;
+    padding: 11px 9px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 13px;
+    background: rgba(255,255,255,.055);
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] .school-admin-drawer-logout {
+    min-height: 42px;
+    margin: 9px 10px 12px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 11px;
+    background: rgba(255,255,255,.055);
+    color: rgba(244,248,255,.86);
+    transition: background .16s ease, border-color .16s ease, color .16s ease;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"] .school-admin-drawer-logout:hover {
+    background: rgba(220,65,80,.15);
+    border-color: rgba(255,145,155,.24);
+    color: #fff;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed nav section h2,
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed nav > label,
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed > div:last-of-type,
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed .school-admin-drawer-logout span {
+    display: none;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed nav section button {
+    justify-content: center;
+    padding-inline: 5px;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed nav section button > span:first-child {
+    width: 34px;
+    height: 34px;
+  }
+  .school-admin-role aside.school-admin-sidebar[data-mobile-role="school_admin"].school-admin-sidebar-collapsed .school-admin-drawer-logout {
+    width: 42px;
+    min-width: 42px;
+    margin-inline: auto;
+    padding: 0;
+  }
+}
