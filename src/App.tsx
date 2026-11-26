@@ -76,6 +76,12 @@ const AppContent: React.FC = () => {
     void import('./components/superadmin/super-admin-mobile.css');
   }, [user?.role, inspectedSchool?.id]);
 
+  // Load the premium School Admin page system across every School Admin route.
+  React.useEffect(() => {
+    if (user?.role !== 'school_admin') return;
+    void import('./components/schooladmin/school-admin-premium.css');
+  }, [user?.role]);
+
   React.useEffect(() => {
     const onApiError = (event: Event) => {
       const detail = (event as CustomEvent<{ status: number; message: string; code?: string }>).detail;
