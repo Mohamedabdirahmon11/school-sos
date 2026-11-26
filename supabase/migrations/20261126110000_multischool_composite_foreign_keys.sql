@@ -10,6 +10,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS fee_structures_id_school_uidx
 CREATE UNIQUE INDEX IF NOT EXISTS student_invoices_id_school_uidx
   ON public.student_invoices (id, school_id);
 
+-- Cover the child-side columns of the new composite foreign keys.
+CREATE INDEX IF NOT EXISTS idx_admission_applications_student_school_fk ON public.admission_applications (student_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_assignment_submissions_assignment_school_fk ON public.assignment_submissions (assignment_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_subject_school_fk ON public.assignments (subject_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_assignments_teacher_school_fk ON public.assignments (teacher_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_fee_payments_structure_school_fk ON public.fee_payments (fee_structure_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_form_teacher_comments_teacher_school_fk ON public.form_teacher_comments (teacher_user_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_staff_members_user_school_fk ON public.staff_members (user_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_student_invoice_items_structure_school_fk ON public.student_invoice_items (fee_structure_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_student_marks_subject_school_fk ON public.student_marks (subject_id, school_id);
+CREATE INDEX IF NOT EXISTS idx_student_marks_submitter_school_fk ON public.student_marks (submitted_by, school_id);
+CREATE INDEX IF NOT EXISTS idx_teachers_user_school_fk ON public.teachers (user_id, school_id);
+
 -- A submission without a tenant key cannot be safely isolated.
 ALTER TABLE public.assignment_submissions
   ALTER COLUMN school_id SET NOT NULL;
