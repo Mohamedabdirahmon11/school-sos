@@ -43,7 +43,7 @@ type FeeStructureLike = {
 export function normalizeStudentPhone(value: unknown): string {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
-  const digits = raw.replace(/\\D/g, '');
+  const digits = raw.replace(/\D/g, '');
   if (digits.length < 7 || digits.length > 15) return '';
   if (digits.startsWith('00251')) return `+251${digits.slice(5)}`;
   if (digits.startsWith('251')) return `+${digits}`;
@@ -83,7 +83,7 @@ export function resolveStudentStatus(value: unknown): 'active' | 'inactive' | 't
   return 'active';
 }
 
-const normalizedLabel = (value: unknown) => String(value ?? '').trim().replace(/\\s+/g, ' ').toLowerCase();
+const normalizedLabel = (value: unknown) => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 
 export function resolveStudentClassName(
   student: StudentRowLike,
@@ -109,7 +109,7 @@ export function resolveStudentFeeStructure(
   const klass = classes.find(item => String(item.id) === classId)
     || classes.find(item => normalizedLabel([item.name, item.section].filter(Boolean).join(' · ')) === normalizedLabel(suppliedClassName));
   const resolvedClassId = classId || String(klass?.id || '');
-  const grade = Number(klass?.gradeLevel ?? klass?.grade_level ?? (suppliedClassName.match(/(?:grade|g)\\s*(\\d+)/i)?.[1] || NaN));
+  const grade = Number(klass?.gradeLevel ?? klass?.grade_level ?? (suppliedClassName.match(/(?:grade|g)\s*(\d+)/i)?.[1] || NaN));
   const year = String(academicYear || '').trim();
   return structures
     .filter(item => {
