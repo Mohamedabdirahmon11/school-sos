@@ -19,6 +19,7 @@ import { ExamTimetablePrint, formatSomaliExamDate, printExamTimetable } from '..
 // The date picker now uses Somali weekday labels instead of weekday: 'long'.
 import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
 import { AcademicResultsWorkspace } from './AcademicResultsWorkspace.tsx';
+import { TermMarksWorkspace } from './TermMarksWorkspace.tsx';
 import { TermExamSchedulingPanel } from './TermExamSchedulingPanel.tsx';
 import { SchoolClass, Subject, Student, ExamConfig, ExamAssessmentComponent, StudentMark } from '../../types/index.ts';
 import { 
@@ -476,7 +477,7 @@ const EXAM_REDESIGN_STYLES = `
 }
 `;
 
-export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> = ({ initialTab = 'marks' }) => {
+export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' | 'term_marks' }> = ({ initialTab = 'term_marks' }) => {
   const { school, isReadOnly, t, refreshUser } = useAuth();
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -484,7 +485,7 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
   const [classSubjectRows, setClassSubjectRows] = useState<Array<{ id: string; subject: Subject | null; teacher: { id: string; fullName: string } | null }>>([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule' | 'marks' | 'approval'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'results_explorer' | 'analytics' | 'entry_approval' | 'sem1_rankings' | 'sem2_yearly' | 'config' | 'schedule' | 'marks' | 'approval' | 'term_marks'>(initialTab);
   useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const [selectedSemester, setSelectedSemester] = useState<'Semester 1' | 'Semester 2'>('Semester 1');
 
@@ -1096,28 +1097,34 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
   const pendingClassMarkCount = marks.filter(mark => mark.status === 'form_teacher_submitted').length;
 
   return (
-    <div className="schoolos-marks-page exam-management-redesign mx-auto min-w-0 w-full max-w-[1680px] space-y-6">
+    <div className={activeTab === 'term_marks' ? 'mx-auto min-w-0 w-full max-w-[1680px] space-y-6 p-3 md:p-6' : 'schoolos-marks-page exam-management-redesign mx-auto min-w-0 w-full max-w-[1680px] space-y-6'}>
       <style>{EXAM_REDESIGN_STYLES}</style>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#18202c] flex items-center gap-2">
             <FileSpreadsheet className="h-6 w-6 text-[#2563eb]" />
-            {activeTab === 'approval' ? 'Marks Approval' : 'Marks Entry'}
+            {activeTab === 'approval' ? 'Marks Approval' : activeTab === 'term_marks' ? 'Term Marks & Report Cards' : 'Marks Register'}
           </h1>
           <p className="mt-1 text-sm text-[#667085]">
             {activeTab === 'approval'
-              ? 'Review each subject submission, approve or return pending marks, and publish approved results.'
-              : 'Enter and review student marks by subject, class and semester.'}
+              ? 'Review legacy subject submissions, approve or return pending marks, and publish approved results.'
+              : activeTab === 'term_marks'
+                ? 'Configure term assessment components, review results, close terms and publish annual report cards.'
+                : 'Review the legacy student marks register by subject, class and semester.'}
             {selectedClass ? ` Current class: ${selectedClass.name} (${selectedClass.section}).` : ''}
           </p>
         </div>
       </div>
 
       <div role="group" aria-label="Exam marks workflow" className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+        <button type="button" aria-pressed={activeTab === 'term_marks'} onClick={() => setActiveTab('term_marks')}
+          className={activeTab === 'term_marks' ? 'rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm' : 'rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100'}>
+          Term Marks & Report Cards
+        </button>
         <button type="button" aria-pressed={activeTab === 'marks'} onClick={() => setActiveTab('marks')}
           className={activeTab === 'marks' ? 'rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm' : 'rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100'}>
-          Marks Entry
+          Marks Register
         </button>
         <button type="button" aria-pressed={activeTab === 'approval'} onClick={() => setActiveTab('approval')}
           className={activeTab === 'approval' ? 'rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm' : 'rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100'}>
@@ -1132,6 +1139,8 @@ export const ExamsResultsView: React.FC<{ initialTab?: 'marks' | 'approval' }> =
           <span>{notice}</span>
         </div>
       )}
+
+      {activeTab === 'term_marks' && <TermMarksWorkspace classes={classes} />}
 
       {(activeTab === 'marks' || activeTab === 'approval') && (
         <section className="space-y-4">
