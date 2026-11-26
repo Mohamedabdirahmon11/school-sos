@@ -512,14 +512,15 @@ export const ClassesSubjectsView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block font-medium">Section (optional)</label>
-                  <input
-                    type="text"
+                  <select
                     value={section}
-                    onChange={e => setSection(e.target.value.toUpperCase())}
-                    placeholder="Leave blank if the class has no sections"
-                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg uppercase font-mono"
-                  />
-                  <p className="mt-1 text-[10px] text-slate-500">If the school uses sections, create separate rows for A, B or C. Leave blank when it has no sections.</p>
+                    onChange={e => setSection(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-[#CBD5E1] rounded-lg bg-white font-mono"
+                  >
+                    <option value="">No section</option>
+                    {['A', 'B', 'C', 'D'].map(value => <option key={value} value={value}>Section {value}</option>)}
+                  </select>
+                  <p className="mt-1 text-[10px] text-slate-500">Dooro Section A, B, C ama D.</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
