@@ -2005,7 +2005,9 @@ class StorageEngine {
       studentId: student.studentId,
       passwordHash: '',
       pin: pinHash,
-      mustChangePassword: true,
+      // The school-issued initial PIN is valid for direct student portal login.
+      // Only an explicit admin PIN reset requires first-login rotation.
+      mustChangePassword: false,
       isBlocked: false,
       failedLoginAttempts: 0,
       createdAt: new Date().toISOString()
