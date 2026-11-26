@@ -55,11 +55,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
     root.style.setProperty('--sidebar-background', background);
     root.style.setProperty('--sidebar-text', theme?.textColor || preset?.text || '#ffffff');
     root.style.setProperty('--sidebar-accent', accent);
-    root.style.setProperty('--sidebar-accent-foreground', luminance > 0.42 ? '#111827' : '#ffffff');
+    root.style.setProperty('--sidebar-accent-foreground', luminance > 0.179 ? '#111827' : '#ffffff');
     root.style.setProperty('--sidebar-width', (theme?.width || 250) + 'px');
     root.style.setProperty('--school-ui-zoom', String((theme?.zoom ?? 96) / 100));
     root.style.setProperty('--sidebar-radius', theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px');
     root.style.setProperty('--sidebar-font-size', theme?.fontSize === 'small' ? '12px' : theme?.fontSize === 'large' ? '14px' : '13px');
+    const activeStyle = theme?.activeStyle || 'pill';
+    root.style.setProperty('--sidebar-active-background', activeStyle === 'bar' || activeStyle === 'outline' ? 'transparent' : 'var(--sidebar-accent)');
+    root.style.setProperty('--sidebar-active-foreground', activeStyle === 'bar' || activeStyle === 'outline' ? (theme?.textColor || '#ffffff') : (luminance > 0.42 ? '#111827' : '#ffffff'));
+    root.style.setProperty('--sidebar-active-border', activeStyle === 'outline' ? '1px solid var(--sidebar-accent)' : '1px solid transparent');
+    root.style.setProperty('--sidebar-active-radius', activeStyle === 'pill' ? '999px' : (theme?.radius === 'sharp' ? '4px' : theme?.radius === 'medium' ? '10px' : '14px'));
+    root.style.setProperty('--sidebar-item-height', theme?.density === 'compact' ? '36px' : theme?.density === 'spacious' ? '48px' : '41px');
+    root.style.setProperty('--sidebar-item-gap', theme?.density === 'compact' ? '2px' : theme?.density === 'spacious' ? '6px' : '3px');
   }, [school?.id, school?.sidebarTheme]);
   const menuTranslations: Record<string, Partial<Record<Exclude<LanguageCode, 'en'>, string>>> = {
     Platform: { so: 'Madasha Guud', am: 'መድረክ', ar: 'المنصة' },
