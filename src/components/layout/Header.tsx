@@ -7,16 +7,17 @@ import { useAuth } from '../../context/AuthContext.tsx';
 import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { LanguageCode } from '../../lib/translations.ts';
-import { Globe, Bell, LogOut, ShieldAlert, KeyRound, ChevronDown, Check, User as UserIcon } from 'lucide-react';
+import { Menu as MenuIcon, Globe, Bell, LogOut, ShieldAlert, KeyRound, ChevronDown, Check, User as UserIcon } from 'lucide-react';
 import { ProfileModal } from '../common/ProfileModal.tsx';
 
 interface HeaderProps {
   currentView: string;
   onNavigate: (view: string) => void;
   onOpenChangePassword?: () => void;
+  onOpenMenu?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenChangePassword }) => {
+export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenChangePassword, onOpenMenu }) => {
   const { user, school, inspectedSchool, viewAsSchool, language, setLanguage, t, logout, isReadOnly } = useAuth();
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -109,6 +110,12 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
     <header className="schoolos-topbar min-h-14 h-auto bg-white border-b border-[#E2E8F0] px-4 py-2 md:px-6 flex items-center justify-between gap-3 shrink-0 z-20">
       {/* Zone 1: Contextual Breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
+        {onOpenMenu && user?.role === 'school_admin' && (
+          <button type="button" onClick={onOpenMenu} aria-label="Open full navigation menu" title="Menu"
+            className="schoolos-topbar-menu grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#0F766E] text-white shadow-sm active:scale-95 md:hidden">
+            <MenuIcon aria-hidden="true" className="h-5 w-5" />
+          </button>
+        )}
         {school && <div title={school.name} className={`grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg md:hidden ${school.logoUrl ? "border border-slate-200 bg-white p-0.5" : ""}`} style={!school.logoUrl ? { backgroundColor: "var(--brand-color)", color: "var(--brand-foreground)" } : undefined}>
           {school.logoUrl ? <img src={school.logoUrl} alt={`${school.name} logo`} className="h-full w-full object-contain" /> : <span className="text-xs font-black">{school.name.trim().charAt(0).toUpperCase() || "S"}</span>}
         </div>}
