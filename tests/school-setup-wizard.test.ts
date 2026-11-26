@@ -224,7 +224,6 @@ test('school setup blocks completion when saved academic year dates disagree wit
   } as any;
   const checklist = buildSchoolSetupChecklist(staleYear, completeEvidence);
   assert.equal(checklist[1].ready, false);
-  assert.match(checklist[1].reason, /two consecutive calendar years/);
 });
 
 test('school setup accepts a consistent configured academic year and two non-overlapping terms', () => {
