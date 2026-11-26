@@ -3,9 +3,10 @@
 
 BEGIN;
 
--- Remove exact duplicate, non-constraint-backed unique indexes only.
+-- Remove exact duplicate, non-constraint-backed indexes only.
 -- The retained indexes below are the ones referenced by constraints.
 DROP INDEX IF EXISTS public.academic_years_id_school_uidx;
+DROP INDEX IF EXISTS public.idx_attendance_student;
 DROP INDEX IF EXISTS public.class_sections_id_school_uidx;
 DROP INDEX IF EXISTS public.classes_id_school_id_uidx;
 DROP INDEX IF EXISTS public.classes_id_school_uidx;
