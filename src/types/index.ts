@@ -283,6 +283,8 @@ export interface SchoolClass {
   classCode?: string;
   academicYear?: string;
   gradeLevel: number; // 0 = KG, 1 to 12
+  /** Kindergarten stage (1–3); null/undefined preserves legacy generic KG rows. */
+  kindergartenLevel?: 1 | 2 | 3 | null;
   section: string; // Optional: "A", "B", etc.
   roomNumber: string;
   capacity: number;
