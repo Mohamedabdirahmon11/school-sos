@@ -14,7 +14,7 @@ test('Classes & Sections uses live school classes and real active teachers', () 
 });
 
 test('Grade 1–12 standard creates only missing Section A classes for the configured school year', () => {
-  assert.match(view, /for \(let level = 1; level <= 8; level \+= 1\)/);
+  assert.match(view, /for \(let level = 1; level <= 12; level \+= 1\)/);
   assert.match(view, /createClass\(level, 'A'/);
   assert.match(view, /row\.section\.trim\(\)\.toUpperCase\(\) === 'A'/);
   assert.match(view, /school\.academicYear/);
