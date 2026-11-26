@@ -3413,7 +3413,7 @@ apiRouter.put('/classes/:id', requireAuth, requireSchoolContext, async (req, res
   if (hasActiveClassIdentityConflict(allClasses, {
     academicYear,
     gradeLevel: Number(req.body?.gradeLevel ?? existing.gradeLevel),
-    kindergartenLevel: req.body?.kindergartenLevel === undefined ? existing.kindergartenLevel : (req.body.kindergartenLevel == null || req.body.kindergartenLevel === '' ? null : Number(req.body.kindergartenLevel)),
+    kindergartenLevel: Number(req.body?.gradeLevel ?? existing.gradeLevel) !== 0 ? null : (req.body?.kindergartenLevel === undefined ? existing.kindergartenLevel : (req.body.kindergartenLevel == null || req.body.kindergartenLevel === '' ? null : Number(req.body.kindergartenLevel))),
     section: String(req.body?.section ?? existing.section ?? '')
   }, existing.id)) {
     res.status(409).json({ code: 'CLASS_SECTION_EXISTS', error: 'Another active class already uses this school/year/grade/section.' }); return;
