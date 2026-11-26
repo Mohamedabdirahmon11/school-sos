@@ -59,10 +59,6 @@ BEGIN
     ALTER TABLE public.attendance_records ADD CONSTRAINT attendance_records_student_school_fk
       FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE CASCADE NOT VALID;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.attendance_records'::regclass AND conname='attendance_records_recorder_school_fk') THEN
-    ALTER TABLE public.attendance_records ADD CONSTRAINT attendance_records_recorder_school_fk
-      FOREIGN KEY (recorded_by, school_id) REFERENCES public.users(id, school_id) NOT VALID;
-  END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.class_subjects'::regclass AND conname='class_subjects_teacher_school_fk') THEN
     ALTER TABLE public.class_subjects ADD CONSTRAINT class_subjects_teacher_school_fk
@@ -85,14 +81,6 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.fee_payments'::regclass AND conname='fee_payments_invoice_school_fk') THEN
     ALTER TABLE public.fee_payments ADD CONSTRAINT fee_payments_invoice_school_fk
       FOREIGN KEY (invoice_id, school_id) REFERENCES public.student_invoices(id, school_id) ON DELETE SET NULL (invoice_id) NOT VALID;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.fee_payments'::regclass AND conname='fee_payments_recorder_school_fk') THEN
-    ALTER TABLE public.fee_payments ADD CONSTRAINT fee_payments_recorder_school_fk
-      FOREIGN KEY (recorded_by, school_id) REFERENCES public.users(id, school_id) NOT VALID;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.fee_payments'::regclass AND conname='fee_payments_voider_school_fk') THEN
-    ALTER TABLE public.fee_payments ADD CONSTRAINT fee_payments_voider_school_fk
-      FOREIGN KEY (voided_by, school_id) REFERENCES public.users(id, school_id) NOT VALID;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.fee_structures'::regclass AND conname='fee_structures_class_school_fk') THEN
@@ -126,10 +114,6 @@ BEGIN
     ALTER TABLE public.student_invoices ADD CONSTRAINT student_invoices_student_school_fk
       FOREIGN KEY (student_id, school_id) REFERENCES public.students(id, school_id) ON DELETE RESTRICT NOT VALID;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.student_invoices'::regclass AND conname='student_invoices_creator_school_fk') THEN
-    ALTER TABLE public.student_invoices ADD CONSTRAINT student_invoices_creator_school_fk
-      FOREIGN KEY (created_by, school_id) REFERENCES public.users(id, school_id) ON DELETE SET NULL (created_by) NOT VALID;
-  END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.student_marks'::regclass AND conname='student_marks_class_school_fk') THEN
     ALTER TABLE public.student_marks ADD CONSTRAINT student_marks_class_school_fk
@@ -146,10 +130,6 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.student_marks'::regclass AND conname='student_marks_submitter_school_fk') THEN
     ALTER TABLE public.student_marks ADD CONSTRAINT student_marks_submitter_school_fk
       FOREIGN KEY (submitted_by, school_id) REFERENCES public.users(id, school_id) NOT VALID;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.student_marks'::regclass AND conname='student_marks_approver_school_fk') THEN
-    ALTER TABLE public.student_marks ADD CONSTRAINT student_marks_approver_school_fk
-      FOREIGN KEY (approved_by, school_id) REFERENCES public.users(id, school_id) NOT VALID;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.teachers'::regclass AND conname='teachers_user_school_fk') THEN
@@ -173,14 +153,11 @@ ALTER TABLE public.assignments VALIDATE CONSTRAINT assignments_subject_school_fk
 ALTER TABLE public.assignments VALIDATE CONSTRAINT assignments_teacher_school_fk;
 ALTER TABLE public.attendance_records VALIDATE CONSTRAINT attendance_records_class_school_fk;
 ALTER TABLE public.attendance_records VALIDATE CONSTRAINT attendance_records_student_school_fk;
-ALTER TABLE public.attendance_records VALIDATE CONSTRAINT attendance_records_recorder_school_fk;
 ALTER TABLE public.class_subjects VALIDATE CONSTRAINT class_subjects_teacher_school_fk;
 ALTER TABLE public.classes VALIDATE CONSTRAINT classes_form_teacher_school_fk;
 ALTER TABLE public.fee_payments VALIDATE CONSTRAINT fee_payments_student_school_fk;
 ALTER TABLE public.fee_payments VALIDATE CONSTRAINT fee_payments_structure_school_fk;
 ALTER TABLE public.fee_payments VALIDATE CONSTRAINT fee_payments_invoice_school_fk;
-ALTER TABLE public.fee_payments VALIDATE CONSTRAINT fee_payments_recorder_school_fk;
-ALTER TABLE public.fee_payments VALIDATE CONSTRAINT fee_payments_voider_school_fk;
 ALTER TABLE public.fee_structures VALIDATE CONSTRAINT fee_structures_class_school_fk;
 ALTER TABLE public.form_teacher_comments VALIDATE CONSTRAINT form_teacher_comments_class_school_fk;
 ALTER TABLE public.form_teacher_comments VALIDATE CONSTRAINT form_teacher_comments_student_school_fk;
@@ -188,12 +165,10 @@ ALTER TABLE public.form_teacher_comments VALIDATE CONSTRAINT form_teacher_commen
 ALTER TABLE public.student_invoice_items VALIDATE CONSTRAINT student_invoice_items_invoice_school_fk;
 ALTER TABLE public.student_invoice_items VALIDATE CONSTRAINT student_invoice_items_structure_school_fk;
 ALTER TABLE public.student_invoices VALIDATE CONSTRAINT student_invoices_student_school_fk;
-ALTER TABLE public.student_invoices VALIDATE CONSTRAINT student_invoices_creator_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_class_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_student_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_subject_school_fk;
 ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_submitter_school_fk;
-ALTER TABLE public.student_marks VALIDATE CONSTRAINT student_marks_approver_school_fk;
 ALTER TABLE public.teachers VALIDATE CONSTRAINT teachers_user_school_fk;
 ALTER TABLE public.staff_members VALIDATE CONSTRAINT staff_members_user_school_fk;
 
