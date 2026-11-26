@@ -47,6 +47,19 @@ BEGIN
   IF (SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='assignment_submissions' AND column_name='school_id') <> 'NO' THEN
     RAISE EXCEPTION 'assignment_submissions.school_id must be NOT NULL';
   END IF;
+  IF to_regclass('public.school_branches_id_school_uidx') IS NULL
+     OR to_regclass('public.idx_classes_branch_school_fk') IS NULL
+     OR to_regclass('public.idx_class_sections_class_school_fk') IS NULL
+     OR to_regclass('public.idx_class_sections_legacy_class_school_fk') IS NULL
+     OR to_regclass('public.idx_students_branch_school_fk') IS NULL
+     OR to_regclass('public.idx_timetable_slots_class_school_fk') IS NULL
+     OR to_regclass('public.idx_timetable_slots_subject_school_fk') IS NULL
+     OR to_regclass('public.idx_timetable_slots_teacher_school_fk') IS NULL
+     OR to_regclass('public.idx_parent_students_student_school_fk') IS NULL
+     OR to_regclass('public.idx_parent_students_parent_school_fk') IS NULL
+     OR to_regclass('public.idx_communication_queue_student_school_fk') IS NULL THEN
+    RAISE EXCEPTION 'a student/parent/timetable tenant index is missing';
+  END IF;
   IF to_regclass('public.idx_admission_applications_student_school_fk') IS NULL
      OR to_regclass('public.idx_assignment_submissions_assignment_school_fk') IS NULL
      OR to_regclass('public.idx_assignments_subject_school_fk') IS NULL
