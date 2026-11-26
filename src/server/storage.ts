@@ -300,7 +300,7 @@ const TABLE_FIELD_MAP: Record<string, Record<string, string>> = {
   students: { pinHash: 'pin_hash', studentId: 'student_id' },
   teachers: { userId: 'user_id', staffId: 'staff_id', assignedClasses: 'assigned_classes', assignedSubjects: 'assigned_subjects' },
   staff_members: { userId: 'user_id', roleTitle: 'role_title', monthlySalary: 'monthly_salary', joinedDate: 'joined_date', staffId: 'staff_id' },
-  classes: { gradeLevel: 'grade_level', classTeacherId: 'class_teacher_id', roomNumber: 'room_number', monthlyFee: 'monthly_fee', isArchived: 'is_archived' },
+  classes: { gradeLevel: 'grade_level', kindergartenLevel: 'kindergarten_level', classTeacherId: 'class_teacher_id', roomNumber: 'room_number', monthlyFee: 'monthly_fee', isArchived: 'is_archived' },
   subjects: { creditUnits: 'credit_units', assignedTeacherIds: 'assigned_teacher_ids' },
   school_notices: { audience: 'audience', isPinned: 'is_pinned', publishDate: 'publish_date', authorName: 'author_name', authorRole: 'author_role', classId: 'class_id', isActive: 'is_active' },
   direct_messages: { recipientId: 'recipient_id', senderId: 'sender_id', senderRole: 'sender_role', senderName: 'sender_name', isRead: 'is_read' },
