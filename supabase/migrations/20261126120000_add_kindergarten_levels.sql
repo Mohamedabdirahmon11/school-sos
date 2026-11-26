@@ -3,6 +3,12 @@
 ALTER TABLE public.classes
   ADD COLUMN IF NOT EXISTS kindergarten_level smallint;
 
+ALTER TABLE public.classes
+  DROP CONSTRAINT IF EXISTS classes_kindergarten_level_check;
+ALTER TABLE public.classes
+  ADD CONSTRAINT classes_kindergarten_level_check
+  CHECK (kindergarten_level IS NULL OR (grade_level = 0 AND kindergarten_level BETWEEN 1 AND 3));
+
 DO $$
 BEGIN
   IF EXISTS (
