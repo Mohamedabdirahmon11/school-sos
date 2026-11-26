@@ -6,6 +6,18 @@ const api = readFileSync(new URL('../src/server/api.ts', import.meta.url), 'utf8
 const migration = readFileSync(new URL('../supabase/migrations/20261118183000_step6_teacher_class_subject_assignments.sql', import.meta.url), 'utf8');
 const uniqueMigration = readFileSync(new URL('../supabase/migrations/20261122090000_teacher_assignment_unique_class_subject.sql', import.meta.url), 'utf8');
 
+test('Teacher assignments canonicalize same-date Term/Semester aliases and block ambiguous duplicates', () => {
+  const check = api.slice(api.indexOf('async function checkTeacherAssignment'), api.indexOf('async function upsertTeacherAssignment'));
+  const upsert = api.slice(api.indexOf('async function upsertTeacherAssignment'), api.indexOf("apiRouter.get('/teacher-assignments'"));
+  assert.match(check, /samePeriodTerms/);
+  assert.match(check, /semester\\s\*\[12\]/i);
+  assert.match(check, /termAliasIds\.includes\(String\(row\.term_id\)\)/);
+  assert.match(check, /term_alias_ids: termAliasIds/);
+  assert.match(upsert, /\.in\('term_id', payload\.term_alias_ids\)/);
+  assert.match(upsert, /logicalRows\s*\|\|\s*\[\]\.length > 1|\(logicalRows\s*\|\|\s*\[\]\)\.length > 1/);
+  assert.match(upsert, /error\.status = 409/);
+});
+
 test('Teacher assignment requires an active teacher and an active class-subject curriculum row', () => {
   const fn = api.slice(api.indexOf('async function checkTeacherAssignment'), api.indexOf("apiRouter.get('/teacher-assignments'"));
   assert.match(fn, /teacher\.data\.status\)\.toLowerCase\(\) !== 'active'/);
