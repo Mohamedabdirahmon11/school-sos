@@ -10,7 +10,9 @@ const migration = readFileSync(
 test('RLS performance migration keeps one SELECT policy per protected table and preserves role scopes', () => {
   const reportCards = migration.slice(migration.indexOf('CREATE POLICY report_cards_read'), migration.indexOf('DROP POLICY IF EXISTS report_cards_admin_insert'));
   assert.match(reportCards, /FOR SELECT TO authenticated/);
-  assert.match(reportCards, /school_admin','super_admin/);
+  assert.match(reportCards, /'school_admin'/);
+  assert.match(reportCards, /'super_admin'/);
+  assert.match(reportCards, /school_id = \(SELECT private\.auth_school_id\(\)\)/);
   assert.match(reportCards, /published_at IS NOT NULL[\s\S]*?is_stale=false[\s\S]*?parent','student[\s\S]*?auth_can_access_student\(student_id\)/);
   assert.match(migration, /DROP POLICY IF EXISTS report_cards_parent_published_read ON public\.report_cards/);
   assert.doesNotMatch(migration, /CREATE POLICY report_cards_admin_read/);
