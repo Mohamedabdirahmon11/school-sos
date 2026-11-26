@@ -1081,3 +1081,59 @@
   .school-people-students-page > header .students-admit-button { grid-column: 1 / -1; }
   .school-people-teachers-page > header .flex.flex-wrap { margin-top: 14px; }
 }
+
+/* ===== Mobile redesign: Students and Parents & Contacts (phones, <768px) ===== */
+@media (max-width: 767px) {
+  /* --- Students header: Admit first, then bulk tools, exports last as a small row --- */
+  .school-people-students-page > header .students-header-actions { display: flex !important; flex-direction: column; gap: 10px !important; }
+  .school-people-students-page > header .students-primary-actions { order: 1; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .school-people-students-page > header .students-export-actions { order: 2; display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--student-line, #e5e7eb); }
+  .school-people-students-page > header .students-admit-button { order: -1; grid-column: 1 / -1; min-height: 50px; font-size: 15px; font-weight: 700; border-radius: 14px; }
+  .school-people-students-page > header .students-import-button,
+  .school-people-students-page > header .students-pin-button { min-height: 46px; border-radius: 12px; font-size: 12px; font-weight: 650; }
+  .school-people-students-page > header .students-utility-button { min-height: 40px; padding: 6px 4px; border-radius: 10px; font-size: 11px; gap: 4px; flex-direction: column; }
+  .school-people-students-page > header h1 { font-size: 26px !important; }
+
+  /* --- Students filters: search full width, selects two per row --- */
+  .school-students-page input[type="text"],
+  .school-students-page input[type="search"] { border-radius: 14px; padding-left: 40px; }
+  .school-students-page select { border-radius: 12px; font-size: 14px !important; }
+
+  /* --- Parents & Contacts: one tidy card per guardian --- */
+  .school-people-parents-page tbody { gap: 14px; }
+  .school-people-parents-page tbody tr {
+    position: relative; padding: 0; border-radius: 18px; overflow: hidden;
+    border: 1px solid #dfe8e4; background: #fff; box-shadow: 0 4px 14px rgb(16 37 34 / 7%);
+  }
+  .school-people-parents-page tbody td::before { content: none; }
+  .school-people-parents-page tbody td { display: block !important; padding: 0 16px !important; border: 0 !important; }
+  /* number chip */
+  .school-people-parents-page tbody td:nth-child(1) {
+    position: absolute; top: 12px; right: 12px; padding: 2px 9px !important; width: auto;
+    border-radius: 999px; background: #eef4f2; color: #5d706a; font-size: 11px; font-weight: 700;
+  }
+  /* contact block */
+  .school-people-parents-page tbody td:nth-child(2) { padding: 16px 52px 12px 16px !important; background: #f2f8f6; }
+  .school-people-parents-page tbody td:nth-child(2) > span:first-child { font-size: 17px; line-height: 1.25; color: #132a29; }
+  .school-people-parents-page tbody td:nth-child(2) > span.font-mono { display: block; margin-top: 3px; font-size: 14px; color: #3d4f4a; letter-spacing: .01em; }
+  .school-people-parents-page tbody td:nth-child(2) > div { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .school-people-parents-page tbody td:nth-child(2) > div a {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px;
+    border-radius: 12px; font-size: 12px; font-weight: 700; background: #fff;
+  }
+  .school-people-parents-page tbody td:nth-child(2) > div a:last-child { background: #e6f6ee; border-color: #b7e3cb; color: #14653f; }
+  /* relationship + children */
+  .school-people-parents-page tbody td:nth-child(3) { padding-top: 12px !important; color: #0f766e; font-size: 12px; font-weight: 700; }
+  .school-people-parents-page tbody td:nth-child(4) { padding-top: 8px !important; padding-bottom: 12px !important; }
+  .school-people-parents-page tbody td:nth-child(4) > div > div { padding: 10px 12px; border-radius: 12px; background: #f6f9f8; font-size: 13px; }
+  .school-people-parents-page tbody td:nth-child(4) > div { display: grid; gap: 8px; }
+  /* account actions */
+  .school-people-parents-page tbody td:nth-child(5) {
+    display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 16px 16px !important;
+    border-top: 1px solid #e5ece9 !important; margin: 0;
+  }
+  .school-people-parents-page tbody td:nth-child(5) button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin: 0 !important;
+    min-height: 46px; padding: 8px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; flex: none;
+  }
+}
