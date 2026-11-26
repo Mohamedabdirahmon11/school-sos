@@ -65,7 +65,7 @@ VALUES ('legacy-parent','pin-school-a','parent','Legacy Parent',ARRAY['legacy-ch
 -- Re-running both migrations must be safe and must not duplicate relationship rows.
 \i supabase/migrations/20261123083200_parent_student_accounts.sql
 \i supabase/migrations/20261123090000_bulk_pin_reset_rotation.sql
-\i supabase/migrations/20261126150000_fix_student_portal_pin_login.sql
+\i supabase/migrations/20261126141321_20261126150000_fix_student_portal_pin_login.sql
 
 DO $$
 DECLARE
