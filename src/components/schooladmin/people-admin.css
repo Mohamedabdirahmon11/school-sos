@@ -1137,3 +1137,19 @@
     min-height: 46px; padding: 8px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; flex: none;
   }
 }
+
+
+/* ===== Students on phones: compact tap-to-open rows. Fees, gender and extras live in the profile. ===== */
+@media (max-width: 767px) {
+  .school-students-page .student-mobile-list { gap: 8px; padding: 8px; }
+  .school-students-page .student-mobile-card { position: relative; padding: 11px 13px !important; border-radius: 14px; }
+  .school-students-page .student-mobile-card > div:first-child button::after { content: ""; position: absolute; inset: 0; }
+  .school-students-page .student-mobile-card > div:nth-child(n+4),
+  .school-students-page .student-mobile-card .student-mobile-open { display: none !important; }
+  .school-students-page .student-mobile-card > div:nth-child(2) { margin-top: 2px; font-size: 12px; }
+  .school-students-page .student-mobile-card > div:nth-child(3) button,
+  .school-students-page .student-mobile-card > button:not(.student-mobile-open) { position: relative; z-index: 1; }
+}
+@media (max-width: 767px) {
+  .school-students-page .student-mobile-card > div:nth-child(3):not(:has(> button:only-child)) { display: none !important; }
+}

@@ -1,6 +1,6 @@
 /**
  * Role-aware mobile shortcuts plus a dedicated full-menu entry.
- * School Admin has three shortcuts and a Menu toggle for the full-screen menu.
+ * School Admin has four shortcuts and a Menu toggle for the full-screen menu.
  * Teacher quick tabs remain registry entries: { id: 't_timetable' }, { id: 't_attendance' }, { id: 't_grades' }.
  */
 import React from 'react';
@@ -32,7 +32,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
       className="schoolos-mobile-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-[#dce7e4] bg-white/95 shadow-[0_-8px_28px_rgba(15,45,40,0.10)] backdrop-blur-xl"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 6px)' }}
     >
-      <div className={`${isSchoolAdmin ? 'grid grid-cols-4 school-admin-mobile-quick-grid' : 'flex gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'} min-h-[68px] items-stretch px-2`}>
+      <div className={`${isSchoolAdmin ? 'grid grid-cols-5 school-admin-mobile-quick-grid' : 'flex gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'} min-h-[68px] items-stretch px-2`}>
         {tabs.map(route => {
           const Icon = route.icon;
           const isActive = !(isSchoolAdmin && isMenuOpen) && currentView === route.id;

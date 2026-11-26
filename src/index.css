@@ -3327,7 +3327,7 @@ main :is(.flex, .inline-flex) > * {
   background:rgba(255,255,255,.97);
   box-shadow:0 -10px 34px rgba(15,45,40,.13);
 }
-.school-admin-mobile-quick-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+.school-admin-mobile-quick-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; }
 :root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action { min-width:0; overflow:hidden; }
 :root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action[aria-current="page"] {
   background:linear-gradient(180deg,#e8f5f1 0%,#f3faf7 100%);
@@ -3437,7 +3437,7 @@ main :is(.flex, .inline-flex) > * {
   .school-admin-mobile-content img { max-width:100%; }
 }
 @media(max-width:380px) {
-  .school-admin-mobile-quick-grid { grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;padding-left:4px;padding-right:4px; }
+  .school-admin-mobile-quick-grid { grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding-left:4px;padding-right:4px; }
   .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action svg { width:18px;height:18px; }
   .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action span { font-size:9px; }
   .schoolos-mobile-bottom-nav .schoolos-mobile-menu-action { width:100%; min-width:0; }
@@ -5147,3 +5147,24 @@ main :is(.flex, .inline-flex) > * {
 :root[data-theme="dark"] .accountant-dashboard section,:root[data-theme="dark"] .accountant-dashboard .bg-white{background:#1a2420!important;border-color:#34453d!important;color:#e6efe9!important}
 :root[data-theme="dark"] .accountant-dashboard h1,:root[data-theme="dark"] .accountant-dashboard h2,:root[data-theme="dark"] .accountant-dashboard h3{color:#e6efe9!important}
 :root[data-theme="dark"] .accountant-dashboard input,:root[data-theme="dark"] .accountant-dashboard select,:root[data-theme="dark"] .accountant-dashboard textarea{background:#121a17!important;color:#e6efe9!important;border-color:#34453d!important}
+
+
+/* ===== Modern School Admin bottom bar: floating rounded bar, Menu on the left, pill-style active tab ===== */
+@media (max-width: 767px) {
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
+    left: 10px; right: 10px; bottom: 8px; width: auto; padding: 6px !important;
+    border: 1px solid #dce8e4; border-radius: 24px; background: rgba(255,255,255,.96);
+    box-shadow: 0 10px 30px rgba(15,45,40,.18); backdrop-filter: blur(14px);
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .school-admin-mobile-quick-grid { min-height: 58px; gap: 2px; padding: 0; }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action {
+    order: -1; border: 0; border-radius: 18px; background: #0f766e; color: #fff; min-height: 52px;
+  }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-menu-action span { color: #fff; }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action { border-radius: 18px; min-height: 52px; }
+  .schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-mobile-quick-action > span[aria-hidden="true"] { display: none; }
+  :root:has(.school-admin-mobile-content) .schoolos-mobile-bottom-nav .schoolos-mobile-quick-action[aria-current="page"] {
+    background: #e3f3ee; box-shadow: none; color: #0f766e;
+  }
+  .school-admin-mobile-content { padding-bottom: 96px; }
+}
