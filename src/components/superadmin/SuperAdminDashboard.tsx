@@ -63,7 +63,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
   const platformCurrency = String(data.platformCurrency || 'ETB').toUpperCase();
 
   return (
-    <div className="sa-page p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="sa-page sa-dashboard p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
       {/* Top Banner & Quick Actions */}
       <div className="sa-hero flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
