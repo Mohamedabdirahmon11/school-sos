@@ -53,9 +53,11 @@ test('Step 8 promotion workflow requires source and target academic years', () =
   assert.match(promotionView, /Target Academic Year/);
 });
 
-test('Step 8 student directory includes mobile cards and summary counts', () => {
+test('Step 8 student directory keeps the real table on mobile and summary counts', () => {
   assert.match(studentsView, /Tirada ardayda/);
-  assert.match(studentsView, /md:hidden/);
+  assert.match(studentsView, /student-mobile-list hidden/);
+  assert.match(studentsView, /block w-full overflow-x-auto/);
+  assert.match(studentsView, /role="region" aria-label="Student directory table/);
   assert.match(studentsView, /Export CSV/);
   assert.match(studentsView, /BulkImportWizard/);
   assert.match(studentsView, /handleExportExcel/);
