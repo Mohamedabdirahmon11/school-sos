@@ -191,8 +191,8 @@ export const DocumentsView: React.FC = () => {
       {message && <div role="status" className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-900"><span>{message}</span><button type="button" aria-label="Xir fariinta" onClick={()=>setMessage('')}><X size={16}/></button></div>}
       {canOpenStructuredTemplates && showStructuredTemplates && <StructuredTemplatesPanel schoolName={school?.name || 'Dugsiga'} accentColor={school?.brandColor || '#176b5b'} logoUrl={school?.logoUrl} schoolTimezone={school?.timezone} gradingScale={school?.gradingScale || []} calendar={school?.setupData?.calendar} userRole={user?.role} userId={user?.id} canManageTemplates={isAdmin} onClose={()=>setShowStructuredTemplates(false)} onCreated={async created=>{setShowStructuredTemplates(false);await loadDocuments();await openDocument(created as DocumentRow);}}/>}
 
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="min-w-0 rounded-xl border border-slate-200 bg-white p-3">
+      <div className="schoolos-documents-layout grid min-w-0 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="schoolos-documents-list min-w-0 rounded-xl border border-slate-200 bg-white p-3">
           <div className="mb-3 flex items-center gap-2"><Search size={16} className="text-slate-400"/><input aria-label="Raadi dukumentiyada" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Raadi dukumenti…" className="min-h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-2 text-sm"/></div>
           <div className="mb-3 grid grid-cols-2 gap-2"><select aria-label="Kala saar nooca" value={typeFilter} onChange={event=>setTypeFilter(event.target.value)} className="min-h-9 min-w-0 rounded-lg border border-slate-200 px-2 text-xs"><option value="all">Nooc kasta</option>{Object.entries(TYPE_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><select aria-label="Kala saar xaaladda" value={statusFilter} onChange={event=>setStatusFilter(event.target.value)} className="min-h-9 min-w-0 rounded-lg border border-slate-200 px-2 text-xs"><option value="all">Xaalad kasta</option><option value="draft">Qabyo</option><option value="final">Dhammaad</option></select></div>
           {isAdmin && <label className="mb-2 flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={includeDeleted} onChange={event=>setIncludeDeleted(event.target.checked)}/> Tus kuwa la tirtiray</label>}
@@ -206,7 +206,7 @@ export const DocumentsView: React.FC = () => {
           </div>
         </aside>
 
-        <main className="min-w-0">
+        <main className="schoolos-documents-editor min-w-0">
           {!selected ? <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center"><FileText size={42} className="mb-3 text-slate-300"/><h2 className="font-bold text-slate-700">Dooro dukumenti ama mid cusub samee</h2><p className="mt-1 max-w-md text-sm text-slate-500">Dukumentiyada waxaa loo kaydiyaa si gaar ah dugsigan.</p></div> :
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
