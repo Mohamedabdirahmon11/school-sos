@@ -168,7 +168,7 @@ export const NoticesEventsView: React.FC<{ initialTab?: 'events' | 'notices' }> 
             Academic Calendar is for dated events, terms, exams and holidays. Notice Board is for general announcements and circulars sent to selected school audiences.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="schoolos-calendar-actions flex flex-wrap items-center gap-2">
           {activeTab === 'events' && <>
             <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-500"><Search className="h-3.5 w-3.5" /><input value={eventSearch} onChange={event => setEventSearch(event.target.value)} placeholder="Search events" className="w-36 bg-transparent text-slate-800 outline-none sm:w-48" /></label>
             <button type="button" onClick={() => { const rows = events.filter(event => (event.title + ' ' + event.type).toLowerCase().includes(eventSearch.toLowerCase())); const csv = ['Event,Date,End date,Type', ...rows.map(event => [event.title,event.startDate,event.endDate || '',event.type].map(value => '"' + String(value || '').replace(/"/g, '""') + '"').join(','))].join('\n'); const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'academic-calendar.csv'; link.click(); URL.revokeObjectURL(url); }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"><Download className="h-3.5 w-3.5" />Export</button>
@@ -182,7 +182,7 @@ export const NoticesEventsView: React.FC<{ initialTab?: 'events' | 'notices' }> 
       {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-center justify-between gap-3"><span>{error}</span><button type="button" onClick={() => void fetchData()} className="shrink-0 rounded-md border border-rose-300 bg-white px-3 py-1.5 font-semibold">Retry</button></div>}
 
       {/* Tabs */}
-      <div className="flex max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-white p-1 shadow-sm">
+      <div className="schoolos-calendar-tabs flex max-w-full items-center gap-2 overflow-x-auto rounded-xl border border-[#DCE7E4] bg-white p-1 shadow-sm">
         <button
           onClick={() => setActiveTab('events')}
           className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
