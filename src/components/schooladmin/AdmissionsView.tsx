@@ -114,7 +114,7 @@ export const AdmissionsView: React.FC = () => {
       {notice && <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{notice}</div>}
       {error && <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">{error}</div>}
 
-      <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="schoolos-admissions-filterbar bg-white rounded-xl border border-[#E2E8F0] p-3 flex flex-col sm:flex-row sm:items-center gap-3">
         <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search applicant, class or parent phone…" aria-label="Search admissions" className="w-full sm:max-w-sm px-3 py-2 text-xs border rounded-lg" />
         <div className="flex flex-wrap items-center gap-1 p-1 bg-[#F1F5F9] rounded-lg text-xs">
           {['all', ...ADMISSION_STAGES.map(stage => stage.key)].map(status => <button key={status} onClick={() => setStatusFilter(status)} className={`px-3 py-1 font-medium rounded capitalize ${statusFilter === status ? 'bg-white text-[#132A29] shadow-xs font-semibold' : 'text-[#64748B]'}`}>{status === 'all' ? 'Dhammaan' : ADMISSION_STAGES.find(stage => stage.key === status)?.label}</button>)}
