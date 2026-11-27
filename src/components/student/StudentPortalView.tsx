@@ -18,7 +18,82 @@ const percentage = (v:number) => Math.round(v)+'%';
 
 function PortalError({error,retry}:{error:any;retry:()=>void}) {
  const status=Number(error?.status||error?.statusCode||0);
- if(status===423) return <div className={'student-portal-shell '+(theme==='auto'?'':'sp-theme-'+theme)} data-theme={theme}>
+ if(status===423) return <div className="sp-state sp-warning" role="alert"><CircleAlert/><div><b>Dejinta dugsiga weli ma dhammaystirna</b><p>{error?.message||'Maamulka dugsiga waa inuu dhammaystiraa dejinta ka hor inta aan xogtan la heli karin.'}</p>{Array.isArray(error?.missing||error?.data?.missing)&&(error?.missing||error?.data?.missing).length>0&&<ul>{(error?.missing||error?.data?.missing).map((item:string,index:number)=><li key={index}>{item}</li>)}</ul>}</div><button onClick={retry}>Dib u tijaabi</button></div>;
+ return <ErrorState error={error} onRetry={retry}/>;
+}
+
+export const StudentPortalView:React.FC=()=>{
+ const {user,school,t}=useAuth();
+ const [view,setView]=useState<StudentView>('home');
+ const [moreOpen,setMoreOpen]=useState(false);
+ const [theme,setTheme]=useState<'auto'|'light'|'dark'>('auto');
+ const [homeworkFilter,setHomeworkFilter]=useState<'pending'|'submitted'|'all'>('pending');
+ const [noticePage,setNoticePage]=useState(1);
+ const [messagePage,setMessagePage]=useState(1);
+ const [drafts,setDrafts]=useState<Record<string,string>>({});
+ const [submittingId,setSubmittingId]=useState<string|null>(null);
+ const [feedback,setFeedback]=useState('');
+ const [contactId,setContactId]=useState('');
+ const [messageDraft,setMessageDraft]=useState('');
+ const [sending,setSending]=useState(false);
+
+ const profileState=useApi(()=>ApiClient.getStudentProfile(),[school?.id,user?.id],Boolean(school&&user?.role==='student'));
+ const profile:any=profileState.data;
+ const student=profile?.student;
+ const studentRecord=student&&profile?{...student,classId:profile.classId}:undefined;
+ const active=Boolean(student?.id);
+ const home=view==='home';
+ const timetableState=useApi(()=>ApiClient.getTimetable(profile?.classId?{classId:profile.classId}:undefined),[school?.id,user?.id,profile?.classId],active&&(home||view==='tt'));
+ const examSchedulesState=useApi(()=>studentRecord?.classId?ApiClient.getPublishedExamSchedules(studentRecord.classId):Promise.resolve([]),[studentRecord?.classId,school?.id],active&&Boolean(studentRecord?.classId)&&(home||view==='tt'));
+ const attendanceState=useApi(()=>ApiClient.getStudentAttendance(student.id),[school?.id,student?.id],active&&(home||view==='att'));
+ const marksState=useApi(()=>ApiClient.getStudentMarks(student.id),[school?.id,student?.id],active&&(home||view==='marks'));
+ const homeworkState=useApi(()=>ApiClient.getAssignments(),[school?.id,user?.id],active&&(home||view==='hw'));
+ const noticesState=useApi(()=>ApiClient.getStudentNotices({page:noticePage,pageSize:20}),[school?.id,user?.id,noticePage],active&&(home||view==='news'));
+ const unreadState=useApi(()=>ApiClient.getNoticeUnreadCount(),[school?.id,user?.id],active);
+ const contactsState=useApi(()=>ApiClient.getMessageContacts(),[school?.id,user?.id],active&&view==='msg');
+ const contacts=Array.isArray(contactsState.data)?contactsState.data:[];
+ const contact=contacts.find((item:any)=>item.id===contactId);
+ const messagesState=useApi(()=>contactId?ApiClient.getMessages({page:messagePage,pageSize:50,contactId}):Promise.resolve([]),[school?.id,user?.id,contactId,messagePage],active&&view==='msg'&&Boolean(contactId));
+
+ useEffect(()=>{if(!contactId&&contacts.length)setContactId(contacts[0].id);else if(contactId&&!contacts.some((item:any)=>item.id===contactId))setContactId(contacts[0]?.id||'');},[contacts,contactId]);
+ useEffect(()=>{setMessagePage(1);},[contactId]);
+ useEffect(()=>{if(!moreOpen)return;const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMoreOpen(false);};window.addEventListener('keydown',closeOnEscape);return()=>window.removeEventListener('keydown',closeOnEscape);},[moreOpen]);
+ useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId).catch(()=>undefined);},[view,contactId]);
+ useEffect(()=>{const refresh=()=>{if(document.visibilityState!=='visible')return;if(view==='home'){timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();}else if(view==='tt')timetableState.retry();else if(view==='att')attendanceState.retry();else if(view==='marks')marksState.retry();else if(view==='hw')homeworkState.retry();else if(view==='news'){noticesState.retry();unreadState.retry();}else if(view==='msg')contactsState.retry();else profileState.retry();};window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};},[view,student?.id,profile?.classId]);
+
+ const timetable=Array.isArray(timetableState.data)?timetableState.data:[];
+ const publishedExamSchedules=Array.isArray(examSchedulesState.data)?examSchedulesState.data:[];
+ const attendance=Array.isArray(attendanceState.data)?attendanceState.data:[];
+ const marks=Array.isArray(marksState.data)?marksState.data.filter((m:any)=>Boolean(m.publishedAt)):[];
+ const homework=Array.isArray(homeworkState.data)?homeworkState.data:[];
+ const notices=Array.isArray(noticesState.data)?noticesState.data:Array.isArray((noticesState.data as any)?.items)?(noticesState.data as any).items:[];
+ const noticePagination=(noticesState.data as any)?.pagination||{page:noticePage,totalPages:1};
+ const messageRows=Array.isArray(messagesState.data)?messagesState.data:[];
+ const messagePagination=(messagesState.data as any)?.pagination||{page:messagePage,totalPages:1};
+ const unread=Number(unreadState.data?.count||0);
+ const pending=homework.filter((h:any)=>!h.submission).length;
+ const submitted=homework.filter((h:any)=>Boolean(h.submission)).length;
+ const today=todayLocal();
+ const month=today.slice(0,7);
+ const monthRows=attendance.filter((r:any)=>String(r.date).startsWith(month));
+ const counts=useMemo(()=>monthRows.reduce((a:any,r:any)=>{if(r.status in a)a[r.status]++;return a;},{present:0,absent:0,late:0,excused:0}),[attendance,month]);
+ const avg=marks.length?marks.reduce((s:number,m:any)=>s+Number(m.percentage||0),0)/marks.length:0;
+ const monthPresent=monthRows.filter((r:any)=>r.status==='present').length;
+ const todayDay=new Intl.DateTimeFormat('en-US',{weekday:'long',timeZone:'Africa/Addis_Ababa'}).format(new Date());
+ const todaySlots=timetable.filter((s:any)=>s.dayOfWeek===todayDay).sort((a:any,b:any)=>a.periodNumber-b.periodNumber);
+ const monthDays=new Date(Number(today.slice(0,4)),Number(today.slice(5,7)),0).getDate();
+ const firstDay=new Date(month+'-01T12:00:00').getDay();
+ const attendanceByDate=new Map(attendance.map((r:any)=>[String(r.date).slice(0,10),r.status]));
+ const visibleHomework=homework.filter((h:any)=>homeworkFilter==='all'||(homeworkFilter==='submitted'?Boolean(h.submission):!h.submission)).sort((a:any,b:any)=>String(a.dueDate).localeCompare(String(b.dueDate)));
+
+ const submitHomework=async(id:string)=>{const content=(drafts[id]||'').trim();if(!content){setFeedback('Fadlan qor jawaabta ka hor gudbinta.');return;}setSubmittingId(id);setFeedback('');try{await ApiClient.submitAssignment(id,content);setFeedback('Hawsha si guul leh ayaa loo gudbiyey.');homeworkState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Hawsha lama gudbin karin.');}finally{setSubmittingId(null);}};
+ const sendMessage=async()=>{const content=messageDraft.trim();if(!content||!contact)return;setSending(true);try{await ApiClient.sendMessage(contact.id,contact.fullName,contact.role,content);setMessageDraft('');setMessagePage(1);messagesState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Fariinta lama diri karin.');}finally{setSending(false);}};
+ const markRead=async(id:string)=>{try{await ApiClient.markNoticeRead(id);noticesState.retry();unreadState.retry();}catch(e){setFeedback(e instanceof Error?e.message:'Ogeysiiska lama calaamadin karin.');}};
+ const navButton=(item:typeof NAV[number],mobile=false)=>{const Icon=item.icon;const selected=view===item.id;const badge=item.id==='hw'?pending:item.id==='news'?unread:0;return <button key={item.id} type="button" className={'sp-nav-item '+(selected?'is-active ':'')+(mobile?'is-mobile':'')} onClick={()=>{setView(item.id);setMoreOpen(false);setFeedback('');if(item.id==='home'){timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();}else if(item.id==='tt')timetableState.retry();else if(item.id==='att')attendanceState.retry();else if(item.id==='marks')marksState.retry();else if(item.id==='hw')homeworkState.retry();else if(item.id==='news'){setNoticePage(1);noticesState.retry();unreadState.retry();}else if(item.id==='msg')contactsState.retry();else if(item.id==='me')profileState.retry();}} aria-current={selected?'page':undefined}><Icon size={18}/><span>{item.label}</span>{badge>0&&<i className="sp-badge">{badge>99?'99+':badge}</i>}</button>;};
+ const title=NAV.find(n=>n.id===view)?.label||'Hoyga';
+ if(school&&school.studentAccessEnabled===false)return <div className="sp-disabled"><CircleAlert size={42}/><h2>Student Portal waa xiran yahay</h2><p>{t('student_access_disabled')}</p></div>;
+
+ return <div className={'student-portal-shell '+(theme==='auto'?'':'sp-theme-'+theme)} data-theme={theme}>
   <header className="sp-mobile-header">
    <button type="button" className="sp-mobile-menu-button" onClick={()=>setMoreOpen(true)} aria-label="Fur menu-ga ardayga" aria-expanded={moreOpen}><Menu size={21}/></button>
    <div className="sp-mobile-brand"><span className="sp-mobile-brand-mark">{String(school?.name||'S').trim().slice(0,1).toUpperCase()}</span><span><b>SchoolOS</b><small>{school?.name||'Student Portal'}</small></span></div>
