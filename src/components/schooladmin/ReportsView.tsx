@@ -85,7 +85,7 @@ export const ReportsView: React.FC = () => {
   if (report.error) return <ErrorState error={report.error} onRetry={report.retry} />;
 
   return (
-    <div className="schoolos-operations-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
+    <div className="schoolos-reports-page schoolos-operations-page mx-auto min-w-0 w-full max-w-[1600px] space-y-6 p-5 md:p-8">
       <div className="schoolos-operation-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-[.16em] text-[#0e8078]">Insights & performance</p>
@@ -106,7 +106,7 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="schoolos-report-stats grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div hidden={user?.role === 'school_admin'} className="min-w-0 rounded-2xl border border-[#dce7e4] bg-white p-5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Total Collected</span>
@@ -163,7 +163,7 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* Export Modules Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="schoolos-report-export-grid grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Finance Export */}
         <div hidden={user?.role === 'school_admin'} className="flex min-w-0 flex-col justify-between rounded-2xl border border-[#DCE7E4] bg-white p-5 shadow-sm">
           <div className="space-y-2">
