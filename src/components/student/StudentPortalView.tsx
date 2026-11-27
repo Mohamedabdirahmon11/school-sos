@@ -26,7 +26,7 @@ export const StudentPortalView:React.FC=()=>{
  const {user,school,t}=useAuth();
  const [view,setView]=useState<StudentView>('home');
  const [moreOpen,setMoreOpen]=useState(false);
- const [theme,setTheme]=useState<'auto'|'light'|'dark'>('auto');
+ const [theme,setTheme]=useState<'auto'|'light'|'dark'>(()=>{try{const saved=window.localStorage.getItem('schoolos-student-theme');return saved==='light'||saved==='dark'||saved==='auto'?saved:'auto';}catch{return 'auto';}});
  const [homeworkFilter,setHomeworkFilter]=useState<'pending'|'submitted'|'all'>('pending');
  const [noticePage,setNoticePage]=useState(1);
  const [messagePage,setMessagePage]=useState(1);
@@ -57,6 +57,7 @@ export const StudentPortalView:React.FC=()=>{
 
  useEffect(()=>{if(!contactId&&contacts.length)setContactId(contacts[0].id);else if(contactId&&!contacts.some((item:any)=>item.id===contactId))setContactId(contacts[0]?.id||'');},[contacts,contactId]);
  useEffect(()=>{setMessagePage(1);},[contactId]);
+ useEffect(()=>{try{window.localStorage.setItem('schoolos-student-theme',theme);}catch{}},[theme]);
  useEffect(()=>{if(!moreOpen)return;const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMoreOpen(false);};window.addEventListener('keydown',closeOnEscape);return()=>window.removeEventListener('keydown',closeOnEscape);},[moreOpen]);
  useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId).catch(()=>undefined);},[view,contactId]);
  useEffect(()=>{const refresh=()=>{if(document.visibilityState!=='visible')return;if(view==='home'){timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();}else if(view==='tt')timetableState.retry();else if(view==='att')attendanceState.retry();else if(view==='marks')marksState.retry();else if(view==='hw')homeworkState.retry();else if(view==='news'){noticesState.retry();unreadState.retry();}else if(view==='msg')contactsState.retry();else profileState.retry();};window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};},[view,student?.id,profile?.classId]);
@@ -139,7 +140,7 @@ export const StudentPortalView:React.FC=()=>{
   <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}<button type="button" className={'sp-nav-item is-mobile sp-bottom-more '+(moreOpen||(['att','hw','news','msg','me'] as StudentView[]).includes(view)?'is-active':'')} onClick={()=>setMoreOpen(v=>!v)} aria-expanded={moreOpen} aria-controls="sp-student-drawer"><Menu size={19}/><span>Dheeraad</span>{unread>0&&<i className="sp-badge">{unread}</i>}</button></nav>
   {moreOpen&&<div className="sp-mobile-drawer-layer" id="sp-student-drawer">
    <button type="button" className="sp-mobile-drawer-backdrop" aria-label="Xir menu-ga" onClick={()=>setMoreOpen(false)}/>
-   <aside className="sp-mobile-drawer sp-more-sheet" role="dialog" aria-modal="true" aria-label="Qaybaha Student Portal">
+   <aside className="sp-mobile-drawer" role="dialog" aria-modal="true" aria-label="Qaybaha Student Portal">
     <div className="sp-drawer-head"><div className="sp-drawer-user"><span className="sp-avatar">{String(user?.fullName||'A').trim().slice(0,1).toUpperCase()}</span><span><b>{user?.fullName||'Arday'}</b><small>{profile?.className||'Fasalka lama qoondeyn'} · ID: {student?.studentId||user?.studentId||'—'}</small></span></div><button type="button" className="sp-drawer-close" onClick={()=>setMoreOpen(false)} aria-label="Xir menu-ga"><X size={20}/></button></div>
     <nav className="sp-drawer-nav" aria-label="Dhammaan qaybaha">{NAV.map(n=>navButton(n,true))}</nav>
     <div className="sp-drawer-foot"><b>{school?.name||'SchoolOS'}</b><small>Student Portal · Ardayga</small></div>
