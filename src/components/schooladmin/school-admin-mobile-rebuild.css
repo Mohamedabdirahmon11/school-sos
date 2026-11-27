@@ -209,3 +209,71 @@
   .school-admin-role .schoolos-people-header-actions { grid-template-columns:minmax(0,1fr)!important; }
   .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] { left:8px!important; right:8px!important; }
 }
+
+
+/* Final phone viewport alignment correction.
+   Keep the School Admin content centered in the available viewport instead of
+   inheriting any desktop sidebar offset or an oversized page wrapper. */
+@media screen and (max-width: 767px) {
+  .school-admin-role .school-admin-mobile-content {
+    display: block !important;
+    position: relative !important;
+    inset-inline: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 0% !important;
+    align-self: stretch !important;
+    margin-inline: 0 !important;
+    transform: none !important;
+    padding-inline: 0 !important;
+  }
+
+  .school-admin-role .school-admin-mobile-content > :not(.pointer-events-none) {
+    position: relative;
+    inset-inline: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .school-admin-role main .schoolos-reference-dashboard,
+  .school-admin-role main .school-people-page,
+  .school-admin-role main .schoolos-operations-page,
+  .school-admin-role main .school-admin-attendance-page,
+  .school-admin-role main .schoolos-timetable-page,
+  .school-admin-role main .academic-setup,
+  .school-admin-role main .exam-management-redesign,
+  .school-admin-role main .school-admin-settings-page {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    transform: none !important;
+    box-sizing: border-box !important;
+  }
+
+  .school-admin-role main .schoolos-reference-dashboard {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  .school-admin-role main :is(.grid, .flex, .inline-flex) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .school-admin-role main :is(.overflow-x-auto, [class*="overflow-x-scroll"]) {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
