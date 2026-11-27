@@ -571,7 +571,7 @@ export const SchoolSettingsView: React.FC<{ initialTab?: 'identity' | 'academics
           <h2 className="text-sm font-bold uppercase tracking-[0.12em] text-[#132A29]">School Settings</h2>
           <p className="mt-1 text-xs text-[#64748B]">Choose a section to manage</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="schoolos-settings-section-grid grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <section className="rounded-2xl border border-[#DCE7E4] bg-white p-3 shadow-sm">
             <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[#64748B]">School basics</h3>
             <div className="space-y-1">
