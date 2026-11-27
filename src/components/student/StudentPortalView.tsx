@@ -156,7 +156,7 @@ export const StudentPortalView:React.FC=()=>{
     <section className="sp-card"><h2>Muuqaalka</h2><div className="sp-theme-options">{(['auto','light','dark'] as const).map(v=><button key={v} className={theme===v?'is-selected':''} onClick={()=>setTheme(v)}>{v==='auto'?'Otomaatig':v==='light'?<><Sun size={16}/> Iftiin</>:<><Moon size={16}/> Mugdi</>}</button>)}</div><p className="sp-muted">Doorashada muuqaalka waxay shaqaynaysaa inta portal-ku furan yahay.</p></section>
    </div>}
   </main></div>
-  <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}<button type="button" className={'sp-nav-item is-mobile sp-bottom-more '+(moreOpen?'is-active':'')} onClick={()=>setMoreOpen(true)} aria-expanded={moreOpen} aria-controls="sp-student-drawer"><Menu size={19}/><span>Menu</span>{unread>0&&<i className="sp-badge">{unread>99?'99+':unread}</i>}</button></nav>
+  <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks','me'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}</nav>
   {moreOpen&&<div className="sp-mobile-drawer-layer" id="sp-student-drawer">
    <button type="button" className="sp-mobile-drawer-backdrop" aria-label="Xir menu-ga" onClick={()=>setMoreOpen(false)}/>
    <aside className="sp-mobile-drawer" role="dialog" aria-modal="true" aria-label="Qaybaha Student Portal">
