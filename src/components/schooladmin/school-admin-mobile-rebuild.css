@@ -571,3 +571,234 @@
   }
   .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] { left: 5px !important; right: 5px !important; }
 }
+
+
+/* Additional School Admin mobile workflow layouts: resources, parents,
+   admissions kanban, and calendar/notice navigation. */
+@media screen and (max-width: 767px) {
+  .school-admin-role .schoolos-resource-module-nav {
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    gap:8px !important;
+    width:100% !important;
+    max-width:100% !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    padding:2px 1px 8px !important;
+    scroll-snap-type:x mandatory;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  .school-admin-role .schoolos-resource-module-button {
+    flex:0 0 116px !important;
+    min-width:116px !important;
+    min-height:66px !important;
+    flex-direction:column !important;
+    justify-content:center !important;
+    gap:5px !important;
+    padding:8px 7px !important;
+    border-radius:14px !important;
+    text-align:center !important;
+    scroll-snap-align:start;
+  }
+  .school-admin-role .schoolos-resource-module-button > span:first-child {
+    width:30px !important;
+    height:30px !important;
+    border-radius:9px !important;
+  }
+  .school-admin-role .schoolos-resource-module-button > span:first-child svg {
+    width:16px !important;
+    height:16px !important;
+  }
+  .school-admin-role .schoolos-resource-module-button > span:last-child {
+    display:block !important;
+    width:100% !important;
+    min-width:0 !important;
+    text-align:center !important;
+  }
+  .school-admin-role .schoolos-resource-module-button > span:last-child > span:first-child {
+    display:block !important;
+    font-size:11px !important;
+    line-height:1.2 !important;
+  }
+  .school-admin-role .schoolos-resource-module-button > span:last-child > span:last-child {
+    display:none !important;
+  }
+  .school-admin-role .schoolos-resource-toolbar {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:stretch !important;
+    gap:10px !important;
+    padding:12px !important;
+    border:1px solid #e2eaf2 !important;
+    border-radius:15px !important;
+    background:#fff !important;
+  }
+  .school-admin-role .schoolos-resource-toolbar > label,
+  .school-admin-role .schoolos-resource-toolbar > label input {
+    width:100% !important;
+    max-width:100% !important;
+  }
+  .school-admin-role .schoolos-resource-toolbar > div {
+    display:flex !important;
+    flex-wrap:wrap !important;
+    align-items:center !important;
+    gap:7px !important;
+    width:100% !important;
+  }
+  .school-admin-role .schoolos-resource-toolbar > div label {
+    flex:1 1 130px !important;
+    min-width:0 !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:7px !important;
+  }
+  .school-admin-role .schoolos-resource-toolbar > div :is(select,button) {
+    min-width:0 !important;
+    min-height:40px !important;
+    max-width:100% !important;
+    font-size:11px !important;
+  }
+
+  .school-admin-role .schoolos-parents-filterbar {
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) !important;
+    gap:9px !important;
+    padding:12px !important;
+  }
+  .school-admin-role .schoolos-parents-filterbar > select,
+  .school-admin-role .schoolos-parents-filterbar > .relative,
+  .school-admin-role .schoolos-parents-filterbar > .relative input {
+    width:100% !important;
+    max-width:100% !important;
+    min-width:0 !important;
+  }
+  .school-admin-role .schoolos-parents-filterbar > span {
+    margin-left:0 !important;
+    justify-self:start !important;
+    font-size:11px !important;
+  }
+  .school-admin-role .schoolos-parents-directory {
+    overflow:visible !important;
+    border:0 !important;
+    background:transparent !important;
+    box-shadow:none !important;
+  }
+  .school-admin-role .schoolos-parents-directory > .overflow-x-auto {
+    overflow:visible !important;
+    border:0 !important;
+    background:transparent !important;
+  }
+  .school-admin-role .schoolos-parents-directory table {
+    min-width:0 !important;
+    width:100% !important;
+    border-collapse:separate !important;
+    border-spacing:0 10px !important;
+  }
+
+  .school-admin-role .schoolos-admissions-filterbar {
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:stretch !important;
+    gap:9px !important;
+    padding:12px !important;
+  }
+  .school-admin-role .schoolos-admissions-filterbar > input {
+    width:100% !important;
+    max-width:100% !important;
+  }
+  .school-admin-role .schoolos-admissions-filterbar > div {
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    width:100% !important;
+    max-width:100% !important;
+    overflow-x:auto !important;
+    gap:5px !important;
+    padding:5px !important;
+    scrollbar-width:none !important;
+    -webkit-overflow-scrolling:touch;
+  }
+  .school-admin-role .schoolos-admissions-filterbar > div button {
+    flex:0 0 auto !important;
+    min-height:38px !important;
+    padding:8px 11px !important;
+    white-space:nowrap !important;
+    font-size:10px !important;
+  }
+  .school-admin-role .schoolos-admissions-filterbar > span {
+    margin-left:0 !important;
+    align-self:flex-start !important;
+  }
+  .school-admin-role .school-people-admissions-page .people-admissions-board {
+    display:grid !important;
+    grid-auto-flow:column !important;
+    grid-auto-columns:minmax(0, 86%) !important;
+    grid-template-columns:none !important;
+    gap:10px !important;
+    width:100% !important;
+    overflow-x:auto !important;
+    overflow-y:visible !important;
+    padding:2px 1px 12px !important;
+    scroll-snap-type:x mandatory;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  .school-admin-role .school-people-admissions-page .people-admissions-board > section {
+    min-width:0 !important;
+    width:100% !important;
+    scroll-snap-align:start;
+  }
+  .school-admin-role .school-people-admissions-page .people-admissions-board article h3 {
+    min-width:0 !important;
+    overflow-wrap:break-word !important;
+    line-height:1.3 !important;
+  }
+
+  .school-admin-role .schoolos-calendar-actions {
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:7px !important;
+    width:100% !important;
+  }
+  .school-admin-role .schoolos-calendar-actions > label {
+    grid-column:1 / -1 !important;
+    width:100% !important;
+  }
+  .school-admin-role .schoolos-calendar-actions > label input {
+    width:100% !important;
+    min-width:0 !important;
+  }
+  .school-admin-role .schoolos-calendar-actions > button {
+    min-width:0 !important;
+    min-height:42px !important;
+    justify-content:center !important;
+    padding:8px !important;
+    font-size:11px !important;
+  }
+  .school-admin-role .schoolos-calendar-tabs {
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    gap:6px !important;
+    max-width:100% !important;
+    overflow-x:auto !important;
+    scrollbar-width:none !important;
+  }
+  .school-admin-role .schoolos-calendar-tabs > button {
+    flex:0 0 auto !important;
+    min-height:42px !important;
+    white-space:nowrap !important;
+    font-size:11px !important;
+    padding-inline:11px !important;
+  }
+}
+@media screen and (max-width: 380px) {
+  .school-admin-role .schoolos-resource-module-button {
+    flex-basis:108px !important;
+    min-width:108px !important;
+  }
+  .school-admin-role .schoolos-calendar-actions {
+    grid-template-columns:minmax(0,1fr) !important;
+  }
+}
