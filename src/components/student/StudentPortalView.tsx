@@ -65,7 +65,7 @@ export const StudentPortalView:React.FC=()=>{
 
  const timetable=Array.isArray(timetableState.data)?timetableState.data:[];
  const publishedExamSchedules=Array.isArray(examSchedulesState.data)?examSchedulesState.data:[];
- const upcomingExams=groupExamRoomSessions(publishedExamSchedules).filter(group=>String(group.sessions[0]?.examDate||'')>=today).slice(0,3);
+
  const attendance=Array.isArray(attendanceState.data)?attendanceState.data:[];
  const marks=Array.isArray(marksState.data)?marksState.data.filter((m:any)=>Boolean(m.publishedAt)):[];
  const homework=Array.isArray(homeworkState.data)?homeworkState.data:[];
@@ -77,6 +77,7 @@ export const StudentPortalView:React.FC=()=>{
  const pending=homework.filter((h:any)=>!h.submission).length;
  const submitted=homework.filter((h:any)=>Boolean(h.submission)).length;
  const today=todayLocal();
+ const upcomingExams=groupExamRoomSessions(publishedExamSchedules).filter(group=>String(group.sessions[0]?.examDate||'')>=today).slice(0,3);
  const month=today.slice(0,7);
  const monthRows=attendance.filter((r:any)=>String(r.date).startsWith(month));
  const counts=useMemo(()=>monthRows.reduce((a:any,r:any)=>{if(r.status in a)a[r.status]++;return a;},{present:0,absent:0,late:0,excused:0}),[attendance,month]);
