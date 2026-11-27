@@ -30,8 +30,9 @@ for(const width of widths) for(const theme of themes) {
    } else if(['home','hw','marks'].includes(section)) {
     await live.locator('.sp-bottom-nav > .sp-nav-item').filter({hasText:label}).click();
    } else {
-    await live.locator('.sp-more-wrap > button').click();
-    await live.locator('.sp-more-sheet .sp-nav-item').filter({hasText:label}).click();
+    await live.locator('.sp-bottom-more').click();
+    await expect(live.locator('.sp-mobile-drawer')).toBeVisible();
+    await live.locator('.sp-drawer-nav .sp-nav-item').filter({hasText:label}).click();
    }
    await expect(live.locator('.sp-main h1')).toBeVisible();
    await live.screenshot({path:path.join(folder,'schoolos',section+'.png'),fullPage:true});

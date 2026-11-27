@@ -4,7 +4,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
-import { Home, CalendarDays, CalendarCheck, ChartNoAxesColumn, BookOpen, Bell, MessageCircle, UserRound, Menu, Sun, Moon, Send, CheckCircle2, CircleAlert, ChevronRight, RefreshCw } from 'lucide-react';
+import { Home, CalendarDays, CalendarCheck, ChartNoAxesColumn, BookOpen, Bell, MessageCircle, UserRound, Menu, Sun, Moon, Send, CheckCircle2, CircleAlert, ChevronRight, RefreshCw, X } from 'lucide-react';
 import './student-portal-design.css';
 
 type StudentView = 'home' | 'tt' | 'att' | 'marks' | 'hw' | 'news' | 'msg' | 'me';
@@ -57,6 +57,7 @@ export const StudentPortalView:React.FC=()=>{
 
  useEffect(()=>{if(!contactId&&contacts.length)setContactId(contacts[0].id);else if(contactId&&!contacts.some((item:any)=>item.id===contactId))setContactId(contacts[0]?.id||'');},[contacts,contactId]);
  useEffect(()=>{setMessagePage(1);},[contactId]);
+ useEffect(()=>{if(!moreOpen)return;const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMoreOpen(false);};window.addEventListener('keydown',closeOnEscape);return()=>window.removeEventListener('keydown',closeOnEscape);},[moreOpen]);
  useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId).catch(()=>undefined);},[view,contactId]);
  useEffect(()=>{const refresh=()=>{if(document.visibilityState!=='visible')return;if(view==='home'){timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();}else if(view==='tt')timetableState.retry();else if(view==='att')attendanceState.retry();else if(view==='marks')marksState.retry();else if(view==='hw')homeworkState.retry();else if(view==='news'){noticesState.retry();unreadState.retry();}else if(view==='msg')contactsState.retry();else profileState.retry();};window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);};},[view,student?.id,profile?.classId]);
 
@@ -93,6 +94,11 @@ export const StudentPortalView:React.FC=()=>{
  if(school&&school.studentAccessEnabled===false)return <div className="sp-disabled"><CircleAlert size={42}/><h2>Student Portal waa xiran yahay</h2><p>{t('student_access_disabled')}</p></div>;
 
  return <div className={'student-portal-shell '+(theme==='auto'?'':'sp-theme-'+theme)} data-theme={theme}>
+  <header className="sp-mobile-header">
+   <button type="button" className="sp-mobile-menu-button" onClick={()=>setMoreOpen(true)} aria-label="Fur menu-ga ardayga" aria-expanded={moreOpen}><Menu size={21}/></button>
+   <div className="sp-mobile-brand"><span className="sp-mobile-brand-mark">{String(school?.name||'S').trim().slice(0,1).toUpperCase()}</span><span><b>SchoolOS</b><small>{school?.name||'Student Portal'}</small></span></div>
+   <button type="button" className="sp-mobile-refresh" onClick={()=>{profileState.retry();timetableState.retry();attendanceState.retry();marksState.retry();homeworkState.retry();noticesState.retry();unreadState.retry();contactsState.retry();}} aria-label="Cusboonaysii xogta"><RefreshCw size={18}/></button>
+  </header>
   <aside className="sp-sidebar">
    <div className="sp-brand"><div className="sp-avatar">{String(user?.fullName||'A').trim().slice(0,1).toUpperCase()}</div><div><b>{user?.fullName}</b><small>{profile?.className||'Fasalka lama qoondeyn'}</small><small>ID: {student?.studentId||user?.studentId||'—'}</small></div></div>
    <nav aria-label="Qaybaha ardayga" className="sp-side-nav">{NAV.map(n=>navButton(n))}</nav>
@@ -130,6 +136,14 @@ export const StudentPortalView:React.FC=()=>{
 
    {active&&view==='me'&&<div className="sp-profile"><section className="sp-card">{[['Magac',user?.fullName],['Aqoonsiga ardayga',student?.studentId],['Fasal',profile?.className],['Form Teacher',profile?.formTeacherName||'Lama qoondeyn'],['Sanad dugsiyeed',profile?.academicYear||school?.academicYear],['Dugsiga',school?.name]].map(([label,value])=><div className="sp-row" key={String(label)}><span className="sp-muted">{label}</span><b>{value||'—'}</b></div>)}</section><section className="sp-card"><h2>Muuqaalka</h2><div className="sp-theme-options">{(['auto','light','dark'] as const).map(v=><button key={v} className={theme===v?'is-selected':''} onClick={()=>setTheme(v)}>{v==='auto'?'Otomaatig':v==='light'?<><Sun size={16}/> Iftiin</>:<><Moon size={16}/> Mugdi</>}</button>)}</div><p className="sp-muted">Doorashada muuqaalka waxay shaqaynaysaa inta portal-ku furan yahay.</p></section></div>}
   </main></div>
-  <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','hw','marks'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}<div className="sp-more-wrap"><button type="button" className={'sp-nav-item is-mobile '+(moreOpen||(['tt','att','news','msg','me'] as StudentView[]).includes(view)?'is-active':'')} onClick={()=>setMoreOpen(v=>!v)} aria-expanded={moreOpen}><Menu size={19}/><span>Dheeraad</span>{unread>0&&<i className="sp-badge">{unread}</i>}</button>{moreOpen&&<div className="sp-more-sheet">{(['tt','att','news','msg','me'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}</div>}</div></nav>
+  <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}<button type="button" className={'sp-nav-item is-mobile sp-bottom-more '+(moreOpen||(['att','hw','news','msg','me'] as StudentView[]).includes(view)?'is-active':'')} onClick={()=>setMoreOpen(v=>!v)} aria-expanded={moreOpen} aria-controls="sp-student-drawer"><Menu size={19}/><span>Dheeraad</span>{unread>0&&<i className="sp-badge">{unread}</i>}</button></nav>
+  {moreOpen&&<div className="sp-mobile-drawer-layer" id="sp-student-drawer">
+   <button type="button" className="sp-mobile-drawer-backdrop" aria-label="Xir menu-ga" onClick={()=>setMoreOpen(false)}/>
+   <aside className="sp-mobile-drawer sp-more-sheet" role="dialog" aria-modal="true" aria-label="Qaybaha Student Portal">
+    <div className="sp-drawer-head"><div className="sp-drawer-user"><span className="sp-avatar">{String(user?.fullName||'A').trim().slice(0,1).toUpperCase()}</span><span><b>{user?.fullName||'Arday'}</b><small>{profile?.className||'Fasalka lama qoondeyn'} · ID: {student?.studentId||user?.studentId||'—'}</small></span></div><button type="button" className="sp-drawer-close" onClick={()=>setMoreOpen(false)} aria-label="Xir menu-ga"><X size={20}/></button></div>
+    <nav className="sp-drawer-nav" aria-label="Dhammaan qaybaha">{NAV.map(n=>navButton(n,true))}</nav>
+    <div className="sp-drawer-foot"><b>{school?.name||'SchoolOS'}</b><small>Student Portal · Ardayga</small></div>
+   </aside>
+  </div>}
  </div>;
 };

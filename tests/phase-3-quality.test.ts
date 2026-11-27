@@ -50,7 +50,8 @@ test('shared async states and responsive table behavior expose keyboard focus an
   assert.match(css, /:focus-visible/);
   assert.match(css, /max-width: 767px/);
   assert.match(css, /overflow-x: auto/);
-  assert.match(students, /hidden overflow-x-auto md:block/);
+  assert.match(students, /block w-full overflow-x-auto/);
+  assert.match(students, /role="region" aria-label="Student directory table/);
 });
 
 test('CSV, Excel and PDF exports reuse the active student list filters', () => {
