@@ -77,6 +77,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={isMenuOpen ? onCloseMenu : onOpenMenu}
+            aria-label={isMenuOpen ? 'Close full navigation menu' : 'Open full navigation menu'}
+            aria-expanded={isMenuOpen}
+            aria-controls="school-admin-mobile-drawer"
+            aria-haspopup="dialog"
+            className={`schoolos-schooladmin-tab schoolos-mobile-menu-action ${isMenuOpen ? 'is-active' : ''}`}
+          >
+            {isMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+            <span>{isMenuOpen ? 'Close' : 'Menu'}</span>
+          </button>
         </div>
       </nav>
     );
