@@ -28,7 +28,9 @@ export const StudentPortalView:React.FC=()=>{
  const [view,setView]=useState<StudentView>('home');
  const [moreOpen,setMoreOpen]=useState(false);
  const [selectedTimetableDay,setSelectedTimetableDay]=useState(()=>{const day=new Intl.DateTimeFormat('en-US',{weekday:'long',timeZone:'Africa/Addis_Ababa'}).format(new Date());return ['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'].includes(day)?day:'Saturday';});
- const [theme,setTheme]=useState<'auto'|'light'|'dark'>('auto');
+ const [theme,setTheme]=useState<'light'|'dark'>('light');
+ const themeOwnerKey=String(user?.id||user?.studentId||'student');
+ const [themeOwner,setThemeOwner]=useState<string|null>(null);
  const [homeworkFilter,setHomeworkFilter]=useState<'pending'|'submitted'|'all'>('pending');
  const [noticePage,setNoticePage]=useState(1);
  const [messagePage,setMessagePage]=useState(1);
@@ -58,6 +60,8 @@ export const StudentPortalView:React.FC=()=>{
  const messagesState=useApi(()=>contactId?ApiClient.getMessages({page:messagePage,pageSize:50,contactId}):Promise.resolve([]),[school?.id,user?.id,contactId,messagePage],active&&view==='msg'&&Boolean(contactId));
 
  useEffect(()=>{if(!contactId&&contacts.length)setContactId(contacts[0].id);else if(contactId&&!contacts.some((item:any)=>item.id===contactId))setContactId(contacts[0]?.id||'');},[contacts,contactId]);
+ useEffect(()=>{let saved:'light'|'dark'='light';try{const value=window.localStorage.getItem('schoolos:student-portal-theme:'+themeOwnerKey);if(value==='dark'||value==='light')saved=value;}catch{}setTheme(saved);setThemeOwner(themeOwnerKey);},[themeOwnerKey]);
+ useEffect(()=>{if(themeOwner!==themeOwnerKey)return;try{window.localStorage.setItem('schoolos:student-portal-theme:'+themeOwnerKey,theme);}catch{}},[theme,themeOwner,themeOwnerKey]);
  useEffect(()=>{setMessagePage(1);},[contactId]);
  useEffect(()=>{if(!moreOpen)return;const previousOverflow=document.body.style.overflow;document.body.style.overflow='hidden';const closeOnEscape=(event:KeyboardEvent)=>{if(event.key==='Escape')setMoreOpen(false);};window.addEventListener('keydown',closeOnEscape);return()=>{document.body.style.overflow=previousOverflow;window.removeEventListener('keydown',closeOnEscape);};},[moreOpen]);
  useEffect(()=>{if(view==='msg'&&contactId)void ApiClient.markMessagesRead(contactId).catch(()=>undefined);},[view,contactId]);
@@ -99,7 +103,7 @@ export const StudentPortalView:React.FC=()=>{
  const title=NAV.find(n=>n.id===view)?.label||'Hoyga';
  if(school&&school.studentAccessEnabled===false)return <div className="sp-disabled"><CircleAlert size={42}/><h2>Student Portal waa xiran yahay</h2><p>{t('student_access_disabled')}</p></div>;
 
- return <div className={'student-portal-shell '+(theme==='auto'?'':'sp-theme-'+theme)} data-theme={theme}>
+ return <div className={'student-portal-shell sp-theme-'+theme} data-theme={theme}>
   <header className="sp-mobile-header">
    <button type="button" className="sp-mobile-menu-button" onClick={()=>setMoreOpen(true)} aria-label="Fur menu-ga ardayga" aria-expanded={moreOpen}><Menu size={21}/></button>
    <div className="sp-mobile-brand"><span className="sp-mobile-brand-mark">{String(school?.name||'S').trim().slice(0,1).toUpperCase()}</span><span><b>SchoolOS</b><small>{school?.name||'Student Portal'}</small></span></div>
@@ -161,7 +165,7 @@ export const StudentPortalView:React.FC=()=>{
      ].filter(([,value])=>value!==undefined&&value!==null&&String(value).trim()!=='').map(([label,value])=><div className="sp-profile-detail" key={String(label)}><small>{label}</small><b>{String(value)}</b></div>)}</div></section>
      {(student?.studentPhone||student?.fatherPhone||student?.address)&&<section className="sp-card sp-profile-section"><h2><Phone size={17}/> Xiriir degdeg ah</h2><div className="sp-profile-contact">{student?.studentPhone&&<a href={'tel:'+student.studentPhone}><Phone size={16}/> Ardayga · {student.studentPhone}</a>}{student?.fatherPhone&&<a href={'tel:'+student.fatherPhone}><Phone size={16}/> Aabbaha · {student.fatherPhone}</a>}{student?.address&&<div><MapPin size={16}/>{student.address}</div>}</div></section>}
     </div>
-    <section className="sp-card"><h2>Muuqaalka</h2><div className="sp-theme-options">{(['auto','light','dark'] as const).map(v=><button key={v} className={theme===v?'is-selected':''} onClick={()=>setTheme(v)}>{v==='auto'?'Otomaatig':v==='light'?<><Sun size={16}/> Iftiin</>:<><Moon size={16}/> Mugdi</>}</button>)}</div><p className="sp-muted">Doorashada muuqaalka waxay shaqaynaysaa inta portal-ku furan yahay.</p></section>
+    <section className="sp-card"><h2>Muuqaalka</h2><div className="sp-theme-options">{(['light','dark'] as const).map(v=><button key={v} className={theme===v?'is-selected':''} onClick={()=>setTheme(v)}>{v==='light'?<><Sun size={16}/> Iftiin</>:<><Moon size={16}/> Mugdi</>}</button>)}</div><p className="sp-muted">Doorashadaada waxaa lagu kaydiyaa koontadaada; way sii jiraysaa markaad baxdo oo aad mar kale soo gasho.</p></section>
    </div>}
   </main></div>
   <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks','me'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}</nav>
