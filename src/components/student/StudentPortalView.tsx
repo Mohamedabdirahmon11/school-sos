@@ -26,7 +26,7 @@ export const StudentPortalView:React.FC=()=>{
  const {user,school,t}=useAuth();
  const [view,setView]=useState<StudentView>('home');
  const [moreOpen,setMoreOpen]=useState(false);
- const [selectedTimetableDay,setSelectedTimetableDay]=useState('Saturday');
+ const [selectedTimetableDay,setSelectedTimetableDay]=useState(()=>{const day=new Intl.DateTimeFormat('en-US',{weekday:'long',timeZone:'Africa/Addis_Ababa'}).format(new Date());return ['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday'].includes(day)?day:'Saturday';});
  const [theme,setTheme]=useState<'auto'|'light'|'dark'>('auto');
  const [homeworkFilter,setHomeworkFilter]=useState<'pending'|'submitted'|'all'>('pending');
  const [noticePage,setNoticePage]=useState(1);
@@ -120,6 +120,7 @@ export const StudentPortalView:React.FC=()=>{
      <div className="sp-card"><span className="sp-muted">Celceliska natiijooyinka</span><strong>{marksState.loading?'—':marks.length?percentage(avg):'—'}</strong><small>{marksState.error?'Natiijooyinka lama soo dejin karin':marks.length?marks.length+' maaddo oo Published ah':'Weli lama daabicin'}</small></div>
      <div className="sp-card"><span className="sp-muted">Hawlo harsan</span><strong>{homeworkState.loading||homeworkState.error?'—':pending}</strong><button className="sp-text-button" onClick={()=>{setView('hw');homeworkState.retry();}}>Fur hawlaha <ChevronRight size={14}/></button></div>
     </section>
+    <nav className="sp-quick-actions" aria-label="Degdeg u fur qaybaha">{NAV.filter(n=>['att','marks','hw','msg'].includes(n.id)).map(n=>navButton(n))}</nav>
     <section className="sp-card"><div className="sp-section-title"><h2>Jadwalka maanta</h2><button className="sp-text-button" onClick={()=>{setView('tt');timetableState.retry();}}>Jadwalka oo dhan <ChevronRight size={14}/></button></div>{timetableState.loading?<div className="sp-empty">Jadwalka waa la soo dejinayaa…</div>:timetableState.error?<PortalError error={timetableState.error} retry={timetableState.retry}/>:todayDay==='Friday'?<div className="sp-empty">Maanta waa Jimce; dugsigu waa fasax.</div>:!todaySlots.length?<div className="sp-empty">Casharro maanta lama qorin.</div>:todaySlots.map((s:any)=><div className="sp-row" key={s.id}><span><b>{s.startTime} – {s.endTime} · {s.subjectName||s.subjectId}</b><small>{s.teacherName||'Macallin'}</small></span><em>Period {s.periodNumber}</em></div>)}</section>
     <section className="sp-card"><div className="sp-section-title"><h2>Ogeysiisyadii ugu dambeeyey</h2><button className="sp-text-button" onClick={()=>{setView('news');setNoticePage(1);noticesState.retry();unreadState.retry();}}>Dhammaan <ChevronRight size={14}/></button></div>{noticesState.loading?<div className="sp-empty">Ogeysiisyada waa la soo dejinayaa…</div>:noticesState.error?<PortalError error={noticesState.error} retry={noticesState.retry}/>:notices.length?notices.slice(0,2).map((n:any)=><div className="sp-row" key={n.id}><span><b>{n.title}</b><small>{dateLabel(n.publishDate)}</small></span>{!n.isRead&&<em className="sp-new">Cusub</em>}</div>):<div className="sp-empty">Ogeysiis cusub ma jiro.</div>}</section>
    </>}
