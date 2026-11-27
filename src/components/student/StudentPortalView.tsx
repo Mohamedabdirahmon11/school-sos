@@ -139,7 +139,7 @@ export const StudentPortalView:React.FC=()=>{
   <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}<button type="button" className={'sp-nav-item is-mobile sp-bottom-more '+(moreOpen||(['att','hw','news','msg','me'] as StudentView[]).includes(view)?'is-active':'')} onClick={()=>setMoreOpen(v=>!v)} aria-expanded={moreOpen} aria-controls="sp-student-drawer"><Menu size={19}/><span>Dheeraad</span>{unread>0&&<i className="sp-badge">{unread}</i>}</button></nav>
   {moreOpen&&<div className="sp-mobile-drawer-layer" id="sp-student-drawer">
    <button type="button" className="sp-mobile-drawer-backdrop" aria-label="Xir menu-ga" onClick={()=>setMoreOpen(false)}/>
-   <aside className="sp-mobile-drawer sp-more-sheet" role="dialog" aria-modal="true" aria-label="Qaybaha Student Portal">
+   <aside className="sp-mobile-drawer" role="dialog" aria-modal="true" aria-label="Qaybaha Student Portal">
     <div className="sp-drawer-head"><div className="sp-drawer-user"><span className="sp-avatar">{String(user?.fullName||'A').trim().slice(0,1).toUpperCase()}</span><span><b>{user?.fullName||'Arday'}</b><small>{profile?.className||'Fasalka lama qoondeyn'} · ID: {student?.studentId||user?.studentId||'—'}</small></span></div><button type="button" className="sp-drawer-close" onClick={()=>setMoreOpen(false)} aria-label="Xir menu-ga"><X size={20}/></button></div>
     <nav className="sp-drawer-nav" aria-label="Dhammaan qaybaha">{NAV.map(n=>navButton(n,true))}</nav>
     <div className="sp-drawer-foot"><b>{school?.name||'SchoolOS'}</b><small>Student Portal · Ardayga</small></div>
