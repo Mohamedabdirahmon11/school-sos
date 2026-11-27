@@ -361,3 +361,119 @@
   .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] :is(.schoolos-schooladmin-tab,.schoolos-mobile-menu-action) span{font-size:8px!important}
   .school-admin-role aside#school-admin-mobile-drawer{width:min(90vw,340px)!important}
 }
+
+
+/* Module-by-module phone layouts: preserve each workflow while giving controls
+   enough room to be tapped and read without turning the page into a scaled desktop. */
+@media screen and (max-width:767px) {
+  /* Teachers: a dedicated stacked hero and clean summary rhythm. */
+  .school-admin-role main .school-people-teachers-page>header {
+    display:flex!important;flex-direction:column!important;align-items:stretch!important;
+    gap:14px!important;padding:18px!important;border-radius:20px!important;
+    box-shadow:0 12px 28px rgba(11,66,66,.12)!important;
+  }
+  .school-admin-role main .school-people-teachers-page>header>div:last-child {
+    display:flex!important;flex-wrap:wrap!important;align-items:center!important;
+    justify-content:space-between!important;gap:9px!important;width:100%!important;
+  }
+  .school-admin-role main .school-people-teachers-page>header>div:last-child button {
+    min-height:44px!important;flex:1 1 145px!important;justify-content:center!important;
+  }
+  .school-admin-role main .school-people-teachers-page>section.grid {
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important;
+  }
+  .school-admin-role main .school-people-teachers-page :is(.overflow-x-auto,table) { max-width:100%!important; }
+
+  /* Attendance: date selection and refresh are a single compact control group. */
+  .school-admin-role main .school-admin-attendance-page>div:first-child {
+    display:flex!important;flex-direction:column!important;align-items:stretch!important;
+    gap:13px!important;padding:0 0 4px!important;
+  }
+  .school-admin-role main .school-admin-attendance-page>div:first-child>div:last-child {
+    display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;
+    align-items:end!important;gap:8px!important;width:100%!important;
+    padding:12px!important;border:1px solid #e2eaf2!important;border-radius:16px!important;
+    background:#fff!important;
+  }
+  .school-admin-role main .school-admin-attendance-page>div:first-child>div:last-child label { min-width:0!important; }
+  .school-admin-role main .school-admin-attendance-page>div:first-child>div:last-child button {
+    min-height:48px!important;padding:10px 13px!important;white-space:nowrap!important;
+  }
+  .school-admin-role main .school-admin-attendance-page>div.grid { grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important; }
+  .school-admin-role main .school-admin-attendance-page>div.grid>div { min-width:0!important;padding:13px!important; }
+
+  /* Timetable: filters stack into a usable control panel; timetable itself scrolls inside. */
+  .school-admin-role main .schoolos-timetable-page>div:first-child {
+    align-items:stretch!important;gap:12px!important;
+  }
+  .school-admin-role main .schoolos-timetable-page>div:first-child>div:last-child {
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    align-items:center!important;gap:8px!important;padding:12px!important;
+    border:1px solid #e2eaf2!important;border-radius:16px!important;background:#fff!important;
+  }
+  .school-admin-role main .schoolos-timetable-page>div:first-child>div:last-child>* {
+    min-width:0!important;max-width:100%!important;
+  }
+  .school-admin-role main .schoolos-timetable-page>div:first-child>div:last-child select {
+    width:100%!important;min-width:0!important;font-size:14px!important;
+  }
+  .school-admin-role main .schoolos-timetable-page>div:first-child>div:last-child span {
+    display:flex!important;align-items:center!important;justify-content:center!important;
+    min-height:38px!important;padding:7px 8px!important;text-align:center!important;
+    white-space:normal!important;font-size:10px!important;
+  }
+
+  /* Exams and marks: workflow tabs and filters remain reachable on narrow screens. */
+  .school-admin-role[data-active-route="sch_exams"] main>div:not(.pointer-events-none) {
+    padding-inline:12px!important;
+  }
+  .school-admin-role[data-active-route="sch_exams"] main [role="group"][aria-label="Exam marks workflow"] {
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;padding:8px!important;border-radius:15px!important;
+  }
+  .school-admin-role[data-active-route="sch_exams"] main [role="group"][aria-label="Exam marks workflow"] button {
+    min-width:0!important;min-height:44px!important;padding:9px 7px!important;
+    white-space:normal!important;font-size:11px!important;line-height:1.25!important;
+  }
+  .school-admin-role main .exam-management-redesign table { min-width:760px!important; }
+  .school-admin-role main .exam-management-redesign :is(input,select) { min-width:0!important; }
+
+  /* Student directory: keep import/add/export actions visually separated. */
+  .school-admin-role main .school-people-students-page .schoolos-people-header {
+    gap:14px!important;padding:16px!important;
+  }
+  .school-admin-role main .school-people-students-page .students-header-actions {
+    display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .school-admin-role main .school-people-students-page .students-header-actions button {
+    min-width:0!important;min-height:46px!important;white-space:normal!important;
+    line-height:1.2!important;
+  }
+  .school-admin-role main .school-people-students-page .schoolos-people-filter {
+    display:flex!important;flex-direction:column!important;gap:10px!important;
+  }
+  .school-admin-role main .school-people-students-page .schoolos-people-filter :is(input,select) {
+    width:100%!important;min-width:0!important;
+  }
+
+  /* Settings: navigation and cards are stacked, never squeezed into desktop columns. */
+  .school-admin-role main .school-admin-settings-page { display:flex!important;flex-direction:column!important;gap:13px!important; }
+  .school-admin-role main .school-admin-settings-page .schoolos-operation-header { padding:16px!important; }
+  .school-admin-role main .school-admin-settings-page .schoolos-operation-header>div { min-width:0!important; }
+  .school-admin-role main .school-admin-settings-page :is(.grid,.flex) { min-width:0!important; }
+  .school-admin-role main .school-admin-settings-page .overflow-x-auto {
+    display:flex!important;flex-wrap:nowrap!important;gap:7px!important;
+    padding:5px!important;scrollbar-width:none!important;
+  }
+  .school-admin-role main .school-admin-settings-page .overflow-x-auto>* { flex:0 0 auto!important; }
+
+  /* Modal forms: two columns collapse to one predictable reading order. */
+  .school-admin-role main .fixed.inset-0[class*="bg-"] :is(.grid-cols-2,.grid-cols-3,.grid-cols-4) {
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .school-admin-role main .fixed.inset-0[class*="bg-"] :is(.flex.items-center.justify-between,.flex.justify-between) {
+    flex-wrap:wrap!important;gap:9px!important;
+  }
+  .school-admin-role main :is(button,a) { overflow-wrap:anywhere; }
+}
