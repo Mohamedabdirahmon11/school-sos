@@ -4,6 +4,7 @@ import { ApiClient } from '../../services/api.ts';
 import { useApi } from '../../hooks/useApi.ts';
 import { ErrorState } from '../common/ErrorState.tsx';
 import { ExamTimetablePrint, printExamTimetable } from '../common/ExamTimetablePrint.tsx';
+import { groupExamRoomSessions } from '../../lib/exam-timetable.ts';
 import { Home, CalendarDays, CalendarCheck, ChartNoAxesColumn, BookOpen, Bell, MessageCircle, UserRound, Users, Phone, MapPin, GraduationCap, Menu, Sun, Moon, Send, CheckCircle2, CircleAlert, ChevronRight, RefreshCw, X } from 'lucide-react';
 import './student-portal-design.css';
 
@@ -64,6 +65,7 @@ export const StudentPortalView:React.FC=()=>{
 
  const timetable=Array.isArray(timetableState.data)?timetableState.data:[];
  const publishedExamSchedules=Array.isArray(examSchedulesState.data)?examSchedulesState.data:[];
+
  const attendance=Array.isArray(attendanceState.data)?attendanceState.data:[];
  const marks=Array.isArray(marksState.data)?marksState.data.filter((m:any)=>Boolean(m.publishedAt)):[];
  const homework=Array.isArray(homeworkState.data)?homeworkState.data:[];
@@ -75,6 +77,7 @@ export const StudentPortalView:React.FC=()=>{
  const pending=homework.filter((h:any)=>!h.submission).length;
  const submitted=homework.filter((h:any)=>Boolean(h.submission)).length;
  const today=todayLocal();
+ const upcomingExams=groupExamRoomSessions(publishedExamSchedules).filter(group=>String(group.sessions[0]?.examDate||'')>=today).slice(0,3);
  const month=today.slice(0,7);
  const monthRows=attendance.filter((r:any)=>String(r.date).startsWith(month));
  const counts=useMemo(()=>monthRows.reduce((a:any,r:any)=>{if(r.status in a)a[r.status]++;return a;},{present:0,absent:0,late:0,excused:0}),[attendance,month]);
@@ -122,6 +125,7 @@ export const StudentPortalView:React.FC=()=>{
     </section>
     <nav className="sp-quick-actions" aria-label="Degdeg u fur qaybaha">{NAV.filter(n=>['att','marks','hw','msg'].includes(n.id)).map(n=>navButton(n))}</nav>
     <section className="sp-card"><div className="sp-section-title"><h2>Jadwalka maanta</h2><button className="sp-text-button" onClick={()=>{setView('tt');timetableState.retry();}}>Jadwalka oo dhan <ChevronRight size={14}/></button></div>{timetableState.loading?<div className="sp-empty">Jadwalka waa la soo dejinayaa…</div>:timetableState.error?<PortalError error={timetableState.error} retry={timetableState.retry}/>:todayDay==='Friday'?<div className="sp-empty">Maanta waa Jimce; dugsigu waa fasax.</div>:!todaySlots.length?<div className="sp-empty">Casharro maanta lama qorin.</div>:todaySlots.map((s:any)=><div className="sp-row" key={s.id}><span><b>{s.startTime} – {s.endTime} · {s.subjectName||s.subjectId}</b><small>{s.teacherName||'Macallin'}</small></span><em>Period {s.periodNumber}</em></div>)}</section>
+    <section className="sp-card"><div className="sp-section-title"><h2>Imtixaannada soo socda</h2><button className="sp-text-button" onClick={()=>{setView('tt');examSchedulesState.retry();}}>Jadwalka oo dhan <ChevronRight size={14}/></button></div>{examSchedulesState.loading?<div className="sp-empty">Jadwalka imtixaanka waa la soo dejinayaa…</div>:examSchedulesState.error?<PortalError error={examSchedulesState.error} retry={examSchedulesState.retry}/>:upcomingExams.length?upcomingExams.map(group=>{const exam=group.sessions[0];return <div className="sp-row" key={group.key}><span><b>{exam.subjectName||exam.subjectId}</b><small>{exam.examName} · {dateLabel(exam.examDate)} · {String(exam.startTime).slice(0,5)}–{String(exam.endTime).slice(0,5)}</small>{group.roomNames.length>0&&<small>Qolka: {group.roomNames.join(', ')}</small>}</span><em className="sp-new">{exam.semester}</em></div>;}):<div className="sp-empty">Ma jiro imtixaan mustaqbalka ah oo la daabacay.</div>}</section>
     <section className="sp-card"><div className="sp-section-title"><h2>Ogeysiisyadii ugu dambeeyey</h2><button className="sp-text-button" onClick={()=>{setView('news');setNoticePage(1);noticesState.retry();unreadState.retry();}}>Dhammaan <ChevronRight size={14}/></button></div>{noticesState.loading?<div className="sp-empty">Ogeysiisyada waa la soo dejinayaa…</div>:noticesState.error?<PortalError error={noticesState.error} retry={noticesState.retry}/>:notices.length?notices.slice(0,2).map((n:any)=><div className="sp-row" key={n.id}><span><b>{n.title}</b><small>{dateLabel(n.publishDate)}</small></span>{!n.isRead&&<em className="sp-new">Cusub</em>}</div>):<div className="sp-empty">Ogeysiis cusub ma jiro.</div>}</section>
    </>}
 
