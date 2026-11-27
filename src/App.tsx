@@ -76,10 +76,12 @@ const AppContent: React.FC = () => {
     void import('./components/superadmin/super-admin-mobile.css');
   }, [user?.role, inspectedSchool?.id]);
 
-  // Load the premium School Admin page system across every School Admin route.
+  // Load School Admin mobile and premium styles only for School Admin sessions.
+  // Keeping these as route-role chunks protects the initial CSS bundle budget.
   React.useEffect(() => {
     if (user?.role !== 'school_admin') return;
     void import('./components/schooladmin/school-admin-premium.css');
+    void import('./components/schooladmin/school-admin-mobile-rebuild.css');
   }, [user?.role]);
 
   React.useEffect(() => {
