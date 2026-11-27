@@ -15,9 +15,10 @@ interface HeaderProps {
   onNavigate: (view: string) => void;
   onOpenChangePassword?: () => void;
   onOpenMenu?: () => void;
+  isMobileMenuOpen?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenChangePassword, onOpenMenu }) => {
+export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenChangePassword, onOpenMenu, isMobileMenuOpen = false }) => {
   const { user, school, inspectedSchool, viewAsSchool, language, setLanguage, t, logout, isReadOnly } = useAuth();
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -116,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onOpenC
       {/* Zone 1: Contextual Breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {onOpenMenu && ['school_admin', 'super_admin'].includes(user?.role || '') && (
-          <button type="button" onClick={onOpenMenu} aria-label="Open full navigation menu" title="Menu"
+          <button type="button" onClick={onOpenMenu} aria-label="Open full navigation menu" aria-controls="school-admin-mobile-drawer" aria-expanded={isMobileMenuOpen} aria-haspopup="dialog" title="Menu"
             className="schoolos-topbar-menu grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white active:scale-90 md:hidden"
             style={{ background: 'linear-gradient(135deg, #6fd0a0 0%, #3fa8b8 60%, #6aa6cb 100%)', boxShadow: '0 6px 16px rgba(60,150,160,.40)', transition: 'transform .15s ease' }}>
             <MenuIcon aria-hidden="true" className="h-6 w-6" strokeWidth={2.2} />

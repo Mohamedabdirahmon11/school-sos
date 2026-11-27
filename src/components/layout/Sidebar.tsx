@@ -35,6 +35,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
   // A phone drawer is always expanded, even if the desktop sidebar was saved as collapsed.
   const isCompact = isCollapsed && !isOpenMobile;
   useEffect(() => {
+    if (!isOpenMobile) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const drawer = document.getElementById('school-admin-mobile-drawer');
+    document.body.style.overflow = 'hidden';
+    const getFocusable = () => drawer
+      ? Array.from(drawer.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(node => !node.hasAttribute('hidden'))
+      : [];
+    getFocusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { onCloseMobile?.(); return; }
+      if (event.key !== 'Tab') return;
+      const nodes = getFocusable();
+      if (!nodes.length) { event.preventDefault(); drawer?.focus(); return; }
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !drawer?.contains(active))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (active === last || !drawer?.contains(active))) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, [isOpenMobile]);
+
+  useEffect(() => {
     const theme = school?.sidebarTheme;
     const presets: Record<string, { background: string; text: string; accent: string }> = {
       light: { background: '#f8fafc', text: '#172033', accent: '#176b60' },
@@ -316,7 +348,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
 
   return <>
     {isOpenMobile && <button aria-label={menuText('Close navigation')} onClick={onCloseMobile} className="fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] md:hidden" />}
-    <aside style={{ background: 'var(--sidebar-background, #0f2a5c)', color: 'var(--sidebar-text, #ffffff)' }} role={isOpenMobile ? 'dialog' : undefined}
+    <aside id="school-admin-mobile-drawer" tabIndex={-1} style={{ background: 'var(--sidebar-background, #0f2a5c)', color: 'var(--sidebar-text, #ffffff)' }} role={isOpenMobile ? 'dialog' : undefined}
       aria-modal={isOpenMobile ? true : undefined}
       aria-label={isOpenMobile ? menuText('Main navigation') : undefined}
       data-mobile-open={isOpenMobile ? 'true' : 'false'}

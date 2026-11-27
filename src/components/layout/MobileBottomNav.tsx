@@ -115,6 +115,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ currentView, o
           onClick={isSchoolAdmin && isMenuOpen ? onCloseMenu : onOpenMenu}
           aria-label={isSchoolAdmin && isMenuOpen ? 'Close full navigation menu' : 'Open full navigation menu'}
           aria-expanded={isMenuOpen}
+          aria-controls="school-admin-mobile-drawer"
           aria-haspopup="dialog"
           title="Menu"
           className={`schoolos-mobile-menu-action flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl py-2 text-[#64748B] transition-colors hover:bg-[#f4f8f7] hover:text-[#132A29] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#0F766E] active:scale-[0.98] ${isSchoolAdmin ? 'w-full min-w-0 px-0.5' : 'min-w-[68px] shrink-0 px-2'}`}
