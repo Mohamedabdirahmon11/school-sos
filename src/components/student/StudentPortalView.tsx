@@ -143,7 +143,7 @@ export const StudentPortalView:React.FC=()=>{
       <div className="sp-profile-quick"><div><small>ID-ga ardayga</small><b>{student?.studentId||user?.studentId||'—'}</b></div><div><small>Fasalka</small><b>{profile?.className||'—'}{student?.section?' · '+student.section:''}</b></div></div>
      </section>
      <section className="sp-card sp-profile-section"><h2><UserRound size={17}/> Xogta shakhsiga</h2><div className="sp-profile-grid">{[
-      ['Magaca koowaad',student?.firstName],['Magaca dhexe',student?.middleName],['Magaca dambe',student?.lastName],['Jinsiga',student?.gender==='male'?'Lab':student?.gender==='female'?'Dhedig':undefined],['Taariikhda dhalashada',student?.dateOfBirth?dateLabel(student.dateOfBirth):undefined],['Telefoonka ardayga',student?.studentPhone],['Cinwaanka',student?.address],['Taariikhda gelitaanka',student?.admissionDate?dateLabel(student.admissionDate):undefined],['Roll number',student?.rollNumber]
+      ['Magaca koowaad',student?.firstName],['Magaca dhexe',student?.middleName],['Magaca dambe',student?.lastName],['Jinsiga',student?.gender==='male'?'Lab':student?.gender==='female'?'Dhedig':undefined],['Taariikhda dhalashada',student?.dateOfBirth?dateLabel(student.dateOfBirth):undefined],['Telefoonka ardayga',student?.studentPhone],['Cinwaanka',student?.address],['Taariikhda gelitaanka',student?.admissionDate?dateLabel(student.admissionDate):undefined],['Roll number',student?.rollNumber],['Kooxda dhiigga',student?.bloodGroup],['Waddada baska',student?.busRouteId]
      ].filter(([,value])=>value!==undefined&&value!==null&&String(value).trim()!=='').map(([label,value])=><div className="sp-profile-detail" key={String(label)}><small>{label}</small><b>{String(value)}</b></div>)}</div></section>
      <section className="sp-card sp-profile-section"><h2><Users size={17}/> Xogta waalidka / masuulka</h2><div className="sp-profile-grid">{[
       ['Magaca aabbaha',student?.fatherName],['Telefoonka aabbaha',student?.fatherPhone],['Telefoonka hooyada',student?.motherPhone]
@@ -156,13 +156,21 @@ export const StudentPortalView:React.FC=()=>{
     <section className="sp-card"><h2>Muuqaalka</h2><div className="sp-theme-options">{(['auto','light','dark'] as const).map(v=><button key={v} className={theme===v?'is-selected':''} onClick={()=>setTheme(v)}>{v==='auto'?'Otomaatig':v==='light'?<><Sun size={16}/> Iftiin</>:<><Moon size={16}/> Mugdi</>}</button>)}</div><p className="sp-muted">Doorashada muuqaalka waxay shaqaynaysaa inta portal-ku furan yahay.</p></section>
    </div>}
   </main></div>
-  <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks','me'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}</nav>
+  <nav className="sp-bottom-nav" aria-label="Menu hoose">{(['home','tt','marks'] as StudentView[]).map(id=>navButton(NAV.find(n=>n.id===id)!,true))}<button type="button" className={'sp-nav-item is-mobile sp-bottom-more '+(moreOpen?'is-active':'')} onClick={()=>setMoreOpen(true)} aria-expanded={moreOpen} aria-controls="sp-student-drawer"><Menu size={19}/><span>Menu</span>{unread>0&&<i className="sp-badge">{unread>99?'99+':unread}</i>}</button></nav>
   {moreOpen&&<div className="sp-mobile-drawer-layer" id="sp-student-drawer">
    <button type="button" className="sp-mobile-drawer-backdrop" aria-label="Xir menu-ga" onClick={()=>setMoreOpen(false)}/>
    <aside className="sp-mobile-drawer" role="dialog" aria-modal="true" aria-label="Qaybaha Student Portal">
-    <div className="sp-drawer-head"><div className="sp-drawer-user"><span className="sp-avatar">{String(user?.fullName||'A').trim().slice(0,1).toUpperCase()}</span><span><b>{user?.fullName||'Arday'}</b><small>{profile?.className||'Fasalka lama qoondeyn'} · ID: {student?.studentId||user?.studentId||'—'}</small></span></div><button type="button" className="sp-drawer-close" onClick={()=>setMoreOpen(false)} aria-label="Xir menu-ga"><X size={20}/></button></div>
+    <div className="sp-drawer-head">
+      <div className="sp-drawer-brand"><span className="sp-drawer-brand-mark"><GraduationCap size={22}/></span><span><b>SchoolOS</b><small>{school?.name||'Student Portal'}</small></span></div>
+      <button type="button" className="sp-drawer-close" onClick={()=>setMoreOpen(false)} aria-label="Xir menu-ga"><X size={20}/></button>
+     </div>
+     <div className="sp-drawer-profile">
+      <span className="sp-drawer-avatar">{String(student?.firstName||user?.fullName||'A').trim().slice(0,1).toUpperCase()}</span>
+      <div className="sp-drawer-profile-copy"><b>{[student?.firstName,student?.middleName,student?.lastName].filter(Boolean).join(' ')||user?.fullName||'Arday'}</b><small>{profile?.className||'Fasalka lama qoondeyn'}{student?.section?' · '+student.section:''}</small><small>ID: {student?.studentId||user?.studentId||'—'}</small></div>
+      <span className="sp-drawer-online" title="Student Portal"/></div>
+     <div className="sp-drawer-section-label">MENUGA ARDAYGA</div>
     <nav className="sp-drawer-nav" aria-label="Dhammaan qaybaha">{NAV.map(n=>navButton(n,true))}</nav>
-    <div className="sp-drawer-foot"><b>{school?.name||'SchoolOS'}</b><small>Student Portal · Ardayga</small></div>
+    <div className="sp-drawer-foot"><span className="sp-drawer-foot-mark"><GraduationCap size={15}/></span><span><b>{school?.name||'SchoolOS'}</b><small>Student Portal · Ardayga</small></span></div>
    </aside>
   </div>}
  </div>;
