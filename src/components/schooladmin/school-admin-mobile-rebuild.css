@@ -277,3 +277,45 @@
     margin-right: 0;
   }
 }
+
+
+/* Students directory: the legacy mobile card list was being re-enabled by
+   people-admin.css with display:grid!important. On phones show only the real
+   directory table; keep horizontal scrolling inside its own wrapper. */
+@media screen and (max-width: 767px) {
+  .school-admin-role .school-people-students-page .student-mobile-list {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+  .school-admin-role .school-people-students-page [aria-label="Student directory table. Scroll horizontally to view all columns."] {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .school-admin-role .school-people-students-page [aria-label="Student directory table. Scroll horizontally to view all columns."] table {
+    display: table !important;
+    min-width: 1120px !important;
+  }
+  .school-admin-role .school-people-students-page [aria-label="Student directory table. Scroll horizontally to view all columns."] thead {
+    display: table-header-group !important;
+  }
+  .school-admin-role .school-people-students-page [aria-label="Student directory table. Scroll horizontally to view all columns."] tbody {
+    display: table-row-group !important;
+  }
+  .school-admin-role .school-people-students-page [aria-label="Student directory table. Scroll horizontally to view all columns."] tr {
+    display: table-row !important;
+  }
+  .school-admin-role .school-people-students-page [aria-label="Student directory table. Scroll horizontally to view all columns."] :is(th, td) {
+    display: table-cell !important;
+    white-space: nowrap !important;
+  }
+}
