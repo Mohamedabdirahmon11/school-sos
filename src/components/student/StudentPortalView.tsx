@@ -144,6 +144,6 @@ export const StudentPortalView:React.FC=()=>{
     <nav className="sp-drawer-nav" aria-label="Dhammaan qaybaha">{NAV.map(n=>navButton(n,true))}</nav>
     <div className="sp-drawer-foot"><b>{school?.name||'SchoolOS'}</b><small>Student Portal · Ardayga</small></div>
    </aside>
-  </div>
+  </div>}
  </div>;
 };
