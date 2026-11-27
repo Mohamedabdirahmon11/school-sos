@@ -69,3 +69,40 @@
 @keyframes sp-drawer-in{from{transform:translateX(-18px);opacity:.6}to{transform:translateX(0);opacity:1}}
 @media(min-width:761px){.sp-mobile-header,.sp-mobile-drawer-layer{display:none!important}}
 @media(prefers-reduced-motion:reduce){.sp-mobile-drawer{animation:none!important}}
+
+
+/* Drawer positioning fix: do not inherit the old bottom-navigation popover rules. */
+@media(max-width:760px){
+ .sp-mobile-drawer-layer{
+  position:fixed!important;inset:0!important;z-index:1000!important;
+  display:flex!important;align-items:stretch!important;justify-content:flex-start!important;
+  width:100vw;height:100dvh;overflow:hidden;isolation:isolate;
+ }
+ .sp-mobile-drawer-backdrop{
+  position:absolute!important;inset:0!important;z-index:0!important;
+  display:block!important;width:100%!important;height:100%!important;
+  background:rgba(5,12,27,.68)!important;backdrop-filter:blur(2px);
+ }
+ .sp-mobile-drawer{
+  position:relative!important;inset:auto!important;z-index:1!important;
+  display:flex!important;flex:0 0 min(86vw,340px)!important;
+  width:min(86vw,340px)!important;max-width:calc(100vw - 44px)!important;
+  min-width:0!important;height:100dvh!important;min-height:100dvh!important;
+  max-height:none!important;margin:0!important;
+  padding:0 14px calc(14px + env(safe-area-inset-bottom,0px))!important;
+  overflow-x:hidden!important;overflow-y:auto!important;
+  overscroll-behavior:contain;background:var(--sp-card)!important;
+  color:var(--sp-ink)!important;border:0!important;
+  border-radius:0 18px 18px 0!important;box-shadow:12px 0 36px rgba(0,0,0,.28)!important;
+  transform:none!important;right:auto!important;bottom:auto!important;top:auto!important;left:auto!important;
+ }
+ .sp-drawer-nav{flex:1 0 auto;width:100%;padding:14px 0}
+ .sp-drawer-nav .sp-nav-item{width:100%;min-width:0;color:var(--sp-ink)!important}
+ .sp-drawer-head,.sp-drawer-foot{flex:none}
+}
+.student-portal-shell{background-color:var(--sp-bg);color:var(--sp-ink);color-scheme:light}
+.student-portal-shell.sp-theme-light{color-scheme:light}
+.student-portal-shell.sp-theme-dark{color-scheme:dark}
+@media(prefers-color-scheme:dark){
+ .student-portal-shell[data-theme="auto"]{color-scheme:dark}
+}
