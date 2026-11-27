@@ -69,3 +69,17 @@
 @keyframes sp-drawer-in{from{transform:translateX(-18px);opacity:.6}to{transform:translateX(0);opacity:1}}
 @media(min-width:761px){.sp-mobile-header,.sp-mobile-drawer-layer{display:none!important}}
 @media(prefers-reduced-motion:reduce){.sp-mobile-drawer{animation:none!important}}
+
+
+/* Drawer is a true viewport-level layer, independent of bottom-nav/popover styles. */
+@media(max-width:760px){
+ .student-portal-shell .sp-mobile-drawer-layer{position:fixed!important;inset:0!important;z-index:9999!important;display:flex!important;align-items:stretch!important;justify-content:flex-start!important;isolation:isolate;overflow:visible!important}
+ .student-portal-shell .sp-mobile-drawer-backdrop{position:absolute!important;inset:0!important;z-index:0!important;display:block!important;background:rgba(5,12,27,.68)!important;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+ .student-portal-shell .sp-mobile-drawer{position:relative!important;z-index:1!important;display:flex!important;flex:0 0 min(86vw,340px)!important;width:min(86vw,340px)!important;min-width:min(86vw,340px)!important;max-width:340px!important;height:100dvh!important;min-height:100%!important;max-height:none!important;margin:0!important;padding:0 15px calc(16px + env(safe-area-inset-bottom,0px))!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior:contain;background:var(--sp-card)!important;color:var(--sp-ink)!important;border:0!important;border-radius:0 20px 20px 0!important;box-shadow:12px 0 40px rgba(0,0,0,.28)!important;animation:sp-drawer-in .22s ease-out}
+ .student-portal-shell .sp-mobile-drawer .sp-nav-item{background:transparent;color:var(--sp-ink)}
+ .student-portal-shell .sp-mobile-drawer .sp-nav-item.is-active{background:var(--sp-soft);color:var(--sp-ink)}
+ .student-portal-shell .sp-mobile-drawer .sp-drawer-head{flex:none}
+ .student-portal-shell .sp-mobile-drawer .sp-drawer-nav{flex:1 0 auto}
+ .student-portal-shell.sp-theme-light{color-scheme:light}
+ .student-portal-shell.sp-theme-dark{color-scheme:dark}
+}
