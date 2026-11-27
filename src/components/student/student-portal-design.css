@@ -242,3 +242,20 @@
  .sp-quick-actions .sp-nav-item .sp-badge{position:absolute;top:3px;right:5px;margin:0;font-size:8px}
  .sp-quick-actions .sp-nav-item:active{transform:scale(.97)}
 }
+
+
+/* Attendance month navigation and clear status legend. */
+.sp-month-controls{display:flex;align-items:center;gap:6px}
+.sp-month-controls button{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--sp-line);border-radius:10px;background:var(--sp-bg);color:var(--sp-ink);cursor:pointer}
+.sp-month-controls button:disabled{opacity:.35;cursor:not-allowed}
+.sp-attendance-legend{display:flex;flex-wrap:wrap;gap:9px 14px;margin-top:13px;color:var(--sp-muted);font-size:11px}
+.sp-attendance-legend span{display:inline-flex;align-items:center;gap:6px}
+.sp-attendance-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--sp-line)}
+.sp-attendance-legend i.is-present,.sp-attendance-legend i.is-absent,.sp-attendance-legend i.is-late,.sp-attendance-legend i.is-excused{background:var(--sp-accent)}
+@media(max-width:760px){
+ .sp-attendance-heading{align-items:center!important;justify-content:space-between}
+ .sp-attendance-heading>div:first-child{display:flex;flex-direction:column;gap:3px;min-width:0}
+ .sp-attendance-heading h2{margin:0}
+ .sp-month-controls button{width:40px;height:40px;border-radius:12px}
+ .sp-attendance-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 8px;padding:11px;border:1px solid var(--sp-line);border-radius:12px;background:var(--sp-bg)}
+}
