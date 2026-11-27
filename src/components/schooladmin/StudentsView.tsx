@@ -538,7 +538,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
             <div><h2 className="font-bold text-[#102522]">Student directory</h2><p className="mt-1 text-xs text-[#71817d]">Select a student to open their full profile</p></div>
             <span className="rounded-full bg-[#e8f4f1] px-3 py-1 text-xs font-semibold text-[#0e8078]">{visibleStudents.length} shown</span>
           </div>
-          <div className="student-mobile-list divide-y divide-[#e4ece9] px-3 md:hidden">
+          <div className="student-mobile-list hidden">
             {visibleStudents.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No students found.</p> :
               visibleStudents.map((student:any) => (
                 <div key={student.id} className="student-mobile-row w-full py-3 text-left">
@@ -551,7 +551,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({ onPrintIDCard }) => 
                 </div>
               ))}
           </div>
-          <div className="hidden overflow-x-auto md:block" role="region" aria-label="Student directory table. Scroll horizontally to view all columns." tabIndex={0}>
+          <div className="block w-full overflow-x-auto" role="region" aria-label="Student directory table. Scroll horizontally to view all columns." tabIndex={0}>
             <table className="w-full min-w-[1120px] text-left text-sm">
               <thead className="border-b border-[#e6efec] bg-[#f6faf8] text-xs font-semibold uppercase tracking-wide text-[#71817d]">
                 <tr>
