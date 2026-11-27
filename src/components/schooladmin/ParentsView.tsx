@@ -165,7 +165,7 @@ export const ParentsView: React.FC = () => {
         </div>
       )}
       {resetPinError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{resetPinError}</p>}
-      <div className="bg-white p-3 rounded-xl border border-[#E2E8F0] flex flex-wrap items-center gap-3">
+      <div className="schoolos-parents-filterbar bg-white p-3 rounded-xl border border-[#E2E8F0] flex flex-wrap items-center gap-3">
         <select aria-label="Filter by class" value={classFilter} onChange={e => { setClassFilter(e.target.value); setPage(1); }}
           className="px-3 py-1.5 border border-[#CBD5E1] rounded-lg text-xs bg-white text-[#334155]">
           <option value="">All classes</option>
@@ -182,7 +182,7 @@ export const ParentsView: React.FC = () => {
         <span className="ml-auto text-xs text-slate-500">{pageInfo?.total ?? contacts.length} unique contacts</span>
       </div>
 
-      <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
+      <div className="schoolos-parents-directory bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-xs">
         {isLoading ? (
           <div className="p-8 text-center text-sm text-slate-500" role="status">Loading parent contacts…</div>
         ) : loadError ? (
