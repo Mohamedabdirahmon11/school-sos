@@ -235,3 +235,12 @@
  .sp-period-time{min-width:72px;font-size:9px}
  .sp-mark-card>strong{font-size:19px}
 }
+
+@media(max-width:760px){
+ .sp-quick-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:0 0 12px}
+ .sp-quick-actions .sp-nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;min-height:67px;padding:8px 3px;border:1px solid var(--sp-line);border-radius:13px;background:var(--sp-card);color:var(--sp-ink);box-shadow:0 3px 12px rgba(20,32,60,.035)}
+ .sp-quick-actions .sp-nav-item svg{width:19px;height:19px;color:var(--sp-warn)}
+ .sp-quick-actions .sp-nav-item span{font-size:9px;font-weight:750;line-height:1.2;text-align:center}
+ .sp-quick-actions .sp-nav-item .sp-badge{position:absolute;top:3px;right:5px;margin:0;font-size:8px}
+ .sp-quick-actions .sp-nav-item:active{transform:scale(.97)}
+}
