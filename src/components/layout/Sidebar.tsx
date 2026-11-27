@@ -64,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, isOpe
       window.removeEventListener('keydown', onKeyDown);
       if (previousFocus?.isConnected) previousFocus.focus();
     };
-  }, [isOpenMobile, onCloseMobile]);
+  }, [isOpenMobile]);
 
   useEffect(() => {
     const theme = school?.sidebarTheme;
