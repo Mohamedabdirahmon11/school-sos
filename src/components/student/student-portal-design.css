@@ -173,3 +173,65 @@
  .sp-profile-grid{align-items:stretch}
  .sp-profile-detail{display:flex;flex-direction:column;justify-content:center;min-height:62px}
 }
+
+
+/* Refined Student Portal mobile information architecture. Desktop styles are intentionally untouched. */
+.sp-timetable-mobile,.sp-marks-mobile{display:none}
+@media(max-width:760px){
+ .sp-page-head{padding:4px 1px 12px;border-bottom:1px solid var(--sp-line)}
+ .sp-page-head h1{letter-spacing:-.035em}
+ .sp-eyebrow{display:inline-flex;align-items:center;gap:6px;margin-bottom:5px}
+ .sp-eyebrow:before{content:"";width:17px;height:2px;border-radius:4px;background:var(--sp-accent)}
+ .sp-stat-grid>.sp-card{position:relative;overflow:hidden;border-radius:16px;box-shadow:0 4px 16px rgba(20,32,60,.045)}
+ .sp-stat-grid>.sp-card:after{content:"";position:absolute;right:-18px;top:-20px;width:66px;height:66px;border-radius:50%;background:var(--sp-soft);opacity:.8}
+ .sp-stat-grid>.sp-card>strong{position:relative;z-index:1;font-size:29px;letter-spacing:-.04em}
+ .sp-progress{height:6px}
+ .sp-card{box-shadow:0 3px 14px rgba(20,32,60,.035)}
+ .sp-section-title{align-items:center}
+ .sp-section-title h2{letter-spacing:-.025em}
+ .sp-row{align-items:center}
+ .sp-timetable-desktop,.sp-marks-desktop{display:none!important}
+ .sp-timetable-mobile,.sp-marks-mobile{display:block}
+ .sp-day-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:12px 0}
+ .sp-day-picker button{min-height:40px;padding:7px 4px;border:1px solid var(--sp-line);border-radius:11px;background:var(--sp-bg);color:var(--sp-muted);font-size:11px;font-weight:700}
+ .sp-day-picker button.is-selected{background:var(--sp-nav);border-color:var(--sp-nav);color:var(--sp-nav-ink);box-shadow:0 4px 10px rgba(20,32,60,.12)}
+ .sp-day-heading{display:flex;justify-content:space-between;align-items:center;margin:12px 1px 8px}
+ .sp-day-heading b{font-size:13px}.sp-day-heading small{font-size:10px;color:var(--sp-muted)}
+ .sp-period-card{display:flex;align-items:center;gap:10px;min-width:0;padding:12px 10px;margin:7px 0;border:1px solid var(--sp-line);border-radius:13px;background:var(--sp-bg)}
+ .sp-period-time{flex:none;min-width:82px;color:var(--sp-muted);font-size:10px;font-weight:800;font-variant-numeric:tabular-nums}
+ .sp-period-copy{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px}
+ .sp-period-copy b{font-size:12px;overflow-wrap:anywhere}.sp-period-copy small{font-size:10px;color:var(--sp-muted)}
+ .sp-period-number{display:grid;place-items:center;flex:none;width:27px;height:27px;border-radius:9px;background:var(--sp-soft);color:var(--sp-ink);font-size:10px;font-weight:800}
+ .sp-mark-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:13px 12px;margin:8px 0;border:1px solid var(--sp-line);border-radius:13px;background:var(--sp-bg)}
+ .sp-mark-card>div{display:flex;flex-direction:column;gap:3px;min-width:0}
+ .sp-mark-card>div b{font-size:12px;overflow-wrap:anywhere}.sp-mark-card>div small{font-size:10px;color:var(--sp-muted)}
+ .sp-mark-card>strong{font-size:21px;letter-spacing:-.03em}
+ .sp-mark-card footer{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--sp-line);font-size:10px;color:var(--sp-muted)}
+ .sp-mark-card footer em{font-style:normal;padding:3px 8px;border-radius:8px;background:var(--sp-soft);color:var(--sp-ink);font-weight:800}
+ .sp-calendar{gap:3px}
+ .sp-day,.sp-calendar>i{min-height:34px}
+ .sp-filter-tabs button{border-radius:11px}
+ .sp-homework-card{border-radius:15px}
+ .sp-news-list .sp-card{border-radius:15px}
+ .sp-mobile-drawer{box-shadow:16px 0 44px rgba(0,0,0,.3)!important}
+ .sp-drawer-nav .sp-nav-item{min-height:50px}
+ .sp-drawer-nav .sp-nav-item:focus-visible{outline-offset:-2px}
+ .sp-mobile-menu-button:active,.sp-mobile-refresh:active,.sp-nav-item.is-mobile:active{transform:scale(.96)}
+ .sp-bottom-nav{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+ .sp-bottom-nav .sp-nav-item.is-mobile{position:relative}
+ .sp-bottom-nav .sp-nav-item.is-mobile.is-active:after{content:"";position:absolute;top:3px;left:50%;width:17px;height:2px;transform:translateX(-50%);border-radius:3px;background:var(--sp-accent)}
+ .sp-profile-hero{box-shadow:0 8px 24px rgba(16,24,43,.13)}
+ .sp-profile-detail{border-radius:12px}
+ .sp-profile-contact a{min-height:44px}
+ .sp-feedback{border-radius:12px;line-height:1.5}
+ .sp-state{align-items:center}
+}
+@media(max-width:360px){
+ .sp-main{padding-left:10px;padding-right:10px}
+ .sp-stat-grid{gap:7px}
+ .sp-stat-grid>.sp-card{padding:10px}
+ .sp-day-picker{gap:4px}
+ .sp-day-picker button{font-size:10px}
+ .sp-period-time{min-width:72px;font-size:9px}
+ .sp-mark-card>strong{font-size:19px}
+}
