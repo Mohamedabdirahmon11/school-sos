@@ -618,7 +618,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
           </div>
           <span className="text-[11px] text-slate-500">Records are scoped to the active school</span>
         </div>
-        <nav aria-label="School resource modules" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <nav aria-label="School resource modules" className="schoolos-resource-module-nav grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {[
             { id: 'library', label: 'Library', detail: 'Books & lending', icon: Library },
             { id: 'transport', label: 'Transport', detail: 'Routes & students', icon: Bus },
@@ -631,7 +631,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
               type="button"
               aria-pressed={activeModule === m.id}
               onClick={() => setActiveModule(m.id as typeof activeModule)}
-              className={`flex min-h-[76px] items-center gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
+              className={`schoolos-resource-module-button flex min-h-[76px] items-center gap-3 rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
                 activeModule === m.id
                   ? 'border-teal-600 bg-teal-50 text-teal-900 shadow-sm'
                   : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
@@ -651,7 +651,7 @@ export const ExtraModulesView: React.FC<ExtraModulesViewProps> = ({ initialSubMo
         </nav>
       </section>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="schoolos-resource-toolbar flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="block w-full sm:max-w-sm">
           <span className="sr-only">Search current module</span>
           <input type="search" value={moduleSearch} onChange={event => { setModuleSearch(event.target.value); setModulePage(1); }} placeholder={`Search ${activeModule} records…`} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs" />
