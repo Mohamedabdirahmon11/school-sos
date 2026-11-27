@@ -1,0 +1,211 @@
+/* School Admin mobile-first rebuild.
+   Deliberately scoped to phones and the School Admin role; desktop, other roles,
+   print layouts, data contracts and existing actions remain unchanged. */
+@media screen and (max-width: 767px) {
+  .school-admin-role,
+  .school-admin-role #root { min-width:0; width:100%; max-width:100%; overflow-x:clip; }
+  .school-admin-role * { box-sizing:border-box; }
+  .school-admin-role main {
+    width:100%!important; min-width:0!important; max-width:100vw!important;
+    padding:12px 0 calc(104px + env(safe-area-inset-bottom,0px))!important;
+    overflow-x:clip!important; background:#f4f7f8!important;
+    -webkit-overflow-scrolling:touch;
+  }
+  .school-admin-role main > div:not(.pointer-events-none) {
+    width:100%!important; max-width:100%!important; min-width:0!important;
+    margin-inline:auto!important; padding-inline:14px!important;
+  }
+  .school-admin-role main :is(h1,.text-3xl,.text-4xl) {
+    font-size:clamp(22px,6vw,27px)!important; line-height:1.16!important;
+    letter-spacing:-.045em!important; font-weight:800!important; overflow-wrap:anywhere;
+  }
+  .school-admin-role main :is(h2,.text-2xl) { font-size:17px!important; line-height:1.25!important; letter-spacing:-.025em; }
+  .school-admin-role main :is(h3) { font-size:14px!important; line-height:1.3!important; }
+  .school-admin-role main :is(p,small,label,span) { overflow-wrap:anywhere; }
+  .school-admin-role main :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
+    width:100%; min-width:0!important; max-width:100%!important; min-height:48px!important;
+    padding:12px 13px!important; border-radius:13px!important; font-size:16px!important;
+  }
+  .school-admin-role main textarea { min-height:104px!important; }
+  .school-admin-role main :is(button,a) { touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  .school-admin-role main button[class*="rounded"] { min-height:42px; }
+  .school-admin-role main :is(.rounded-xl,.rounded-2xl,.rounded-3xl) { border-radius:17px!important; }
+  .school-admin-role main :is(.p-6,.p-8):is(.rounded-xl,.rounded-2xl,.rounded-3xl) { padding:15px!important; }
+  .school-admin-role main :is(.gap-5,.gap-6,.gap-8) { gap:12px!important; }
+  .school-admin-role main :is(.space-y-5 > :not([hidden])~:not([hidden]),.space-y-6 > :not([hidden])~:not([hidden])) { margin-top:14px!important; }
+  .school-admin-role main :is(.grid,.flex) { min-width:0; }
+  .school-admin-role main :is(.overflow-x-auto,[class*="overflow-x-scroll"]) {
+    width:100%; max-width:100%!important; overflow-x:auto!important;
+    overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin; border-radius:14px;
+  }
+  .school-admin-role main table { min-width:680px!important; font-size:12px!important; }
+  .school-admin-role main table :is(th,td) { padding:11px 10px!important; white-space:nowrap; }
+  .school-admin-role main :is(.grid-cols-3,.grid-cols-4,.grid-cols-5,.grid-cols-6,.grid-cols-7) {
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+
+  /* App chrome: a real phone drawer and a compact four-destination dock. */
+  .school-admin-role aside.school-admin-sidebar {
+    position:fixed!important; inset:0 auto 0 0!important;
+    width:min(86vw,340px)!important; max-width:340px!important;
+    height:100dvh!important; max-height:100dvh!important;
+    z-index:100!important; border-radius:0 22px 22px 0!important;
+    box-shadow:18px 0 55px rgba(13,32,48,.22)!important;
+    overflow:hidden!important;
+  }
+  .school-admin-role aside.school-admin-sidebar nav {
+    min-height:0!important; overflow-y:auto!important; overscroll-behavior:contain;
+    padding:12px 13px 18px!important;
+  }
+  .school-admin-role aside.school-admin-sidebar nav button {
+    min-height:45px!important; margin-block:3px!important; border-radius:13px!important;
+    font-size:13px!important;
+  }
+  .school-admin-role header:not(.schoolos-operation-header) {
+    min-height:58px!important; padding-inline:14px!important;
+    background:rgba(255,255,255,.96)!important; border-bottom:1px solid #e5ebef!important;
+    box-shadow:0 3px 16px rgba(20,42,55,.035);
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] {
+    position:fixed!important; display:block!important; z-index:70!important;
+    left:12px!important; right:12px!important; bottom:calc(9px + env(safe-area-inset-bottom,0px))!important;
+    width:auto!important; max-width:520px!important; height:68px!important;
+    margin-inline:auto!important; padding:5px!important; border:1px solid #e2e9ed!important;
+    border-radius:21px!important; background:rgba(255,255,255,.97)!important;
+    box-shadow:0 12px 38px rgba(22,43,57,.17)!important; backdrop-filter:blur(18px);
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] > div {
+    display:grid!important; grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    width:100%!important; height:100%!important; min-height:0!important; gap:4px!important; padding:0!important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-schooladmin-tab {
+    display:flex!important; min-width:0!important; width:100%!important; height:100%!important;
+    min-height:0!important; flex-direction:column!important; align-items:center!important;
+    justify-content:center!important; gap:4px!important; padding:5px 2px!important;
+    border:0!important; border-radius:15px!important; color:#657580!important; background:transparent!important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-schooladmin-tab.is-active {
+    color:#087f78!important; background:#e8f5f2!important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-schooladmin-tab svg {
+    width:20px!important; height:20px!important; flex:0 0 20px!important;
+  }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] .schoolos-schooladmin-tab span {
+    display:block!important; width:100%!important; font-size:10px!important; line-height:1.1!important;
+    text-align:center!important; white-space:nowrap!important; overflow:hidden!important;
+    text-overflow:ellipsis!important; font-weight:700!important;
+  }
+
+  /* Dashboard: mobile information hierarchy, not a compressed desktop grid. */
+  .school-admin-role .schoolos-reference-dashboard { display:flex!important; flex-direction:column!important; gap:14px!important; width:100%!important; min-width:0!important; }
+  .school-admin-role .schoolos-dash-welcome {
+    display:flex!important; flex-direction:column!important; align-items:stretch!important;
+    gap:16px!important; padding:20px 17px!important; border-radius:21px!important;
+    background:linear-gradient(145deg,#103b3a 0%,#087f78 70%,#159b8c 100%)!important;
+    box-shadow:0 12px 28px rgba(8,94,88,.16);
+  }
+  .school-admin-role .schoolos-dash-welcome h1 { color:#fff!important; font-size:26px!important; }
+  .school-admin-role .schoolos-dash-welcome p,.school-admin-role .schoolos-dash-kicker { color:rgba(255,255,255,.78)!important; }
+  .school-admin-role .schoolos-dash-school-line { margin-top:14px!important; padding-top:13px!important; border-top:1px solid rgba(255,255,255,.18); }
+  .school-admin-role .schoolos-dash-welcome-actions { display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:8px!important; }
+  .school-admin-role .schoolos-dash-button { display:flex!important; justify-content:center!important; min-width:0!important; min-height:46px!important; padding:10px!important; border-radius:13px!important; font-size:12px!important; }
+  .school-admin-role .schoolos-dash-stats { display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:9px!important; }
+  .school-admin-role .schoolos-dash-stat {
+    display:flex!important; min-width:0!important; min-height:116px!important; flex-direction:column!important;
+    justify-content:space-between!important; gap:8px!important; padding:13px!important;
+    border:1px solid #e4ebee!important; border-radius:17px!important; background:#fff!important;
+    box-shadow:0 4px 14px rgba(25,51,65,.045)!important; text-align:left!important;
+  }
+  .school-admin-role .schoolos-dash-stat-top { display:flex!important; align-items:center!important; justify-content:space-between!important; gap:6px!important; color:#667783!important; font-size:11px!important; line-height:1.2!important; }
+  .school-admin-role .schoolos-dash-stat strong { color:#172f3a!important; font-size:25px!important; line-height:1!important; letter-spacing:-.04em!important; }
+  .school-admin-role .schoolos-dash-stat small { color:#82909a!important; font-size:10px!important; line-height:1.25!important; }
+  .school-admin-role .schoolos-dash-grid,.school-admin-role .schoolos-dash-grid-main,.school-admin-role .schoolos-dash-grid-lower {
+    display:grid!important; grid-template-columns:minmax(0,1fr)!important; gap:12px!important;
+  }
+  .school-admin-role .schoolos-dash-panel { min-width:0!important; padding:15px!important; border:1px solid #e4ebee!important; border-radius:18px!important; background:#fff!important; box-shadow:0 4px 14px rgba(25,51,65,.04)!important; }
+  .school-admin-role .schoolos-dash-panel-head { align-items:center!important; gap:8px!important; }
+  .school-admin-role .schoolos-dash-panel-head h2 { font-size:16px!important; }
+  .school-admin-role .schoolos-dash-text-link { font-size:11px!important; white-space:nowrap; }
+  .school-admin-role .schoolos-dash-chart { gap:7px!important; min-height:150px!important; }
+  .school-admin-role .schoolos-dash-chart-day b { font-size:10px!important; }
+  .school-admin-role .schoolos-dash-list-row { min-width:0!important; gap:9px!important; padding-block:11px!important; }
+  .school-admin-role .schoolos-dash-list-copy b { font-size:12px!important; }
+  .school-admin-role .schoolos-dash-list-copy small { font-size:10px!important; }
+
+  /* People: directory actions become a tidy stack; stats and search get their own rhythm. */
+  .school-admin-role .school-people-page { width:100%!important; max-width:100%!important; padding:0!important; margin:0!important; }
+  .school-admin-role .schoolos-people-header {
+    display:flex!important; flex-direction:column!important; align-items:stretch!important; gap:13px!important;
+    padding:18px!important; border-radius:19px!important;
+  }
+  .school-admin-role .schoolos-people-header-actions,
+  .school-admin-role .students-header-actions { display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:8px!important; width:100%!important; }
+  .school-admin-role .students-export-actions,.school-admin-role .students-primary-actions { display:contents!important; }
+  .school-admin-role .schoolos-people-header-actions button,
+  .school-admin-role .schoolos-people-header-actions a { display:flex!important; justify-content:center!important; min-width:0!important; min-height:44px!important; padding:9px!important; font-size:11px!important; }
+  .school-admin-role .schoolos-people-stats { display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:9px!important; }
+  .school-admin-role .schoolos-people-stat { min-width:0!important; padding:13px!important; border-radius:16px!important; }
+  .school-admin-role .schoolos-people-filter { padding:13px!important; border-radius:17px!important; }
+  .school-admin-role .school-people-page table { min-width:760px!important; }
+  .school-admin-role .people-panel { padding:13px!important; border-radius:16px!important; }
+  .school-admin-role .school-people-admissions-page .people-admissions-board { display:grid!important; grid-template-columns:minmax(0,1fr)!important; gap:10px!important; }
+  .school-admin-role .school-people-admissions-page .people-admissions-board > section { width:100%!important; min-width:0!important; }
+
+  /* Finance, communications, reports and settings share a mobile page frame. */
+  .school-admin-role .schoolos-operations-page {
+    width:100%!important; max-width:100%!important; margin:0!important;
+    padding:0!important; background:transparent!important;
+  }
+  .school-admin-role .schoolos-operation-header {
+    display:flex!important; flex-direction:column!important; align-items:stretch!important;
+    gap:13px!important; padding:17px!important; border-radius:19px!important;
+    background:#fff!important; border:1px solid #e4ebee!important;
+  }
+  .school-admin-role .schoolos-operation-header > div { min-width:0!important; max-width:100%!important; }
+  .school-admin-role .schoolos-operation-header button { min-height:44px!important; }
+  .school-admin-role .schoolos-operation-stats,
+  .school-admin-role .schoolos-report-stats { display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:9px!important; }
+  .school-admin-role .schoolos-operations-page :is(.grid.grid-cols-4,.grid.grid-cols-3) { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+  .school-admin-role .schoolos-operations-page :is(.flex.items-center.gap-1.bg-\[\#F1F5F9\],.flex.max-w-full.items-center.gap-2.overflow-x-auto) {
+    width:100%!important; max-width:100%!important; overflow-x:auto!important; flex-wrap:nowrap!important;
+    padding:5px!important; border-radius:14px!important; scrollbar-width:none;
+  }
+  .school-admin-role .schoolos-operations-page :is(.flex.items-center.gap-1.bg-\[\#F1F5F9\],.flex.max-w-full.items-center.gap-2.overflow-x-auto) button {
+    flex:0 0 auto!important; min-height:39px!important; white-space:nowrap!important; padding-inline:12px!important;
+  }
+  .school-admin-role .schoolos-operations-page table { min-width:720px!important; }
+  .school-admin-role .schoolos-operations-page .overflow-hidden { min-width:0!important; }
+  .school-admin-role .school-admin-settings-page .grid { grid-template-columns:minmax(0,1fr)!important; }
+  .school-admin-role .school-admin-settings-page .schoolos-operation-header { gap:11px!important; }
+  .school-admin-role .school-admin-settings-page :is(.bg-white.p-6,.bg-white.p-5) { padding:14px!important; }
+  .school-admin-role .school-admin-settings-page label { display:block; min-width:0; }
+  .school-admin-role .school-admin-settings-page input[type="color"] { width:100%!important; min-height:46px!important; }
+
+  /* Academic setup and timetable use swipeable navigation, stacked controls and bounded grids. */
+  .school-admin-role .academic-setup { width:100%!important; max-width:100%!important; padding:0!important; }
+  .school-admin-role .academic-setup .wrap,.school-admin-role .academic-setup .lead { padding:14px!important; border-radius:17px!important; }
+  .school-admin-role .academic-setup .bar { overflow-x:auto!important; grid-template-columns:none!important; grid-auto-flow:column!important; grid-auto-columns:minmax(112px,1fr)!important; }
+  .school-admin-role .schoolos-timetable-page { width:100%!important; min-width:0!important; padding:0!important; }
+  .school-admin-role .schoolos-timetable-page table { min-width:820px!important; }
+  .school-admin-role .exam-management-redesign { width:100%!important; min-width:0!important; padding:0!important; }
+  .school-admin-role .exam-management-redesign :is(.grid-cols-3,.grid-cols-4,.grid-cols-5) { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+
+  /* Modals become safe-area aware bottom sheets; inner content scrolls independently. */
+  .school-admin-role main .fixed.inset-0[class*="bg-"] {
+    z-index:120!important; align-items:flex-end!important; justify-content:center!important;
+    padding:8px 8px max(8px,env(safe-area-inset-bottom,0px))!important;
+  }
+  .school-admin-role main .fixed.inset-0[class*="bg-"] > :is(div,section,form) {
+    width:100%!important; max-width:100%!important; min-width:0!important;
+    max-height:calc(100dvh - 22px)!important; overflow-y:auto!important;
+    overscroll-behavior:contain; border-radius:22px 22px 14px 14px!important;
+  }
+}
+@media screen and (max-width: 380px) {
+  .school-admin-role main > div:not(.pointer-events-none) { padding-inline:10px!important; }
+  .school-admin-role .schoolos-dash-stat { min-height:108px!important; padding:11px!important; }
+  .school-admin-role .schoolos-dash-stat strong { font-size:22px!important; }
+  .school-admin-role .schoolos-people-header-actions { grid-template-columns:minmax(0,1fr)!important; }
+  .school-admin-role nav.schoolos-mobile-bottom-nav[data-mobile-role="school_admin"] { left:8px!important; right:8px!important; }
+}
