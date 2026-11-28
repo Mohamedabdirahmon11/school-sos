@@ -1,3 +1,8 @@
+## Add to Home Screen (2026-11-28)
+
+- PARTIAL: web app manifest, placeholder icons and a service worker that caches nothing.
+- NOT DONE: install test on a real Android phone and iPhone.
+
 ## School Admin uniform phone design (2026-11-26)
 
 - PARTIAL: shared phone-only CSS for page spacing, titles, cards, buttons, headers and tables.
